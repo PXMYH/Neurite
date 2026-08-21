@@ -53,6 +53,19 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 ## Setup notes
 
 GitHub disables Issues on new forks by default; they were enabled for this fork on 2026-08-21
-(`gh api -X PATCH repos/PXMYH/Neurite -f has_issues=true`). The `wayfinder:*` labels are **not**
-created yet — `gh issue create --label` fails on an unknown label, so create one first with
-`gh label create wayfinder:map` when `/wayfinder` is first used.
+(`gh api -X PATCH repos/PXMYH/Neurite -f has_issues=true`).
+
+Every label the skills reference already exists, so `gh issue create --label` and
+`gh issue edit --add-label` never fail on an unknown label:
+
+| Label                 | Used by                       |
+| --------------------- | ----------------------------- |
+| `wayfinder:map`       | the map issue                 |
+| `wayfinder:research`  | ticket type — AFK             |
+| `wayfinder:prototype` | ticket type — HITL            |
+| `wayfinder:grilling`  | ticket type — HITL, default   |
+| `wayfinder:task`      | ticket type — HITL or AFK     |
+
+The five triage labels live in `triage-labels.md`. Adding a new label vocabulary means creating the
+labels too (`gh label create <name> --color <hex> --description "..."`) — GitHub rejects writes that
+name a label it doesn't hold.
