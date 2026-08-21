@@ -6,6 +6,10 @@
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" type="text/css" href="./resources/styles/styles.css">
     <meta charset="UTF-8">
+    <!-- Without this, mobile Safari lays the page out at 980px and scales it down.
+         Zoom is deliberately left enabled: the fractal's touch handlers are pan-only,
+         so pinch is the only way to zoom on a touch screen today. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="description" content="Fractal Graph-of-Thought. Rhizomatic Mind-Mapping for Ai-Agents, Web-Links, Notes, and Code.">
 
 
