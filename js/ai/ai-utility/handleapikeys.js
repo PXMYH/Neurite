@@ -312,7 +312,7 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
                 API_URL = 'https://api.groq.com/openai/v1/chat/completions';
                 API_KEY = Elem.byId('GROQ-api-key-input').value;
                 break;
-            case 'claude':
+            case 'anthropic':
                 alert("Claude model can only be used with the AI proxy server. Please enable the proxy server and refresh the page.");
                 return null;
             case 'ollama':
