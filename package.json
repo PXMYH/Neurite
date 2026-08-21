@@ -6,6 +6,7 @@
   "scripts": {
     "start": "vite",
     "start:host": "vite --host",
+    "test": "node --test",
     "build": "vite build",
     "postbuild": "shx cp -r js dist/js && shx cp -r resources dist/resources && shx cp -r wiki dist/wiki"
   },
