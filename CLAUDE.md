@@ -9,6 +9,8 @@ npm install
 npm start              # vite dev server on http://localhost:8080
 npm run start:host     # same, exposed on the LAN
 npm run build          # vite build -> dist/ (+ postbuild copies js/, resources/, wiki/)
+npm test               # node --test, auto-discovers test/
+node --test test/vec2.test.js   # one file (a bare directory arg is read as a module path and fails)
 ```
 
 Optional backend (proxied AI calls, web scraping, Wolfram, wiki search, file tree):
@@ -23,9 +25,23 @@ Each sub-server gets `npm install` run for it automatically on first start, exce
 (install Playwright there manually). The frontend auto-detects the gateway by polling
 `GET localhost:7070/check` (`Host.checkServer`) and flips the global `useProxy`.
 
-There is no test suite, no linter, and no typechecker. Verification is manual in the browser
-(or via the automation server's `GET localhost:8081/screenshot`, which returns a base64 PNG of a
-Playwright-driven instance). `git remote` points at the fork `PXMYH/Neurite`.
+There is no linter and no typechecker, and the test suite is deliberately thin — `node --test` with
+no runner dependency. Most verification is still manual in the browser (or via the automation
+server's `GET localhost:8081/screenshot`, which returns a base64 PNG of a Playwright-driven
+instance). `git remote` points at the fork `PXMYH/Neurite`.
+
+Nothing under `js/` exports anything, so a test cannot import it. There are two ways in, and
+`test/` has one example of each:
+
+- **Read the source as text** when the question is about the code's shape rather than its behaviour
+  (`test/provider-ids.test.js` checks that every `case` label in the provider switch names a
+  registered provider). Cheap, but it goes stale silently, so assert the parse found something
+  before comparing.
+- **Run the file in a `node:vm` context** when you want the real functions (`test/vec2.test.js`
+  loads `js/mandelbrot/mandelbrot.js` against stubbed globals). Two traps: a script's first lines
+  often touch the DOM, so the stubs have to exist before the file is parsed into existence; and a
+  top-level `class` or `let` is a lexical binding that never lands on the sandbox global, so the
+  names you want out have to be exported explicitly.
 
 ## Architecture
 
