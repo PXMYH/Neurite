@@ -156,3 +156,21 @@ These are consistent across the codebase and easy to violate by habit:
   plain x/y math.
 - Private state uses `#field`; several classes expose data via `forEach(cb, ct)` rather than returning
   arrays.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on the fork `PXMYH/Neurite`, driven through the `gh` CLI; external PRs are
+not part of the triage queue. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles use their default label strings (`needs-triage`, `needs-info`,
+`ready-for-agent`, `ready-for-human`, `wontfix`), all of which exist in the repo.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root — neither exists yet, so skills
+proceed without them. See `docs/agents/domain.md`.
