@@ -91,6 +91,29 @@ test('a selectable provider carries both of the fields determineModel reads', ()
     assert.deepEqual(incomplete, []);
 });
 
+// setModelSelectorsVisibility shows one model dropdown by matching
+// `[id^="wrapper-" + chosenProviderId.toLowerCase()]`. That is a *prefix* match
+// against a live document, so it returns the first wrapper whose id merely starts
+// with the string, not the one that equals it. Two provider ids where one
+// lowercases to a prefix of the other would therefore show the wrong dropdown,
+// silently and only for the shorter of the two.
+//
+// No pair collides today. This exists so that adding, say, `open` beside `OpenAi`
+// fails here instead of in a user's face.
+test('no lowercased provider id is a prefix of another', ()=>{
+    const lowered = Object.keys(providers()).map( (id)=> id.toLowerCase() );
+    assert.ok(lowered.length > 0, 'parsed no provider ids at all');
+
+    const collisions = lowered.flatMap( (a)=> lowered
+        .filter( (b)=> b !== a && b.startsWith(a) )
+        .map( (b)=> `"${a}" is a prefix of "${b}"` ) );
+
+    assert.deepEqual(collisions, [],
+        'The wrapper lookup in setModelSelectorsVisibility is a prefix match, so the '
+      + 'shorter id would select the longer id\'s dropdown.'
+    );
+});
+
 test('every element a provider names exists in the markup', ()=>{
     const ids = markupIds();
 

@@ -17,9 +17,13 @@ Select.selectOption = function(select, option){
     select.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 }
 
-function createSelectWithWrapper(name, wrapperName, nodeIndex) {
+// `selectId` is the id of the global dropdown this one mirrors, so the per-node id
+// is that plus the index. `wrapperName` has to be the provider id lowercased:
+// setModelSelectorsVisibility lowercases the chosen id and matches the wrapper by
+// prefix, which is the only reason the wrapper carries a name at all.
+function createSelectWithWrapper(selectId, wrapperName, nodeIndex) {
     const select = Html.make.select('model-selector custom-select ignoreSetup');
-    select.id = name + '-select-' + nodeIndex;
+    select.id = selectId + '-' + nodeIndex;
 
     const container = Html.make.div('dropdown-container');
     container.appendChild(select);
