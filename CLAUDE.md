@@ -188,5 +188,5 @@ See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root — neither exists yet, so skills
-proceed without them. See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` at the repo root is the domain glossary — read it before naming anything.
+`docs/adr/` does not exist yet. See `docs/agents/domain.md`.

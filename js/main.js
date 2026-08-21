@@ -336,3 +336,16 @@ class PageLoad {
 
 const pageLoader = new PageLoad();
 pageLoader.mainLoad();
+
+// Ask the browser not to evict this origin's storage. Safari deletes
+// script-writable storage — including the IndexedDB saved graphs live in —
+// after seven days of browser use with no interaction here. Being installed to
+// the Home Screen is the documented way to be granted this, so the answer also
+// tells us whether an install actually took: refused in a plain tab, granted
+// once installed.
+if (navigator.storage?.persist) {
+    navigator.storage.persist().then(
+        (granted)=>{ Logger.info("Persistent storage", granted ? "granted" : "refused") },
+        (err)=>{ Logger.warn("Persistent storage request failed:", err) }
+    );
+}

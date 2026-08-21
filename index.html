@@ -6,7 +6,25 @@
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" type="text/css" href="./resources/styles/styles.css">
     <meta charset="UTF-8">
+    <!-- Without this, mobile Safari lays the page out at 980px and scales it down.
+         Zoom is deliberately left enabled: the fractal's touch handlers are pan-only,
+         so pinch is the only way to zoom on a touch screen today. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="description" content="Fractal Graph-of-Thought. Rhizomatic Mind-Mapping for Ai-Agents, Web-Links, Notes, and Code.">
+
+    <!-- Home Screen install. The manifest carries name, icons and standalone display;
+         the apple-* tags cover what iOS still reads only from them. Installing matters
+         beyond the icon: a Home Screen web app gets its own storage-eviction clock,
+         which is the only documented way to keep saved graphs past 7 idle days. -->
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icons/icon-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <!-- 'black', not 'black-translucent': translucent lets the app's top panels slide
+         under the clock, and nothing here pads for the safe area yet. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Neurite">
+    <meta name="theme-color" content="#000000">
 
 
     <!--CDN imports-->
