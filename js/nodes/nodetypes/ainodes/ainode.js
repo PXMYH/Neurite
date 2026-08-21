@@ -517,18 +517,15 @@ AiNode.setupContextSpecificSliderListeners = function(node){
     // Additional specific behaviors for other sliders can be added here
 }
 
-function getSelectByName(node, name){
-    return node.content.querySelector(`#${name}-select-${node.index}`)
+function getSelectById(node, selectId){
+    return node.content.querySelector(`#${selectId}-${node.index}`)
 }
 
 AiNode.setSelects = function(node){
-    node.inferenceSelect = getSelectByName(node, "inference");
-    node.openAiSelect = getSelectByName(node, "open-ai");
-    node.anthropicSelect = getSelectByName(node, "anthropic");
-    node.groqSelect = getSelectByName(node, "groq");
-    node.localModelSelect = getSelectByName(node, "local-model");
-    node.customModelSelect = getSelectByName(node, "custom-model");
-    node.neuriteModelSelect = getSelectByName(node, "neurite-model");
+    node.inferenceSelect = getSelectById(node, 'inference-select');
+    for (const [, p] of providersWithSelect()) {
+        node[p.nodeSelectId] = getSelectById(node, p.domSelectId);
+    }
 }
 
 AiNode.setupLocalLLMDropdownListeners = function(node){
@@ -554,24 +551,32 @@ AiNode.setupCustomSelect = function(dropdown){
     On.click(dropdown.closest('.dropdown-container'), refresh);
 }
 
+// The providers that own a model dropdown, in registry order. Everything a node
+// needs in order to mirror the global dropdowns is already in `Providers`, so
+// deriving the list is what stops a new provider from having to be spelled out
+// again in each of the three functions below.
+//
+// Call this at runtime only: aihelpers.js, where `Providers` lives, loads after
+// this file, so a reference at load time would read undefined.
+function providersWithSelect(){
+    return Object.entries(Providers).filter( ([, p])=> p.nodeSelectId );
+}
+
 function createAndConfigureLocalLlmSelects(nodeIndex) {
     const className = 'local-llm-dropdown-container-' + nodeIndex
                     + ' inference-template-wrapper';
     const localLlmSelects = Html.make.div(className);
 
     localLlmSelects.append(
-        createSelectWithWrapper('inference', 'inference', nodeIndex),
-        createSelectWithWrapper('open-ai', 'openai', nodeIndex),
-        createSelectWithWrapper('anthropic', 'anthropic', nodeIndex),
-        createSelectWithWrapper('groq', 'groq', nodeIndex),
-        createSelectWithWrapper('local-model', 'ollama', nodeIndex),
-        createSelectWithWrapper('custom-model', 'custom', nodeIndex),
-        createSelectWithWrapper('neurite-model', 'neurite', nodeIndex)
+        createSelectWithWrapper('inference-select', 'inference', nodeIndex),
+        ...providersWithSelect().map(
+            ([id, p])=> createSelectWithWrapper(p.domSelectId, id.toLowerCase(), nodeIndex)
+        )
     );
     return localLlmSelects;
 }
 
-function syncOptions(sourceId, targetSelect, storageId, setValue) {
+function syncOptions(sourceId, targetSelect, setValue) {
     const sourceSelect = Elem.byId(sourceId);
     const ct = new ctSyncOptions(sourceSelect, targetSelect);
     // Remove from targetSelect options missing from sourceSelect
@@ -605,13 +610,10 @@ const ctSyncOptions = class {
 
 AiNode.refreshOptions = function(node, setValues){
     // Sync options from global dropdowns to node-specific dropdowns
-    syncOptions('inference-select', node.inferenceSelect, 'inference-select-storage', setValues);
-    syncOptions('open-ai-select', node.openAiSelect, 'open-ai-select-storage', setValues);
-    syncOptions('anthropic-select', node.anthropicSelect, 'anthropic-select-storage', setValues);
-    syncOptions('groq-select', node.groqSelect, 'groq-select-storage', setValues);
-    syncOptions('local-model-select', node.localModelSelect, 'local-model-select-storage', setValues);
-    syncOptions('custom-model-select', node.customModelSelect, 'custom-model-select-storage', setValues);
-    syncOptions('neurite-model-select', node.neuriteModelSelect, 'neurite-model-select-storage', setValues);
+    syncOptions('inference-select', node.inferenceSelect, setValues);
+    for (const [, p] of providersWithSelect()) {
+        syncOptions(p.domSelectId, node[p.nodeSelectId], setValues);
+    }
 }
 
 const allOptions = [
