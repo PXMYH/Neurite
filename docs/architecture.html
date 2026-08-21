@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neurite — Component Diagram</title>
+<style>
+  :root{
+    --bg:#0c0b14; --panel:#15132250; --line:#2c2846; --ink:#e6e3f5; --dim:#8f89b3;
+    --accent:#7c6cff; --accent2:#38d6c4; --warm:#ffb457; --pink:#ff6ec7;
+    --g-boot:#7c6cff; --g-ui:#4aa3ff; --g-zet:#38d6c4; --g-core:#ffb457;
+    --g-node:#ff8f6e; --g-store:#c58cff; --g-ai:#ff6ec7; --g-api:#ffe066;
+    --g-search:#7ee787; --g-srv:#9aa4d6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+      radial-gradient(900px 600px at 12% -10%, #1d1740 0%, transparent 60%),
+      radial-gradient(700px 500px at 95% 8%, #10233a 0%, transparent 55%),
+      var(--bg);
+    color:var(--ink);font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{padding:26px 30px 10px}
+  h1{margin:0;font-size:26px;letter-spacing:-.4px}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--dim);margin:6px 0 0;max-width:80ch}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:14px 30px 6px}
+  .bar .lbl{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.9px;margin-right:4px}
+  button{background:#1b1830;color:var(--ink);border:1px solid var(--line);border-radius:999px;
+    padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
+  button:hover{border-color:var(--accent);color:#fff}
+  button.on{background:var(--accent);border-color:var(--accent);color:#0c0b14;font-weight:600}
+  button.ghost.on{background:var(--accent2);border-color:var(--accent2)}
+  main{display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:18px;padding:10px 30px 40px;align-items:start}
+  .canvas{background:#100e1c80;border:1px solid var(--line);border-radius:14px;overflow:auto}
+  svg{display:block;width:100%;min-width:860px;height:auto}
+  .box{cursor:pointer}
+  .box rect{fill:#191630;stroke:var(--line);stroke-width:1.2;rx:8}
+  .box:hover rect{stroke:#fff}
+  .box text{fill:var(--ink);font-size:12.5px;font-weight:600;pointer-events:none}
+  .box text.f{fill:var(--dim);font-size:10.5px;font-weight:400;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .box.sel rect{stroke-width:2.4;stroke:#fff}
+  .box.dimmed{opacity:.22}
+  .grp rect{fill:none;stroke:var(--line);stroke-dasharray:4 5;rx:12}
+  .grp text{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:700}
+  .edge{fill:none;stroke:#4b4470;stroke-width:1.4}
+  .edge.dashed{stroke-dasharray:5 4}
+  .edge.dimmed{opacity:.12}
+  .edge.hot{stroke:var(--warm);stroke-width:2.6}
+  .ehead{fill:#4b4470}
+  .ehead.hot{fill:var(--warm)}
+  .ehead.dimmed{opacity:.12}
+  /* edge labels would collide with boxes in the full view — only shown on an active flow path */
+  .elbl{fill:var(--warm);font-size:10.5px}
+  .elbl.off{display:none}
+  aside{position:sticky;top:16px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .card h2{margin:0 0 4px;font-size:16px}
+  .card h3{margin:14px 0 5px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
+  .card p{margin:6px 0}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+  code{background:#00000045;padding:1px 5px;border-radius:4px;color:#cfc8ff}
+  ul{margin:6px 0;padding-left:18px}
+  li{margin:3px 0}
+  ol.steps{margin:6px 0;padding-left:20px}
+  ol.steps li{margin:6px 0}
+  ol.steps li.cur{color:#fff}
+  .tag{display:inline-block;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;
+    padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;padding:0 30px 34px;color:var(--dim);font-size:12px}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+  .facts{padding:0 30px 60px}
+  .facts h2{font-size:18px;margin:0 0 10px}
+  .facts .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .facts .card p:first-child{margin-top:0}
+  /* below this the diagram cannot sit beside the panel without scrolling — stack instead */
+  @media (max-width:1400px){main{grid-template-columns:1fr}aside{position:static}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Neurite — <span>component diagram</span></h1>
+  <p class="sub">A fractal mind-map where notes, nodes and LLM calls are the same object graph.
+  Click any component for its files and role. Pick a <em>flow</em> to trace one path through the system.
+  Everything below was read off the source at commit time — no invented boxes.</p>
+</header>
+
+<div class="bar">
+  <span class="lbl">Flow</span>
+  <button data-flow="" class="on">All components</button>
+  <button data-flow="boot">1 · Boot</button>
+  <button data-flow="notes">2 · Notes ⇄ Nodes</button>
+  <button data-flow="ai">3 · AI request</button>
+  <button data-flow="save">4 · Save / Load</button>
+  <button data-flow="search">5 · Search &amp; RAG</button>
+  <button data-flow="render">6 · Render tick</button>
+</div>
+
+<main>
+  <div class="canvas"><svg id="svg" viewBox="0 0 1000 1270" role="img" aria-label="Neurite component diagram"></svg></div>
+  <aside>
+    <div class="card" id="detail"></div>
+    <div class="card" id="flowcard" hidden></div>
+  </aside>
+</main>
+
+<div class="legend" id="legend"></div>
+
+<div class="facts">
+  <h2>Five things the diagram can’t show</h2>
+  <div class="row">
+    <div class="card">
+      <p><strong>Nothing is bundled.</strong> <code>index.html</code> has one script tag:
+      <code>js/main.js</code>. The other 81 files are fetched in order by <code>PageLoad.scripts</code>
+      as plain <code>&lt;script src&gt;</code> into one shared global scope.</p>
+      <p>A new file that isn’t in that array simply never runs. Position matters: anything touched at
+      class-body level needs its dependency loaded earlier.</p>
+    </div>
+    <div class="card">
+      <p><strong>Positions are complex numbers.</strong> Node coordinates live in the Mandelbrot plane,
+      not screen space. <code>Graph.pan</code> and <code>Graph.zoom</code> are <code>vec2</code>
+      complex values; every node’s <code>step(dt)</code> then adds a pull along
+      <code>Fractal.grad</code>, so nodes drift toward set boundaries.</p>
+    </div>
+    <div class="card">
+      <p><strong>Text and graph are one loop, gated by flags.</strong> Typing rewrites nodes; dragging a
+      node title rewrites the text. Three globals in <code>globals.js</code> —
+      <code>processAll</code>, <code>bypassZettelkasten</code>, <code>restoreZettelkastenEvent</code> —
+      are what stop that loop feeding itself.</p>
+    </div>
+    <div class="card">
+      <p><strong>Persistence is DOM-shaped.</strong> A node serializes into
+      <code>content.dataset.node_json</code>, and re-hydration replays
+      <code>dataset.node_extras</code> through <code>Node.Extensions</code>. A new widget without a
+      <code>push_extra_cb</code> entry silently vanishes on reload.</p>
+    </div>
+    <div class="card">
+      <p><strong>The backend is optional and auto-detected.</strong> The app polls
+      <code>GET localhost:7070/check</code> and flips one global, <code>useProxy</code>. That single
+      boolean re-routes every AI call from “browser holds the key” to “server holds the key”.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------- data */
+const GROUPS = [
+  /* left column: what the user types, sees and stores */
+  {id:'boot',  label:'Bootstrap',                x:16,  y:44,   w:470, cols:2, color:'--g-boot'},
+  {id:'ui',    label:'UI shell',                  x:16,  y:244,  w:470, cols:2, color:'--g-ui'},
+  {id:'zet',   label:'Zettelkasten (text side)',  x:16,  y:444,  w:470, cols:1, color:'--g-zet'},
+  {id:'store', label:'Persistence',               x:16,  y:718,  w:470, cols:2, color:'--g-store'},
+  {id:'search',label:'Search + embeddings',       x:16,  y:844,  w:470, cols:2, color:'--g-search'},
+  /* right column: the engine, the models, the optional backend */
+  {id:'core',  label:'Core: graph + geometry',    x:514, y:44,   w:470, cols:1, color:'--g-core'},
+  {id:'node',  label:'Nodes (graph side)',        x:514, y:318,  w:470, cols:2, color:'--g-node'},
+  {id:'ai',    label:'AI layer',                  x:514, y:518,  w:470, cols:2, color:'--g-ai'},
+  {id:'api',   label:'Scriptable API',            x:514, y:792,  w:470, cols:2, color:'--g-api'},
+  {id:'srv',   label:'localhost_servers (opt-in, :7070)', x:514, y:918, w:470, cols:2, color:'--g-srv'}
+];
+
+const C = [
+ /* --- bootstrap --- */
+ {id:'html', g:'boot', name:'index.html', sub:'entry + CDN libs',
+  files:['index.html'],
+  keys:['&lt;script src="js/main.js"&gt;'],
+  why:'The only hand-written script tag in the app. Also where every third-party library comes from — CodeMirror 5, Prism, marked, DOMPurify, localforage, pdf.js are CDN tags here, not npm dependencies. Vite sees this file and nothing else, which is why <code>npm run build</code> needs a postbuild copy of <code>js/</code>, <code>resources/</code> and <code>wiki/</code>.'},
+ {id:'pageload', g:'boot', name:'PageLoad', sub:'js/main.js',
+  files:['js/main.js'],
+  keys:['PageLoad.resources (5)','PageLoad.tabs (6)','PageLoad.scripts (82)','loadScript(":MODULE")'],
+  why:'The real build system. Injects HTML/SVG partials sequentially, loads tab HTML in parallel, then loads 82 scripts <strong>one at a time in a hand-maintained order</strong>. Order is a dependency graph. A <code>:MODULE</code> suffix is the only way to get <code>import</code>/<code>export</code> in a file.'},
+ {id:'globals', g:'boot', name:'globals.js', sub:'shared state + helpers',
+  files:['js/globals.js'],
+  keys:['class Stored (localforage)','settings','Tag.node / Tag.ref','Html / Svg / Elem','Host.baseUrl :7070','useProxy','processAll · bypassZettelkasten · restoreZettelkastenEvent'],
+  why:'Loaded first after main.js because nearly everything reads from it. Holds the persisted <code>settings</code> object, the user-configurable Zettelkasten tags, the DOM factories, and the three flags that gate the text⇄graph sync loop.'},
+ {id:'app', g:'boot', name:'App', sub:'js/main.js · init() order',
+  files:['js/main.js'],
+  keys:['App.init()','Host.checkServer()','nodeSimulation.start()','zetPanes.init()','signalReady()'],
+  why:'Constructed after every script has loaded. <code>init()</code> is a fixed sequence: probe the backend, init tags and body listeners, start the render loop, then AI, embeddings, recorder, interface, tabs, panes, saved views — then sets <code>window.appReady</code>.'},
+
+ /* --- ui shell --- */
+ {id:'iface', g:'ui', name:'interface.js', sub:'input + modes',
+  files:['js/interface/interface.js','js/interface/handledrop.js'],
+  keys:['On.* / Off.*','nodeMode','drag &amp; drop ingest'],
+  why:'Owns pointer, key and drop handling. Events are always registered through <code>On.click(elem, cb)</code> helpers from main.js rather than <code>addEventListener</code> (wheel/touch variants are passive).'},
+ {id:'customui', g:'ui', name:'customui/*', sub:'dropdowns, modals, sliders',
+  files:['js/interface/dropdown/customui/','js/interface/dropdown/dropdown.js'],
+  keys:['customdropdown','customsliders','custommodal','rightclick/customcontextmenu','record/record.js'],
+  why:'Hand-rolled widget set — no UI framework. Control values are wired to <code>settings</code> via <code>loadControls()</code> / <code>updateSettingsFromControls()</code> during <code>App.init()</code>.'},
+ {id:'tabs', g:'ui', name:'dropdown/tabs/*', sub:'notes · ai · data · edit',
+  files:['js/interface/dropdown/tabs/notestab.js','.../aitab.js','.../datatab.js','.../edittab.js'],
+  keys:['ZetPanes','tab HTML from resources/html/tabs/'],
+  why:'Each tab’s markup is fetched at boot and its JS wires the panel. <code>notestab.js</code> is the important one: it builds a Zettelkasten pane per tab.'},
+ {id:'filetree', g:'ui', name:'filetree.js', sub:'local FS browser',
+  files:['js/interface/filetree.js'],
+  keys:['/directaccess'],
+  why:'Browses the real filesystem through the DirectAccess server, and is the source for file-tree nodes. Dead without the backend running.'},
+
+ /* --- zettelkasten --- */
+ {id:'zetcm', g:'zet', name:'CodeMirror layer', sub:'zetcodemirror.js · zetsyntax.js',
+  files:['js/zettelkasten/zetcodemirror.js','js/zettelkasten/zetsyntax.js'],
+  keys:['class ZettelkastenUI','custom syntax mode for Tag.node / Tag.ref'],
+  why:'Wraps CodeMirror 5 with Neurite’s own note syntax highlighting and the UI affordances (click a title to focus its node). One instance per notes pane.'},
+ {id:'zetproc', g:'zet', name:'ZettelkastenProcessor', sub:'the sync engine',
+  files:['js/zettelkasten/zettelkasten.js'],
+  keys:['processInput()','NodeWrap · wrapPerTitle · wrapPerLine','onTitleInput / onNodeBodyInput','handleRefTags()','deleteInactiveNodesFromDict()','renameNode()'],
+  why:'Bi-directional. Text → graph: on every CodeMirror change it walks lines, opens a node section at <code>Tag.node</code> (<code>##</code>), declares edges at <code>Tag.ref</code> (<code>[[</code>), makes an AI node at <code>LLM_TAG</code> (<code>AI:</code>). Graph → text: rewrites just that node’s range. Any wrap not marked <em>live</em> during a pass gets its node deleted.'},
+ {id:'zetaux', g:'zet', name:'panes · path · splitter', sub:'placement + layout',
+  files:['js/zettelkasten/zetplacementstrategy.js','js/zettelkasten/zetpath.js','js/zettelkasten/zetsplitter.js'],
+  keys:['window.codeMirrorInstances','window.zettelkastenParsers','window.zettelkastenUIs','window.zettelkastenProcessors'],
+  why:'Placement strategy decides where a newly parsed node lands in the plane. The four parallel <code>window.*</code> arrays are the pane registry — index <em>i</em> in each belongs to the same pane.'},
+
+ /* --- core --- */
+ {id:'graph', g:'core', name:'Graph', sub:'js/nodes/nodeutilities.js',
+  files:['js/nodes/nodeutilities.js'],
+  keys:['nodes{} · edges{} · nodeViews{}','pan · zoom · rotation (vec2)','xyToZ() · vecToZ()','forEachNode(cb, ct)','SelectedNodes'],
+  why:'The single source of truth for what exists. <code>pan</code> and <code>zoom</code> are complex numbers, so panning is complex addition and zooming is complex multiplication — rotation comes free.'},
+ {id:'fractal', g:'core', name:'Fractal + vec2', sub:'js/mandelbrot/',
+  files:['js/mandelbrot/mandelbrot.js','js/mandelbrot/updatefractal.js'],
+  keys:['class vec2 (cmult, cadd, rot, mag2)','Fractal.grad','Fractal.render_hair','fromZtoUV'],
+  why:'Not a background image — it is the coordinate system. <code>vec2</code> is complex arithmetic; all geometry in the app goes through it. <code>Fractal.grad</code> is the force field that nudges nodes.'},
+ {id:'sim', g:'core', name:'NodeSimulation', sub:'nodestep.js · one rAF loop',
+  files:['js/nodes/nodeinteraction/nodestep.js'],
+  keys:['nodeStep()','settings.framesDelay','regenDebt'],
+  why:'The app has exactly one <code>requestAnimationFrame</code> loop, in this order: autopilot → SVG viewbox → mouse orbit → FPS → nodes → edges → fractal line regeneration. Frame skipping is <code>settings.framesDelay</code>; fractal redraw is amortised through <code>regenDebt</code>.'},
+
+ /* --- nodes --- */
+ {id:'node', g:'node', name:'Node + Edge', sub:'physics + DOM',
+  files:['js/nodes/nodeclass.js','js/nodes/edgeclass.js'],
+  keys:['step(dt)','applyMandelbrotForce()','updateNodeData()','dataset.node_json','Node.Extensions','Node.getType()'],
+  why:'One class for every node. Types are duck-typed flags (<code>isTextNode</code>, <code>isLLM</code>, <code>isLink</code>, <code>isImageNode</code>) that <code>Node.getType</code> reads — there are no subclasses. Serialization writes into the DOM dataset, not a separate store.'},
+ {id:'nodeview', g:'node', name:'NodeView', sub:'createnodes/window.js',
+  files:['js/nodes/createnodes/window.js','js/nodes/createnodes/createnodes.js'],
+  keys:['windowify()','addAtNaturalScale()','addForImage()','toggleSelected()'],
+  why:'The draggable window chrome around a node: title bar, resize, collapse, selection. Split from <code>Node</code> so the physics object has no opinion about presentation.'},
+ {id:'ntypes', g:'node', name:'node types', sub:'text · ai · link · image …',
+  files:['js/nodes/nodetypes/'],
+  keys:['TextNode.create','createLlmNode','new LinkNode()','createMediaNode','createWolframNode','FileTreeNode.create'],
+  why:'Free functions and static factories, each newing up a bare <code>Node</code>, building DOM, then setting its flag. Adding a type means adding a factory + a flag, not a subclass.'},
+ {id:'nint', g:'node', name:'node interaction', sub:'drag · connect · filter',
+  files:['js/nodes/nodeinteraction/'],
+  keys:['movenodes.js','connect.js','filternodes.js','nodemode.js','bundlecode.js:MODULE'],
+  why:'Selection, dragging, edge creation, filtering, and the per-node code bundler. Note the callback idiom used throughout: <code>nodes.forEach(Node.moveAtThisAngle, angle)</code> — static method, subject bound as <code>this</code>.'},
+
+ /* --- storage --- */
+ {id:'savenet', g:'store', name:'savenet.js', sub:'graph import/export',
+  files:['js/interface/dropdown/savenet.js'],
+  keys:['GraphsKeeper','GraphExporter','GraphImporter',':MODULE'],
+  why:'Serializes the whole graph to JSON and re-hydrates it, replaying node extras. Blobs (images, media) are stored separately from the graph JSON so a graph document stays small.'},
+ {id:'stored', g:'store', name:'IndexedDB', sub:'localforage via class Stored',
+  files:['js/globals.js'],
+  keys:['class Stored','settings persistence','saved views / coords'],
+  why:'All durable state — saved graphs, settings, API keys, saved views — lives in IndexedDB in the browser. There is no server-side database anywhere in this repo.'},
+
+ /* --- ai --- */
+ {id:'aicall', g:'ai', name:'AiCall', sub:'js/ai/ai_v2.js',
+  files:['js/ai/ai_v2.js','js/ai/aimessage.js','js/ai/prompts.js'],
+  keys:['AiCall.stream(node) / .single(node)','addSystemPrompt / addUserPrompt','exec()','activeRequests + requestId','AbortController'],
+  why:'The request builder and streaming reader. Given a node it streams into that node’s response area; given none it streams into the active CodeMirror — which is how the LLM writes notes that then become nodes through the Zettelkasten loop. In-flight calls are keyed by <code>requestId</code> so they can be aborted.'},
+ {id:'providers', g:'ai', name:'Providers + keys', sub:'aihelpers.js · handleapikeys.js',
+  files:['js/ai/ai-utility/aihelpers.js','js/ai/ai-utility/handleapikeys.js','js/ai/ai-utility/dummyai.js'],
+  keys:['const Providers','Ai.determineModel(node)','getAPIParams()','useProxy','useDummyResponses'],
+  why:'Where the endpoint and credentials get decided. <code>getAPIParams</code> branches twice: on <code>useProxy</code> (server holds keys, call goes to <code>/aiproxy/&lt;provider&gt;</code>) and then on the provider itself (direct call with a key from storage, or <code>neurite</code> via <code>window.NeuriteBackend</code>). <code>useDummyResponses</code> fakes a stream for offline UI work.'},
+ {id:'ainode', g:'ai', name:'AI nodes', sub:'nodetypes/ainodes/',
+  files:['js/nodes/nodetypes/ainodes/ainodemessage.js','.../responsehandler.js','.../ainode.js','.../promptlibrary.js'],
+  keys:['@ node references','/ commands','responsehandler streaming render'],
+  why:'Multi-agent looping: an AI node pulls context from connected nodes, <code>@</code> addresses another node, <code>/</code> runs a command. The response handler renders the stream token-by-token into the node, handling code fences and markdown.'},
+ {id:'ollama', g:'ai', name:'Ollama', sub:'local models',
+  files:['js/ai/ollama/ollama.js','js/ai/ollama/ollama-api.js'],
+  keys:['model pull / list','embeddings'],
+  why:'First-class local-model path: list, pull and run models, optionally proxied through the gateway to dodge CORS.'},
+ {id:'aiaux', g:'ai', name:'vision · automata · network', sub:'js/ai/',
+  files:['js/ai/vision.js','js/ai/automata.js','js/ai/network.js'],
+  keys:['image input','cellular automata','network view'],
+  why:'Peripheral AI features: multimodal image input, an automata playground, and the network/graph statistics view behind the networks tab.'},
+
+ /* --- scriptable api --- */
+ {id:'neuralapi', g:'api', name:'neuralapi.js', sub:'functionRegistry',
+  files:['js/interface/neuralapi.js'],
+  keys:['functionRegistry','registerFunctions()','initializeFunctionMappings()','Animation / Interpolation'],
+  why:'Defines every scriptable action, then assigns each base name <strong>and every alias</strong> onto <code>window</code> — so <code>neuriteAddNote</code>, <code>addNote</code> and <code>createNote</code> all resolve to the same function. This is the surface both the user’s scripts and the LLM call. Also drives animated pan/zoom sequences.'},
+ {id:'funccall', g:'api', name:'function calling', sub:'interface/functioncall/',
+  files:['js/interface/functioncall/functioncallingpanel.js','.../requestfunctioncall.js','.../neuraltelemetryprompt.js'],
+  keys:['panel editor','telemetry prompt (current view state)'],
+  why:'Turns the registry into an LLM tool surface: it describes the current view to the model, asks for a call, then executes it against <code>window</code>. This is how “zoom to that cluster and add three notes” works.'},
+
+ /* --- search --- */
+ {id:'searchapi', g:'search', name:'searchapi/*', sub:'search · wiki · wolfram · code',
+  files:['js/interface/searchapi/search.js','.../searchapi.js','.../wikipedia.js','.../wolframapi.js','.../codeparser/'],
+  keys:['Host.baseUrl + /wikisearch/...','/wolframalpha','parsemirror · gitparsed'],
+  why:'External knowledge in. Web/wiki/Wolfram results arrive as new link or Wolfram nodes. The code parser turns a repo or snippet into a navigable node set.'},
+ {id:'embdb', g:'search', name:'embeddingsdb.js', sub:'RAG index',
+  files:['js/interface/searchapi/embeddingsdb.js'],
+  keys:['new Worker("/embeddings.js", {type:"module"})','chunk + cosine search'],
+  why:'Owns the vector store and the worker handle. Chunks page/note text, embeds it, and returns nearest chunks to inject into a prompt.'},
+ {id:'worker', g:'search', name:'embeddings worker', sub:'public/embeddings.js',
+  files:['public/embeddings.js'],
+  keys:['transformers.js from CDN','runs off the main thread'],
+  why:'Deliberately outside <code>js/</code> so it is served as a real module worker instead of being swallowed by <code>PageLoad</code>. Keeps embedding work off the render loop.'},
+
+ /* --- servers --- */
+ {id:'gateway', g:'srv', name:'gateway :7070', sub:'start_servers.js',
+  files:['localhost_servers/start_servers.js','localhost_servers/servers.json'],
+  keys:['express, 500mb body limit','CORS: localhost:8080 + neurite.network','app.use("/"+name.toLowerCase(), router)','GET /check'],
+  why:'One express process mounts every sub-server as a router under its lowercased name, and <code>npm install</code>s each on first start. <code>/check</code> reports which mounted — that is the endpoint the frontend polls to set <code>useProxy</code>.'},
+ {id:'aiproxy', g:'srv', name:'/aiproxy', sub:'keys stay server-side',
+  files:['localhost_servers/ai-proxy/'],
+  keys:['provider fan-out','.env keys'],
+  why:'Forwards chat/completions to the real provider with credentials from the server’s environment, so the browser never holds a key. Selected by <code>useProxy</code>.'},
+ {id:'webscrape', g:'srv', name:'/webscrape', sub:'page text extraction',
+  files:['localhost_servers/webscrape/'],
+  keys:['fetch + extract'],
+  why:'Fetches a URL server-side (no CORS wall) and returns readable text — the feed for link nodes and for the embeddings index.'},
+ {id:'wikisearch', g:'srv', name:'/wikisearch', sub:'wiki summaries',
+  files:['localhost_servers/wiki-search/novelty.js'],
+  keys:['/wikisearch/wikipedia_summaries?keyword=&amp;top_n_links='],
+  why:'Keyword → ranked Wikipedia summaries. The only sub-server whose exact query string is visible in the frontend (<code>wikipedia.js</code>).'},
+ {id:'wolfram', g:'srv', name:'/wolframalpha', sub:'computation',
+  files:['localhost_servers/wolfram-alpha/'],
+  keys:['pods → Wolfram node'],
+  why:'Proxies Wolfram Alpha and returns pods, which become a Wolfram node with rendered images and plaintext.'},
+ {id:'direct', g:'srv', name:'/directaccess', sub:'local filesystem',
+  files:['localhost_servers/direct-access/'],
+  keys:['list / read paths'],
+  why:'Gives the file-tree UI real disk access. The one component that turns the app from a web page into something with local reach — worth knowing before you expose the port.'},
+ {id:'automation', g:'srv', name:'/automation :8081', sub:'Playwright, flag-gated',
+  files:['localhost_servers/automation/automation.js'],
+  keys:['npm run start:neurite','GET /screenshot → base64 PNG','window.startedViaPlaywright'],
+  why:'Only starts with the <code>neurite</code> flag, and is the exception to auto-install (Playwright must be installed by hand). Its own listener on 8081 serves <code>/screenshot</code> — the closest thing this repo has to a test.'}
+];
+
+const E = [
+ ['html','pageload','loads',['boot']],
+ ['pageload','globals','1st script',['boot']],
+ ['pageload','iface','82 scripts',['boot']],
+ ['pageload','app','then new App()',['boot']],
+ ['globals','app','',['boot']],
+ ['app','sim','start()',['boot','render']],
+ ['app','graph','new Graph()',['boot']],
+ ['app','tabs','',['boot']],
+ ['app','gateway','GET /check → useProxy',['boot'],'dashed'],
+ ['iface','customui','',[]],
+ ['tabs','zetcm','ZetPanes builds a pane each',['notes']],
+ ['zetcm','zetproc','change event',['notes']],
+ ['zetproc','zetaux','placement',['notes']],
+ ['zetproc','ntypes','## → create node',['notes']],
+ ['zetproc','graph','[[ref]] → edge',['notes']],
+ ['node','zetproc','title/body edit → rewrite text',['notes'],'dashed'],
+ ['ntypes','node','',['notes','ai']],
+ ['ntypes','nodeview','windowify',['notes']],
+ ['graph','node','owns',['render']],
+ ['fractal','node','grad force',['render']],
+ ['fractal','graph','pan/zoom are complex',['render']],
+ ['sim','graph','per frame',['render']],
+ ['sim','fractal','regenDebt',['render']],
+ ['nint','node','drag · connect',[]],
+ ['nodeview','node','',[]],
+ ['graph','savenet','toJSON',['save']],
+ ['savenet','stored','put / get',['save']],
+ ['globals','stored','settings',['save'],'dashed'],
+ ['savenet','ntypes','re-hydrate',['save'],'dashed'],
+ ['ainode','aicall','build request',['ai']],
+ ['aicall','providers','model + endpoint',['ai']],
+ ['providers','aiproxy','useProxy = true',['ai'],'dashed'],
+ ['aicall','ollama','local model',['ai'],'dashed'],
+ ['aicall','ainode','stream tokens',['ai']],
+ ['aicall','zetcm','no node → write notes',['ai','notes'],'dashed'],
+ ['embdb','aicall','context chunks',['ai','search'],'dashed'],
+ ['funccall','neuralapi','execute call',['ai']],
+ ['neuralapi','graph','mutate view',['ai']],
+ ['aicall','funccall','tool request',['ai'],'dashed'],
+ ['searchapi','wikisearch','',['search'],'dashed'],
+ ['searchapi','wolfram','',['search'],'dashed'],
+ ['embdb','webscrape','page text',['search'],'dashed'],
+ ['embdb','worker','embed off-thread',['search']],
+ ['searchapi','ntypes','result → node',['search']],
+ ['filetree','direct','',[],'dashed'],
+ ['gateway','aiproxy','mount',[]],
+ ['gateway','webscrape','',[]],
+ ['gateway','wikisearch','',[]],
+ ['gateway','wolfram','',[]],
+ ['gateway','direct','',[]],
+ ['gateway','automation','neurite flag',[]]
+];
+
+const FLOWS = {
+  boot:{label:'Boot sequence', steps:[
+    ['html','Browser loads <code>index.html</code>: CDN libs plus one app script.'],
+    ['pageload','<code>PageLoad.mainLoad()</code> injects 5 HTML/SVG partials, then 6 tab files in parallel.'],
+    ['globals','Scripts load sequentially, <code>globals.js</code> first — every later file assumes it.'],
+    ['app','After the last script: <code>Graph = new Graph()</code>, <code>App = new App()</code>, <code>App.init()</code>.'],
+    ['gateway','<code>Host.checkServer()</code> polls <code>/check</code>; success flips <code>useProxy</code>.'],
+    ['sim','<code>nodeSimulation.start()</code> begins the single rAF loop. <code>window.appReady = true</code>.']
+  ]},
+  notes:{label:'Notes ⇄ Nodes (the sync loop)', steps:[
+    ['tabs','<code>ZetPanes</code> gives each notes tab a CodeMirror + parser + UI + processor, pushed into four parallel <code>window.*</code> arrays.'],
+    ['zetcm','You type. CodeMirror fires <code>change</code>.'],
+    ['zetproc','<code>processInput()</code> walks lines: <code>##</code> opens a node, <code>[[…]]</code> declares refs, <code>AI:</code> makes an LLM node.'],
+    ['ntypes','New titles create nodes through the type factories; stale wraps get their nodes deleted.'],
+    ['graph','Refs resolve to edges in <code>Graph.edges</code>.'],
+    ['node','Editing a node title or body runs the reverse path — <code>onTitleInput</code> rewrites just that range in CodeMirror. Flags stop the echo.']
+  ]},
+  ai:{label:'An AI request', steps:[
+    ['ainode','An AI node collects context: its own prompt, connected nodes, <code>@</code> references, <code>/</code> commands.'],
+    ['embdb','If RAG is on, nearest embedding chunks are injected.'],
+    ['aicall','<code>AiCall.stream(node)</code> assembles system + user prompts, registers a <code>requestId</code>, calls <code>exec()</code>.'],
+    ['providers','<code>getAPIParams</code> picks endpoint + credentials: proxy or direct, per provider.'],
+    ['aiproxy','With <code>useProxy</code>, the call goes to <code>:7070/aiproxy/&lt;provider&gt;</code> and keys stay on the server.'],
+    ['funccall','If function calling is on, the model can answer with a registry call instead of prose.'],
+    ['neuralapi','That call lands on a <code>window</code> alias and mutates the graph or the view.']
+  ]},
+  save:{label:'Save / load a graph', steps:[
+    ['node','Each node writes itself into <code>content.dataset.node_json</code> via <code>updateNodeData()</code>.'],
+    ['graph','<code>toJSON</code> walks nodes and edges, dropping non-serializable fields.'],
+    ['savenet','<code>GraphExporter</code> splits blobs (images, media) out from the graph JSON.'],
+    ['stored','Both go to IndexedDB through <code>class Stored</code> (localforage). No server involved.'],
+    ['ntypes','On load, <code>GraphImporter</code> rebuilds nodes and replays <code>dataset.node_extras</code> through <code>Node.Extensions</code>.']
+  ]},
+  search:{label:'Search + RAG', steps:[
+    ['searchapi','A query fans out to web, Wikipedia or Wolfram.'],
+    ['wikisearch','Wiki path: <code>/wikisearch/wikipedia_summaries?keyword=…&amp;top_n_links=…</code>.'],
+    ['webscrape','Page text is fetched server-side to dodge CORS.'],
+    ['worker','Text is chunked and embedded in the worker, off the render loop.'],
+    ['embdb','Chunks land in the vector store; cosine search returns the nearest.'],
+    ['ntypes','Results become link / Wolfram nodes in the graph, and context for the next prompt.']
+  ]},
+  render:{label:'One render tick', steps:[
+    ['sim','<code>nodeStep()</code> runs once per frame (skipping <code>settings.framesDelay</code> frames).'],
+    ['graph','Autopilot moves <code>pan</code>/<code>zoom</code>; the SVG viewbox is recomputed.'],
+    ['node','Every node integrates <code>step(dt)</code> — velocity, damping, edge springs.'],
+    ['fractal','<code>applyMandelbrotForce()</code> adds a pull along <code>Fractal.grad</code>, then fractal lines are regenerated against <code>regenDebt</code>.']
+  ]}
+};
+
+/* ------------------------------------------------------------- layout */
+const BW = 6, BH = 62, GAP = 12, HEAD = 22, PAD = 11;
+const byId = {};
+for (const g of GROUPS) {
+  const kids = C.filter(c => c.g === g.id);
+  const cols = g.cols, rows = Math.ceil(kids.length / cols);
+  const bw = (g.w - PAD * 2 - GAP * (cols - 1)) / cols;
+  kids.forEach((c, i) => {
+    const col = i % cols, row = (i / cols) | 0;
+    c.x = g.x + PAD + col * (bw + GAP);
+    c.y = g.y + HEAD + PAD + row * (BH + GAP);
+    c.w = bw; c.h = BH; c.color = g.color;
+    byId[c.id] = c;
+  });
+  g.h = HEAD + PAD * 2 + rows * BH + GAP * (rows - 1);
+}
+
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('svg');
+const mk = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+const cssvar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* edges first so boxes sit on top */
+const gEdges = mk('g', {}), gBoxes = mk('g', {});
+svg.append(gEdges, gBoxes);
+
+function anchors(a, b) {
+  const ac = {x:a.x + a.w/2, y:a.y + a.h/2}, bc = {x:b.x + b.w/2, y:b.y + b.h/2};
+  const dx = bc.x - ac.x, dy = bc.y - ac.y;
+  if (Math.abs(dx) > Math.abs(dy) * 0.9) {
+    const s = dx > 0 ? {x:a.x + a.w, y:ac.y} : {x:a.x, y:ac.y};
+    const t = dx > 0 ? {x:b.x, y:bc.y} : {x:b.x + b.w, y:bc.y};
+    return [s, t, 'h'];
+  }
+  const s = dy > 0 ? {x:ac.x, y:a.y + a.h} : {x:ac.x, y:a.y};
+  const t = dy > 0 ? {x:bc.x, y:b.y} : {x:bc.x, y:b.y + b.h};
+  return [s, t, 'v'];
+}
+
+const edgeEls = [];
+for (const [from, to, label, flows, style] of E) {
+  const a = byId[from], b = byId[to];
+  if (!a || !b) { console.warn('bad edge', from, to); continue; }
+  const [s, t, dir] = anchors(a, b);
+  const d = dir === 'h'
+    ? `M${s.x},${s.y} C${(s.x + t.x) / 2},${s.y} ${(s.x + t.x) / 2},${t.y} ${t.x},${t.y}`
+    : `M${s.x},${s.y} C${s.x},${(s.y + t.y) / 2} ${t.x},${(s.y + t.y) / 2} ${t.x},${t.y}`;
+  const path = mk('path', {d, class:'edge' + (style === 'dashed' ? ' dashed' : '')});
+  const ang = dir === 'h' ? (t.x > s.x ? 0 : 180) : (t.y > s.y ? 90 : -90);
+  const head = mk('path', {d:'M0,0 L-7,3.4 L-7,-3.4 Z', class:'ehead',
+    transform:`translate(${t.x},${t.y}) rotate(${ang})`});
+  let lbl = null;
+  if (label) {
+    const mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2;
+    lbl = mk('text', {x:mx, y:my - 5, class:'elbl off', 'text-anchor':'middle'});
+    lbl.textContent = label;
+  }
+  gEdges.append(path, head); if (lbl) gEdges.append(lbl);
+  edgeEls.push({from, to, path, head, lbl, flows});
+}
+
+for (const g of GROUPS) {
+  const r = mk('rect', {x:g.x, y:g.y, width:g.w, height:g.h, class:'x'});
+  const wrap = mk('g', {class:'grp'});
+  const t = mk('text', {x:g.x + 12, y:g.y + 15, fill:cssvar(g.color)});
+  t.textContent = g.label;
+  wrap.append(r, t); gBoxes.append(wrap);
+}
+
+const boxEls = {};
+for (const c of C) {
+  const g = mk('g', {class:'box', tabindex:0, role:'button'});
+  const r = mk('rect', {x:c.x, y:c.y, width:c.w, height:c.h, stroke:cssvar(c.color)});
+  const n = mk('text', {x:c.x + 11, y:c.y + 25});
+  n.textContent = c.name;
+  const s = mk('text', {x:c.x + 11, y:c.y + 43, class:'f'});
+  s.textContent = c.sub;
+  g.append(r, n, s);
+  g.addEventListener('click', () => select(c.id));
+  g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(c.id); } });
+  gBoxes.append(g);
+  boxEls[c.id] = g;
+}
+
+/* ------------------------------------------------------------ behaviour */
+const detail = document.getElementById('detail');
+const flowcard = document.getElementById('flowcard');
+let curFlow = '', curSel = null;
+
+function select(id, fromFlow) {
+  curSel = id;
+  const c = byId[id];
+  for (const k in boxEls) boxEls[k].classList.toggle('sel', k === id);
+  const ins = E.filter(e => e[1] === id), outs = E.filter(e => e[0] === id);
+  const nm = x => byId[x] ? byId[x].name : x;
+  detail.innerHTML = `
+    <span class="tag" style="color:${cssvar(c.color)};border-color:${cssvar(c.color)}">${GROUPS.find(g=>g.id===c.g).label}</span>
+    <h2 style="margin-top:8px">${c.name}</h2>
+    <p style="color:var(--dim);margin-top:0" class="mono">${c.files.join('<br>')}</p>
+    <p>${c.why}</p>
+    <h3>Key symbols</h3><ul>${c.keys.map(k => `<li class="mono">${k}</li>`).join('')}</ul>
+    ${outs.length ? `<h3>Talks to</h3><ul>${outs.map(e => `<li>${nm(e[1])}${e[2] ? ' — ' + e[2] : ''}</li>`).join('')}</ul>` : ''}
+    ${ins.length ? `<h3>Driven by</h3><ul>${ins.map(e => `<li>${nm(e[0])}${e[2] ? ' — ' + e[2] : ''}</li>`).join('')}</ul>` : ''}`;
+  if (!fromFlow && curFlow) {
+    const st = FLOWS[curFlow].steps.findIndex(s => s[0] === id);
+    if (st >= 0) markStep(st);
+  }
+}
+
+function setFlow(f) {
+  curFlow = f;
+  document.querySelectorAll('.bar button').forEach(b => b.classList.toggle('on', b.dataset.flow === f));
+  if (!f) {
+    for (const k in boxEls) boxEls[k].classList.remove('dimmed');
+    edgeEls.forEach(e => {
+      [e.path, e.head].forEach(el => el.classList.remove('dimmed', 'hot'));
+      if (e.lbl) e.lbl.classList.add('off');
+    });
+    flowcard.hidden = true;
+    return;
+  }
+  const steps = FLOWS[f].steps, ids = steps.map(s => s[0]);
+  const pairs = new Set();
+  for (let i = 0; i < ids.length - 1; i++) pairs.add(ids[i] + '>' + ids[i + 1]);
+  for (const k in boxEls) boxEls[k].classList.toggle('dimmed', !ids.includes(k));
+  edgeEls.forEach(e => {
+    const inFlow = e.flows.includes(f);
+    const hot = pairs.has(e.from + '>' + e.to) || pairs.has(e.to + '>' + e.from);
+    [e.path, e.head].forEach(el => {
+      el.classList.toggle('dimmed', !inFlow && !hot);
+      el.classList.toggle('hot', hot); });
+    if (e.lbl) e.lbl.classList.toggle('off', !(inFlow || hot));
+  });
+  flowcard.hidden = false;
+  flowcard.innerHTML = `<h2>${FLOWS[f].label}</h2><ol class="steps">` +
+    steps.map((s, i) => `<li data-i="${i}"><strong>${byId[s[0]].name}</strong> — ${s[1]}</li>`).join('') + '</ol>';
+  flowcard.querySelectorAll('li').forEach(li =>
+    li.addEventListener('click', () => { markStep(+li.dataset.i); select(steps[+li.dataset.i][0], true); }));
+  select(ids[0], true); markStep(0);
+}
+
+function markStep(i) {
+  flowcard.querySelectorAll('li').forEach(li => li.classList.toggle('cur', +li.dataset.i === i));
+}
+
+document.querySelectorAll('.bar button').forEach(b =>
+  b.addEventListener('click', () => setFlow(b.dataset.flow)));
+
+document.getElementById('legend').innerHTML =
+  GROUPS.map(g => `<span><i style="background:${cssvar(g.color)}"></i>${g.label}</span>`).join('') +
+  '<span><i style="background:#4b4470"></i>solid edge = direct call</span>' +
+  '<span><i style="background:#4b4470;opacity:.5"></i>dashed = optional / conditional path</span>' +
+  '<span><i style="background:var(--warm)"></i>edge labels appear on the selected flow</span>';
+
+select('pageload');
+</script>
+</body>
+</html>
