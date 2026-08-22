@@ -305,10 +305,11 @@ class ZetPanes {
         this.paneContent.appendChild(pane);
         this.switchPane(paneId);
 
-        processAll = true;
-        restoreZettelkastenEvent = true;
-
-        window.zetPaneList.at(-1).cm.setValue(paneContent);
+        // Every title in paneContent already has a node, so the pass must bind to
+        // it rather than spawn a duplicate.
+        const restored = window.zetPaneList.at(-1);
+        restored.processor.writeAs(ZettelkastenProcessor.Pass.restore,
+            ()=>restored.cm.setValue(paneContent));
 
         this.paneCounter += 1;
     }

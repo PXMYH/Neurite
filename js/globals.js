@@ -272,12 +272,6 @@ class ProcessedNodes {
 
 //Zettelkasten
 
-let processAll = false;//set to true until made more robust.
-
-let restoreZettelkastenEvent = false;
-
-let bypassZettelkasten = false;
-
 class Tag {
     static init(){
         Tag.node = Modal.inputValues['node-tag'] || "##";

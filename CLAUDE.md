@@ -99,9 +99,11 @@ registered into the parallel arrays `window.codeMirrorInstances`, `window.zettel
 - Graph → text: `onTitleInput` / `onNodeBodyInput` rewrite the CodeMirror range for that node's section.
 - `wrapPerTitle` / `wrapPerLine` map titles and line numbers to `NodeWrap`s; a wrap not marked `live`
   during a pass gets its node deleted (`deleteInactiveNodesFromDict`).
-- Module-level flags in `js/globals.js` gate this loop: `processAll` (full reparse), `bypassZettelkasten`
-  (skip the next change event), `restoreZettelkastenEvent` (rebinding to existing nodes on load).
-  Writing to CodeMirror or a node textarea without setting the right flag causes feedback loops.
+- Writing into CodeMirror from code triggers a pass, so say which pass you want:
+  `processor.writeAs(ZettelkastenProcessor.Pass.<mode>, () => cm.setValue(...))`. `Pass.edit` is a human
+  typing, `rewrite` reparses every node's body, `restore` binds titles to nodes that already exist,
+  `spawn` does that for one appended tag. `processAs(mode)` runs a pass over text already in the editor.
+  The mode is scoped to that processor and to that write; nothing to set and clear by hand.
 - `Tag.node`/`Tag.ref` are user-configurable, so never hardcode `##` or `[[`; use `Tag.*`,
   `ZettelkastenParser.regexpNodeTitle`, and `bracketsMap`/`getClosingBracket`.
 

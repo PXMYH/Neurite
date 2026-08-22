@@ -374,15 +374,18 @@ On.paste(window, (e) => {
     const codeMirrorWrapper = cm.getWrapperElement();
     if (codeMirrorWrapper.contains(e.target)) {
         Logger.debug("Paste detected in CodeMirror");
+        const processor = getActiveZetCMInstanceInfo()?.zettelkastenProcessor;
 
         function paste(){
-            processAll = true;
-            Logger.debug("processAll set to true after paste in CodeMirror");
-
-            // Simulate a minor change in content to trigger an input event
-            const cursorPos = cm.getCursor();
-            cm.replaceRange(' ', cursorPos); // Insert a temporary space
-            cm.replaceRange('', cursorPos, { line: cursorPos.line, ch: cursorPos.ch + 1 }); // Immediately remove it
+            // Both writes belong to one rewrite pass. Setting a global flag armed
+            // the first pass only: it fired synchronously on the insert and
+            // cleared the flag, so the delete reparsed as an ordinary edit.
+            processor?.writeAs(ZettelkastenProcessor.Pass.rewrite, ()=>{
+                // Simulate a minor change in content to trigger an input event
+                const cursorPos = cm.getCursor();
+                cm.replaceRange(' ', cursorPos); // Insert a temporary space
+                cm.replaceRange('', cursorPos, { line: cursorPos.line, ch: cursorPos.ch + 1 }); // Immediately remove it
+            });
 
             Logger.debug("Triggered input event in CodeMirror");
         }

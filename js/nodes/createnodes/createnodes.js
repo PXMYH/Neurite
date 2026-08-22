@@ -98,8 +98,14 @@ function spawnZettelkastenNode(spawningNode, offsetDistance = 0.6, theta = null,
     // Create a new node at the calculated position and scale
     const newNode = createTextNodeWithPosAndScale(title, text, newScale, newPositionX, newPositionY);
     newNode.draw();
-    restoreZettelkastenEvent = true;
-    addNodeTagToZettelkasten(newNode.getTitle(), text);
+
+    // The node exists already, so the pass must bind the new title to it instead
+    // of spawning a second one -- but the other nodes are untouched, so this is
+    // not a full reparse.
+    const processor = getActiveZetCMInstanceInfo()?.zettelkastenProcessor;
+    const append = ()=>addNodeTagToZettelkasten(newNode.getTitle(), text);
+    if (processor) processor.writeAs(ZettelkastenProcessor.Pass.spawn, append);
+    else append();
 
     return newNode;
 }

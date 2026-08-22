@@ -100,7 +100,7 @@ flowchart LR
 ## Suggested reading order
 
 1. `js/main.js` — `PageLoad` (the loader), `App.init()` (the boot sequence), and the `On`/`Off`/`Elem`/`Request` helpers every other file uses.
-2. `js/globals.js` — `settings`, `Stored`, `Tag`, `Host`, and the three sync-gating flags.
+2. `js/globals.js` — `settings`, `Stored`, `Tag`, `Host`, `useProxy`.
 3. `js/nodes/nodeutilities.js` + `js/nodes/nodeclass.js` — what a node and the graph actually are.
 4. `js/mandelbrot/mandelbrot.js` — `vec2` is complex arithmetic; node positions are points in the plane.
 5. `js/nodes/nodeinteraction/nodestep.js` — the whole per-frame order of operations.
@@ -113,8 +113,8 @@ flowchart LR
   load time. Not listed = never executed, silently.
 - **Need `import`/`export`?** Append `:MODULE` to the entry (`savenet.js:MODULE`), otherwise the file is a
   plain script.
-- **Writing to CodeMirror or a node textarea?** Set the right flag (`bypassZettelkasten`, `processAll`,
-  `restoreZettelkastenEvent`) or you get a feedback loop between text and graph.
+- **Writing to CodeMirror from code?** Wrap the write: `processor.writeAs(ZettelkastenProcessor.Pass.rewrite,
+  () => cm.setValue(...))`. The write is what triggers a parse, so the mode names what that parse should do.
 - **New stateful widget on a node?** Register a `push_extra_cb` entry, or it silently disappears on reload —
   persistence replays `dataset.node_extras` through `Node.Extensions`.
 - **Never hardcode `##` or `[[`.** They are `Tag.node` / `Tag.ref` and the user can change them.
