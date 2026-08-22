@@ -125,10 +125,16 @@ function zetHandleVertMouseMove(event) {
     });
 }
 
-window.codeMirrorInstances = window.codeMirrorInstances || [];
-window.zettelkastenParsers = window.zettelkastenParsers || [];
-window.zettelkastenUIs = window.zettelkastenUIs || [];
-window.zettelkastenProcessors = window.zettelkastenProcessors || [];
+// One entry per Pane: its id, its editor, and the three objects built around that
+// editor. This was four arrays correlated by position, and removal filtered only
+// the first of them, so a deleted Pane's parser, UI and processor stayed
+// registered for the rest of the session -- re-parsed on every save, and still
+// counted by the index arithmetic that recovered Pane names.
+//
+// Keeping the id here is what lets a Pane be found by identity instead of by
+// position. `savenet.js` needed that: it read a name with `'zet-pane-' + (index+1)`,
+// which is only the right Pane until one is deleted.
+window.zetPaneList = window.zetPaneList || [];
 window.currentActiveZettelkastenMirror = null;
 
 class ZetPanes {
@@ -194,10 +200,13 @@ class ZetPanes {
         const zettelkastenProcessor = new ZettelkastenProcessor(cm, zettelkastenParser);
         ZetPath.updateOptions(zettelkastenProcessor); // Update the placement path only for the new processor
 
-        window.codeMirrorInstances.push(cm);
-        window.zettelkastenParsers.push(zettelkastenParser);
-        window.zettelkastenUIs.push(zettelkastenUI);
-        window.zettelkastenProcessors.push(zettelkastenProcessor);
+        window.zetPaneList.push({
+            paneId,
+            cm,
+            parser: zettelkastenParser,
+            ui: zettelkastenUI,
+            processor: zettelkastenProcessor
+        });
 
         return pane;
     }
@@ -208,10 +217,8 @@ class ZetPanes {
         panes.forEach(pane => {
             if (pane.id === paneId) {
                 pane.classList.add('active');
-                const textareaId = pane.querySelector('.zet-zettelkasten').id;
-                const cm = window.codeMirrorInstances.find(
-                    (instance)=>(instance.getTextArea().id === textareaId)
-                );
+                const zetPane = window.zetPaneList.find((entry)=>(entry.paneId === paneId));
+                const cm = zetPane && zetPane.cm;
 
                 window.currentActiveZettelkastenMirror = cm;
 
@@ -254,16 +261,15 @@ class ZetPanes {
         const pane = this.paneContent.querySelector('#' + paneId);
         if (!pane) return;
 
-        const id = 'zet-note-input-' + paneId.replace('zet-pane-', '');
-        const cm = window.codeMirrorInstances.find(
-            (instance)=>(instance.getTextArea().id === id)
-        );
-
-        if (cm) {
+        const index = window.zetPaneList.findIndex((entry)=>(entry.paneId === paneId));
+        if (index !== -1) {
+            const cm = window.zetPaneList[index].cm;
             cm.setValue('');
             cm.clearHistory();
-            // Remove the CodeMirror instance from the array
-            window.codeMirrorInstances = window.codeMirrorInstances.filter(instance => instance !== cm);
+            // One splice retires the editor, parser, UI and processor together. As
+            // four arrays this dropped the editor only, and the processor kept
+            // running on every save for the rest of the session.
+            window.zetPaneList.splice(index, 1);
         }
 
         pane.remove();
@@ -302,7 +308,7 @@ class ZetPanes {
         processAll = true;
         restoreZettelkastenEvent = true;
 
-        window.codeMirrorInstances[window.codeMirrorInstances.length - 1].setValue(paneContent);
+        window.zetPaneList.at(-1).cm.setValue(paneContent);
 
         this.paneCounter += 1;
     }

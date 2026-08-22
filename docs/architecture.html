@@ -205,8 +205,8 @@ const C = [
   why:'Bi-directional. Text → graph: on every CodeMirror change it walks lines, opens a node section at <code>Tag.node</code> (<code>##</code>), declares edges at <code>Tag.ref</code> (<code>[[</code>), makes an AI node at <code>LLM_TAG</code> (<code>AI:</code>). Graph → text: rewrites just that node’s range. Any wrap not marked <em>live</em> during a pass gets its node deleted.'},
  {id:'zetaux', g:'zet', name:'panes · path · splitter', sub:'placement + layout',
   files:['js/zettelkasten/zetplacementstrategy.js','js/zettelkasten/zetpath.js','js/zettelkasten/zetsplitter.js'],
-  keys:['window.codeMirrorInstances','window.zettelkastenParsers','window.zettelkastenUIs','window.zettelkastenProcessors'],
-  why:'Placement strategy decides where a newly parsed node lands in the plane. The four parallel <code>window.*</code> arrays are the pane registry — index <em>i</em> in each belongs to the same pane.'},
+  keys:['window.zetPaneList','{paneId, cm, parser, ui, processor}'],
+  why:'Placement strategy decides where a newly parsed node lands in the plane. <code>window.zetPaneList</code> is the pane registry — one entry per pane, holding its id and the four objects built around its editor. It was four parallel arrays correlated by index; removal pruned only the first, so deleted panes kept a live processor.'},
 
  /* --- core --- */
  {id:'graph', g:'core', name:'Graph', sub:'js/nodes/nodeutilities.js',

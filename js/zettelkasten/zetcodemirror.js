@@ -1,7 +1,7 @@
 ﻿function getAllInternalZetNodeWraps() {
     const wrapPerTitle = {};
-    window.zettelkastenProcessors.forEach(processor => {
-        Object.assign(wrapPerTitle, processor.wrapPerTitle);
+    window.zetPaneList.forEach(pane => {
+        Object.assign(wrapPerTitle, pane.processor.wrapPerTitle);
     });
     return wrapPerTitle;
 }
@@ -281,22 +281,25 @@ class ZettelkastenParser {
 }
 
 function updateAllZetMirrorModes() {
-    const parsers = window.zettelkastenParsers || [];
-    parsers.forEach(parser => {
+    const panes = window.zetPaneList || [];
+    panes.forEach(pane => {
+        const parser = pane.parser;
         if (typeof parser?.updateMode === 'function') parser.updateMode();
     });
 }
 
 function updateAllZettelkastenProcessors() {
-    const processors = window.zettelkastenProcessors || [];
-    processors.forEach(processor => {
+    const panes = window.zetPaneList || [];
+    panes.forEach(pane => {
+        const processor = pane.processor;
         if (typeof processor?.processInput === 'function') processor.processInput();
     });
 }
 
 function updateAllCodeMirrorPlaceholders() {
-    const parsers = window.zettelkastenParsers || [];
-    parsers.forEach(parser => {
+    const panes = window.zetPaneList || [];
+    panes.forEach(pane => {
+      const parser = pane.parser;
       if (typeof parser?.updatePlaceholder === 'function') parser.updatePlaceholder();
     });
   }
@@ -402,22 +405,16 @@ CodeMirror.defineMode("custom", function (config, parserConfig) {
 function getActiveZetCMInstanceInfo() {
     const activeCodeMirror = window.currentActiveZettelkastenMirror;
     if (activeCodeMirror) {
-        for (let i = 0; i < window.zettelkastenUIs.length; i++) {
-            const ui = window.zettelkastenUIs[i];
-            if (ui.cm !== activeCodeMirror) continue;
-
-            const textarea = activeCodeMirror.getTextArea();
-            const textareaId = textarea.id;
-            const paneId = textareaId.replace('zet-note-input-', 'zet-pane-');
-            const processor = window.zettelkastenProcessors[i]; // Get the corresponding processor
+        for (const pane of window.zetPaneList) {
+            if (pane.cm !== activeCodeMirror) continue;
 
             return {
-                ui,
-                parser: ui.parser,
+                ui: pane.ui,
+                parser: pane.parser,
                 cm: activeCodeMirror,
-                textarea,
-                paneId,
-                zettelkastenProcessor: processor
+                textarea: activeCodeMirror.getTextArea(),
+                paneId: pane.paneId,
+                zettelkastenProcessor: pane.processor
             };
         }
     }
@@ -426,22 +423,17 @@ function getActiveZetCMInstanceInfo() {
 
 function getZetNodeCMInstance(nodeOrTitle) {
     let title = typeof nodeOrTitle === 'string' ? nodeOrTitle : nodeOrTitle.getTitle();
-    for (let i = 0; i < window.zettelkastenUIs.length; i++) {
-        const ui = window.zettelkastenUIs[i];
-        const lineNumber = ui.parser.nodeTitleToLineMap.get(title);
+    for (const pane of window.zetPaneList) {
+        const lineNumber = pane.parser.nodeTitleToLineMap.get(title);
         if (lineNumber === undefined) continue;
 
-        const cm = ui.cm;
-        const textareaId = cm.getTextArea().id;
-        const paneId = textareaId.replace('zet-note-input-', 'zet-pane-');
-        const zettelkastenProcessor = window.zettelkastenProcessors[i];
         return {
-            ui,
-            parser: ui.parser,
-            cm,
+            ui: pane.ui,
+            parser: pane.parser,
+            cm: pane.cm,
             lineNumber,
-            paneId: paneId,
-            zettelkastenProcessor
+            paneId: pane.paneId,
+            zettelkastenProcessor: pane.processor
         };
     }
     return null;
