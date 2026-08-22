@@ -110,7 +110,11 @@ Node.prototype.getData = async function(){
         Logger.warn("Node.getData: Creation time for node", this.uuid, "is not defined.");
     }
 
-    if (this.isImageNode) {
+    // Ask Node.getType instead of testing the flags again. This tested three of
+    // them in a different order than getType did, so one node had two type names
+    // and the model was shown both -- 'image' here, 'base' in the graph summary.
+    switch (Node.getType(this)) {
+    case 'image':
         return {
             type: 'image',
             data: await getImageNodeData(this).catch(error => {
@@ -119,9 +123,7 @@ Node.prototype.getData = async function(){
             }),
             title: title
         };
-    }
-
-    if (this.isLink) {
+    case 'link': {
         const key = this.linkUrl.startsWith('blob:') ? (titleInput ? titleInput.value : "No title found") : this.linkUrl;
         return {
             type: 'link',
@@ -129,8 +131,7 @@ Node.prototype.getData = async function(){
             title: title
         };
     }
-
-    if (this.isLLM) {
+    case 'llm': {
         const lastPromptsAndResponses = getLastPromptsAndResponses(4, 400, this.aiResponseTextArea);
         const safeTitle = title.trim() ? title : "no_name";
         return {
@@ -139,7 +140,10 @@ Node.prototype.getData = async function(){
             title: title
         };
     }
+    }
 
+    // Text, file tree, media and Wolfram nodes all carry their content in a
+    // textarea. `type` below describes the shape of `data`, not the kind of node.
     const contentText = Node.getTextareaContent(this);
     if (!contentText) {
         return null;

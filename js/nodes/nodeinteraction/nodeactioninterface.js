@@ -1,7 +1,11 @@
 const NodeActions = {};
 
 NodeActions.forNode = function(node){
-    return new NodeActions[Node.getType(node)](node)
+    // There are more node types than there are action classes -- an image node's
+    // actions are the base ones. Fall back rather than throw, so naming a type in
+    // Node.typeByFlag does not oblige anyone to write an actions class for it.
+    const Actions = NodeActions[Node.getType(node)] || NodeActions.base;
+    return new Actions(node);
 }
 
 // Define action parameter types
