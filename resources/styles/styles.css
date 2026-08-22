@@ -1,4 +1,22 @@
-﻿
+﻿/* UI tokens for the application chrome. The syntax-highlighting colours have
+   their own :root block further down; this one is separate on purpose. Tokens
+   are added as the rules that need them are touched, so every name here has at
+   least one consumer — a single-pass rewrite of all 4190 lines is not the goal. */
+:root {
+    /* One accent, desaturated. Replaces the three blues that used to compete
+       for the role: #007BFF on the selection ring, #4a669d on the anchored
+       card, #006BB6 in the slider fill and the loaders. */
+    --ui-accent: #5a7ec0;
+    /* Same hue at low alpha, so a selected card can be tinted without going
+       opaque and hiding what is behind it. */
+    --ui-accent-dim: rgba(90, 126, 192, 0.18);
+
+    /* Card surfaces. Alpha values are the pre-existing ones; they live here so
+       the card work can change them in one place. */
+    --ui-surface: rgb(50 51 62 / 70%);
+    --ui-surface-anchored: #1a1921bf;
+}
+
 html, body {
     overscroll-behavior-x: none;
 }
@@ -118,7 +136,7 @@ body {
     flex-direction: column;
     align-items: baseline;
     border: none;
-    background-color: rgb(50 51 62 / 70%);
+    background-color: var(--ui-surface);
     -webkit-box-shadow: 0px 0px 6.5px rgba(0, 0, 0, 0.3);
     -moz-box-shadow: 0px 0px 6.5px rgba(0, 0, 0, 0.3);
     box-shadow: 0px 0px 6.5px rgba(0, 0, 0, 0.3);
@@ -133,7 +151,7 @@ body {
 }
 
 .window-anchored {
-    background-color: #1a1921bf;
+    background-color: var(--ui-surface-anchored);
     border: 2px solid #1a1a1a;
 }
 
@@ -149,9 +167,10 @@ body {
         z-index: 1;
     }
 
-    .window-anchored.selected {
-        background-color: #4a669d;
-    }
+    /* Selection is drawn by `.window.selected` for every card, anchored or not,
+       so the anchored variant needs no rule of its own. It used to set a solid
+       #4a669d here, which replaced the anchored surface and so made a selected
+       anchored card indistinguishable from a selected loose one. */
 
 .drag-box {
     position: absolute;
@@ -162,9 +181,18 @@ body {
     z-index: 0;
 }
 
-.selected {
-    background-color: #6c7687;
-    color: #222226;
+/* Was a bare `.selected`, which in one global stylesheet reached every element
+   that has ever been given a `selected` class. It only won on `.window.selected`
+   (every other consumer has a more specific rule), where it replaced the card
+   background with opaque #6c7687 and its text with near-black #222226.
+   Scoped to the card, and the grey swapped for an accent tint that keeps the
+   card translucent and leaves body text readable.
+
+   The tint is a background-image rather than a background-color so it layers
+   over whichever surface the card already has. That is what lets an anchored
+   card stay recognisably anchored while it is selected. */
+.window.selected {
+    background-image: linear-gradient(var(--ui-accent-dim), var(--ui-accent-dim));
 }
 .window.selected::before {
     content: "";
@@ -174,7 +202,7 @@ body {
     left: -1px;
     right: -1px;
     bottom: -1px;
-    border: 2px solid #007BFF;
+    border: 2px solid var(--ui-accent);
     pointer-events: none;
     z-index: 1;
 }
@@ -1802,6 +1830,9 @@ td {
 
         .options-replacer div.selected {
             background-color: #a3d3eb;
+            /* Was inherited from the bare `.selected` rule, which is now scoped
+               to the card. This background is light, so it needs the dark text. */
+            color: #222226;
         }
 
     .options-replacer .dropdown-option.selected:hover {
@@ -2646,7 +2677,7 @@ input[type=range] {
 
 .loader {
     border: 5px solid #222226; /* Dark grey */
-    border-top: 5px solid #006BB6; /* Blue */
+    border-top: 5px solid var(--ui-accent);
     border-radius: 50%;
     width: 15px;
     height: 15px;
@@ -2679,7 +2710,7 @@ input[type=range] {
 
 .loader-fillBackground {
     border: 5px solid #222226; /* Dark grey */
-    border-top: 5px solid #006BB6; /* Blue */
+    border-top: 5px solid var(--ui-accent);
     border-radius: 50%;
     width: 15px;
     height: 15px;
@@ -2689,7 +2720,7 @@ input[type=range] {
 }
 
 .loader-fill {
-    background-color: #006BB6; /* Blue */
+    background-color: var(--ui-accent);
     position: absolute;
     top: 50%;
     left: 50%;
@@ -2918,7 +2949,7 @@ textarea[id^='custom-instructions-textarea-']:focus {
         .prompt-list input.selected:focus,
         .prompt-list input.selected:hover {
             background-color: rgb(30, 55, 81);
-            border-color: rgb(0, 107, 182);
+            border-color: var(--ui-accent);
         }
 
 .prompt-list-buttons {
