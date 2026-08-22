@@ -304,7 +304,13 @@ class NodeView {
             e.stopPropagation();
         });
         On.mouseup(btn, (e) => {
-            this.setSvgButtonStyle(btn, "initial", mode);
+            // A mouseup on the button means the pointer is still inside it, so
+            // hover is the state it lands in. Setting "initial" here left the
+            // button looking un-hovered until the pointer left and came back,
+            // because there is no later mouseenter to correct it. A release
+            // outside the button never reaches this handler; mouseleave has
+            // already restored the focus-or-initial state by then.
+            this.setSvgButtonStyle(btn, "hover", mode);
             e.stopPropagation();
             if (btn.ready) cb(e);
         });
