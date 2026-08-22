@@ -6,6 +6,7 @@ Artifacts for understanding this codebase before changing it.
 | --- | --- |
 | [`architecture.html`](architecture.html) | Interactive component diagram. Click a component for its files, key symbols and neighbours; pick a *flow* to trace one path (boot, notes⇄nodes, AI request, save/load, search, render tick). Open it directly in a browser — no build, no dependencies. |
 | this file | Same map as static text, for reading in a terminal or on GitHub. |
+| [`adr/`](adr/) | Decisions that would otherwise get re-proposed. [`0001`](adr/0001-keep-the-hand-ordered-script-array.md) is why `PageLoad.scripts` stays a hand-ordered array. |
 
 ## The one-paragraph version
 
