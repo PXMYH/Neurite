@@ -247,6 +247,31 @@ Host.provideAPIKeys.ct = class {
     onFailure() { return "Failed to provide API keys to the proxy server"; }
 }
 
+// How to reach each provider, in one table rather than two switches.
+//
+// `Providers` in aihelpers.js records where a provider's *widgets* live. This
+// records how to *call* it, which is a different question, so it sits next to its
+// only reader instead. The two are pinned together by a test, because a provider
+// present in one and absent from the other used to be silent: both switches ended
+// in `default:` -> OpenAI, so a forgotten provider sent its request to the OpenAI
+// endpoint carrying the OpenAI key.
+//
+// - proxyOnly    the message to show when the direct route does not exist
+// - keyless      needs no key from the user, so the missing-key alert is skipped
+// - bearer       the direct route wants `Authorization: Bearer <key>`
+// - fromModelData the endpoint and key come off the selected option's dataset
+// - requestId    the body carries a request id, so the call can be cancelled
+// - managed      neither route applies; handled before either one is chosen
+const ProviderRoutes = {
+    anthropic: {proxyPath: '/aiproxy/anthropic',
+                proxyOnly: "Claude model can only be used with the AI proxy server. Please enable the proxy server and refresh the page."},
+    GROQ:      {proxyPath: '/aiproxy/groq',        directUrl: 'https://api.groq.com/openai/v1/chat/completions', keyInputId: 'GROQ-api-key-input', bearer: true},
+    ollama:    {proxyPath: '/aiproxy/ollama/chat', directUrl: 'http://127.0.0.1:11434/api/chat', keyless: true, requestId: true},
+    OpenAi:    {proxyPath: '/aiproxy/openai',      directUrl: 'https://api.openai.com/v1/chat/completions', keyInputId: 'api-key-input', bearer: true},
+    custom:    {proxyPath: '/aiproxy/custom',      fromModelData: true, keyless: true, requestId: true},
+    neurite:   {managed: true, keyless: true}
+}
+
 function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
     const { providerId, model } = inferenceOverride || Ai.determineModel();
     Logger.info("Selected Ai:", model);
@@ -255,7 +280,16 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
     let API_URL;
     let apiEndpoint;
 
-    if (providerId === 'neurite') {
+    const route = ProviderRoutes[providerId];
+    if (!route) {
+        // This used to fall through to `default:` in both switches, which is
+        // OpenAI, so an unrouted provider silently borrowed OpenAI's endpoint and
+        // key. The caller turns null into a visible "Parameters are missing."
+        Logger.err("No route for provider:", providerId);
+        return null;
+    }
+
+    if (route.managed) {
         // Neurite provider setup with specific endpoint and credentials
         API_URL = null;
         const headers = new Headers();
@@ -280,63 +314,46 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
 
     if (useProxy) {
         // Use the AI proxy server
-        switch (providerId) {
-            case 'GROQ':
-                API_URL = Host.urlForPath('/aiproxy/groq');
-                break;
-            case 'anthropic':
-                API_URL = Host.urlForPath('/aiproxy/anthropic');
-                break;
-            case 'ollama':
-                API_URL = Host.urlForPath('/aiproxy/ollama/chat');
-                break;
-            case 'custom':
-                // Assume 'modelName' is the name or identifier you are working with
-                const apiDetails = fetchCustomModelData(model);
-                if (!apiDetails) {
-                    Logger.err("Failed to fetch API details for the model:", model);
-                    break;
-                }
-                API_URL = Host.urlForPath('/aiproxy/custom');
+        if (route.fromModelData) {
+            const apiDetails = fetchCustomModelData(model);
+            // On failure API_URL is deliberately left unset, so the request is not
+            // sent to a half-built target. Same as the old switch, which `break`ed
+            // before assigning it.
+            if (!apiDetails) {
+                Logger.err("Failed to fetch API details for the model:", model);
+            } else {
+                API_URL = Host.urlForPath(route.proxyPath);
                 apiEndpoint = apiDetails.apiEndpoint;
                 API_KEY = apiDetails.apiKey;
-                break;
-            default:
-                API_URL = Host.urlForPath('/aiproxy/openai');
+            }
+        } else {
+            API_URL = Host.urlForPath(route.proxyPath);
         }
         Host.provideAPIKeys();
     } else {
         // Use the direct API endpoints
-        switch (providerId) {
-            case 'GROQ':
-                API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-                API_KEY = Elem.byId('GROQ-api-key-input').value;
-                break;
-            case 'anthropic':
-                alert("Claude model can only be used with the AI proxy server. Please enable the proxy server and refresh the page.");
-                return null;
-            case 'ollama':
-                API_URL = 'http://127.0.0.1:11434/api/chat';
-                break;
-            case 'custom':
-                const apiDetails = fetchCustomModelData(model);
-                API_URL = apiDetails.apiEndpoint;
-                API_KEY = apiDetails.apiKey;
-                break;
-            default:
-                API_URL = 'https://api.openai.com/v1/chat/completions';
-                API_KEY = Elem.byId('api-key-input').value;
+        if (route.proxyOnly) {
+            alert(route.proxyOnly);
+            return null;
+        }
+        if (route.fromModelData) {
+            const apiDetails = fetchCustomModelData(model);
+            API_URL = apiDetails.apiEndpoint;
+            API_KEY = apiDetails.apiKey;
+        } else {
+            API_URL = route.directUrl;
+            if (route.keyInputId) API_KEY = Elem.byId(route.keyInputId).value;
         }
     }
 
-    if (!useProxy && !API_KEY && providerId !== 'ollama' && providerId !== 'custom' && providerId !== 'neurite') {
+    if (!useProxy && !API_KEY && !route.keyless) {
         alert("Please enter your API key");
         return null;
     }
 
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
-    if (!useProxy && (providerId === 'OpenAi' || providerId === 'GROQ')) {
+    if (!useProxy && route.bearer) {
         headers.append("Authorization", `Bearer ${API_KEY}`);
     }
 
@@ -344,9 +361,7 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
     const temperature = customTemperature ?? parseFloat(Elem.byId('model-temperature').value);
     const body = {model, messages, max_tokens, temperature, stream };
 
-    if (providerId === 'ollama' || providerId === 'custom') {
-        body.requestId = Date.now().toString();
-    }
+    if (route.requestId) body.requestId = Date.now().toString();
 
     if (apiEndpoint) {
         body.apiEndpoint = apiEndpoint;
