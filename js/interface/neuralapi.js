@@ -603,7 +603,7 @@ Animation.addNote = function(nodeTitle, nodeText){
     const formattedTitle = getUniqueNodeTitle(nodeTitle.replace(/\n/g, ' '));
     const contentToAdd = Tag.node + ' ' + formattedTitle + '\n' + (nodeText ?? '');
 
-    // Enable random node placement
+    // Spread the new node over the viewport rather than following the zet path
     zettelkastenProcessor.placementStrategy.zetPlacementOverride = true;
 
     const lastLine = cm.lastLine();

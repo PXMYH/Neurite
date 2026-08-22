@@ -2261,7 +2261,15 @@ input[type=range] {
     transition: opacity .2s;
     margin: 12px 0;
     background: linear-gradient(to right, #888 0%, #888 50%, #888 50%, #888 100%);
+    /* A control that exists to be dragged was showing the default arrow. `cursor`
+       is inherited, so the thumb pseudo-elements pick this up too and follow the
+       active state instead of hard-coding one of their own. */
+    cursor: grab;
 }
+
+    input[type=range]:active {
+        cursor: grabbing;
+    }
 
     /* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
     input[type=range]::-webkit-slider-thumb {
@@ -2270,7 +2278,6 @@ input[type=range] {
         width: 10px;
         height: 20px;
         background: #bbb;
-        cursor: pointer;
         border-radius: 4px;
         margin-top: -1px;
     }
@@ -2283,7 +2290,6 @@ input[type=range] {
         width: 10px;
         height: 20px;
         background: #bbb;
-        cursor: pointer;
         border-radius: 4px;
     }
 

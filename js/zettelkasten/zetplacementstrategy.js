@@ -1,4 +1,9 @@
 class NodePlacementStrategy {
+    // How many placements one lap of the spiral spreads over the viewport. Chosen
+    // so neighbouring slots sit further apart than a default card is wide.
+    static SPREAD_SLOTS = 12;
+    #spreadIndex = 0;
+
     constructor(pathObject, nodeObjects = {}) {
         this.nodeObjects = nodeObjects;
         this.path = pathObject.path || [];
@@ -16,11 +21,11 @@ class NodePlacementStrategy {
         Logger.debug("Calculating position and scale...");
         Logger.debug("Current path index:", this.currentPathIndex);
         Logger.debug("Path length:", this.path.length);
-        Logger.debug("random?", this.zetPlacementOverride);
+        Logger.debug("override?", this.zetPlacementOverride);
 
         if (this.zetPlacementOverride) { // Use the directly passed flag
-            Logger.debug("Placement override active, creating random node");
-            return this.createRandomNode(currentNodeTitle);
+            Logger.debug("Placement override active, spreading a node over the viewport");
+            return this.createSpreadNode(currentNodeTitle);
         }
 
         const nodeKeys = Object.keys(this.nodeObjects);
@@ -39,15 +44,15 @@ class NodePlacementStrategy {
         Logger.debug("Current path point:", currentPathPoint);
 
         if (!currentPathPoint) {
-            Logger.debug("Current path point is undefined, creating random node");
+            Logger.debug("Current path point is undefined, spreading a node over the viewport");
             this.currentPathIndex = (this.currentPathIndex + 1) % this.path.length;
-            return this.createRandomNode(currentNodeTitle);
+            return this.createSpreadNode(currentNodeTitle);
         }
 
         if (currentPathPoint.useCreateTextNode) {
-            Logger.debug("Current path point indicates creating random node");
+            Logger.debug("Current path point indicates spreading a node over the viewport");
             this.currentPathIndex = (this.currentPathIndex + 1) % this.path.length;
-            return this.createRandomNode(currentNodeTitle);
+            return this.createSpreadNode(currentNodeTitle);
         }
 
         const startNode = this.getStartNode(currentPathPoint);
@@ -68,8 +73,25 @@ class NodePlacementStrategy {
         return createTextNodeWithPosAndScale(currentNodeTitle, '', newScale, newX, newY);
     }
 
-    createRandomNode(currentNodeTitle) {
-        return TextNode.create(currentNodeTitle, '', (Math.random() - 0.5) * 1.8, (Math.random() - 0.5) * 1.8)
+    // Was two uniform random draws over the viewport. Uniform draws clump: two
+    // notes created in a row could land a few pixels apart, and the second card
+    // then sat on top of the first with nothing to say either was there. Walking
+    // a golden-angle spiral instead spreads consecutive placements apart by
+    // construction and covers the viewport evenly, without needing to know how
+    // big a card is in plane units.
+    //
+    // Only the radius wraps at SPREAD_SLOTS; the angle keeps advancing off the
+    // raw counter. A lap is therefore rotated against the one before it, so
+    // placement 13 interleaves with the first twelve instead of landing on top
+    // of placement 1. Past a lap or two the viewport is genuinely crowded and
+    // no placement rule can keep cards apart — that is a zoom level problem.
+    createSpreadNode(currentNodeTitle) {
+        const n = this.#spreadIndex++;
+        const angle = n * 2.399963229728653;    // golden angle, in radians
+        // sqrt keeps the points area-uniform rather than bunched at the centre.
+        const slot = n % NodePlacementStrategy.SPREAD_SLOTS;
+        const radius = 0.9 * Math.sqrt((slot + 0.5) / NodePlacementStrategy.SPREAD_SLOTS);
+        return TextNode.create(currentNodeTitle, '', radius * Math.cos(angle), radius * Math.sin(angle))
     }
 
     getStartNode(currentPathPoint) {
