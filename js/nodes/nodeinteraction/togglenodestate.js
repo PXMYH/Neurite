@@ -104,6 +104,7 @@ NodeView.prototype.initCollapsed = function(){
     if (!this.btnExpand) {
         this.btnExpand = this.getBtnExpand();
         On.click(this.btnExpand, this.toggleCollapse.bind(this));
+        On.keydown(this.btnExpand, NodeView.keyActivates(this.toggleCollapse.bind(this)));
 
         const circle = this.circleCollapsed = this.getCircleCollapsed();
         On.dblclick(circle, this.onCircleDoubleClicked.bind(this));
@@ -115,6 +116,12 @@ NodeView.prototype.initCollapsed = function(){
 NodeView.prototype.makeBtnExpand = function(){
     const btn = Svg.new.svg();
     btn.setAttribute('class', 'expand-button');
+    // Collapsing hides the header and the collapse button with it, so this is
+    // the only way back out. It has to be reachable by the same means that got
+    // the card collapsed, or Enter on the collapse button is a one-way trip.
+    btn.setAttribute('tabindex', '0');
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('aria-label', 'expand');
     btn.style.zIndex = 'inherit';
 
     const useElem = Svg.new.use();

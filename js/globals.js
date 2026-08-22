@@ -196,7 +196,14 @@ Settings.default = {
         hover: ["RGB(100,100,100)", "RGB(200,200,255)"],
         click: ["RGB(70,70,70)", "RGB(100,100,100)"],
         initial: ["none", "RGB(170,170,170)"],
-        focus: ["none", "RGB(200,200,255)"]
+        // `focus` means the card's title has focus, and it tints all three
+        // buttons at once — so it cannot also say which single button the Tab
+        // key has landed on. `keyFocus` is that one button, in the accent
+        // colour (`--ui-accent`, RGB(90,126,192)). A CSS outline is no use
+        // here: these groups carry `scale(0.125)`, which shrinks an outline
+        // along with everything else.
+        focus: ["none", "RGB(200,200,255)"],
+        keyFocus: ["RGB(90,126,192)", "RGB(240,240,255)"]
     },
 
     maxDist: 4,

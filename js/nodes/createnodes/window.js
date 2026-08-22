@@ -8,6 +8,20 @@ class NodeView {
     }
     static byId(id){ return Graph.nodeViews[id] }
 
+    // Wraps a click callback as a keydown handler, so an element that is only
+    // focusable because it was given a `tabindex` still activates the way a real
+    // <button> would. Every card control is an SVG element rather than a
+    // <button>, so each of them needs this.
+    static keyActivates(cb){
+        return (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault(); // Space would scroll the page
+            e.stopPropagation();
+            if (e.repeat) return; // a held key is one activation, not many
+            cb(e);
+        };
+    }
+
     static windowify(title, content, node, nscale_mult = 1, intrinsicScale = 1){
         const odiv = node.content;
         const div = Html.make.div('window');
@@ -290,11 +304,45 @@ class NodeView {
     applySvgButtonUI(btn, cb = () => {}, mode = "fill") {
         const input = this.titleInput;
 
+        // An SVG group is not focusable and receives no key events, so every
+        // card button was mouse-only: no way to delete a node, zoom to it or
+        // collapse it from the keyboard. `tabindex` puts the group in the tab
+        // order, `role` has it announced as a button, and the keydown handler
+        // below supplies the Enter/Space activation a real <button> would have
+        // brought with it. Wrapping each glyph in an actual <button> would have
+        // been the shorter route, but it changes the SVG that saved graphs
+        // re-hydrate. The name comes off the id (`button-delete` -> "delete"),
+        // so `addSvgButton` callers are covered without touching their signature.
+        btn.setAttribute('tabindex', '0');
+        btn.setAttribute('role', 'button');
+        if (!btn.hasAttribute('aria-label')) {
+            btn.setAttribute('aria-label', btn.id.replace(/^button-/, '').replace(/-/g, ' '));
+        }
+
         const onMouseLeave = () => {
-            const focusState = (input?.matches(':focus') ? 'focus' : 'initial');
+            // Also the blur handler, where `btn` has already lost focus, so the
+            // first branch only fires for a pointer leaving a button the Tab key
+            // is still sitting on — which should keep its ring rather than go dark.
+            const focusState = btn.matches(':focus-visible') ? 'keyFocus'
+                             : (input?.matches(':focus') ? 'focus' : 'initial');
             this.setSvgButtonStyle(btn, focusState, mode);
             btn.ready = false;
         };
+
+        On.focus(btn, () => {
+            // `:focus-visible`, not plain focus: clicking a button focuses it
+            // too, and lighting it up afterwards would leave the card looking
+            // like it had a button selected. Same distinction the CSS draws.
+            if (btn.matches(':focus-visible')) this.setSvgButtonStyle(btn, 'keyFocus', mode);
+        });
+        On.blur(btn, onMouseLeave);
+        On.keydown(btn, NodeView.keyActivates((e) => {
+            this.setSvgButtonStyle(btn, "click", mode);
+            cb(e);
+        }));
+        On.keyup(btn, (e) => {
+            if (e.key === 'Enter' || e.key === ' ') this.setSvgButtonStyle(btn, 'keyFocus', mode);
+        });
 
         On.mouseenter(btn, () => this.setSvgButtonStyle(btn, "hover", mode));
         On.mouseleave(btn, onMouseLeave);

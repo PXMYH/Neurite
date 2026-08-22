@@ -134,11 +134,21 @@ body {
     width: 24px;
     height: 24px;
     cursor: pointer;
-    display: none;
+    /* Invisible rather than `display: none`. A display-none element cannot hold
+       focus, and this is the only control that reopens a collapsed card — so
+       hiding it that way made the pointer the one way back, and collapsing a
+       card from the keyboard was a one-way trip. `pointer-events` off stops the
+       now-present element from swallowing clicks aimed at the circle beneath it
+       while it is invisible. Whether the card is collapsed at all is decided by
+       an inline `display` from `Elem.hide`, which still applies. */
+    opacity: 0;
+    pointer-events: none;
 }
 
-.collapsed:hover .expand-button {
-    display: block;
+.collapsed:hover .expand-button,
+.expand-button:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 
@@ -4293,4 +4303,67 @@ code.language-markdown {
 .link-anchor:hover {
     color: #888;
     background-color: #1a1a1d;
+}
+
+/* Keyboard focus.
+
+   Twenty-two `outline: none` declarations were spread through this file, so
+   tabbing through the app moved an invisible caret: no control said it had
+   focus. Most of them were removing the browser's ring in favour of a border
+   or background change, which is a fair trade — those are left alone. This
+   block is the ones that replaced the ring with nothing.
+
+   `:focus-visible` rather than `:focus`, so a click never leaves a ring behind
+   — the browser decides, and it only counts keyboard and similar input. The
+   block sits last in the file on purpose: it ties the specificity of
+   `input[type=range]`, `textarea:focus` and `.Searchbar:focus` and wins on
+   order. The four selectors after `.expand-button` do not tie — each of those
+   rules names a class or an id alongside `:focus`, so it outranks a bare
+   `input`/`textarea` and has to be matched selector for selector. */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.Searchbar:focus-visible,
+.expand-button:focus-visible,
+textarea#rawTextArea:focus-visible,
+textarea#prompt:focus-visible,
+textarea[id^='custom-instructions-textarea-']:focus-visible,
+.prompt-list input:focus-visible,
+.custom-textarea:focus-visible,
+#customContextMenu .custom-node-method-input:focus-visible {
+    outline: 2px solid var(--ui-accent);
+    /* Offset so the ring reads as a ring and not as a new border: several of
+       these controls sit flush against a panel edge or a slider. */
+    outline-offset: 2px;
+}
+
+/* The one place the ring is the wrong tool. A card button is an SVG `<g>` under
+   `scale(0.125)`, and an outline on a group is painted in the group's own
+   coordinate system — so the browser's ring comes out at an eighth size, in
+   Chrome's blue rather than the app's accent. These buttons say they have focus
+   by repainting instead: `settings.buttonGraphics.keyFocus` fills the button's
+   background rect with the accent colour, applied in `applySvgButtonUI`. */
+.windowbutton:focus-visible {
+    outline: none;
+}
+
+/* Pressed feedback. Every button in the app had a `:hover` and nothing for the
+   press, so a click gave no acknowledgement of its own — the only signal was
+   whatever the action went on to do. One pixel down is enough, and `transform`
+   keeps it off the layout. `.copy-button` and `.pin-button` are left out: both
+   already animate a scale, and one `transform` would overwrite the other. */
+.linkbuttons:active,
+.key-button:active,
+.deletebuttons:active,
+.api-modal-button:active,
+.question-button:active,
+.add-prompt-button:active,
+.delete-prompt-button:active,
+.set-instructions-button:active,
+.prompt-library-button:active,
+.code-button:active,
+.modal-ok:active,
+.modal-cancel:active {
+    transform: translateY(1px);
 }
