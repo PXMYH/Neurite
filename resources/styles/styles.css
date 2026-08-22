@@ -3416,11 +3416,15 @@ code.language-markdown {
     }
 
 /*Node Panel*/
+/* The palette is canvas furniture, not a menu item: it is the only visible way
+   to make a note, so it has no hidden resting state. It used to sit at
+   `translateX(-200%)` and slide in only while the dropdown was open, which put
+   every node-creating affordance off-screen on a fresh load. */
 .node-panel {
     position: fixed;
     left: 0;
     top: 0;
-    width: auto;
+    width: fit-content;
     height: auto;
     background: #1a1921bf;
     backdrop-filter: blur(6px);
@@ -3434,8 +3438,6 @@ code.language-markdown {
     border-bottom-right-radius: 8px;
     border-top-left-radius: 8px;
     z-index: 100;
-    transform: translateX(-200%); /* Start off-screen to the left */
-    transition: transform 0.3s ease; /* Transition for sliding effect */
     overflow: hidden; /* Hide overflow */
     /*-webkit-box-shadow: 0px 0px 30px 10px rgba(21, 21, 27, 0.44);
     -moz-box-shadow: 0px 0px 30px 10px rgba(21, 21, 27, 0.44);
@@ -3443,11 +3445,6 @@ code.language-markdown {
     margin-top: 10px;
     margin-left: 12px;
 }
-
-    .node-panel.open {
-        transform: translateX(0%); /* Slide in to view */
-        width: fit-content; /* Adjust width to fit the content */
-    }
 
 .icon-row {
     display: flex;

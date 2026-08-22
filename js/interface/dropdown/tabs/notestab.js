@@ -146,6 +146,7 @@ class ZetPanes {
         this.addPaneButton = container.querySelector('.zet-add-pane-button');
         this.deletePaneButton = container.querySelector('.zet-delete-pane-button');
         this.searchButton = container.querySelector('#notesSearchButton');
+        this.settingsButton = container.querySelector('.zet-settings-button');
     }
 
     init(){
@@ -156,6 +157,10 @@ class ZetPanes {
         On.click(this.deletePaneButton, this.removeSelectedPane);
         On.change(this.paneDropdown, ()=>{ this.switchPane(this.paneDropdown.value) } );
         On.click(this.searchButton, ZetPanes.openSearchModal);
+        // These are Zettelkasten settings, so they belong beside the archive
+        // controls. They used to hang off a click on the node palette's note
+        // icon, where nothing suggested they existed.
+        On.click(this.settingsButton, ZetPanes.openSettingsModal);
 
         this.addPane();
     }
@@ -328,5 +333,9 @@ class ZetPanes {
         Modal.open('zetSearchModal');
         setupZettelkastenSearchBar();
         performZettelkastenSearch(Elem.byId('Searchbar').value);
+    }
+
+    static openSettingsModal(){
+        Modal.open('noteModal'); // titled "Zettelkasten Settings"
     }
 }

@@ -114,10 +114,11 @@ On.dblclick(dropdownContent, Event.stopPropagation);
 On.click(menuButton, (e)=>{
     e.stopPropagation();
 
-    // Toggle the "open" class on the menu button and dropdown content
+    // Toggle the "open" class on the menu button and dropdown content.
+    // The node panel is deliberately not in here: it is always on screen, so
+    // hiding it with the dropdown made every way to create a note vanish.
     menuButton.classList.toggle("open");
     dropdownContent.classList.toggle("open");
-    nodePanel.classList.toggle("open");
 
     // If the dropdown is opened, manually set the first tab to active and display its content
     if (dropdownContent.classList.contains("open")) {

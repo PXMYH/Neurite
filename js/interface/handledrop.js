@@ -55,8 +55,15 @@ function makeIconDraggable(iconDiv) {
 
     On.click(iconDiv, (e) => {
         if (!Mouse.isDragging) {
+            // A note needs no input to exist, so a click makes one rather than
+            // asking for anything — the same call the drop path makes below.
+            // The other three icons open a modal because a link needs a URL and
+            // a file tree needs a directory; this one used to open Zettelkasten
+            // Settings, which is unrelated to creating a note and left the
+            // tooltip's promise unkept. Those settings now live on the gear in
+            // the Notes tab's pane header.
             if (iconDiv.classList.contains('note-icon')) {
-                Modal.open('noteModal');
+                createNodeFromWindow('', '', true);
             }
             if (iconDiv.classList.contains('ai-icon')) {
                 Modal.open('aiModal');
