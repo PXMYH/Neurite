@@ -2580,6 +2580,28 @@ td {
     position: fixed;
 }
 
+/* Reads as a state, not a control: saving is not something to switch off. */
+.autosave-status {
+    display: block;
+    padding: 5px;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: #8a8a8a;
+    cursor: default;
+}
+
+.autosave-status::before {
+    content: "\25CF"; /* a filled dot -- this is on right now */
+    color: var(--ui-accent);
+    margin-right: 5px;
+    font-size: 11px;
+    vertical-align: 1px;
+}
+
+#disk-file-button {
+    font-size: 13px;
+}
+
 .coordinates-container {
     background-color: #222226; /* Replace with your desired background color */
     border-top: 2px solid #727272;

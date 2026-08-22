@@ -5,11 +5,8 @@
 
     <div class="top-section">
         <div class="buttons-left">
-            <div title="Autosave enabled">
-                <input type="checkbox" id="autosave-enabled" name="autosave-enabled">
-                <label for="autosave-enabled">Autosave</label>
-            </div>
-            <a id="new-save-button">Save As...</a>
+            <span class="autosave-status" title="Every change is saved on its own, every 8 seconds and whenever this tab is hidden. There is no manual save.">Autosaving</span>
+            <a id="disk-file-button" title="Also write every autosave to a file on this computer.">Save to file…</a>
             <a id="clear-button">Clear</a>
             <div id="clear-sure" style="display:none">
                 <a id="clear-sure-button">Yes</a>

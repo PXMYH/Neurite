@@ -2,11 +2,106 @@
     return new Blob([json], {type: 'application/json'})
 }
 
+// A web page cannot write to disk on its own. The user has to name the file
+// once, in a real click, and only then may the page keep writing to it. Chrome
+// remembers that grant across restarts, so after the one click every autosave
+// lands in that file with no further prompting. Safari -- and every browser on
+// iOS -- has no file picker at all, so there this stays off and the copy in
+// IndexedDB is the only one. That is why `isSupported` is checked before the
+// button is even shown, rather than failing at the moment of the click.
+class DiskMirror {
+    static isSupported = (typeof window.showSaveFilePicker === 'function');
+
+    #handle = null;
+    #state = null;
+    #writing = null;
+
+    get isActive(){ return this.#handle !== null }
+
+    useState(state){
+        this.#state = state;
+        if (!DiskMirror.isSupported) return Promise.resolve(false);
+
+        return state.load('disk-file-handle').then(this.#adoptStored);
+    }
+    #adoptStored = (handle)=>{
+        if (!handle) return false;
+
+        // The handle survives a restart but its permission may not, and
+        // re-requesting one needs a user gesture that a page load does not
+        // have. So adopt an already-granted handle silently and leave the
+        // rest to the button.
+        return handle.queryPermission({mode: 'readwrite'})
+            .then(this.#adoptIfGranted.bind(this, handle))
+            .catch(this.#onStoredHandleUnusable);
+    }
+    #adoptIfGranted = (handle, permission)=>{
+        if (permission !== 'granted') return false;
+
+        this.#handle = handle;
+        return true;
+    }
+    #onStoredHandleUnusable = (err)=>{
+        Logger.warn("Stored disk file is unusable:", err);
+        this.forget();
+        return false;
+    }
+
+    pick(){ // only from within a user gesture
+        return window.showSaveFilePicker({
+            suggestedName: 'neurite-graph.neurite',
+            types: [{
+                description: "Neurite graph",
+                accept: {'application/octet-stream': ['.neurite', '.txt']}
+            }]
+        }).then(this.#adoptPicked, this.#onPickFailed)
+    }
+    #adoptPicked = (handle)=>{
+        this.#handle = handle;
+        this.#state?.save('disk-file-handle', handle)
+            .catch(Logger.warn.bind(Logger, "Could not remember the disk file:"));
+        return true;
+    }
+    #onPickFailed = (err)=>{
+        if (err?.name !== 'AbortError') Logger.warn("No disk file chosen:", err);
+        return false;
+    }
+
+    forget(){
+        this.#handle = null;
+        return this.#state?.delete('disk-file-handle');
+    }
+
+    write(blob){
+        const handle = this.#handle;
+        if (!handle) return Promise.resolve();
+
+        // Autosave runs on a timer, so a slow disk must not leave two writes
+        // holding the same file open. Queue them behind each other instead.
+        this.#writing = Promise.resolve(this.#writing)
+            .then(this.#writeThrough.bind(this, handle, blob))
+            .catch(this.#onWriteFailed);
+        return this.#writing;
+    }
+    #writeThrough(handle, blob){
+        return handle.createWritable()
+            .then( (stream)=>stream.write(blob).then(stream.close.bind(stream)) )
+    }
+    #onWriteFailed = (err)=>{
+        // Keeping the handle would mean repeating the same failure every eight
+        // seconds. Drop it, say so once, and let the button reconnect.
+        Logger.err("Failed to mirror the save to disk:", err);
+        this.#handle = null;
+    }
+}
+
 class GraphsKeeper {
     #blobData = new Stored('blobs', 'blob-data');
     #blobMeta = new Stored('graphs', 'blob-meta');
     #data = new Stored('graphs', 'graph-data');
     #meta = new Stored('graphs', 'graph-meta');
+
+    disk = new DiskMirror();
 
     blobForBlobId(blobId){ return this.#blobData.load(blobId) }
     blobMetaForGraphId(graphId){ return this.#blobMeta.load(graphId) }
@@ -22,9 +117,11 @@ class GraphsKeeper {
         this.#blobMeta.load(graphId).then(this.#deleteBlobs);
         this.#blobMeta.delete(graphId);
         this.#data.delete(graphId);
+        this.#lastWritten.delete(graphId);
         return this.#meta.delete(graphId);
     }
     drop(){
+        this.forgetLastWritten();
         Stored.drop('blobs');
         return Stored.drop('graphs');
     }
@@ -36,14 +133,39 @@ class GraphsKeeper {
     saveBlobMeta(graphId, dictMeta){
         return this.#blobMeta.save(graphId, dictMeta)
     }
+    // Autosave fires every eight seconds whether or not anything moved. Writing
+    // an unchanged graph would spend a revision, a whole IndexedDB write and --
+    // once a disk file is bound -- a whole file rewrite, on every tick of an
+    // idle tab. So compare against the last write and do nothing when the graph
+    // is the same. Only a completed write counts, or a store that rejected the
+    // data would look written.
+    #lastWritten = new Map();
+
+    forgetLastWritten(){ this.#lastWritten.clear() }
+
     saveMetaAndData(meta, data){
+        if (this.#lastWritten.get(meta.graphId) === data) return Promise.resolve();
+
         meta.lastUpdated = new Date().toLocaleString();
         meta.revisions += 1;
         meta.size = new Blob([data]).size;
-        this.#data.save(meta.graphId, data);
-        return this.saveMeta(meta);
+        return this.#data.save(meta.graphId, data)
+            .then(this.saveMeta.bind(this, meta))
+            .then(this.#markWritten.bind(this, meta.graphId, data))
+            .then(this.#mirrorToDisk.bind(this, meta));
     }
+    #markWritten(graphId, data){ this.#lastWritten.set(graphId, data) }
     saveMeta(meta){ return this.#meta.save(meta.graphId, meta) }
+
+    #mirrorToDisk(meta){
+        if (!this.disk.isActive) return;
+
+        // Mirror the same bundle the drop-to-import path reads, so the file on
+        // disk is a whole graph -- images and media included -- rather than
+        // markup that points at blobs left behind in IndexedDB.
+        return (new GraphExporter(meta, this)).export().then(this.#writeToDisk);
+    }
+    #writeToDisk = (blob)=>this.disk.write(blob);
 }
 
 class GraphExporter {
@@ -151,7 +273,7 @@ View.Graphs = class {
     #btnClear = Elem.byId('clear-button');
     #btnClearSure = Elem.byId('clear-sure-button');
     #btnClearUnsure = Elem.byId('clear-unsure-button');
-    #chkboxAutosave = Elem.byId('autosave-enabled');
+    #btnDiskFile = Elem.byId('disk-file-button');
     #divClearSure = Elem.byId('clear-sure');
     #dropArea = Elem.byId('saved-networks-container');
 
@@ -168,13 +290,6 @@ View.Graphs = class {
         this.#selectedGraph = meta;
         this.#state.save('latest-selected', meta?.graphId);
         return this;
-    }
-
-    #downloadTitledBlob(title, blob){
-        const tempAnchor = Html.make.a(URL.createObjectURL(blob));
-        tempAnchor.download = title + '.txt';
-        tempAnchor.click();
-        Promise.delay(1).then(URL.revokeObjectURL.bind(URL, tempAnchor.href));
     }
 
     #updateGraphs = ()=>{
@@ -228,20 +343,16 @@ View.Graphs = class {
 
         #makeDiv(meta, isSelected){
             const inputTitle = this.#makeTitleInput(meta.title);
-            const btnSave = this.#makeLinkButton("Save");
             const btnLoad = this.#makeLinkButton("Load");
-            const btnDownload = this.#makeLinkButton("↓");
             const btnDelete = this.#makeLinkButton("X");
 
             On.change(inputTitle, this.#onTitleInputChanged);
-            On.click(btnSave, this.#onBtnSaveClicked);
             On.click(btnLoad, this.#onBtnLoadClicked);
-            On.click(btnDownload, this.#onBtnDownloadClicked);
             On.click(btnDelete, this.#onBtnDeleteClicked);
 
             const div = Html.new.div();
             if (isSelected) div.classList.add("selected-save");
-            div.append(inputTitle, btnSave, btnLoad, btnDownload, btnDelete);
+            div.append(inputTitle, btnLoad, btnDelete);
             div.title = "added on: " + meta.added + "\n"
                     + "revisions: " + meta.revisions + "\n"
                     + "last: " + meta.lastUpdated + "\n"
@@ -264,22 +375,6 @@ View.Graphs = class {
             this.meta.title = e.target.value;
             this.mom.#stored.saveMeta(this.meta);
         }
-        #onBtnSaveClicked = (e)=>{
-            const title = this.meta.title;
-            const selected = this.mom.#selectedGraph;
-            if (this.meta === selected) {
-                return this.mom.#saver.saveWithTitle(title)
-            }
-
-            const msg = "This will overwrite " + title
-                    + " with the currently selected save, " + selected.title
-                    + ". Continue?"
-            window.confirm(msg).then(this.#handleConfirmOverwrite);
-        }
-        #handleConfirmOverwrite = (confirmed)=>{
-            if (confirmed) this.mom.#saver.saveWithTitle(this.meta.title)
-        }
-
         #onBtnLoadClicked = (e)=>{
             if (this.meta.size > 0) return this.#proceedWithLoad();
 
@@ -290,8 +385,13 @@ View.Graphs = class {
             if (confirmed) this.#proceedWithLoad()
         }
         #proceedWithLoad(){
-            this.mom.#autosave();
-            this.mom.#stored.dataForMeta(this.meta).then(this.#loadData);
+            // Wait for the autosave to finish reading the screen. It scrapes the
+            // live DOM one microtask later, so loading straight away would hand
+            // the incoming graph to the outgoing graph's save.
+            return this.mom.#autosave().then(this.#loadSelf);
+        }
+        #loadSelf = ()=>{
+            return this.mom.#stored.dataForMeta(this.meta).then(this.#loadData)
         }
         #loadData = (data)=>{
             this.mom.#setSelectedGraph(this.meta)
@@ -307,14 +407,6 @@ View.Graphs = class {
             const isSelected = (meta === mom.#selectedGraph);
             if (isSelected) mom.#state.delete('latest-selected');
             mom.#stored.deleteForMeta(meta).then(mom.#updateGraphs);
-        }
-
-        #onBtnDownloadClicked = (e)=>{
-            (new GraphExporter(this.meta, this.mom.#stored)).export()
-                .then(this.#downloadBlob)
-        }
-        #downloadBlob = (blob)=>{
-            this.mom.#downloadTitledBlob(this.meta.title, blob)
         }
 
         updateForBlob(){
@@ -361,11 +453,7 @@ View.Graphs = class {
         const file = e.dataTransfer.files[0];
         if (!file) return Logger.info("Missing file");
 
-        this.#saveSelected().then(this.#import.bind(this, file));
-    }
-    #saveSelected = ()=>{
-        const title = this.#selectedGraph?.title;
-        return (title ? this.#saver.saveWithTitle(title) : Promise.resolve());
+        this.#autosave().then(this.#import.bind(this, file));
     }
     #import(file){
         const importer = new GraphImporter();
@@ -420,19 +508,17 @@ View.Graphs = class {
     }
 
     #onBtnClearSureClicked = (e)=>{
-        window.confirm("Create a new save?")
-            .then(this.#handleConfirmNewSave)
-            .then(this.#afterNewSave)
-    }
-    #handleConfirmNewSave = (createNewSave)=>{
-        this.#setSelectedGraph(null).#clearGraph();
-        App.zetPanes.addPane();
-        if (createNewSave) return this.#saver.save();
-    }
-    #afterNewSave = ()=>{
-        this.#updateGraphs();
         Elem.hide(this.#divClearSure);
         this.#btnClear.text = "Clear";
+        // Bank what is on screen before wiping it, then leave nothing selected:
+        // the next autosave tick opens a fresh save rather than overwriting the
+        // one just banked.
+        this.#autosave().then(this.#startNewGraph);
+    }
+    #startNewGraph = ()=>{
+        this.#setSelectedGraph(null).#clearGraph();
+        App.zetPanes.addPane();
+        return this.#updateGraphs();
     }
 
     #onBtnResetSettingsClicked(e){
@@ -457,17 +543,10 @@ View.Graphs = class {
             this.title = title;
         }
 
-        handleConfirmation(force = false){
+        save(){
             const len = this.mom.#graphs
                         .filter(Object.hasTitleThis, this.title).length;
-            return (len < 1) ? this.addSaveAndSelectIt("new")
-                 : (force) ? this.#handleForce(force)
-                 : window.confirm(this.#getMsgConfirmForce(len))
-                    .then(this.#handleForce);
-        }
-        #handleForce = (force)=>{
-            return (force) ? this.#overwrite()
-                 : this.addSaveAndSelectIt("duplicate")
+            return (len < 1) ? this.addSaveAndSelectIt("new") : this.#overwrite();
         }
 
         #overwrite(){
@@ -501,27 +580,11 @@ View.Graphs = class {
         #afterAddSave = ()=>{
             Logger.info("Added", this.#type, "save:", this.title)
         }
+        // Autosave runs on a timer, so this must not ask the user anything -- a
+        // prompt here would reappear every eight seconds. The disk file is the
+        // way out of a full store, and the button that picks one stays visible.
         #onSaveError = (err)=>{
-            Logger.err("Failed to save in local storage:", err);
-            return window.confirm(this.#msgFull)
-                .then(this.#handleConfirmDownload);
-        }
-        #msgFull = "Local storage is full. Download the data as a .txt file?";
-        #handleConfirmDownload = (shouldDownload)=>{
-            return shouldDownload && this.makeData().then(this.#downloadData)
-        }
-        #downloadData = (data)=>{
-            const blob = new Blob([data], { type: 'text/plain' });
-            this.mom.#downloadTitledBlob(this.title, blob);
-        }
-
-        #getMsgConfirmForce(len){
-            return (len > 1 ? len : 'A')
-                + " save" + (len > 1 ? 's' : '')
-                + ' of title "' + this.title + '"'
-                + " already exist" + (len > 1 ? '' : 's')
-                + ". Click 'Yes' to overwrite" + (len > 1 ? " all" : '')
-                + ", or 'No' to create a duplicate."
+            Logger.err("Failed to save:", this.title, err)
         }
     }
 
@@ -667,21 +730,14 @@ View.Graphs = class {
             return nodeData + zettelkastenPanesSaveElements.join('') + this.#collectAdditionalSaveObjects();
         }
 
-        #handleTitle(title, isExisting){
+        saveWithTitle(title){
             const mom = this.mom;
             const meta = mom.#graphs.find(Object.hasTitleThis, title);
             if (meta) mom.#setSelectedGraph(meta);
 
             return (new View.Graphs.CoreSaver(mom, title, this.#makeSaveData))
-                .handleConfirmation(isExisting)
+                .save()
                 .then(mom.#updateGraphs);
-        }
-        saveWithTitle(title){ return this.#handleTitle(title, true) }
-        save(){
-            return prompt("Enter a title for this save:").then( (input)=>{
-                const title = (input ?? "").trim();
-                if (title) return this.#handleTitle(title);
-            })
         }
     }
 
@@ -832,11 +888,54 @@ View.Graphs = class {
         img.src = URL.createObjectURL(blob);
     }
 
+    // Autosave is the only way a graph is written, so it can never decline to
+    // run: with nothing selected it opens a save of its own instead of dropping
+    // the work. The one case it does skip is a blank title, which #updateGraphs
+    // sets while it rebuilds the list -- that is a save in progress, not an
+    // unsaved graph.
     #autosave = ()=>{
-        const title = this.#selectedGraph?.title;
-        if (!title || !this.#chkboxAutosave.checked) return;
+        const selected = this.#selectedGraph;
+        if (!selected) return this.#saver.saveWithTitle(this.#titleForNewGraph());
+        if (!selected.title) return Promise.resolve();
 
-        this.#saver.saveWithTitle(title);
+        return this.#saver.saveWithTitle(selected.title);
+    }
+    // #maxGraphId only ever climbs, so this cannot collide with a title already
+    // in the list, and it stays readable in the way a timestamp would not.
+    #titleForNewGraph(){ return "Graph " + (this.#maxGraphId + 1) }
+
+    #startAutosave = ()=>{
+        setInterval(this.#autosave, 8000);
+        // Eight seconds is a long time to lose when a tab closes or an iPad
+        // switches apps. Neither fires a reliable unload, but both go hidden.
+        On.visibilitychange(document, this.#onVisibilityChanged);
+    }
+    #onVisibilityChanged = (e)=>{
+        if (document.visibilityState === 'hidden') this.#autosave();
+    }
+
+    #updateDiskFileButton = ()=>{
+        const btn = this.#btnDiskFile;
+        if (!btn) return;
+        if (!DiskMirror.isSupported) return Elem.hide(btn);
+
+        const isActive = this.#stored.disk.isActive;
+        btn.text = (isActive ? "Saving to file" : "Save to file…");
+        btn.title = (isActive
+            ? "Every autosave also writes to the file you picked. Click to pick another."
+            : "Also write every autosave to a file on this computer.");
+    }
+    #onBtnDiskFileClicked = (e)=>{
+        this.#stored.disk.pick().then(this.#afterDiskFilePicked)
+    }
+    #afterDiskFilePicked = (isPicked)=>{
+        this.#updateDiskFileButton();
+        if (!isPicked) return;
+
+        // The graph is already in the store, so the next autosave would find
+        // nothing changed and skip -- leaving the new file empty. Fill it now.
+        this.#stored.forgetLastWritten();
+        return this.#autosave();
     }
 
     init(){
@@ -845,9 +944,12 @@ View.Graphs = class {
         On.click(this.#btnClear, this.#onBtnClearClicked);
         On.click(this.#btnClearSure, this.#onBtnClearSureClicked);
         On.click(this.#btnClearUnsure, this.#onBtnClearUnsureClicked);
+        On.click(this.#btnDiskFile, this.#onBtnDiskFileClicked);
         On.click(Elem.byId('resetSettings'), this.#onBtnResetSettingsClicked);
         On.click(Elem.byId('clearLocalStorage'), this.#onBtnClearLocalClicked);
-        On.click(Elem.byId('new-save-button'), (e)=>this.#saver.save() );
+
+        this.#stored.disk.useState(this.#state)
+            .then(this.#updateDiskFileButton);
 
         for (const htmlnode of Graph.htmlNodes.children) {
             const node = new Node(htmlnode);
@@ -887,8 +989,11 @@ View.Graphs = class {
 
         const classLoader = (stateFromURL) ? View.Graphs.FileStateLoader
                           : View.Graphs.LocalStorageStateLoader;
+        // The timer starts only once the previous session is back on screen,
+        // or the first tick would open a new save before the old one loads.
         return (new classLoader(this)).load(stateFromURL)
-            .then(this.#updateGraphs);
+            .then(this.#updateGraphs)
+            .then(this.#startAutosave);
     }
 
     static FileStateLoader = class {
@@ -917,11 +1022,8 @@ View.Graphs = class {
     static LocalStorageStateLoader = class {
         constructor(mom){ this.mom = mom }
         load(){
-            const stored = this.mom.#state;
-            return stored.load('latest-selected')
+            return this.mom.#state.load('latest-selected')
                 .then(this.#handleLatestSelected)
-                .then(stored.load.bind(stored, 'autosave-enabled'))
-                .then(this.#handleAutosaveEnabled);
         }
 
         #handleLatestSelected = (graphId)=>{
@@ -930,17 +1032,7 @@ View.Graphs = class {
             if (!meta) return;
 
             mom.#setSelectedGraph(meta);
-            mom.#stored.dataForMeta(meta).then(mom.#loadGraph.bind(mom));
-        }
-
-        #handleAutosaveEnabled = (autosaveEnabled)=>{
-            const mom = this.mom;
-            mom.#chkboxAutosave.checked = (autosaveEnabled === "true");
-            On.change(mom.#chkboxAutosave, this.#onCheckboxToggled);
-            setInterval(mom.#autosave, 8000);
-        }
-        #onCheckboxToggled = (e)=>{
-            this.mom.#state.save('autosave-enabled', e.target.checked)
+            return mom.#stored.dataForMeta(meta).then(mom.#loadGraph.bind(mom));
         }
     }
 }
