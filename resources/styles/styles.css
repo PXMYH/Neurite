@@ -1391,6 +1391,12 @@ textarea#prompt {
 
 .api-panel {
     display: flex;
+    /* Was a row, which left the four key buttons sharing whatever the key inputs
+       did not take: a 55px column, narrow enough that every one of `Save Keys`,
+       `Clear Keys`, `Keys .txt` and `Load Keys` broke across two lines. Stacking
+       the panel gives them the full width to sit in. The open height is measured
+       from `scrollHeight` in `togglePanel`, so the slide animation still fits. */
+    flex-direction: column;
     overflow: hidden;
     transition: height 0.2s ease;
     height: 0; /* Start with 0 height for the initial state if hidden */
@@ -1410,9 +1416,11 @@ textarea#prompt {
 
 .api-buttons {
     display: flex;
-    flex-direction: column;
+    /* Two per row: at the panel's width that is about 130px each, which is what
+       these labels need to stay on one line. */
+    flex-wrap: wrap;
+    gap: 4px;
     justify-content: center;
-    align-items: flex-end;
     margin-left: 0px;
 }
 
@@ -1976,6 +1984,9 @@ td {
 
         .key-button {
             z-index: 1;
+            /* Share the row two-up. `flex-basis: 45%` with wrapping puts two on
+               each line and lets them grow into whatever width is left over. */
+            flex: 1 1 45%;
             padding: 2px 2px;
             font-size: 14px;
             cursor: pointer;
@@ -1983,7 +1994,7 @@ td {
             transition: background-color 0.3s;
             border: inset;
             border-color: #8882;
-            margin-bottom: 4px;
+            /* Spacing is the container's `gap` now, in both axes. */
         }
 
             .key-button:hover {
@@ -2871,6 +2882,9 @@ input[type=range] {
     flex-direction: column;
     justify-content: left;
     width: 90%;
+    /* Covers the rows whose value is a `<span>` inside the label rather than a
+       `.number-input`, so every readout in the panel counts without shifting. */
+    font-variant-numeric: tabular-nums;
 }
 
     .settingsSlider.centered {
@@ -4219,6 +4233,12 @@ code.language-markdown {
 .number-input-wrapper {
     display: flex;
     align-items: baseline;
+    /* The value input has `width: 100%`, so it began exactly where the label
+       ended: `Length:50`, `Lines:128`, with nothing between the name of a
+       setting and its value. `column-gap` rather than `gap` because six of
+       these wrappers carry an inline `flex-direction: column` — their label is
+       already on its own line and does not need separating from the value. */
+    column-gap: 8px;
 }
 
 .number-input-wrapper:hover .number-input {
@@ -4238,7 +4258,25 @@ code.language-markdown {
     width: 100%;
     border: none;
     outline: none;
+    /* Right-aligned so the values line up as a column down the panel instead of
+       each one floating wherever its label happens to end. */
+    text-align: right;
+    /* These readouts change while a slider is dragged. Proportional digits make
+       the number jitter sideways as it counts; tabular ones hold their place. */
+    font-variant-numeric: tabular-nums;
+    /* Every one of these inputs sits beside its own slider, so the spin buttons
+       are dead weight — and they are not free: the browser reserves their width
+       whether or not they are visible, which in a 117px settings cell is enough
+       to clip a four-character value like `0.73`. */
+    appearance: textfield;
+    -moz-appearance: textfield;
 }
+
+    .number-input::-webkit-inner-spin-button,
+    .number-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
 
 
 .link-anchor {
