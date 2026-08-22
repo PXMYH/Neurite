@@ -617,9 +617,8 @@ Animation.addNote = function(nodeTitle, nodeText){
     }
 
     const position = { line: lastLine, ch: lastLineText.length };
-    processAll = true;
-    cm.replaceRange(newLinesToAdd + contentToAdd, position);
-    processAll = false;
+    zettelkastenProcessor.writeAs(ZettelkastenProcessor.Pass.rewrite,
+        ()=>cm.replaceRange(newLinesToAdd + contentToAdd, position));
 
     const node = ui.scrollToTitle(formattedTitle);
     return Promise.forAnimation("Add Note", 0, ()=>{

@@ -59,6 +59,25 @@ TextArea.ofNode = function(node){
 }
 
 class ZettelkastenProcessor {
+    // What a pass over the editor's text should do. `full` reparses every node's
+    // body instead of only the node whose line changed; `restoring` binds a title
+    // to the node that already carries it instead of spawning a new one.
+    //
+    // These were module-level globals -- processAll, restoreZettelkastenEvent and
+    // bypassZettelkasten -- that a caller set before writing into CodeMirror, for
+    // processInput to read and clear. The write is what triggers the pass, so the
+    // globals were how a caller passed arguments through the change event. Naming
+    // the four combinations that callers actually ask for, and bracketing the
+    // write with writeAs, means a mode is stated at the call and cannot outlive
+    // it. bypassZettelkasten had no writer at all and is gone.
+    static Pass = {
+        edit:    {full: false, restoring: false},   // a human typing
+        rewrite: {full: true,  restoring: false},   // code replaced the text
+        restore: {full: true,  restoring: true},    // a saved pane is reloading
+        spawn:   {full: false, restoring: true}     // one node's tag was appended
+    };
+
+    mode = ZettelkastenProcessor.Pass.edit;
     noteInputLines = [];
     placementStrategy = new NodePlacementStrategy([], {});
     prevNoteInputLines = [];
@@ -70,6 +89,20 @@ class ZettelkastenProcessor {
 
         this.noteInput.on('change', this.processInput);
     }
+
+    // Write into the editor and let the pass the write triggers run in `mode`.
+    // Brackets the whole write, so the mode cannot leak: setting a global and
+    // returning left it set for whatever ran next, and a write that fires two
+    // change events got the mode on the first pass only, because the first pass
+    // cleared it. neuralapi.js was the one caller that reset its flag by hand;
+    // this does that for every caller, and also when the write throws.
+    writeAs(mode, write){
+        const prev = this.mode;
+        this.mode = mode;
+        try { write() } finally { this.mode = prev }
+    }
+    // Run a pass in `mode` without writing -- the caller put the text in already.
+    processAs(mode){ this.writeAs(mode, this.processInput) }
 
     static updateForThisPath(processor){
         const strategy = processor.placementStrategy;
@@ -109,10 +142,7 @@ class ZettelkastenProcessor {
     }
 
     processInput = ()=>{
-        if (bypassZettelkasten) {
-            bypassZettelkasten = false;
-            return;
-        }
+        const mode = this.mode;
 
         this.forEachNodeWrap(this.initializeNodeWrap, this);
         this.noteInputLines = this.noteInput.getValue().split('\n');
@@ -122,15 +152,13 @@ class ZettelkastenProcessor {
             currentNodeTitle = this.processLine(line, index, currentNodeTitle)
         });
 
-        if (!processAll) this.processChangedNode(this.noteInputLines);
+        if (!mode.full) this.processChangedNode(this.noteInputLines);
 
         this.deleteInactiveNodesFromDict(this.wrapPerTitle);
         this.deleteInactiveNodesFromDict(this.wrapPerLine);
 
         this.prevNoteInputLines = this.noteInputLines;
         this.noteInputLines = [];
-        processAll = false;
-        restoreZettelkastenEvent = false;
     }
 
     processLine(line, index, currentNodeTitle){
@@ -147,7 +175,8 @@ class ZettelkastenProcessor {
             return this.handleLlmPromptLine(line, currentNodeTitle)
         }
 
-        if (processAll) { // Removed check for restoreZettelkastenEvent to ensure node body text updates for all nodes when processAll is true.
+        // A full pass updates every node's body, restoring or not.
+        if (this.mode.full) {
             // Call without the start and end lines
             this.handlePlainTextAndReferences(line, currentNodeTitle)
         }
@@ -205,7 +234,7 @@ class ZettelkastenProcessor {
         const wrapPerTitle = this.wrapPerTitle;
         currentNodeTitle = line.substr(Tag.node.length).trim();
 
-        if (restoreZettelkastenEvent) {
+        if (this.mode.restoring) {
             const savedNode = Node.byTitle(currentNodeTitle);
             if (savedNode) {
                 const wrap = this.makeZetWrap(savedNode, currentNodeTitle);
@@ -242,7 +271,7 @@ class ZettelkastenProcessor {
             }
         } else {
             wrap.plainText = '';
-            if (processAll) wrap.node.textarea.value = wrap.plainText;
+            if (this.mode.full) wrap.node.textarea.value = wrap.plainText;
             const lineNum = wrap.lineNum;
             if (wrapPerLine[lineNum] === wrap) delete wrapPerLine[lineNum];
             wrap.live = true;
@@ -297,12 +326,17 @@ class ZettelkastenProcessor {
         }
 
         // Collect the relevant CodeMirror instances to update
-        const cmInstancesToUpdate = new Set();
+        // Keyed by CodeMirror instance, so the same pane is only updated once.
+        // The processor rides along from the same lookup that found the editor --
+        // the rewrite mode belongs to the pane being written to, and used to be a
+        // global that armed every other pane's processor as well.
+        const instancesToUpdate = new Map();
 
         // Get the CodeMirror instance for the current node
         const currentNodeInstance = getZetNodeCMInstance(name);
-        const currentCm = currentNodeInstance?.cm;
-        if (currentCm) cmInstancesToUpdate.add(currentCm);
+        if (currentNodeInstance?.cm) {
+            instancesToUpdate.set(currentNodeInstance.cm, currentNodeInstance.zettelkastenProcessor);
+        }
 
         // Process the nodes connected by edges
         for (const edge of wrap.node.edges) {
@@ -310,19 +344,22 @@ class ZettelkastenProcessor {
             const connectedNode = edge.pts.find(pt => pt !== wrap.node);
 
             if (connectedNode?.isTextNode) {
-                const connectedTitle = connectedNode.getTitle();
-                const connectedCm = getZetNodeCMInstance(connectedTitle)?.cm;
-                if (connectedCm) cmInstancesToUpdate.add(connectedCm);
+                const connectedInstance = getZetNodeCMInstance(connectedNode.getTitle());
+                if (connectedInstance?.cm) {
+                    instancesToUpdate.set(connectedInstance.cm, connectedInstance.zettelkastenProcessor);
+                }
             }
         }
 
         // Update the collected CodeMirror instances
         const renameNodeInInstance = renameNode(name, newName);
-        for (const cm of cmInstancesToUpdate) {
-            processAll = true;
-            const updatedValue = renameNodeInInstance(cm.getValue());
-            cm.setValue(updatedValue);
-            cm.refresh();
+        for (const [cm, processor] of instancesToUpdate) {
+            const write = ()=>{
+                cm.setValue(renameNodeInInstance(cm.getValue()));
+                cm.refresh();
+            };
+            if (processor) processor.writeAs(ZettelkastenProcessor.Pass.rewrite, write);
+            else write();
         }
 
         App.zetPanes.switchPane(currentNodeInstance.paneId);

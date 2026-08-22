@@ -121,10 +121,12 @@
       <code>Fractal.grad</code>, so nodes drift toward set boundaries.</p>
     </div>
     <div class="card">
-      <p><strong>Text and graph are one loop, gated by flags.</strong> Typing rewrites nodes; dragging a
-      node title rewrites the text. Three globals in <code>globals.js</code> —
-      <code>processAll</code>, <code>bypassZettelkasten</code>, <code>restoreZettelkastenEvent</code> —
-      are what stop that loop feeding itself.</p>
+      <p><strong>Text and graph are one loop, and a write names its pass.</strong> Typing rewrites nodes;
+      dragging a node title rewrites the text. A pass runs as a CodeMirror <code>change</code> handler, so
+      code that writes into the editor brackets the write —
+      <code>processor.writeAs(ZettelkastenProcessor.Pass.rewrite, …)</code> — and the mode says what that
+      pass should do. This was three globals in <code>globals.js</code> that a caller set and the pass
+      cleared.</p>
     </div>
     <div class="card">
       <p><strong>Persistence is DOM-shaped.</strong> A node serializes into
@@ -169,8 +171,8 @@ const C = [
   why:'The real build system. Injects HTML/SVG partials sequentially, loads tab HTML in parallel, then loads 82 scripts <strong>one at a time in a hand-maintained order</strong>. Order is a dependency graph. A <code>:MODULE</code> suffix is the only way to get <code>import</code>/<code>export</code> in a file.'},
  {id:'globals', g:'boot', name:'globals.js', sub:'shared state + helpers',
   files:['js/globals.js'],
-  keys:['class Stored (localforage)','settings','Tag.node / Tag.ref','Html / Svg / Elem','Host.baseUrl :7070','useProxy','processAll · bypassZettelkasten · restoreZettelkastenEvent'],
-  why:'Loaded first after main.js because nearly everything reads from it. Holds the persisted <code>settings</code> object, the user-configurable Zettelkasten tags, the DOM factories, and the three flags that gate the text⇄graph sync loop.'},
+  keys:['class Stored (localforage)','settings','Tag.node / Tag.ref','Html / Svg / Elem','Host.baseUrl :7070','useProxy'],
+  why:'Loaded first after main.js because nearly everything reads from it. Holds the persisted <code>settings</code> object, the user-configurable Zettelkasten tags and the DOM factories. It also held the three flags that gated the text⇄graph sync loop; those are now <code>ZettelkastenProcessor.Pass</code> modes, passed per write.'},
  {id:'app', g:'boot', name:'App', sub:'js/main.js · init() order',
   files:['js/main.js'],
   keys:['App.init()','Host.checkServer()','nodeSimulation.start()','zetPanes.init()','signalReady()'],
@@ -201,7 +203,7 @@ const C = [
   why:'Wraps CodeMirror 5 with Neurite’s own note syntax highlighting and the UI affordances (click a title to focus its node). One instance per notes pane.'},
  {id:'zetproc', g:'zet', name:'ZettelkastenProcessor', sub:'the sync engine',
   files:['js/zettelkasten/zettelkasten.js'],
-  keys:['processInput()','NodeWrap · wrapPerTitle · wrapPerLine','onTitleInput / onNodeBodyInput','handleRefTags()','deleteInactiveNodesFromDict()','renameNode()'],
+  keys:['processInput()','Pass · writeAs() · processAs()','NodeWrap · wrapPerTitle · wrapPerLine','onTitleInput / onNodeBodyInput','handleRefTags()','deleteInactiveNodesFromDict()','renameNode()'],
   why:'Bi-directional. Text → graph: on every CodeMirror change it walks lines, opens a node section at <code>Tag.node</code> (<code>##</code>), declares edges at <code>Tag.ref</code> (<code>[[</code>), makes an AI node at <code>LLM_TAG</code> (<code>AI:</code>). Graph → text: rewrites just that node’s range. Any wrap not marked <em>live</em> during a pass gets its node deleted.'},
  {id:'zetaux', g:'zet', name:'panes · path · splitter', sub:'placement + layout',
   files:['js/zettelkasten/zetplacementstrategy.js','js/zettelkasten/zetpath.js','js/zettelkasten/zetsplitter.js'],

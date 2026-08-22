@@ -625,8 +625,8 @@ View.Graphs = class {
                 .then(this.#getSaveData);
         }
         #handlePane(pane){
-            processAll = true;
-            pane.processor.processInput();
+            // The text is already in the editor; this only reparses it.
+            pane.processor.processAs(ZettelkastenProcessor.Pass.rewrite);
         }
         #saveBlobsForGraphId = (graphId)=>{
             return graphId
