@@ -61,8 +61,9 @@ function addNodeTagToZettelkasten(title, content = null) {
     curMirror.refresh();
 
     // Find the UI associated with the current active Zettelkasten mirror
-    const ui = window.zettelkastenUIs.find(ui => ui.cm === curMirror);
-    if (!ui) return;
+    const pane = window.zetPaneList.find(pane => pane.cm === curMirror);
+    if (!pane) return;
+    const ui = pane.ui;
 
     const node = ui.scrollToTitle(title);
     node.contentEditableDiv.value = content;

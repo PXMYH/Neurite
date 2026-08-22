@@ -221,7 +221,7 @@ ZetPath.updateOptions = function(targetProcessor = null){
     pathObject.zetPath.generatePath();
     const updateForThisPath = ZettelkastenProcessor.updateForThisPath;
     if (targetProcessor) updateForThisPath.call(pathObject, targetProcessor)
-    else window.zettelkastenProcessors.forEach(updateForThisPath, pathObject)
+    else window.zetPaneList.forEach((pane)=>updateForThisPath.call(pathObject, pane.processor))
 
     Logger.debug("Updated path options:", pathObject.zetPath.options);
 

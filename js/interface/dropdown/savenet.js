@@ -617,16 +617,16 @@ View.Graphs = class {
 
         #makeSaveData = (meta)=>{
             //TEMP FIX: To-Do: Ensure processChangedNodes in zettelkasten.js does not cause other node textareas to have their values overwritten.
-            window.zettelkastenProcessors.forEach(this.#handleProcessor);
+            window.zetPaneList.forEach(this.#handlePane);
 
             return Promise.resolve(meta.graphId)
                 .then(this.#saveBlobsForGraphId)
                 .then(this.#updateTheNodes)
                 .then(this.#getSaveData);
         }
-        #handleProcessor(processor){
+        #handlePane(pane){
             processAll = true;
-            processor.processInput();
+            pane.processor.processInput();
         }
         #saveBlobsForGraphId = (graphId)=>{
             return graphId
@@ -651,9 +651,15 @@ View.Graphs = class {
             nodeData = this.#replaceNewLinesInLLMSaveData(nodeData);
 
             const zettelkastenPanesSaveElements = [];
-            window.codeMirrorInstances.forEach( (instance, index)=>{
-                const content = instance.getValue();
-                const name = App.zetPanes.getPaneName('zet-pane-' + (index + 1));
+            window.zetPaneList.forEach( (pane, index)=>{
+                const content = pane.cm.getValue();
+                // Ask the Pane for its own id. This was `'zet-pane-' + (index + 1)`,
+                // which stops naming the right Pane as soon as one is deleted: the id
+                // counter never reuses a number, so the sequence has a gap and every
+                // later Pane was saved with an empty name. The element id below stays
+                // positional -- it only has to be unique, and the loader reads these
+                // in document order.
+                const name = App.zetPanes.getPaneName(pane.paneId);
                 const paneSaveElement = `<div id="zettelkasten-pane-${index}" data-pane-name="${encodeURIComponent(name)}" style="display:none;">${encodeURIComponent(content)}</div>`;
                 zettelkastenPanesSaveElements.push(paneSaveElement);
             });
