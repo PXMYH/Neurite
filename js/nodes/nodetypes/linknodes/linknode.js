@@ -124,19 +124,17 @@ class LinkNode {
 
         view.navButtons ||= {};
 
-        let x = 59;
-
+        // No x offsets to carry: `addSvgButton` appends, and the view numbers the
+        // whole row itself so `delete` stays at the end of it.
         if (this.viewType === 'webview') {
-            const back = view.addSvgButton("button-back", "caret-left-icon", x, () => this.goBack());
+            const back = view.addSvgButton("button-back", "caret-left-icon", () => this.goBack());
             view.navButtons["button-back"] = back;
-            x += 20;
 
-            const forward = view.addSvgButton("button-forward", "caret-right-icon", x, () => this.goForward());
+            const forward = view.addSvgButton("button-forward", "caret-right-icon", () => this.goForward());
             view.navButtons["button-forward"] = forward;
-            x += 20;
         }
 
-        const refresh = view.addSvgButton("button-refresh", "refresh-button", x, () => this.refreshViewer());
+        const refresh = view.addSvgButton("button-refresh", "refresh-button", () => this.refreshViewer());
         view.navButtons["button-refresh"] = refresh;
     }
 

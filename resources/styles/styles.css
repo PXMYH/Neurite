@@ -26,6 +26,11 @@
     --ui-radius-inner: 5px;
 
     --ui-transition: 160ms ease;
+
+    /* The accent's opposite at the same saturation and lightness, so a
+       destructive control reads as destructive without shouting. Only the card's
+       delete button uses it so far. */
+    --ui-danger: #c0605a;
 }
 
 html, body {
@@ -396,6 +401,25 @@ body {
     align-items: flex-end;
     margin-bottom: 6px;
     margin-top: 0px;
+    /* The group is appended before the title but belongs after it. `order` moves
+       it without touching the DOM, which matters because the header markup is
+       what a saved graph re-hydrates. The title wrapper flex-grows, so this puts
+       the controls hard against the right edge — out of the top-left corner
+       where the eye lands first, and with `delete` at the far end of the row. */
+    order: 1;
+}
+
+/* Delete is the one control that destroys work, so it stops looking like its two
+   neighbours the moment it is the target. The fill is a CSS property here and the
+   button's own paint code writes a presentation attribute, so this wins without
+   needing `!important` or a special case in `setSvgButtonStyle`. */
+.windowbutton#button-delete:hover > rect:first-of-type,
+.windowbutton#button-delete:focus-visible > rect:first-of-type {
+    fill: var(--ui-danger);
+}
+
+.windowbutton > rect:first-of-type {
+    transition: fill var(--ui-transition);
 }
 
 .title-input-wrapper {
@@ -418,6 +442,10 @@ input[type="text"i].title-input {
        field reads as editable from an underline, so that is all it gets. */
     border-width: 0 0 1px 0;
     border-color: #aaa;
+    /* Room for the copy button, which is absolutely positioned over this input's
+       own wrapper at `right: 8px` and is 16px wide. Without the reserve, a title
+       long enough to fill the header ran straight underneath the icon. */
+    padding-right: 28px;
 }
 
     input[type="text"i].title-input:focus {

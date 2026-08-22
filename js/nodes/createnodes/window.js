@@ -233,8 +233,15 @@ class NodeView {
         this.svgButtons = [];
 
         this.svgButtons.push([btnDel, "fill"]);
-        this.applySvgButtonUI(btnDel, () => {
+        this.applySvgButtonUI(btnDel, async () => {
             const title = node.getTitle();
+            // A card carries everything typed into it and there is no undo, so
+            // one mis-aimed click while dragging used to lose that work outright.
+            // `window.confirm` is the app's own modal (`customdialog.js`), not the
+            // browser's, and it resolves to a boolean.
+            const named = title?.trim();
+            if (!await window.confirm(`Delete ${named ? `"${named}"` : 'this note'}?`)) return;
+
             if (Node.prev === node) {
                 Node.prev = null;
                 App.nodeSimulation.mousePath = [];
@@ -366,18 +373,34 @@ class NodeView {
         onMouseLeave();
     }
 
-    updateButtonContainerSize() {
+    static #slotWidth = 20; // pre-scale units between two buttons
+
+    // A card control's place in the row is an x offset baked into its own
+    // `transform`, so the row used to be numbered by hand in two places: the
+    // three base slots in `icons.html` and a `let x = 59` walk in `linknode.js`.
+    // That made "delete goes last" impossible to state, because the buttons a
+    // link node appends later would land after it. Numbering the row from one
+    // rule here fixes that, and takes the magic offsets with it.
+    layOutSvgButtons(){
         const svg = this.buttons;
         if (!svg) return;
 
-        const buttonCount = svg.querySelectorAll('.windowbutton').length;
-        const unitPerButton = 20; // how far each button is translated
+        // Move delete to the end of the group rather than sorting a copy of the
+        // list: the row sits at the right of the header, so the far end is the
+        // slot furthest from the note, and document order is also tab order.
+        // `appendChild` moves the existing element, so its listeners come along.
+        const btnDel = svg.querySelector('#button-delete');
+        if (btnDel) svg.appendChild(btnDel);
 
-        const requiredWidth = (buttonCount * unitPerButton) / 8;
-        svg.setAttribute('viewBox', `0 0 ${requiredWidth} 2.125`);
+        const slot = NodeView.#slotWidth;
+        const btns = svg.querySelectorAll('.windowbutton');
+        btns.forEach((btn, i) => {
+            btn.setAttribute('transform', `scale(0.125 0.125) translate(${i * slot + 1} 1)`);
+        });
+        svg.setAttribute('viewBox', `0 0 ${(btns.length * slot) / 8} 2.125`);
     }
 
-    addSvgButton(id, iconId, translateX, clickHandler, mode = "stroke") {
+    addSvgButton(id, iconId, clickHandler, mode = "stroke") {
         const svgNs = "http://www.w3.org/2000/svg";
         const buttons = this.buttons;
         if (!buttons) return;
@@ -389,8 +412,7 @@ class NodeView {
 
         const g = document.createElementNS(svgNs, "g");
         g.setAttribute("id", id);
-        g.setAttribute("transform", `scale(0.125 0.125) translate(${translateX} 1)`);
-        g.classList.add("windowbutton");
+        g.classList.add("windowbutton"); // layOutSvgButtons sets the transform
 
         // Button background
         const bg = document.createElementNS(svgNs, "rect");
@@ -426,7 +448,7 @@ class NodeView {
 
         buttons.appendChild(g);
         this.applySvgButtonUI(g, clickHandler, mode);
-        this.updateButtonContainerSize();
+        this.layOutSvgButtons();
 
         if (!this.svgButtons) this.svgButtons = [];
         this.svgButtons.push([g, mode]);
