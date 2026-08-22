@@ -3870,6 +3870,10 @@ code.language-markdown {
     border-bottom: 1px solid #131313; /* Example border */
     height: fit-content;
     width: 100%;
+    /* The padding is outside the 100% otherwise, so the wrapper measured 20px wider
+       than the panel holding it and the right edge of the prompt was cut off. That
+       spilled harmlessly past an unclipped panel before; the panel clips now. */
+    box-sizing: border-box;
 }
 
 .context-settings-panel {
