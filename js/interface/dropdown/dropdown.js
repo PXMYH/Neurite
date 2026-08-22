@@ -99,6 +99,7 @@ function openTab(tabId, element) {
 }
 
 // Get the menu button and dropdown content elements
+const dropdownDiv = Elem.byId('dropdowndiv');
 const menuButton = document.querySelector(".menu-button");
 const dropdownContent = document.querySelector(".dropdown-content");
 const nodePanel = document.querySelector(".node-panel");
@@ -145,6 +146,13 @@ On.click(menuButton, (e)=>{
 
 On.mousedown(dropdownContent, Event.stopPropagation);
 
+// The bar reaches from edge to edge, so its empty middle is a wide target for a
+// gesture meant for the canvas: without this, dragging the bar pans the graph and
+// scrolling over it zooms. The 40px button it replaced was small enough to hit by
+// accident only rarely.
+['mousedown', 'wheel', 'dblclick']
+.forEach(Event.stopPropagationByNameForThis, dropdownDiv);
+
 
 // Add-node menu. The rows keep their own click and drag handlers from
 // `handledrop.js`; this only opens and closes the menu around them.
@@ -167,8 +175,13 @@ On.click(nodeAddButton, (e)=>{
 On.click(nodeAddMenu, (e)=>{ if (!Mouse.isDragging) setNodeAddMenuOpen(false) });
 On.dragend(nodeAddMenu, (e)=>setNodeAddMenuOpen(false) );
 
-// `.node-panel` stops `mousedown` propagating, so this only ever sees a press
-// outside the palette.
+// Any press that is not on the plus or in its menu closes it. Two handlers rather
+// than one on `document`, because both `.node-panel` and the bar around it stop
+// `mousedown` before it gets that far -- the bar deliberately, to keep canvas
+// gestures out, which would otherwise leave a press on the bar unable to close it.
+On.mousedown(dropdownDiv, (e)=>{
+    if (!nodePanel.contains(e.target)) setNodeAddMenuOpen(false);
+});
 On.mousedown(document, (e)=>setNodeAddMenuOpen(false) );
 On.keydown(document, (e)=>{ if (e.key === 'Escape') setNodeAddMenuOpen(false) });
 

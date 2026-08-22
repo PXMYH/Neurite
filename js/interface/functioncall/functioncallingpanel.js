@@ -31,11 +31,15 @@ function formatResultAsTitle(result) {
     return "Result: " + titleString;
 }
 
+// The add-node group sits over the canvas, so a gesture aimed at the plus or at a
+// row in its menu must not also reach the graph behind it.
+//
+// There used to be a `mousemove` guard here too, carving out an exception for the
+// function-call panel's editor. That panel now lives in the dropdown, which has
+// never needed one, and the plus that is left is an ordinary button -- the canvas
+// already sees `mousemove` over every other button in the app.
 ['click', 'mousedown', 'wheel', 'dragstart', 'dragend']
 .forEach(Event.stopPropagationByNameForThis, nodePanel);
-On.mousemove(nodePanel, (e)=>{
-    if (!App.viewCode.div.contains(e.target)) e.stopPropagation();
-});
 
 CodeMirror.defineMode("ignoreCodeBlocks", function (config) {
     var jsMode = CodeMirror.getMode(config, { name: "javascript" });

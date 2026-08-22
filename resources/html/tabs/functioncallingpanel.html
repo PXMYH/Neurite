@@ -1,120 +1,72 @@
-<!--Node Drag Icons and Function Calling Panel-->
+<!--Function Calling Panel-->
 
-<div class="node-panel">
-    <!-- One button, and the four creators behind it. Four bare icons sat here
-         permanently, which cost a strip of canvas to show four glyphs nobody had
-         a name for; behind a plus they get room for their labels instead.
+<div class="function-call-container">
 
-         Each row is still the same `.panel-icon <type>-icon` element it was, so
-         `handledrop.js` keeps working unchanged: it reads `classList[1]` for the
-         icon name, and drag-out-to-place still starts from the row itself. -->
-    <button type="button" class="node-add-button" id="nodeAddButton"
-            title="Add a node" aria-haspopup="true" aria-expanded="false" aria-controls="nodeAddMenu">
-        <svg aria-hidden="true">
-            <use xlink:href="#plus-icon"></use>
-        </svg>
-    </button>
-
-    <!-- Every title says what a click does first, then the drag, then any canvas
-         shortcut. They used to name only the shortcut, so the icons read as
-         reminders for a gesture rather than as controls you could press.
-
-         AI is last so that turning AI features off shortens the menu rather than
-         leaving a hole in the middle of it. -->
-    <div class="node-add-menu" id="nodeAddMenu" role="menu" aria-label="Add a node">
-        <div class="panel-icon note-icon node-add-item" role="menuitem" title="New note: click, or drag out to place it. Shift + Double Click on the canvas does the same.">
-            <svg aria-hidden="true">
-                <use xlink:href="#note-icon-symbol"></use>
-            </svg>
-            <span>Note</span>
+    <!-- Sub-dropdown for function calls -->
+    <div class="function-call-panel hidden">
+        <!-- Function call list -->
+        <div class="function-call-list custom-scrollbar">
+            <!-- Function call items will be added here dynamically -->
         </div>
-        <div class="panel-icon link-icon node-add-item" role="menuitem" title="Link node: click to enter a URL, or drag out to place one.">
-            <svg aria-hidden="true">
-                <use xlink:href="#link-icon-symbol"></use>
-            </svg>
-            <span>Link</span>
-        </div>
-        <div class="panel-icon edges-icon node-add-item" role="menuitem" title="File tree: click to pick a folder, or drag out to place a node. Hold Shift on the canvas to freeze and connect nodes.">
-            <svg style="transform: translateX(-1px);" aria-hidden="true">
-                <use xlink:href="#edges-icon-symbol"></use>
-            </svg>
-            <span>File tree</span>
-        </div>
-        <div class="panel-icon ai-icon node-add-item" role="menuitem" title="AI note: click for its settings, or drag out to place one. Alt/Option + Double Click on the canvas places one directly.">
-            <svg aria-hidden="true">
-                <use xlink:href="#ai-icon-symbol"></use>
-            </svg>
-            <span>AI note</span>
-        </div>
-    </div>
-    <div class="function-call-container">
+        <button id="clear-function-calls-button" style="display: none;">Clear</button>
+        <!-- Function prompt wrapper -->
+        <div class="function-prompt-wrapper">
+            <!-- Function prompt input -->
+            <div style="display: flex;">
+                <!-- Run function button -->
+                <button id="function-run-button" class="function-button">
+                    <svg width="18" height="18">
+                        <use xlink:href="#function-button"></use>
+                    </svg>
+                </button>
 
-        <!-- Sub-dropdown for function calls -->
-        <div class="function-call-panel hidden">
-            <!-- Function call list -->
-            <div class="function-call-list custom-scrollbar">
-                <!-- Function call items will be added here dynamically -->
-            </div>
-            <button id="clear-function-calls-button" style="display: none;">Clear</button>
-            <!-- Function prompt wrapper -->
-            <div class="function-prompt-wrapper">
-                <!-- Function prompt input -->
-                <div style="display: flex;">
-                    <!-- Run function button -->
-                    <button id="function-run-button" class="function-button">
-                        <svg width="18" height="18">
-                            <use xlink:href="#function-button"></use>
-                        </svg>
-                    </button>
+                <div class="input-group" style="display: flex; position: relative; width: 60%;">
+                    <textarea id="function-prompt" class="custom-scrollbar function-prompt-textarea" rows="1" oninput="autoGrow(event);" placeholder="Set Task..." required></textarea>
 
-                    <div class="input-group" style="display: flex; position: relative; width: 60%;">
-                        <textarea id="function-prompt" class="custom-scrollbar function-prompt-textarea" rows="1" oninput="autoGrow(event);" placeholder="Set Task..." required></textarea>
+                    <div class="status-icons-container" style="position: absolute; right: 42px; top: 50%; transform: translateY(-50%);">
+                        <!-- Status icons here -->
+                        <div class="loader" id="functionLoadingIcon" style="display:none;"></div>
 
-                        <div class="status-icons-container" style="position: absolute; right: 42px; top: 50%; transform: translateY(-50%);">
-                            <!-- Status icons here -->
-                            <div class="loader" id="functionLoadingIcon" style="display:none;"></div>
-
-                            <div class="error-icon-css" id="functionErrorIcon" style="display:none;">
-                                <div class="error-x-mark">
-                                    <span class="error-x-mark-left"></span>
-                                    <span class="error-x-mark-right"></span>
-                                </div>
+                        <div class="error-icon-css" id="functionErrorIcon" style="display:none;">
+                            <div class="error-x-mark">
+                                <span class="error-x-mark-left"></span>
+                                <span class="error-x-mark-right"></span>
                             </div>
                         </div>
                     </div>
-
-                    <button id="function-send-button" class="function-button">
-                        <svg width="18" height="18" class="function-send-svg">
-                            <use xlink:href="#play-icon"></use>
-                        </svg>
-                    </button>
-
-                    <!-- Regenerate button -->
-                    <button id="function-regen-button" class="function-button">
-                        <svg width="18" height="18">
-                            <use xlink:href="#refresh-icon"></use>
-                        </svg>
-                    </button>
                 </div>
-            </div>
 
-            <!-- CodeMirror container -->
-            <div class="function-codemirror-container">
-                <textarea id="neurite-function-cm"></textarea>
-            </div>
-        </div>
-        <!-- Toggle button for function call panel -->
-        <div class="toggle-panel" onclick="toggleFunctionCallPanel()">
-            <div class="bar left-bar"></div>
-            <div class="icon-wrapper">
-                <!-- Wrapper for the icon only -->
-                <div class="toggle-icon">
-                    <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
-                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" />
+                <button id="function-send-button" class="function-button">
+                    <svg width="18" height="18" class="function-send-svg">
+                        <use xlink:href="#play-icon"></use>
                     </svg>
-                </div>
+                </button>
+
+                <!-- Regenerate button -->
+                <button id="function-regen-button" class="function-button">
+                    <svg width="18" height="18">
+                        <use xlink:href="#refresh-icon"></use>
+                    </svg>
+                </button>
             </div>
-            <div class="bar right-bar"></div>
         </div>
+
+        <!-- CodeMirror container -->
+        <div class="function-codemirror-container">
+            <textarea id="neurite-function-cm"></textarea>
+        </div>
+    </div>
+    <!-- Toggle button for function call panel -->
+    <div class="toggle-panel" onclick="toggleFunctionCallPanel()">
+        <div class="bar left-bar"></div>
+        <div class="icon-wrapper">
+            <!-- Wrapper for the icon only -->
+            <div class="toggle-icon">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" />
+                </svg>
+            </div>
+        </div>
+        <div class="bar right-bar"></div>
     </div>
 </div>

@@ -1,12 +1,64 @@
 
-<!-- Dropdown -->
+<!-- Top bar. One strip owns both corners of the screen: the add-node control at
+     the left end, the menu at the right end. They used to be two separate pieces
+     of canvas furniture -- a 310px panel pinned top-left and a floating button
+     top-right -- which read as two unrelated systems and left the panel mostly
+     empty once the palette collapsed behind a plus. -->
 
 <div class="dropdown" id="dropdowndiv">
+    <!-- One button, and the four creators behind it. Each row is still the same
+         `.panel-icon <type>-icon` element it was, so `handledrop.js` keeps working
+         unchanged: it reads `classList[1]` for the icon name, and drag-out-to-place
+         still starts from the row itself.
+
+         `.node-panel` is also the element `functioncallingpanel.js` hangs its
+         event guards on, so the class stays even though the panel it was named
+         for is now a group inside the bar. -->
+    <div class="node-panel">
+        <button type="button" class="node-add-button" id="nodeAddButton"
+                title="Add a node" aria-haspopup="true" aria-expanded="false" aria-controls="nodeAddMenu">
+            <svg aria-hidden="true">
+                <use xlink:href="#plus-icon"></use>
+            </svg>
+        </button>
+
+        <!-- Every title says what a click does first, then the drag, then any canvas
+             shortcut. They used to name only the shortcut, so the icons read as
+             reminders for a gesture rather than as controls you could press.
+
+             AI is last so that turning AI features off shortens the menu rather than
+             leaving a hole in the middle of it. -->
+        <div class="node-add-menu" id="nodeAddMenu" role="menu" aria-label="Add a node">
+            <div class="panel-icon note-icon node-add-item" role="menuitem" title="New note: click, or drag out to place it. Shift + Double Click on the canvas does the same.">
+                <svg aria-hidden="true">
+                    <use xlink:href="#note-icon-symbol"></use>
+                </svg>
+                <span>Note</span>
+            </div>
+            <div class="panel-icon link-icon node-add-item" role="menuitem" title="Link node: click to enter a URL, or drag out to place one.">
+                <svg aria-hidden="true">
+                    <use xlink:href="#link-icon-symbol"></use>
+                </svg>
+                <span>Link</span>
+            </div>
+            <div class="panel-icon edges-icon node-add-item" role="menuitem" title="File tree: click to pick a folder, or drag out to place a node. Hold Shift on the canvas to freeze and connect nodes.">
+                <svg style="transform: translateX(-1px);" aria-hidden="true">
+                    <use xlink:href="#edges-icon-symbol"></use>
+                </svg>
+                <span>File tree</span>
+            </div>
+            <div class="panel-icon ai-icon node-add-item" role="menuitem" title="AI note: click for its settings, or drag out to place one. Alt/Option + Double Click on the canvas places one directly.">
+                <svg aria-hidden="true">
+                    <use xlink:href="#ai-icon-symbol"></use>
+                </svg>
+                <span>AI note</span>
+            </div>
+        </div>
+    </div>
+
     <div class="menu-button" title="Menu: notes, AI, fractal and saves">
         <div class="menu-icon" id="menu-icon"></div>
     </div>
-
-    <div id="left-panel"></div>
 
     <div class="dropdown-content">
         <div>
@@ -40,6 +92,13 @@
             <div id="tab3" class="tabcontent">
                 <!-- Tab 3 content will be loaded here -->
             </div>
+
+            <!-- The function-calling console, below the tabs rather than inside one.
+                 It holds a CodeMirror, and CodeMirror measures itself when it is
+                 constructed: a `.tabcontent` is `display: none` until its tab is
+                 opened, which would give the editor zero dimensions. The dropdown
+                 is only translated off-screen, so the editor still gets real ones. -->
+            <div id="function-call-slot"></div>
         </div>
     </div>
 </div>

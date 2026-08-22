@@ -325,7 +325,7 @@ class PageLoad {
         return Promise.all(proms);
     }
     static tabs = {
-        'left-panel': 'functioncallingpanel.html',
+        'function-call-slot': 'functioncallingpanel.html',
         'tab1': 'notestab.html',
         'tab4': 'aitab.html',
         'tab2': 'fractaltab.html',
