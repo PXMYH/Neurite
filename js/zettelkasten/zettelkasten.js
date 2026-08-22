@@ -264,6 +264,11 @@ class ZettelkastenProcessor {
                         followMouseFromWindow = false;
                     }
                 }
+                // The notes pane already reveals the new heading through
+                // ui.scrollToTitle; this is the map's half of that. Not while
+                // restoring, or opening a saved graph would ping every card in
+                // it.
+                if (!this.mode.restoring) node.view.flashAsNew();
 
                 const wrap = this.makeZetWrap(node, currentNodeTitle);
                 wrapPerLine[i] = wrap;

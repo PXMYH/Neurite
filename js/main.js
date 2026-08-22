@@ -91,7 +91,7 @@ class On {
     }
 }
 [
-    'blur', 'change', 'click', 'contextmenu', 'dblclick',
+    'animationend', 'blur', 'change', 'click', 'contextmenu', 'dblclick',
     'drag', 'dragend', 'dragenter', 'dragleave', 'dragover', 'dragstart', 'drop',
     'error', 'focus', 'gesturechange', 'gestureend', 'gesturestart',
     'input', 'keydown', 'keypress', 'keyup', 'load', 'loadedmetadata',

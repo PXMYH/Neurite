@@ -246,6 +246,64 @@ body {
     z-index: 1;
 }
 
+/* A note that has just appeared is the one card on the map the user is looking
+   for and cannot yet name, so it says where it is twice and then goes quiet.
+   The notes pane already did this much -- `addNodeTagToZettelkasten` calls
+   `ui.scrollToTitle` -- while the map did nothing, and a card can land at the
+   mouse (which for the palette button is behind the palette) or on a
+   spread-placement spiral slot anywhere in the viewport.
+
+   Deliberately not the `selected` class: joining `App.selectedNodes` would make
+   the next multi-node drag or delete silently include a card the user never
+   chose.
+
+   An expanding area rather than a ring, because `Node.draw` writes
+   `transform: scale(s, s)` on this card's parent every frame. At a low zoom a
+   2px ring paints a fraction of a pixel, while something that grows to 2.4x the
+   card stays proportionally large at any scale -- the same reason the keyboard
+   focus state is a colour change and not an outline. */
+.window.just-created::after {
+    content: "";
+    display: block;
+    position: absolute;
+    inset: 0;
+    border-radius: var(--ui-radius);
+    background-color: var(--ui-accent);
+    /* Unblurred this is a hard-edged rectangle sliding out from under the card,
+       which reads as a selection artifact rather than a pulse. The blur happens
+       in the pseudo-element's own coordinate space and is then scaled by the
+       animation below and by the physics loop's transform, so it stays
+       proportional at any zoom -- same reason the halo is an area, not a ring. */
+    filter: blur(8px);
+    /* Behind the card, so the halo reads as a glow around it instead of washing
+       out the title the user is about to type into. */
+    z-index: -1;
+    pointer-events: none;
+    /* `forwards` matters: with the default `none` the pseudo-element reverts to
+       these base declarations when the animation ends, which is a solid accent
+       rectangle at full opacity. The class is also removed in JS, and either one
+       alone is enough -- but a card's DOM is what gets saved, so both. */
+    animation: newCardPing 900ms ease-out 2 forwards;
+}
+
+@keyframes newCardPing {
+    from { transform: scale(1);   opacity: 0.5 }
+    to   { transform: scale(2.4); opacity: 0 }
+}
+
+/* Still an animation, not `animation: none`: the class is taken off on
+   `animationend`, so removing the animation would leave it on for good. */
+@media (prefers-reduced-motion: reduce) {
+    .window.just-created::after {
+        animation: newCardFade 1200ms ease-out 1 forwards;
+    }
+}
+
+@keyframes newCardFade {
+    from { opacity: 0.45 }
+    to   { opacity: 0 }
+}
+
 .node-textarea {
     background-color: #222226;
     color: #bbb;

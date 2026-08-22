@@ -634,6 +634,25 @@ class NodeView {
 
     toggleSelected(value){ this.div.classList.toggle('selected', value) }
     static toggleSelectedToThis(nodeView){ nodeView.toggleSelected(this) }
+
+    // Says where a card just appeared. Not the `selected` class: joining
+    // App.selectedNodes would make the next multi-node drag or delete include a
+    // card the user never chose.
+    flashAsNew(){
+        this.div.classList.add('just-created');
+        On.animationend(this.div, NodeView.onFlashEnd);
+    }
+    // A card's DOM is what gets saved, so the class comes back off once the
+    // animation has run. Filtered by name rather than listened for with
+    // {once: true}, because any animation inside the card (a loader's spin, for
+    // one) bubbles its own animationend up to this same div.
+    static onFlashEnd(e){
+        if (!e.animationName.startsWith('newCard')) return;
+
+        const div = e.currentTarget;
+        div.classList.remove('just-created');
+        Off.animationend(div, NodeView.onFlashEnd);
+    }
 }
 
 const OverlayHelper = {
