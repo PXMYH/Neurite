@@ -225,8 +225,8 @@ const C = [
  /* --- nodes --- */
  {id:'node', g:'node', name:'Node + Edge', sub:'physics + DOM',
   files:['js/nodes/nodeclass.js','js/nodes/edgeclass.js'],
-  keys:['step(dt)','applyMandelbrotForce()','updateNodeData()','dataset.node_json','Node.Extensions','Node.getType()'],
-  why:'One class for every node. Types are duck-typed flags (<code>isTextNode</code>, <code>isLLM</code>, <code>isLink</code>, <code>isImageNode</code>) that <code>Node.getType</code> reads — there are no subclasses. Serialization writes into the DOM dataset, not a separate store.'},
+  keys:['step(dt)','applyMandelbrotForce()','updateNodeData()','dataset.node_json','Node.Extensions','Node.typeByFlag','Node.getType()'],
+  why:'One class for every node. Types are duck-typed flags — there are no subclasses — and <code>Node.typeByFlag</code> is the one list of them, read by <code>Node.getType</code>. Nodes with no flag (media, Wolfram) are <code>base</code>. There are more types than there are <code>NodeActions</code> classes, so <code>NodeActions.forNode</code> falls back to the base actions. Serialization writes into the DOM dataset, not a separate store.'},
  {id:'nodeview', g:'node', name:'NodeView', sub:'createnodes/window.js',
   files:['js/nodes/createnodes/window.js','js/nodes/createnodes/createnodes.js'],
   keys:['windowify()','addAtNaturalScale()','addForImage()','toggleSelected()'],

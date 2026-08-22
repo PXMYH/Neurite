@@ -427,10 +427,26 @@ class Node {
     static filterEdgesToThis(node){
         node.edges = node.edges.filter( (edge)=>!edge.pts.includes(this) )
     }
+    // Every flag a node creator writes, and the type name it answers to. This was
+    // an if-chain that knew three of the five, so an image node and a file-tree
+    // node both reported 'base' -- while getData in connect.js derived the type a
+    // second time from the same flags and answered 'image' for that same node. The
+    // model reads both, so it was told two different types for one node.
+    //
+    // A creator sets exactly one flag and toJSON round-trips it, so the order here
+    // is not load-bearing. Media and Wolfram nodes set no flag at all; they are
+    // the 'base' default.
+    static typeByFlag = {
+        isTextNode: 'text',
+        isLLM: 'llm',
+        isLink: 'link',
+        isImageNode: 'image',
+        isFileTree: 'fileTree'
+    };
     static getType(node){
-        if (node.isTextNode) return 'text';
-        if (node.isLLM) return 'llm';
-        if (node.isLink) return 'link';
+        for (const flag in Node.typeByFlag) {
+            if (node[flag]) return Node.typeByFlag[flag];
+        }
         return 'base';
     }
     static remove(node){ node.remove() }
