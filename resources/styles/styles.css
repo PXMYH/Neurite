@@ -31,6 +31,19 @@
        destructive control reads as destructive without shouting. Only the card's
        delete button uses it so far. */
     --ui-danger: #c0605a;
+
+    /* Card edges. Warm, because the canvas behind a card is near-black and the
+       accent is not: a blue-grey hairline reads as part of the background, and
+       the previous rgba(255,255,255,0.09) resolved to roughly #171717 against
+       it -- a border in name only.
+
+       This is a second hue alongside --ui-accent, which is a cost worth being
+       explicit about. It is not a second *accent*: the accent still owns every
+       interactive and stateful thing (selection, focus, hover, sliders, the
+       new-card halo), and this owns only the resting silhouette of a card. Kept
+       at 60% saturation and near the accent's lightness so it stays in the same
+       family rather than competing with it. */
+    --ui-card-outline: #d49454;
 }
 
 html, body {
@@ -179,16 +192,27 @@ body {
     width: fit-content;
     max-width: fit-content;
     height: fit-content;
-    /* Was a transparent hairline, so a card's only edge against the near-black
-       canvas was its own soft shadow and the silhouette stayed vague. The width
-       was already reserved here, so giving it a colour costs no layout. */
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    /* Was a transparent hairline, then a 9%-white one, and in both cases a
+       card's only real edge against the near-black canvas was its own soft
+       shadow, so the silhouette stayed vague. The width was already reserved
+       here, so giving it an opaque colour costs no layout.
+
+       Width stays at 1px deliberately. `Node.draw` writes
+       `transform: scale(s, s)` on this element's parent every frame, so px here
+       is not px on screen -- widening the border buys proportionally nothing on
+       zoom-out, while full opacity is what makes the line survive being
+       sub-pixel, since the compositor still has a real colour to antialias. */
+    border: 1px solid var(--ui-card-outline);
     z-index: 2;
 }
 
 .window-anchored {
     background-color: var(--ui-surface-anchored);
-    border: 2px solid #1a1a1a;
+    /* Same outline colour as a loose card. The 2px is the anchored tell, next to
+       the darker surface above. It used to be `2px solid #1a1a1a`, which against
+       a near-black canvas meant anchoring a card erased its outline -- the
+       heavier border made it *less* visible, not more. */
+    border: 2px solid var(--ui-card-outline);
 }
 
     .window-anchored::before {
