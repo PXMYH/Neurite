@@ -319,7 +319,10 @@ class Interface {
             this.coordsLive = true;
             const dest = Graph.vecToZ();
             regenAmount += Math.abs(e.deltaY);
-            const amount = Math.exp(e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
+            // `performZoom` inverts its argument, so amount > 1 zooms in. deltaY is
+            // negative when the wheel is scrolled up, so the exponent has to be
+            // negated for up to mean in. The drag-zoom path above already does this.
+            const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
             performZoom(amount, dest);
             e.stopPropagation();
         } else if (settings.panClick === "scroll") {
