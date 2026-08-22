@@ -2,7 +2,7 @@ const playwright = require('playwright');
 const http = require('http');
 const url = require('url');
 
-const defaultNeuriteUrl = 'http://localhost:8080/';
+const defaultNeuriteUrl = 'http://localhost:8999/'; // tracks vite.config.js `server.port`
 
 async function startNeurite(url, browserType = 'chromium') {
     const browser = await playwright[browserType].launch({ headless: false });

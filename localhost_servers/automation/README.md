@@ -15,7 +15,7 @@ This server replaces native screenshot behavior as the browser default requires 
 node automation.js
 ```
 
-This will navigate to http://localhost:8080/, Neurite's default port when run locally.
+This will navigate to http://localhost:8999/, Neurite's default port when run locally.
 
 **Custom URL:**
 ```bash

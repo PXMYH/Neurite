@@ -17,7 +17,10 @@ app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 const corsOptions = {
-  origin: ['https://neurite.network', 'http://localhost:8080'],
+  // Tracks vite.config.js `server.port`. A stale entry here does not fail
+  // loudly: the gateway answers, the browser drops the response, and every
+  // proxied AI call reports a CORS error that names no port.
+  origin: ['https://neurite.network', 'http://localhost:8999'],
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   optionsSuccessStatus: 204

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm install
-npm start              # vite dev server on http://localhost:8080
+npm start              # vite dev server on http://localhost:8999 (strictPort, so a busy port fails)
 npm run start:host     # same, exposed on the LAN
 npm run build          # vite build -> dist/ (+ postbuild copies js/, resources/, wiki/)
 npm test               # node --test, auto-discovers test/

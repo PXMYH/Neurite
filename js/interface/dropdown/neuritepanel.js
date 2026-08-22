@@ -2,7 +2,7 @@ window.NeuriteEnv = {
     isProd: window.location.origin === 'https://neurite.network',
     isTest: window.location.origin === 'https://test.neurite.network',
     isElectron: window.startedViaElectron === true,
-    isLocalhostFrontend: window.location.origin === 'http://localhost:8080',
+    isLocalhostFrontend: window.location.origin === 'http://localhost:8999', // tracks vite.config.js `server.port`
     isLocalFileFrontend: window.location.origin === 'null',
 
     get isElectronWithLocalFrontend() {

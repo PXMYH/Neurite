@@ -301,7 +301,7 @@ const C = [
  /* --- servers --- */
  {id:'gateway', g:'srv', name:'gateway :7070', sub:'start_servers.js',
   files:['localhost_servers/start_servers.js','localhost_servers/servers.json'],
-  keys:['express, 500mb body limit','CORS: localhost:8080 + neurite.network','app.use("/"+name.toLowerCase(), router)','GET /check'],
+  keys:['express, 500mb body limit','CORS: localhost:8999 + neurite.network','app.use("/"+name.toLowerCase(), router)','GET /check'],
   why:'One express process mounts every sub-server as a router under its lowercased name, and <code>npm install</code>s each on first start. <code>/check</code> reports which mounted — that is the endpoint the frontend polls to set <code>useProxy</code>.'},
  {id:'aiproxy', g:'srv', name:'/aiproxy', sub:'keys stay server-side',
   files:['localhost_servers/ai-proxy/'],
