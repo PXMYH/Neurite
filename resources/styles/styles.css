@@ -15,6 +15,17 @@
        the card work can change them in one place. */
     --ui-surface: rgb(50 51 62 / 70%);
     --ui-surface-anchored: #1a1921bf;
+
+    /* Shadows are tinted with the surface hue instead of pure black, and offset
+       downward, so the whole app implies one light direction from above. */
+    --ui-shadow: 0 3px 12px rgba(12, 12, 20, 0.5);
+    --ui-shadow-raised: 0 6px 20px rgba(12, 12, 20, 0.6);
+
+    /* Softer on containers, tighter on the panels nested inside them. */
+    --ui-radius: 8px;
+    --ui-radius-inner: 5px;
+
+    --ui-transition: 160ms ease;
 }
 
 html, body {
@@ -134,12 +145,19 @@ body {
 .window {
     display: flex;
     flex-direction: column;
-    align-items: baseline;
-    border: none;
+    /* Was `baseline`, which on a column flex container aligns items by the
+       first item's text baseline on the cross (horizontal) axis. Nothing in the
+       card wants that; `flex-start` is what the layout already looked like. */
+    align-items: flex-start;
     background-color: var(--ui-surface);
-    -webkit-box-shadow: 0px 0px 6.5px rgba(0, 0, 0, 0.3);
-    -moz-box-shadow: 0px 0px 6.5px rgba(0, 0, 0, 0.3);
-    box-shadow: 0px 0px 6.5px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--ui-shadow);
+    border-radius: var(--ui-radius);
+    /* Named properties only. The physics loop writes `left`, `top` and
+       `transform` on this element's parent every frame, so transitioning any
+       geometric property here would fight the simulation. */
+    transition: box-shadow var(--ui-transition),
+                background-color var(--ui-transition),
+                border-color var(--ui-transition);
     user-select: none;
     position: relative;
     /* Set initial width and height */
@@ -193,6 +211,7 @@ body {
    card stay recognisably anchored while it is selected. */
 .window.selected {
     background-image: linear-gradient(var(--ui-accent-dim), var(--ui-accent-dim));
+    box-shadow: var(--ui-shadow-raised);
 }
 .window.selected::before {
     content: "";
@@ -203,6 +222,8 @@ body {
     right: -1px;
     bottom: -1px;
     border: 2px solid var(--ui-accent);
+    /* Sits 1px outside the card, so it needs 1px more curve to follow it. */
+    border-radius: calc(var(--ui-radius) + 1px);
     pointer-events: none;
     z-index: 1;
 }
@@ -210,6 +231,9 @@ body {
 .node-textarea {
     background-color: #222226;
     color: #bbb;
+    /* The card is rounded now, and this panel is the opaque thing inside it, so
+       without a radius of its own it squares the card's bottom corners off. */
+    border-radius: var(--ui-radius-inner);
     overflow-y: scroll;
     resize: both;
     width: 259px;
@@ -264,7 +288,10 @@ body {
     padding-right: 2px;
     box-sizing: border-box;
     background-color: #222229;
-    border-radius: 0;
+    /* This panel is flush with the card's left, right and bottom edges and butts
+       against the header at the top, so it follows the card's curve on the
+       bottom two corners only. The 1px is the card's own border. */
+    border-radius: 0 0 calc(var(--ui-radius) - 1px) calc(var(--ui-radius) - 1px);
     position: relative;
     display: grid;
     grid-template-columns: 1fr;
@@ -376,12 +403,15 @@ body {
 input[type="text"i].title-input {
     background: none !important;
     border-style: solid;
-    border-width: 2px 5px 0px 0;
+    /* Was `2px 5px 0px 0`: a 2px rule above the title and a 5px one down its
+       right side, which drew a grey L through the card header. An editable
+       field reads as editable from an underline, so that is all it gets. */
+    border-width: 0 0 1px 0;
     border-color: #aaa;
 }
 
     input[type="text"i].title-input:focus {
-        border-color: RGB(200,200,255);
+        border-color: var(--ui-accent);
         color: lightgrey;
         /* Change the border color when the input is focused */
         outline: none;
