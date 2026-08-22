@@ -7,8 +7,11 @@
 
     if (e.getModifierState(controls.altKey.value)) {
         // Alt + double click => Create LLM node
+        // The guard is inside the branch rather than in its condition so that Alt
+        // still owns the gesture with AI features off: it does nothing, instead of
+        // falling through and quietly making a text note.
         e.preventDefault();
-        createLlmNode('', undefined, undefined, e.clientX, e.clientY).draw();
+        if (AiFeatures.enabled) createLlmNode('', undefined, undefined, e.clientX, e.clientY).draw();
     } else if (e.getModifierState(controls.controlKey.value)) {
         // Control + double click => Create Link node
         e.preventDefault();

@@ -144,3 +144,48 @@ On.click(menuButton, (e)=>{
 });
 
 On.mousedown(dropdownContent, Event.stopPropagation);
+
+
+// Add-node menu. The rows keep their own click and drag handlers from
+// `handledrop.js`; this only opens and closes the menu around them.
+const nodeAddButton = Elem.byId('nodeAddButton');
+const nodeAddMenu = Elem.byId('nodeAddMenu');
+
+function setNodeAddMenuOpen(isOpen){
+    nodeAddMenu.classList.toggle('open', isOpen);
+    nodeAddButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
+On.click(nodeAddButton, (e)=>{
+    e.stopPropagation();
+    setNodeAddMenuOpen(!nodeAddMenu.classList.contains('open'));
+});
+
+// A new note follows the mouse until it is placed, so the menu has to be out of
+// the way the moment one is made. The drag guard is the same one the rows use:
+// a drag out of the menu ends in a drop, not a click.
+On.click(nodeAddMenu, (e)=>{ if (!Mouse.isDragging) setNodeAddMenuOpen(false) });
+On.dragend(nodeAddMenu, (e)=>setNodeAddMenuOpen(false) );
+
+// `.node-panel` stops `mousedown` propagating, so this only ever sees a press
+// outside the palette.
+On.mousedown(document, (e)=>setNodeAddMenuOpen(false) );
+On.keydown(document, (e)=>{ if (e.key === 'Escape') setNodeAddMenuOpen(false) });
+
+
+// AI switch. Off hides every AI prompt surface through `body.ai-disabled`; the
+// two paths CSS cannot reach are guarded where they are called, in
+// `createnodes.js` and `customcontextmenu.js`.
+const aiFeaturesCheckbox = Elem.byId('ai-features-enabled');
+aiFeaturesCheckbox.checked = AiFeatures.enabled;
+
+On.change(aiFeaturesCheckbox, (e)=>{
+    AiFeatures.enabled = aiFeaturesCheckbox.checked;
+
+    // `openTab` writes an inline `display: block` on the tab it opens, so the Ai
+    // tab has to be left rather than merely restyled if it is the one showing.
+    const aiTabContent = Elem.byId('tab4');
+    if (!AiFeatures.enabled && aiTabContent.style.display === 'block') {
+        openTab('tab1', document.getElementsByClassName('tablink')[0]);
+    }
+});

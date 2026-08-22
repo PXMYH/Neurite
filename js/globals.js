@@ -84,6 +84,30 @@ class Modal {
 Modal.loadInputValues();
 
 
+// One switch for every AI surface. It writes a class onto `body` instead of
+// hiding each panel itself, because the AI panels come into existence at
+// different points during boot -- tab HTML lands asynchronously, node chrome
+// later still -- so a one-shot pass would miss whichever was not built yet.
+// `localStorage` rather than `settings` for the same reason `Modal.inputValues`
+// uses it: `Settings` hydrates from localforage asynchronously, which would let
+// the AI panels paint before the flag arrived.
+class AiFeatures {
+    static #key = 'aiFeaturesEnabled';
+
+    // Absent means on. AI is what most of this app is for, so an unset flag has
+    // to mean enabled or a first load would look broken.
+    static get enabled(){ return localStorage.getItem(AiFeatures.#key) !== 'false' }
+    static set enabled(isOn){
+        localStorage.setItem(AiFeatures.#key, isOn ? 'true' : 'false');
+        AiFeatures.apply();
+    }
+    static apply(){
+        document.body.classList.toggle('ai-disabled', !AiFeatures.enabled);
+    }
+}
+AiFeatures.apply();
+
+
 
 var controls = {
     altKey: {

@@ -79,15 +79,21 @@ Menu.Context = class {
         );
     }
     populateForBackground(x, y){
-        this.menu.append(
+        // Built as a list so the Ai entry can be left out entirely with AI
+        // features off. The menu is repopulated on every open, so the switch takes
+        // effect without a reload.
+        const options = [
             // Option to create a Text Node (without calling draw)
-            this.option("+ Note", createNodeFromWindow),
-            this.option("+ Ai", createAndDrawLlmNode),
+            this.option("+ Note", createNodeFromWindow)
+        ];
+        if (AiFeatures.enabled) options.push(this.option("+ Ai", createAndDrawLlmNode));
+        options.push(
             // Option to create a Link Node or Search Google
             this.option("+ Link", returnLinkNodes),
             this.option("+ File", this.fileInput.click.bind(this.fileInput)),
             this.option("Paste", this.onPasteOption.bind(null, this.targetModel))
-        )
+        );
+        this.menu.append(...options);
     }
     populateForGeneric(target){ // non-SVG targets
         const onClick = Logger.info.bind(Logger, "Generic action for:");

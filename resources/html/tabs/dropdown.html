@@ -12,10 +12,16 @@
         <div>
             <div class="tabs">
                 <button class="tablink" title="Take notes and interact with AI" onclick="openTab('tab1', this)">Notes</button>
-                <button class="tablink" title="Change AI model and settings" onclick="openTab('tab4', this)">Ai</button>
+                <button class="tablink" id="tablink-ai" title="Change AI model and settings" onclick="openTab('tab4', this)">Ai</button>
                 <button class="tablink" title="Adjust fractal rendering" onclick="openTab('tab2', this)">Fractal</button>
                 <button class="tablink" title="Teleport to interesting locations" onclick="openTab('tab6', this)">Saves</button>
                 <button class="tablink" title="help" onclick="openTab('tab3', this)">?</button>
+                <!-- The switch rides in the tab bar because the Ai tab is one of the
+                     things it hides, so it cannot live inside that tab. -->
+                <div class="feature-toggle" title="AI features: off hides every AI prompt and panel">
+                    <input type="checkbox" id="ai-features-enabled" name="ai-features-enabled">
+                    <label for="ai-features-enabled">AI</label>
+                </div>
             </div>
 
             <!-- Tab content placeholders -->
