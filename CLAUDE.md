@@ -64,6 +64,8 @@ Consequences that bite:
   level, `class X extends Y`) must appear after their dependencies.
 - Files are plain scripts, not modules. Use `import`/`export` only if you also append `:MODULE` to the
   entry in `PageLoad.scripts` (see `bundlecode.js:MODULE`, `imagenode.js:MODULE`, `savenet.js:MODULE`).
+  Converting one leaf file at a time this way is welcome; a planned migration of all 81 is not — see
+  [`docs/adr/0001`](docs/adr/0001-keep-the-hand-ordered-script-array.md).
 - Vite only ever sees `index.html`, which is why `postbuild` shells out to copy `js/`, `resources/`, and
   `wiki/` into `dist/`. Third-party libs (CodeMirror 5, Prism, marked, DOMPurify, localforage, pdf.js)
   come from CDN `<script>` tags in `index.html`, not from `package.json`.
