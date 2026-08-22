@@ -1061,39 +1061,95 @@ input[type="text"i].title-input {
     flex-grow: 1;
     text-align: left;
 }
-/* Top bar. One strip across the top owning both ends: the add-node control at the
-   left, the menu at the right. It replaces a floating 40px button top-right plus a
-   separate 310px panel pinned top-left -- two pieces of furniture for what is one
-   band of chrome, with the panel mostly empty once its palette collapsed behind a
-   plus. Fixed rather than absolute so it survives a scrolled body. */
+/* Canvas chrome as floating islands. The root spans the viewport so its children
+   can be placed against any edge of it, and it passes every gesture straight
+   through -- only the islands themselves are targets. What this replaces was one
+   opaque strip across the top: it owned a full band of screen for two controls,
+   and needed a gesture guard across its empty middle so that dragging the bar did
+   not pan the graph behind it. Fixed rather than absolute so it survives a
+   scrolled body. */
 .dropdown {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 7px 16px;
-    background: #1a1921bf;
-    backdrop-filter: blur(6px);
-    /* The canvas behind it is near-black, so the surface alone leaves the bar
-       reading as a smudge rather than as an edge. One hairline gives it a bottom. */
-    border-bottom: 1px solid #8882;
-    /* Matches what the old node panel carried, so the bar sits over the canvas
+    /* Sized in viewport units rather than with `inset: 0`, which does not reach the
+       viewport here: `body` is `position: absolute; height: 0` and carries a
+       `transform`, and a transformed ancestor becomes the containing block even for
+       fixed descendants. `inset: 0` measured that body instead and produced a box
+       1440 wide and 0 tall, which put every bottom-anchored island above the top
+       edge of the screen. `dvh` rather than `vh` so the islands follow a mobile
+       browser's toolbar in and out instead of hiding behind it. */
+    width: 100vw;
+    height: 100dvh;
+    pointer-events: none;
+    /* Matches what the old node panel carried, so the chrome sits over the canvas
        and its nodes exactly as that panel did. */
     z-index: 100;
 }
 
+    .dropdown > * {
+        pointer-events: auto;
+    }
+
+/* The tool island, centred at the top. More opaque and rounder than the bar was:
+   it floats over whatever the fractal happens to be drawing, so it has to read as
+   an object sitting on the canvas rather than as an edge of the window. */
+.tool-bar {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    background: #1a1921f2;
+    backdrop-filter: blur(6px);
+    border: 1px solid #8882;
+    /* Softer than --ui-radius: at 6px of padding around 38px tools, 8px leaves the
+       corner reading as a clipped square rather than as a pill. */
+    border-radius: 12px;
+    box-shadow: var(--ui-shadow-raised);
+}
+
+    .tool-bar .node-panel {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Separates the controls that make nodes from the one that switches a feature
+       off across the whole app. Without it the switch reads as a fifth tool. */
+    .tool-bar-divider {
+        width: 1px;
+        align-self: stretch;
+        margin: 2px;
+        background-color: #8883;
+    }
+
+        /* Bottom-left, the corner furthest from the tools, because settings are what
+           you reach for least. It used to be a bare 34px hit area at the end of the
+           strip, which supplied its surface; alone over the canvas it needs a body of
+           its own, or it is three grey lines floating on a fractal. */
         .menu-button {
-            position: relative;
-            /* Pushed to the far end: everything else in the bar is left-aligned. */
-            margin-left: auto;
-            width: 34px;
-            height: 34px;
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            width: 40px;
+            height: 40px;
+            background: #1a1921f2;
+            backdrop-filter: blur(6px);
+            border: 1px solid #8882;
+            border-radius: var(--ui-radius);
+            box-shadow: var(--ui-shadow-raised);
             cursor: pointer;
+            transition: background-color var(--ui-transition);
             z-index: 2;
         }
+
+            .menu-button:hover {
+                background-color: #2a2932f2;
+            }
 
         .menu-icon {
             position: absolute;
@@ -1137,44 +1193,64 @@ input[type="text"i].title-input {
                 transform: translateY(-6px) rotate(-45deg);
             }
 
-/* Hangs directly off the bottom of the bar. `top: 100%` and `right: 0` resolve
-   against the bar's padding box, which reaches the viewport edges, so no negative
-   margins are needed to close the gap -- the pair the floating button needed
-   (`-38px`/`-5px`) were tuned to overlap that button and are gone. */
+/* Rises out of the menu button, so it is anchored to the same corner and leaves
+   the same way it arrived. It is hidden by transform and never by `display`, which
+   is load-bearing: the panel holds two CodeMirror editors, and CodeMirror measures
+   itself when it is constructed -- in a `display: none` container it comes up with
+   zero dimensions and stays that way. */
 .dropdown-content {
     position: absolute;
-    top: 100%;
-    right: 0;
-    background: #1a1921bf;
+    /* Clears the 40px button plus a gap the width of the screen gutter. */
+    bottom: 72px;
+    left: 16px;
+    /* The panel grows upward now. The fractal tab is 35 controls tall, so on a
+       short window it would run off the top of the screen -- where, unlike the
+       bottom, there is no scrollbar to bring it back. */
+    max-height: calc(100dvh - 104px);
+    overflow-y: auto;
+    /* Widths here are content-driven -- each tab sizes the panel to itself -- so a
+       horizontal scrollbar can only ever come from something spilling sideways by a
+       few px, never from content worth reaching. Clipping it also keeps that spill
+       from stealing 15px of height and starting a vertical scrollbar with it. */
+    overflow-x: hidden;
+    /* Absorbs the few px the note pane hangs below its tab, which would otherwise
+       show as a permanent vertical scrollbar on a panel that fits. */
+    padding-bottom: 16px;
+    background: #1a1921f2;
     backdrop-filter: blur(6px);
-    /* Only the free corner is rounded: the top edge meets the bar and the right
-       edge meets the side of the screen. */
-    border-bottom-left-radius: 8px;
-    overflow: visible;
+    /* Floating clear of every edge now, so all four corners are free to round. */
+    border: 1px solid #8882;
+    border-radius: var(--ui-radius);
+    box-shadow: var(--ui-shadow-raised);
     /* One column for the one child. It asked for two equal ones, and `1fr`
        equalises them, so the panel measured 650px to hold 325px of tabs and
-       325px of nothing -- unnoticed while it floated in the corner, obvious now
-       that it hangs off a bar and the empty half is a slab of frosted glass. */
+       325px of nothing. */
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     grid-column-gap: 0px;
     grid-row-gap: 0px;
-    /*-webkit-box-shadow: 0px 0px 30px 10px rgba(21, 21, 27, 0.44);
-    -moz-box-shadow: 0px 0px 30px 10px rgba(21, 21, 27, 0.44);
-    box-shadow: 0px 0px 30px 10px rgba(21, 21, 27, 0.44);*/
     z-index: 1;
-    transform: translateY(-200%); /* Start off screen */
-    transition: transform 0.3s ease; /* Transition for sliding effect */
+    /* Its own height plus the gutter it sits in, so it clears the bottom edge
+       whatever the open tab makes it measure. */
+    transform: translateY(calc(100% + 88px));
+    transition: transform 0.3s ease;
 }
 
     .dropdown-content.open {
-        transform: translateY(0%); /* Slide in to view */
+        transform: translateY(0);
     }
 
         .submenu {
             padding: 10px;
             color: #bbb;
+            /* The note pane's two resize handles are absolutely positioned and sized at
+               100%, and with no positioned ancestor here they measured the whole settings
+               panel instead of the pane they belong to -- 656px of handle in a 616px pane.
+               That went unnoticed while the panel clipped nothing; now that the panel
+               scrolls, 40px of invisible handle was enough to give it a permanent
+               scrollbar in both directions. */
+            position: relative;
         }
 
             .submenu a {
@@ -1844,21 +1920,16 @@ input[type="checkbox"] {
         .tabs {
             display: flex;
             justify-content: flex-start;
-            /* The 47px that used to be reserved here held the tab row clear of the
-               floating menu button, which overlapped the dropdown's top-right corner.
-               That button now sits in the top bar, above the dropdown rather than on
-               top of it, so the reservation only left the switch stranded 47px short
-               of the right edge. */
-            padding-right: 8px;
         }
 
-        /* At the far end of the tab row, and set apart from it: the tabs choose what
-           the dropdown shows, this switches a feature off across the whole app. */
+        /* In the tool pill, past the divider: it rides next to the AI note tool it
+           governs, and outside the menu because the Ai tab is one of the things it
+           hides. It spent a while at the end of the tab row, where every tab was
+           also a chip with a dark fill and a 14px label, so it read as a sixth tab. */
         .feature-toggle {
             display: flex;
             align-items: center;
-            margin-left: auto;
-            padding-left: 10px;
+            padding: 0 6px 0 2px;
         }
 
             /* Every checkbox in the app is `display: none`, which also takes it out of
@@ -3712,110 +3783,54 @@ code.language-markdown {
     }
 
 /*Node Panel*/
-/* The add-node group at the left end of the bar: the plus, and the menu it
-   anchors. It was a standalone panel with its own surface, pinned to the top-left
-   corner of the canvas -- a second slab of chrome facing the menu button across
-   the screen. The bar supplies the surface now, so this is a positioning context
-   and nothing else.
+/* The tools in the pill. Each is also a `.panel-icon`, which is where the drag
+   binding, the grab cursor and the transition come from; only the geometry and the
+   surface are set here.
 
-   The class name outlives the panel on purpose: `dropdown.js` looks it up and
-   `functioncallingpanel.js` hangs its event guards on the result. */
-.node-panel {
-    position: relative;
+   Qualified by the pill to outrank `.panel-icon`, which is otherwise the same
+   specificity and sits later in this file -- `width`, `height`, `padding`,
+   `background-color`, `box-shadow` and `border-radius` would all come from the
+   square icon these used to be.
+
+   Labels stay visible. Excalidraw's toolbar can be icon-only because a rectangle
+   and an arrow are legible as shapes; a file tree and an AI note are not, and a
+   nameless icon is exactly what made the note tool hard to find to begin with. */
+.tool-bar .node-add-item {
     display: flex;
     align-items: center;
-}
-
-/* The one control that is always on screen, so it is sized like a button rather
-   than like the icons it opens. */
-.node-add-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
+    gap: 7px;
+    width: auto;
+    height: 38px;
+    padding: 0 10px;
     color: #bbb;
-    background-color: #222226;
-    border: 1px solid #8882;
+    /* The pill is the surface. One per tool as well made the group read as four
+       buttons crammed into a box rather than as one control with four positions. */
+    background-color: transparent;
+    box-shadow: none;
+    /* `.panel-icon` sets `15%`, which on an element this wide curves to a lozenge. */
     border-radius: var(--ui-radius-inner);
-    cursor: pointer;
-    transition: background-color var(--ui-transition), color var(--ui-transition);
+    font-size: 13px;
 }
 
-    .node-add-button svg {
+    .tool-bar .node-add-item svg {
         width: 20px;
         height: 20px;
-    }
-
-    .node-add-button:hover {
-        color: #222226;
-        background-color: #ddd;
-    }
-
-    .node-add-button:focus-visible {
-        outline: 2px solid var(--ui-accent);
-        outline-offset: 2px;
-    }
-
-    /* Pressed-looking while its menu is open, so the button says which state it is in. */
-    .node-add-button[aria-expanded="true"] {
-        color: #222226;
-        background-color: #929292;
-    }
-
-/* A popover under the plus, not a section of the bar: laid out in the flow it
-   would set the bar's height to the height of four rows. `min-width` keeps the
-   rows a uniform, pressable width instead of ragged shrink-wrapped ones.
-
-   It carries its own surface because it hangs over the canvas rather than over
-   chrome -- more opaque than the bar, since text has to be read against whatever
-   fractal happens to be behind it. */
-.node-add-menu {
-    display: none;
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    flex-direction: column;
-    width: max-content;
-    min-width: 168px;
-    gap: 4px;
-    padding: 6px;
-    background: #1a1921f2;
-    backdrop-filter: blur(6px);
-    border: 1px solid #8882;
-    border-radius: var(--ui-radius);
-    box-shadow: var(--ui-shadow-raised);
-    z-index: 3;
-}
-
-    .node-add-menu.open {
-        display: flex;
-    }
-
-/* Also a `.panel-icon`, so it inherits that surface, hover and grab cursor. Only
-   the geometry changes: a row with a label instead of a square.
-
-   Qualified by the menu to outrank `.panel-icon`, which is otherwise the same
-   specificity and sits later in this file, so `width`, `height`, `padding` and
-   `border-radius` would all come from the square. */
-.node-add-menu .node-add-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: auto;
-    height: auto;
-    padding: 6px 8px;
-    font-size: 13px;
-    text-align: left;
-    /* `.panel-icon` sets `15%`, which on a row this wide curves to a lozenge. */
-    border-radius: var(--ui-radius-inner);
-}
-
-    .node-add-menu .node-add-item svg {
-        width: 22px;
-        height: 22px;
         flex-shrink: 0;
+    }
+
+    /* `.panel-icon:hover` goes to a near-white fill, which was legible on a lone
+       square over the canvas but blows a hole in a dark pill. A light wash over the
+       pill's own surface is the same signal at the weight this context wants. */
+    .tool-bar .node-add-item:hover {
+        color: #eee;
+        background-color: #ffffff14;
+    }
+
+    /* Inset, because the tools sit 6px from the pill's edge and an outset ring
+       would be drawn outside it. */
+    .tool-bar .node-add-item:focus-visible {
+        outline: 2px solid var(--ui-accent);
+        outline-offset: -2px;
     }
 
 /* Lives at the foot of the dropdown now, so it takes the dropdown's width instead

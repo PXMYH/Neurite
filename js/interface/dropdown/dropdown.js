@@ -146,44 +146,59 @@ On.click(menuButton, (e)=>{
 
 On.mousedown(dropdownContent, Event.stopPropagation);
 
-// The bar reaches from edge to edge, so its empty middle is a wide target for a
-// gesture meant for the canvas: without this, dragging the bar pans the graph and
-// scrolling over it zooms. The 40px button it replaced was small enough to hit by
-// accident only rarely.
+// Every gesture over a piece of chrome is aimed at the chrome, not at the graph
+// behind it: without this, dragging an island pans the canvas and scrolling over
+// one zooms it. The root itself is `pointer-events: none`, so this only ever sees
+// what bubbled up out of an island.
 ['mousedown', 'wheel', 'dblclick']
 .forEach(Event.stopPropagationByNameForThis, dropdownDiv);
 
 
-// Add-node menu. The rows keep their own click and drag handlers from
-// `handledrop.js`; this only opens and closes the menu around them.
-const nodeAddButton = Elem.byId('nodeAddButton');
-const nodeAddMenu = Elem.byId('nodeAddMenu');
+// The tools. `handledrop.js` owns what each one does -- it binds click and
+// drag-out-to-place by the `.panel-icon` class -- so all that is left here is
+// reaching them from the keyboard, which no version of this palette has offered.
+const toolBar = document.querySelector('.tool-bar');
 
-function setNodeAddMenuOpen(isOpen){
-    nodeAddMenu.classList.toggle('open', isOpen);
-    nodeAddButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-}
+// The tools are divs, because a `draggable` <button> does not fire `dragstart`
+// in every browser and drag-out-to-place is the point of them. That costs the
+// activation a real button would have given for free.
+On.keydown(toolBar, (e)=>{
+    if (e.key !== 'Enter' && e.key !== ' ') return;
 
-On.click(nodeAddButton, (e)=>{
-    e.stopPropagation();
-    setNodeAddMenuOpen(!nodeAddMenu.classList.contains('open'));
+    const item = e.target.closest('.node-add-item');
+    if (!item) return;
+
+    e.preventDefault(); // Space scrolls otherwise
+    item.click();
 });
 
-// A new note follows the mouse until it is placed, so the menu has to be out of
-// the way the moment one is made. The drag guard is the same one the rows use:
-// a drag out of the menu ends in a drop, not a click.
-On.click(nodeAddMenu, (e)=>{ if (!Mouse.isDragging) setNodeAddMenuOpen(false) });
-On.dragend(nodeAddMenu, (e)=>setNodeAddMenuOpen(false) );
+// 1-4, in the order the tools sit in the pill. The titles name the digit, so
+// these have to work.
+const toolShortcuts = {
+    '1': 'note-icon',
+    '2': 'link-icon',
+    '3': 'edges-icon',
+    '4': 'ai-icon'
+};
 
-// Any press that is not on the plus or in its menu closes it. Two handlers rather
-// than one on `document`, because both `.node-panel` and the bar around it stop
-// `mousedown` before it gets that far -- the bar deliberately, to keep canvas
-// gestures out, which would otherwise leave a press on the bar unable to close it.
-On.mousedown(dropdownDiv, (e)=>{
-    if (!nodePanel.contains(e.target)) setNodeAddMenuOpen(false);
+On.keydown(document, (e)=>{
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    const iconClass = toolShortcuts[e.key];
+    if (!iconClass) return;
+
+    // A digit is text before it is a shortcut. CodeMirror types into a hidden
+    // textarea, so editors are covered by the tag check.
+    const focused = document.activeElement;
+    if (focused && (focused.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName))) return;
+
+    const tool = toolBar.querySelector('.' + iconClass);
+    // `offsetParent` is null while AI features are off, which hides the AI tool.
+    if (!tool || !tool.offsetParent) return;
+
+    tool.click();
 });
-On.mousedown(document, (e)=>setNodeAddMenuOpen(false) );
-On.keydown(document, (e)=>{ if (e.key === 'Escape') setNodeAddMenuOpen(false) });
 
 
 // AI switch. Off hides every AI prompt surface through `body.ai-disabled`; the

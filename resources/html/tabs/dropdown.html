@@ -1,61 +1,80 @@
 
-<!-- Top bar. One strip owns both corners of the screen: the add-node control at
-     the left end, the menu at the right end. They used to be two separate pieces
-     of canvas furniture -- a 310px panel pinned top-left and a floating button
-     top-right -- which read as two unrelated systems and left the panel mostly
-     empty once the palette collapsed behind a plus. -->
+<!-- Canvas chrome, as floating islands rather than as bars.
+
+     The root spans the viewport only so its children can be placed against any
+     edge; it is `pointer-events: none`, so the canvas behind it is untouched
+     except where an island actually sits. What came before was a full-width
+     strip pinned to the top, which owned a band of the screen it had no content
+     for and needed a gesture guard across its whole empty middle to stop drags
+     on it from panning the graph.
+
+     Two islands: the tool pill, centred at the top, and the menu, bottom-left. -->
 
 <div class="dropdown" id="dropdowndiv">
-    <!-- One button, and the four creators behind it. Each row is still the same
-         `.panel-icon <type>-icon` element it was, so `handledrop.js` keeps working
-         unchanged: it reads `classList[1]` for the icon name, and drag-out-to-place
-         still starts from the row itself.
+
+    <!-- The tool pill. The four creators used to sit in a popover behind a plus,
+         which cost a tap to reach any of them and hid what the app could make.
+         Four is few enough to lay out flat, so the plus is gone and every tool
+         is one press.
+
+         Each row is still the same `.panel-icon <type>-icon` element it always
+         was: `handledrop.js` reads `classList[1]` for the icon name and binds
+         click and drag-out-to-place by the `.panel-icon` class, so both keep
+         working with no change there.
 
          `.node-panel` is also the element `functioncallingpanel.js` hangs its
          event guards on, so the class stays even though the panel it was named
-         for is now a group inside the bar. -->
-    <div class="node-panel">
-        <button type="button" class="node-add-button" id="nodeAddButton"
-                title="Add a node" aria-haspopup="true" aria-expanded="false" aria-controls="nodeAddMenu">
-            <svg aria-hidden="true">
-                <use xlink:href="#plus-icon"></use>
-            </svg>
-        </button>
+         for is long gone -- it is the tool group inside the pill now. -->
+    <div class="tool-bar" role="toolbar" aria-label="Create a node">
+        <div class="node-panel">
+            <!-- Every title says what a click does first, then the drag, then the
+                 canvas shortcut. They used to name only the shortcut, so the icons
+                 read as reminders for a gesture rather than as controls you press.
 
-        <!-- Every title says what a click does first, then the drag, then any canvas
-             shortcut. They used to name only the shortcut, so the icons read as
-             reminders for a gesture rather than as controls you could press.
-
-             AI is last so that turning AI features off shortens the menu rather than
-             leaving a hole in the middle of it. -->
-        <div class="node-add-menu" id="nodeAddMenu" role="menu" aria-label="Add a node">
-            <div class="panel-icon note-icon node-add-item" role="menuitem" title="New note: click, or drag out to place it. Shift + Double Click on the canvas does the same.">
+                 AI is last so that turning AI features off shortens the pill rather
+                 than leaving a hole in the middle of it. -->
+            <div class="panel-icon note-icon node-add-item" role="button" tabindex="0"
+                 title="New note (1): click, or drag out to place it. Shift + Double Click on the canvas does the same.">
                 <svg aria-hidden="true">
                     <use xlink:href="#note-icon-symbol"></use>
                 </svg>
                 <span>Note</span>
             </div>
-            <div class="panel-icon link-icon node-add-item" role="menuitem" title="Link node: click to enter a URL, or drag out to place one.">
+            <div class="panel-icon link-icon node-add-item" role="button" tabindex="0"
+                 title="Link node (2): click to enter a URL, or drag out to place one.">
                 <svg aria-hidden="true">
                     <use xlink:href="#link-icon-symbol"></use>
                 </svg>
                 <span>Link</span>
             </div>
-            <div class="panel-icon edges-icon node-add-item" role="menuitem" title="File tree: click to pick a folder, or drag out to place a node. Hold Shift on the canvas to freeze and connect nodes.">
+            <div class="panel-icon edges-icon node-add-item" role="button" tabindex="0"
+                 title="File tree (3): click to pick a folder, or drag out to place a node. Hold Shift on the canvas to freeze and connect nodes.">
                 <svg style="transform: translateX(-1px);" aria-hidden="true">
                     <use xlink:href="#edges-icon-symbol"></use>
                 </svg>
                 <span>File tree</span>
             </div>
-            <div class="panel-icon ai-icon node-add-item" role="menuitem" title="AI note: click for its settings, or drag out to place one. Alt/Option + Double Click on the canvas places one directly.">
+            <div class="panel-icon ai-icon node-add-item" role="button" tabindex="0"
+                 title="AI note (4): click for its settings, or drag out to place one. Alt/Option + Double Click on the canvas places one directly.">
                 <svg aria-hidden="true">
                     <use xlink:href="#ai-icon-symbol"></use>
                 </svg>
                 <span>AI note</span>
             </div>
         </div>
+
+        <div class="tool-bar-divider" aria-hidden="true"></div>
+
+        <!-- The switch sits beside the AI note tool it governs, and outside the
+             menu because the Ai tab is one of the things it hides. -->
+        <div class="feature-toggle" title="AI features: off hides every AI prompt and panel">
+            <input type="checkbox" id="ai-features-enabled" name="ai-features-enabled">
+            <label for="ai-features-enabled">AI</label>
+        </div>
     </div>
 
+    <!-- Bottom-left, the corner furthest from the tools: settings are the thing
+         you reach for least. -->
     <div class="menu-button" title="Menu: notes, AI, fractal and saves">
         <div class="menu-icon" id="menu-icon"></div>
     </div>
@@ -68,12 +87,6 @@
                 <button class="tablink" title="Adjust fractal rendering" onclick="openTab('tab2', this)">Fractal</button>
                 <button class="tablink" title="Teleport to interesting locations" onclick="openTab('tab6', this)">Saves</button>
                 <button class="tablink" title="help" onclick="openTab('tab3', this)">?</button>
-                <!-- The switch rides in the tab bar because the Ai tab is one of the
-                     things it hides, so it cannot live inside that tab. -->
-                <div class="feature-toggle" title="AI features: off hides every AI prompt and panel">
-                    <input type="checkbox" id="ai-features-enabled" name="ai-features-enabled">
-                    <label for="ai-features-enabled">AI</label>
-                </div>
             </div>
 
             <!-- Tab content placeholders -->
@@ -96,8 +109,8 @@
             <!-- The function-calling console, below the tabs rather than inside one.
                  It holds a CodeMirror, and CodeMirror measures itself when it is
                  constructed: a `.tabcontent` is `display: none` until its tab is
-                 opened, which would give the editor zero dimensions. The dropdown
-                 is only translated off-screen, so the editor still gets real ones. -->
+                 opened, which would give the editor zero dimensions. The panel is
+                 only translated off-screen, so the editor still gets real ones. -->
             <div id="function-call-slot"></div>
         </div>
     </div>
