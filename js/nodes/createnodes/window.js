@@ -232,7 +232,11 @@ class NodeView {
         // Track buttons with their style mode
         this.svgButtons = [];
 
-        this.svgButtons.push([btnDel, "fill"]);
+        // "stroke", not "fill": all three glyphs are stroked paths now, so the
+        // colour a state change writes has to land on `stroke`. This is also what
+        // `addSvgButton` has always defaulted to, so every button in a card header
+        // is finally recoloured through one code path.
+        this.svgButtons.push([btnDel, "stroke"]);
         this.applySvgButtonUI(btnDel, async () => {
             const title = node.getTitle();
             // A card carries everything typed into it and there is no undo, so
@@ -252,9 +256,9 @@ class NodeView {
                 const nodeInfo = getZetNodeCMInstance(node);
                 nodeInfo.parser.deleteNodeByTitle(title);
             }
-        });
+        }, "stroke");
 
-        this.svgButtons.push([btnFs, "fill"]);
+        this.svgButtons.push([btnFs, "stroke"]);
         this.applySvgButtonUI(btnFs, () => {
             Autopilot.zoomToFitFrame(node).targetZoom_scaleBy(1.2).start();
             if (node.isTextNode) {
@@ -262,7 +266,7 @@ class NodeView {
                 nodeInfo.ui.scrollToTitle(node.getTitle());
                 App.zetPanes.switchPane(nodeInfo.paneId);
             }
-        });
+        }, "stroke");
 
         this.svgButtons.push([btnCol, "stroke"]);
         this.applySvgButtonUI(btnCol, this.toggleCollapse.bind(this), "stroke");

@@ -3,6 +3,15 @@ function createSyntaxTextarea() {
 
     const className = 'editable-div custom-scrollbar textarea-override';
     const textarea = Html.make.textarea(className);
+    // An empty note used to be a blank rectangle with nothing to say it was
+    // typeable, and nothing to say a reference tag is what draws an edge. Same
+    // hint the notes pane shows when empty (`generateCmPlaceholder`), shortened
+    // to fit a card. `.editable-div::placeholder` gives it a colour of its own —
+    // the textarea's own text colour is near-invisible by design.
+    const refTag = tagValues.refTag;
+    const refExample = isBracketLinks ? refTag + 'Title' + getClosingBracket(refTag)
+                                      : refTag + 'Title';
+    textarea.placeholder = 'Write here. ' + refExample + ' links to another node.';
 
     // Create the overlay div for syntax highlighting
     const displayDiv = Html.make.div('syntax-display-div custom-scrollbar');

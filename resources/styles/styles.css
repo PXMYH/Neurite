@@ -179,7 +179,10 @@ body {
     width: fit-content;
     max-width: fit-content;
     height: fit-content;
-    border: 1px solid rgba(0, 0, 0, 0);
+    /* Was a transparent hairline, so a card's only edge against the near-black
+       canvas was its own soft shadow and the silhouette stayed vague. The width
+       was already reserved here, so giving it a colour costs no layout. */
+    border: 1px solid rgba(255, 255, 255, 0.09);
     z-index: 2;
 }
 
@@ -298,7 +301,10 @@ body {
     min-height: 180px;
     max-height: 320px;
     overflow: hidden;
-    padding: 5px 0px 1px 22px;
+    /* Left padding was 22px against a title that started at the card's own edge,
+       so the two blocks of text in a card were indented 24px apart. 10px is what
+       `.header-container` now uses. */
+    padding: 6px 0px 4px 10px;
     margin: 0px;
     padding-right: 2px;
     box-sizing: border-box;
@@ -336,6 +342,16 @@ body {
     background: transparent;
     color: #2b2847;
     caret-color: #bbb;
+}
+
+/* `::placeholder` inherits `color`, and this textarea's own text is deliberately
+   near-invisible because the readable copy is the highlighted overlay above it. So
+   the placeholder needs a colour of its own or an empty note stays a blank void
+   with nothing to say it can be typed in. The overlay is `background: transparent`,
+   which is what lets this show through. */
+.editable-div::placeholder {
+    color: #6c6c7a;
+    font-style: italic;
 }
 
 .syntax-display-div {
@@ -391,15 +407,53 @@ body {
 .header-container {
     display: flex;
     justify-content: flex-end; /* Align items to the end (right) of the container */
+    /* The glyphs belong to the title beside them, so they share its centre line.
+       Without this the button row sat 6px higher (see `.button-container`). */
+    align-items: center;
     width: 100%; /* Make sure this takes up the full width of the parent container */
+    box-sizing: border-box;
+    /* Matches `.editor-wrapper`'s left padding, so the title and the note body
+       start on the same vertical. The title used to begin 2px *past* the card's
+       left edge while the body began at 22px. */
+    padding: 2px 8px 2px 10px;
+    /* The header had no background, so it showed the card surface: translucent
+       #32333e over the canvas resolves to about rgb(35,36,43), and the body below
+       is rgb(34,34,41) — the same tone to within one step per channel. The card
+       read as one flat slab. This lifts the strip just enough to separate them. */
+    background-color: rgba(255, 255, 255, 0.035);
+    /* The divider used to be the title input's own `border-bottom`, and that input
+       flex-grows into whatever the button group leaves, so the rule stopped at 71%
+       of the card width and nothing carried the eye to the right edge. On the
+       header it spans the header by construction, whatever the button count. */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    /* Follows the card's curve; the 1px is the card's own border. */
+    border-radius: calc(var(--ui-radius) - 1px) calc(var(--ui-radius) - 1px) 0 0;
+    transition: border-color var(--ui-transition);
     z-index: 1;
+}
+
+/* Replaces the accent underline the title input used to grow on focus. The rule is
+   the header's now, so the header is what lights up — and `focus-within` also
+   covers the copy button, which is the other focusable thing in the strip. */
+.header-container:focus-within {
+    border-bottom-color: var(--ui-accent);
+}
+
+/* A collapsed card is a bare circle with its title floating over it: the header
+   survives (`hideButHeaderAndTitle`) but the card's surface does not, so a tinted
+   strip and a rule would hang in space with nothing under them. */
+.window.collapsed .header-container {
+    background-color: transparent;
+    border-bottom-color: transparent;
 }
 
 .button-container {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    margin-bottom: 6px;
+    /* Was 6px, which lifted the whole row above the title's baseline. The header
+       centres its children now, so any margin here just breaks that alignment. */
+    margin-bottom: 0;
     margin-top: 0px;
     /* The group is appended before the title but belongs after it. `order` moves
        it without touching the DOM, which matters because the header markup is
@@ -427,33 +481,32 @@ body {
     display: flex;
     flex-grow: 1;
     flex-shrink: 1;
-    margin-top: 2px;
+    margin-top: 0;
     margin-right: 2px;
-    margin-left: -2px;
+    /* Was -2px, which pulled the title past the card's own left edge. The header
+       supplies the indent now. */
+    margin-left: 0;
     z-index: 150;
 }
 
 /* stripped down, now just handles look */
 input[type="text"i].title-input {
     background: none !important;
-    border-style: solid;
-    /* Was `2px 5px 0px 0`: a 2px rule above the title and a 5px one down its
-       right side, which drew a grey L through the card header. An editable
-       field reads as editable from an underline, so that is all it gets. */
-    border-width: 0 0 1px 0;
-    border-color: #aaa;
+    /* No border at all. It carried the header's divider for a while, but an input
+       that flex-grows can only draw a rule as long as the space the buttons leave,
+       so the rule moved to `.header-container` and the focus state with it. */
+    border: none;
     /* Room for the copy button, which is absolutely positioned over this input's
-       own wrapper at `right: 8px` and is 16px wide. Without the reserve, a title
+       own wrapper at `right: 6px` and is 20px wide. Without the reserve, a title
        long enough to fill the header ran straight underneath the icon. */
-    padding-right: 28px;
+    padding-right: 30px;
 }
 
     input[type="text"i].title-input:focus {
-        border-color: var(--ui-accent);
         color: lightgrey;
-        /* Change the border color when the input is focused */
         outline: none;
-        /* Remove the default outline */
+        /* Remove the default outline; `.header-container:focus-within` draws the
+           accent instead, on the one rule the header has. */
     }
 
 .hide-except-title > *:not(.title-input) {
@@ -469,12 +522,16 @@ input[type="text"i].title-input {
 
 .copy-button {
     position: absolute;
-    top: 5px;
-    right: 8px;
-    width: 16px;
-    height: 16px;
+    /* Centred on the title rather than pinned 5px from its top: this button shares
+       a row with the three window buttons, and the header centres those. */
+    top: 50%;
+    transform: translateY(-50%);
+    right: 6px;
+    /* 20px to match a window button's rendered size. It used to be 16, so the one
+       icon that sat closest to the title was also the smallest in the header. */
+    width: 20px;
+    height: 20px;
     cursor: pointer;
-    transition: transform 0.1s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -483,22 +540,25 @@ input[type="text"i].title-input {
 /* Color and scale on hover */
 .copy-button:hover svg {
     transform: scale(1.1);
-    opacity: 1;
+    color: #ddd;
 }
 
-/* Smooth default size */
 .copy-button svg {
     width: 100%;
     height: 100%;
     display: block;
-    transition: transform 0.2s ease, fill 0.2s ease;
-    opacity: 0.85;
-    color: white;
-    fill: white;
+    transition: transform var(--ui-transition), color var(--ui-transition);
+    /* The glyph is stroked now, like every other icon in a card header, so the
+       colour has to reach `stroke`. It was `fill: white`, which made it the
+       brightest thing in a row of rgb(170,170,170) glyphs. */
+    fill: none;
+    stroke: currentColor;
+    color: rgb(170, 170, 170);
 }
 
-/* Pulse effect on click */
-.copy-button:active {
+/* Pulse on click. On the svg, not the button: the button carries the translateY
+   that centres it, and a transform here would drop it back down. */
+.copy-button:active svg {
     transform: scale(0.9);
 }
 
@@ -543,31 +603,44 @@ input[type="text"i].title-input {
             position: absolute;
             width: 15px;
             height: 15px;
-            bottom: -8px;
-            /* Adjust this value */
-            right: -8px;
+            /* Was -8px on both, which hung half the grip off the card and across
+               its rounded corner. Flush now, so the whole 15px hit area is on the
+               card the grip resizes. */
+            bottom: 0;
+            right: 0;
             cursor: nwse-resize;
             z-index: 4;
             pointer-events: auto;
             /* Add this line */
         }
 
+            /* Two parallel ticks along the corner, the short one nearest it — the
+               ordinary grip shape. They used to be 2px and 2.8px wide, scaled .9 and
+               .5, and offset by translates inside a rotated frame, so they came out
+               at 9.9px and 3px: different widths, different lengths, and not evenly
+               spaced. Same width and round ends now (the round ends match the header
+               icons), rotated about their own centres, and placed with right/bottom
+               so the offsets are readable in screen terms. */
             .resize-handle::before {
                 content: "";
                 position: absolute;
                 width: 2px;
-                height: 10px;
+                height: 11px;
+                right: 6px;
+                bottom: 1px;
+                border-radius: 1px;
                 background-color: #bbb;
-                transform-origin: 0 0;
             }
 
             .resize-handle::after {
                 content: "";
                 position: absolute;
-                width: 2.8px;
-                height: 5px;
+                width: 2px;
+                height: 6px;
+                right: 2px;
+                bottom: 0;
+                border-radius: 1px;
                 background-color: #bbb;
-                transform-origin: 0 0;
             }
 
             .resize-handle.focused::before {
@@ -578,12 +651,9 @@ input[type="text"i].title-input {
                 background-color: RGB(200,200,255);
             }
 
-            .resize-handle::before {
-                transform: rotate(45deg) translate(-1px, -4px) scale(.9);
-            }
-
+            .resize-handle::before,
             .resize-handle::after {
-                transform: rotate(45deg) translate(3px, -1px) scale(.5);
+                transform: rotate(45deg);
             }
 
             .resize-handle.dragging {
