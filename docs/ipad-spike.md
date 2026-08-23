@@ -78,9 +78,12 @@ served only by `touchmove` moves the view without redrawing the fractal at the n
 `js/nodes/createnodes/window.js` registers 16 mouse handlers and zero touch handlers. The two that
 matter for the ticket's "can a node be opened, read and scrolled":
 
-- drag — `On.mousedown(this.headerContainer, ...)` at `window.js:83`
-- resize — `On.mousedown(this.resizeHandle, ...)` at `window.js:581`, with `mousemove`/`mouseup` bound
-  on `document` at `:592-593`
+- drag — `On.mousedown(this.headerContainer, ...)` in `NodeView.init`, `window.js:84`
+- resize — `On.mousedown(this.resizeHandle, ...)` in `NodeView.setResizeEventListeners`, `window.js:607`,
+  with `mousemove`/`mouseup` bound on `document` at `:618-619`
+
+Cited by method as well as by line, because this file moves: the two line numbers above were 83 and
+581 when this file was written four commits earlier.
 
 iPad Safari synthesises a `mousedown`/`mousemove`/`mouseup` sequence for some single-finger
 interactions and not others, and that boundary is exactly what the device pass has to establish. Record
@@ -221,8 +224,10 @@ doing over the Tailscale name, or the missing API will read as a bug in the app.
 Six passes, in this order. Record the raw observation, not a diagnosis.
 
 1. **Baseline.** `npm run start:host` on the Mac, then one of the three addresses below on the iPad.
-   Screenshot both orientations. Note `window.innerWidth/Height` — the Fractal tab shows FPS but not
-   size, so this one needs Web Inspector, or read it off a screenshot ruler.
+   Record the device model and the iPadOS version first — every number below is meaningless without
+   them, and `tsconfig.json` sets `target: ES2022`, so anything older than Safari 16 is a different
+   question entirely. Screenshot both orientations. Note `window.innerWidth/Height` — the Fractal tab
+   shows FPS but not size, so this one needs Web Inspector, or read it off a screenshot ruler.
 2. **Fractal pan and pinch.** One finger on the background: does it pan? Two fingers: does the view
    zoom smoothly, snap, double-apply, or rotate when rotation was not wanted? Then pinch with two
    fingers **starting on a Node** and again **starting inside a Pane** — the gesture path is on
