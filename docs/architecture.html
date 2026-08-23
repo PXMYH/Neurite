@@ -194,7 +194,7 @@ const C = [
  {id:'filetree', g:'ui', name:'filetree.js', sub:'local FS browser',
   files:['js/interface/filetree.js'],
   keys:['/directaccess'],
-  why:'Browses the real filesystem through the DirectAccess server, and is the source for file-tree nodes. Dead without the backend running.'},
+  why:'Browses the real filesystem through the DirectAccess server, and is the source for file-tree nodes. Dead without the backend running. Its paths are relative to that server’s root, so <code>/</code> is <code>DIRECTACCESS_ROOT</code> rather than the disk’s root.'},
 
  /* --- zettelkasten --- */
  {id:'zetcm', g:'zet', name:'CodeMirror layer', sub:'zetcodemirror.js · zetsyntax.js',
@@ -321,8 +321,8 @@ const C = [
   why:'Proxies Wolfram Alpha and returns pods, which become a Wolfram node with rendered images and plaintext.'},
  {id:'direct', g:'srv', name:'/directaccess', sub:'local filesystem',
   files:['localhost_servers/direct-access/'],
-  keys:['list / read paths'],
-  why:'Gives the file-tree UI real disk access. The one component that turns the app from a web page into something with local reach — worth knowing before you expose the port.'},
+  keys:['list / read paths','DIRECTACCESS_ROOT confines both'],
+  why:'Gives the file-tree UI real disk access, confined to one root: a request path is read as relative to <code>DIRECTACCESS_ROOT</code> (default the home directory) and refused unless it resolves inside it after <code>realpath</code>. The one component that turns the app from a web page into something with local reach — worth knowing before you expose the port.'},
  {id:'automation', g:'srv', name:'/automation :8081', sub:'Playwright, flag-gated',
   files:['localhost_servers/automation/automation.js'],
   keys:['npm run start:neurite','GET /screenshot → base64 PNG','window.startedViaPlaywright'],

@@ -13,7 +13,9 @@ ai-proxy, a Node.js server for handling api calls between Neurite's js interface
 
 automation, a Node.js server for running Neurite via Playwright, currently used for a headless browser option as well as for taking automated screenshots of Neurite.
 
-direct-access, a Node.js server that uses fs to enable basic filetree access.
+direct-access, a Node.js server that uses fs to enable basic filetree access. It only
+reads inside one directory: set DIRECTACCESS_ROOT to choose it, or leave it unset for
+the home directory. See direct-access/README.txt.
 
 
 # Prerequisites

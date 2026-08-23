@@ -31,6 +31,10 @@ Each sub-server gets `npm install` run for it automatically on first start, exce
 (install Playwright there manually). The frontend auto-detects the gateway by polling
 `GET localhost:7070/check` (`Host.checkServer`) and flips the global `useProxy`.
 
+`DIRECTACCESS_ROOT` is the one folder the file tree may read; it defaults to the home directory,
+and every request path is taken as relative to it, so `/` in the file tree is that folder rather
+than the disk's root (`localhost_servers/direct-access/file-access.js`).
+
 There is no linter. There is a typechecker (`npm run typecheck`) and it only checks the `.ts` files;
 the test suite is deliberately thin — `node --test` with
 no runner dependency. Most verification is still manual in the browser (or via the automation
