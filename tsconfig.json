@@ -1,0 +1,31 @@
+{
+  // The checker. It emits nothing: `npm run typecheck` is a question asked about the
+  // tree, never a step that produces a file the browser loads. Emit lives in
+  // tsconfig.build.json and runs only for `dist/`.
+  //
+  // Every file under js/ is in one program with no import between them, because a
+  // TypeScript file that neither imports nor exports is a *script*, and scripts share
+  // one global scope -- which is exactly what PageLoad.scripts builds at runtime. So
+  // the load model needs no translation: `Logger` and `tagValues` are visible in a
+  // .ts file the same way they are visible in a .js file, and a type error that
+  // crosses two files is still reported.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    // A file converted with `:MODULE` writes `./x.js` and means `./x.ts`, which is
+    // what both tsc and the dev server resolve. "bundler" is the mode that allows it.
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // The 81 remaining .js files are in the program so their globals have types, but
+    // they are not themselves checked: `checkJs` turns them into 1,917 errors in 79
+    // files, almost all TS2339 (property does not exist), and a check nobody can get
+    // to zero is a check nobody runs. A file gets checked when it becomes .ts.
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["js/**/*.ts", "js/**/*.js"]
+}

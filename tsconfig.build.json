@@ -1,0 +1,30 @@
+{
+  // Emit for `dist/` only, and transpile-only on purpose.
+  //
+  // `npm start` never runs this. Vite's dev server already answers a request for
+  // js/x.js with x.ts transpiled, so the dev loop stays edit-then-refresh with no
+  // build and no watch process. What the dev server does not do is write the release
+  // copy: `postbuild` copies js/ verbatim, so without this step a .ts file would ship
+  // to dist/ as TypeScript and the browser would fail to run it.
+  //
+  // Checking is `npm run typecheck`, not this. Splitting them keeps the release copy
+  // byte-for-byte the same shape as what the dev server serves -- esbuild in dev and
+  // tsc here both strip types and neither one checks.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noCheck": true,
+    // Without this, tsc would also re-emit all 81 .js files into dist/ and the
+    // release would run code no browser has served during development.
+    "allowJs": false,
+    // tsc prepends "use strict" to a script file under `strict`; esbuild in dev does
+    // not. Off, so dev and dist agree on the semantics of the same source.
+    "alwaysStrict": false,
+    "rootDir": ".",
+    "outDir": "dist",
+    // Matches build.sourcemap: 'inline' in vite.config.js.
+    "inlineSourceMap": true,
+    "inlineSources": true
+  },
+  "include": ["js/**/*.ts"]
+}
