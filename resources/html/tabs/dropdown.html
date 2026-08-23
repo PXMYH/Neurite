@@ -122,57 +122,102 @@
         <div class="menu-icon" id="menu-icon"></div>
     </div>
 
+    <!-- The menu is a column of rows, and one row at a time is a whole panel. It was
+         a strip of five chips over the panel they switched: five 14px labels laid
+         side by side in a box that then had to be as wide as the widest of them,
+         with the active chip the only clue which panel you were looking at.
+
+         A column reads top to bottom the way a menu does, each row is a full-width
+         target rather than a chip, and the panel that opens replaces the column
+         instead of sitting under it -- so the width is the panel's own and the
+         reader is never looking at two levels of the same menu at once. -->
     <div class="dropdown-content">
-        <div>
-            <div class="tabs">
-                <!-- Ai is first, and it is what the menu opens on: the prompt that used
-                     to sit under the notes editor is at the top of it now. -->
-                <button class="tablink" id="tablink-ai" title="Prompt the AI, change model and keys" onclick="openTab('tab4', this)">Ai</button>
-                <button class="tablink" title="Adjust fractal rendering" onclick="openTab('tab2', this)">Fractal</button>
-                <button class="tablink" title="Teleport to interesting locations" onclick="openTab('tab6', this)">Saves</button>
+        <div class="menu-panel">
+            <nav class="menu-list" id="menuList" aria-label="Menu">
+                <!-- Every row here opens a panel, so every one carries a chevron.
+                     `openTab` is unchanged: it shows the panel, and the panel view
+                     is what `MainMenu.showDetail` switches to. The `tablink` class
+                     stays because `openTab` clears `activeTab` across it, and
+                     `#tablink-ai` is the id `body.ai-disabled` hides. -->
+                <button class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
+                    <span class="menu-row-label">Ai</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
+                <button class="menu-row tablink" onclick="openTab('tab2', this)">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>
+                    <span class="menu-row-label">Fractal</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
+                <button class="menu-row tablink" onclick="openTab('tab6', this)">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-icon"></use></svg>
+                    <span class="menu-row-label">Saves</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
                 <!-- Second from the end, before help: settings are read less often
                      than any tab that holds content, and more often than help. -->
-                <button class="tablink" title="Input, node placement and stored data" onclick="openTab('tab5', this)">Settings</button>
-                <button class="tablink" title="help" onclick="openTab('tab3', this)">?</button>
+                <button class="menu-row tablink" onclick="openTab('tab5', this)">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#gear-icon"></use></svg>
+                    <span class="menu-row-label">Settings</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
+                <button class="menu-row tablink" onclick="openTab('tab3', this)">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#question-mark"></use></svg>
+                    <span class="menu-row-label">Help</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
+            </nav>
+
+            <!-- One panel at a time, with the way back at the top of it. The heading
+                 is written by `MainMenu.showDetail` from the row's own label, so a
+                 renamed row cannot disagree with the heading it opens. -->
+            <div class="menu-detail" id="menuDetail">
+                <button type="button" class="menu-back" id="menuBackButton" aria-label="Back to the menu">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#caret-left-icon"></use></svg>
+                    <span class="menu-row-label" id="menuDetailTitle">Menu</span>
+                </button>
+
+                <!-- Tab content placeholders -->
+
+                <!-- No tablink points here any more: the Notes tab is gone. The div and
+                     its `PageLoad.tabs` entry stay because the app reads what loads into
+                     it and would throw without it -- `App.init` builds `ZetPanes` from
+                     `#zetPaneContainer`, and `openTab` refreshes
+                     `currentActiveZettelkastenMirror` on every tab switch. It also keeps
+                     text-to-graph sync alive: an AI answer with no target node is
+                     streamed into that editor, and the sync pass turns it into nodes.
+
+                     So this is invisible, not dead. Issue #65 records the 14 mirror sites
+                     and the 18 `zetPaneList` sites, and holds the choice between giving
+                     the editor a designed home and deleting it outright. -->
+                <div id="tab1" class="tabcontent">
+                    <!-- Tab 1 content will be loaded here -->
+                </div>
+                <div id="tab4" class="tabcontent">
+                    <!-- Tab 4 content will be loaded here -->
+                </div>
+                <div id="tab2" class="tabcontent">
+                    <!-- Tab 2 content will be loaded here -->
+                </div>
+                <div id="tab6" class="tabcontent">
+                    <!-- Tab 6 content will be loaded here -->
+                </div>
+                <div id="tab5" class="tabcontent">
+                    <!-- Tab 5 content will be loaded here -->
+                </div>
+                <div id="tab3" class="tabcontent">
+                    <!-- Tab 3 content will be loaded here -->
+                </div>
             </div>
 
-            <!-- Tab content placeholders -->
+            <!-- The function-calling console, at the foot of the menu and in neither
+                 view: it is here in both, as it was under every tab before.
 
-            <!-- No tablink points here any more: the Notes tab is gone. The div and its
-                 `PageLoad.tabs` entry stay because the app reads what loads into it and
-                 would throw without it -- `App.init` builds `ZetPanes` from
-                 `#zetPaneContainer`, and `openTab` refreshes
-                 `currentActiveZettelkastenMirror` on every tab switch. It also keeps
-                 text-to-graph sync alive: an AI answer with no target node is streamed
-                 into that editor, and the sync pass turns it into nodes.
-
-                 So this is invisible, not dead. Issue #65 records the 14 mirror sites and
-                 the 18 `zetPaneList` sites, and holds the choice between giving the editor
-                 a designed home and deleting it outright. -->
-            <div id="tab1" class="tabcontent">
-                <!-- Tab 1 content will be loaded here -->
-            </div>
-            <div id="tab4" class="tabcontent">
-                <!-- Tab 4 content will be loaded here -->
-            </div>
-            <div id="tab2" class="tabcontent">
-                <!-- Tab 2 content will be loaded here -->
-            </div>
-            <div id="tab6" class="tabcontent">
-                <!-- Tab 6 content will be loaded here -->
-            </div>
-            <div id="tab5" class="tabcontent">
-                <!-- Tab 5 content will be loaded here -->
-            </div>
-            <div id="tab3" class="tabcontent">
-                <!-- Tab 3 content will be loaded here -->
-            </div>
-
-            <!-- The function-calling console, below the tabs rather than inside one.
-                 It holds a CodeMirror, and CodeMirror measures itself when it is
-                 constructed: a `.tabcontent` is `display: none` until its tab is
-                 opened, which would give the editor zero dimensions. The panel is
-                 only translated off-screen, so the editor still gets real ones. -->
+                 It cannot move inside `.menu-detail`, which the list view hides with
+                 `display: none`. Its CodeMirror is built at load, inside a panel that is
+                 `height: 0` but still `display: block` and `width: 100%` -- zero height it
+                 recovers from on `refresh()`, zero width it does not. `.dropdown-content`
+                 is only translated off-screen for the same reason. -->
             <div id="function-call-slot"></div>
         </div>
     </div>

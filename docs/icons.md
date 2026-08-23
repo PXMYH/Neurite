@@ -32,6 +32,7 @@ file types.
 | `plus-icon` | `plus` |
 | `delete-icon` | `trash-2` |
 | `gear-icon` | `settings` |
+| `fractal-icon` | `orbit` |
 | `question-mark` | `circle-question-mark` |
 | `play-icon` | `send` |
 | `refresh-icon` | `rotate-cw` |

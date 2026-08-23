@@ -23,19 +23,20 @@ const AI = 'resources/html/tabs/aitab.html';
 const dropdownHtml = read('resources/html/tabs/dropdown.html');
 const dropdownJs = read('js/interface/dropdown/dropdown.js');
 
-// Every tablink, as [tabId, label] in DOM order. The order is load-bearing:
-// `dropdown.js` reaches the menu's landing tab by index.
-const tablinks = [...dropdownHtml.matchAll(/<button class="tablink"[^>]*onclick="openTab\('(\w+)', this\)"[^>]*>([^<]+)</g)]
+// Every menu row, as [tabId, label] in DOM order. The label is the text of the row's
+// own `.menu-row-label`, which is also what `MainMenu.showDetail` copies into the
+// panel heading -- so a row with no label would open a panel titled "Menu".
+const tablinks = [...dropdownHtml.matchAll(/onclick="openTab\('(\w+)', this\)"[\s\S]*?class="menu-row-label">([^<]+)</g)]
     .map( (m)=> [m[1], m[2].trim()] );
 
-test('no tablink opens the Notes tab, and the ones left are in a known order', ()=>{
+test('no menu row opens the Notes tab, and the ones left are in a known order', ()=>{
     assert.deepEqual(tablinks, [
         ['tab4', 'Ai'],
         ['tab2', 'Fractal'],
         ['tab6', 'Saves'],
         ['tab5', 'Settings'],
-        ['tab3', '?'],
-    ], 'the tab strip changed; the index reads in dropdown.js point at the wrong tabs');
+        ['tab3', 'Help'],
+    ], 'the menu column changed; check that every row still has a label to open under');
 
     // Every remaining link has both halves: a div to show, and an entry that fills it.
     const main = read('js/main.js');
@@ -97,21 +98,43 @@ test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>
         'the prompt is no longer hidden when AI features are off');
 });
 
-test('the menu lands on the Ai tab, and nothing opens tab1 by hand', ()=>{
+test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
     assert.doesNotMatch(dropdownJs, /openTab\('tab1'/,
-        'something still opens a tab with no tablink');
-    // The landing tab is conditional, and the condition is not cosmetic: AI features
-    // are off until switched on, and `body.ai-disabled` hides `#tab4` and
-    // `#tablink-ai` with `!important`, so an unconditional land on Ai opens the menu
-    // on a 214x48 empty box. Measured in the browser before this branch was fixed.
-    assert.match(dropdownJs, /AiFeatures\.enabled \? 'tab4' : 'tab2'/,
-        'the menu lands on the same tab whether or not AI features are on');
-    assert.match(dropdownJs, /const iLanding = AiFeatures\.enabled \? 0 : 1;/,
-        'the tablink to mark active is not chosen alongside the tab');
-    // Leaving the Ai tab when AI features are switched off. It cannot go to tab4 (the
-    // tab being left) and it cannot go to tab1 (no tablink to mark active).
-    assert.match(dropdownJs, /openTab\('tab2', document\.getElementsByClassName\('tablink'\)\[1\]\)/,
-        'switching AI features off leaves the Ai tab open or lands on a tab with no link');
+        'something still opens a tab with no menu row');
+
+    // Opening into a panel is what the empty-menu bug was: `body.ai-disabled` hides
+    // `#tab4` and `#tablink-ai` with `!important`, AI features are off until someone
+    // switches them on, and Notes -- the row that used to be visible either way -- is
+    // gone. Measured at 214x48 in the browser before the list existed. No `openTab`
+    // call may run on open, conditional or not.
+    const onOpen = dropdownJs.slice(dropdownJs.indexOf("dropdownContent.classList.contains(\"open\")"));
+    const iEndOfHandler = onOpen.indexOf('On.mousedown');
+    assert.ok(iEndOfHandler > 0, 'the menu-open handler was not found');
+    assert.doesNotMatch(onOpen.slice(0, iEndOfHandler), /openTab\(/,
+        'opening the menu opens a panel again; a hidden one leaves the menu empty');
+    assert.match(dropdownJs, /if \(dropdownContent\.classList\.contains\("open"\)\) \{[\s\S]*?MainMenu\.showList\(\)/,
+        'opening the menu does not go to the list');
+
+    // Leaving the Ai panel when AI features are switched off. Back to the list: every
+    // other panel would be a guess, and `#tab1` has no row to mark active.
+    assert.match(dropdownJs,
+        /if \(!AiFeatures\.enabled && aiTabContent\.style\.display === 'block'\) MainMenu\.showList\(\)/,
+        'switching AI features off leaves the Ai panel showing');
+
+    // Two views, one class. `openTab` has to switch to the panel it just showed, or
+    // every row would look dead; and the heading has to come from the row itself.
+    assert.match(dropdownJs, /MainMenu\.showDetail\(element\)/,
+        'openTab shows a panel without switching to the panel view');
+    assert.match(dropdownJs, /classList\.remove\('detail-open'\)/, 'showList shows no list');
+    assert.match(dropdownJs, /classList\.add\('detail-open'\)/, 'showDetail shows no panel');
+    assert.match(dropdownJs, /On\.click\(Elem\.byId\('menuBackButton'\), MainMenu\.showList\)/,
+        'the back button is not bound, so the panel view has no way out');
+    for (const id of ['menuList', 'menuDetail', 'menuBackButton', 'menuDetailTitle']) {
+        assert.match(dropdownHtml, new RegExp('id="' + id + '"'), id + ' is missing from the menu');
+    }
+    // `Menu` is the right-click menu (`customcontextmenu.js`), and these files share
+    // one global scope, so reusing the name would replace it.
+    assert.doesNotMatch(dropdownJs, /^const Menu\b/m, 'this file redeclares the context menu');
 
     // The loop that used to run here hid `tabcontent[i]` for each tablink index. There
     // are five tablinks and six tab divs now, so it would have left one shown, and it

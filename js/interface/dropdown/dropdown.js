@@ -79,6 +79,30 @@ On.wheel(document, (e)=>{
 document.body.style.transform = "scale(1)";
 document.body.style.transformOrigin = "0 0";
 
+// The menu has two views: the column of rows, and the one panel a row opens. Not
+// `Menu` -- that name belongs to the right-click menu, in `customcontextmenu.js`.
+//
+// Which view is showing is a class on the panel rather than a pair of inline
+// `display`s, so the two can never both be hidden or both be shown.
+const MainMenu = {
+    div: document.querySelector('.menu-panel'),
+    divTitle: Elem.byId('menuDetailTitle'),
+
+    showList(){
+        MainMenu.div.classList.remove('detail-open');
+    },
+
+    // The heading is the row's own label, so a row and the panel it opens cannot
+    // end up naming two different things.
+    showDetail(row){
+        const label = row && row.querySelector('.menu-row-label');
+        if (label) MainMenu.divTitle.textContent = label.textContent;
+        MainMenu.div.classList.add('detail-open');
+    }
+}
+
+On.click(Elem.byId('menuBackButton'), MainMenu.showList);
+
 function openTab(tabId, element) {
     var i, tabcontent, tablinks;
 
@@ -95,6 +119,9 @@ function openTab(tabId, element) {
     Elem.byId(tabId).style.display = 'block';
     element.classList.add("activeTab");
 
+    // A panel is a view of its own now, so opening a tab is also going to it.
+    MainMenu.showDetail(element);
+
     window.currentActiveZettelkastenMirror.refresh();
 }
 
@@ -103,9 +130,6 @@ const dropdownDiv = Elem.byId('dropdowndiv');
 const menuButton = document.querySelector(".menu-button");
 const dropdownContent = document.querySelector(".dropdown-content");
 const nodePanel = document.querySelector(".node-panel");
-
-// Get the first tabcontent element
-const firstTab = document.querySelector(".tabcontent");
 
 On.paste(dropdownContent, (e)=>{
 });
@@ -121,24 +145,19 @@ On.click(menuButton, (e)=>{
     menuButton.classList.toggle("open");
     dropdownContent.classList.toggle("open");
 
-    // If the dropdown is opened, manually set the first tab to active and display its content
     if (dropdownContent.classList.contains("open")) {
-        // Ai, the first tablink, when AI features are on; Fractal, the second, when
-        // they are off. `body.ai-disabled` hides `#tab4` and `#tablink-ai` with
-        // `!important`, so landing on Ai there opens the menu on an empty box -- and
-        // AI features are off until switched on. Notes used to be the landing tab and
-        // was always visible; it has no tablink now -- issue #65.
-        //
-        // A hidden tablink still holds its place in the collection, so the indices are
-        // the ones in the markup either way.
+        // The list, every time. Opening straight into a panel meant choosing one that
+        // is visible, and there is no longer a row that always is: Notes was, and has
+        // none any more (issue #65), while `body.ai-disabled` hides Ai and `#tab4`
+        // with `!important` for as long as AI features are off -- which is until
+        // someone switches them on. That opened the menu as an empty 214x48 box. The
+        // list is the answer rather than a better guess: it holds no panel to hide.
         //
         // The loop that stood here removed a class nobody adds (`active`, where `openTab`
         // writes `activeTab`) and hid `tabcontent[i]` for as many i as there are
         // tablinks -- one short of the tabs, now that one tab has no link. `openTab`
         // hides every `.tabcontent` and clears every `activeTab` itself.
-        const iLanding = AiFeatures.enabled ? 0 : 1;
-        openTab(AiFeatures.enabled ? 'tab4' : 'tab2',
-                document.getElementsByClassName('tablink')[iLanding]);
+        MainMenu.showList();
 
         // If there's any selected text, deselect it
         if (window.getSelection) {
@@ -216,11 +235,9 @@ On.change(aiFeaturesCheckbox, (e)=>{
     AiFeatures.enabled = aiFeaturesCheckbox.checked;
 
     // `openTab` writes an inline `display: block` on the tab it opens, so the Ai
-    // tab has to be left rather than merely restyled if it is the one showing.
-    // Fractal, the second tablink: the Ai tab is the first one, and it is the tab
-    // being left. Notes was the old landing place and has no tablink now.
+    // panel has to be left rather than merely restyled if it is the one showing.
+    // Back to the list, not sideways into another panel: the list is where the menu
+    // starts, and going there needs no argument about which panel is safe to show.
     const aiTabContent = Elem.byId('tab4');
-    if (!AiFeatures.enabled && aiTabContent.style.display === 'block') {
-        openTab('tab2', document.getElementsByClassName('tablink')[1]);
-    }
+    if (!AiFeatures.enabled && aiTabContent.style.display === 'block') MainMenu.showList();
 });

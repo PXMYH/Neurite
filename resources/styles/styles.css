@@ -1299,7 +1299,10 @@ input[type="text"i].title-input {
             /* Open and Save to, as full-width labelled rows: an icon, then words,
                with the whole row as the target. They were two bare links in a
                cluster with Clear, which read as three equal footnotes and put the
-               only route out of the browser next to the one that empties it. */
+               only route out of the browser next to the one that empties it.
+
+               `.menu-row` is the same shape used by the menu's own column, and is
+               the name to keep: `.save-action` goes when its markup moves up there. */
             .save-actions {
                 display: flex;
                 flex-direction: column;
@@ -1310,7 +1313,8 @@ input[type="text"i].title-input {
                 margin: 0 -10px 4px;
             }
 
-                .save-action {
+                .save-action,
+                .menu-row {
                     display: flex;
                     align-items: center;
                     gap: 10px;
@@ -1328,7 +1332,8 @@ input[type="text"i].title-input {
                                 color var(--ui-transition);
                 }
 
-                    .save-action:hover {
+                    .save-action:hover,
+                    .menu-row:hover {
                         background-color: #ffffff14;
                         color: #fff;
                     }
@@ -1336,20 +1341,35 @@ input[type="text"i].title-input {
                     /* Keyboard users get the accent rather than the hover grey: a
                        row can be hovered and focused at once, and which one is
                        which has to stay legible. */
-                    .save-action:focus-visible {
+                    .save-action:focus-visible,
+                    .menu-row:focus-visible {
                         outline: none;
                         background-color: var(--ui-accent-dim);
                         box-shadow: inset 0 0 0 1px var(--ui-accent);
                         color: #fff;
                     }
 
-                    .save-action svg {
+                    .save-action svg,
+                    .menu-row svg {
                         flex: none;
                         width: 16px;
                         height: 16px;
                         /* The symbols are stroked with `currentColor`, so the icon
                            follows the label through hover and focus on its own. */
                         color: inherit;
+                    }
+
+                    /* Takes the slack, so the chevron sits at the right edge rather
+                       than next to the word. */
+                    .menu-row-label {
+                        flex: 1;
+                        min-width: 0;
+                    }
+
+                    /* Present on every row, so it says "this opens something" without
+                       competing with the label for attention. */
+                    .menu-row-chevron {
+                        opacity: 0.45;
                     }
 
             /* The file input behind Open. `display: none` would be simpler, but
@@ -2050,10 +2070,71 @@ input[type="checkbox"] {
 
 
 
-        .tabs {
+        /* The menu, as a column of rows rather than a strip of chips. Five 14px
+           labels laid side by side made the panel as wide as all five of them, and
+           the active chip was the only sign of which panel was open. A column reads
+           the way a menu reads, and the panel it opens replaces it. */
+        .menu-list {
             display: flex;
-            justify-content: flex-start;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px;
+            /* Every label is one short word, so the panel would otherwise shrink to
+               the width of "Settings" and read as a tooltip. Close to the 290px the
+               tab panels ask for, so opening one is a step rather than a jump. */
+            min-width: 260px;
+            box-sizing: border-box;
         }
+
+        /* One view at a time, and both may be `display: none`. The list holds nothing
+           that measures itself; inside the detail, every `.tabcontent` is already
+           `display: none` until its tab opens, and the one editor that cannot survive
+           a zero-width container -- the function-calling console -- sits outside both. */
+        .menu-panel:not(.detail-open) > .menu-detail {
+            display: none;
+        }
+
+        .menu-panel.detail-open > .menu-list {
+            display: none;
+        }
+
+        /* The way back, and the name of where you are. A heading and a control at
+           once: the panels below it carry their own `.submenu` padding, so the
+           spacing here is the button's alone. */
+        .menu-back {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            padding: 12px 12px 10px;
+            border: none;
+            border-bottom: 1px solid #8882;
+            background: none;
+            color: #ddd;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            transition: color var(--ui-transition);
+        }
+
+            .menu-back:hover {
+                color: #fff;
+            }
+
+            .menu-back:focus-visible {
+                outline: none;
+                box-shadow: inset 0 0 0 1px var(--ui-accent);
+                color: #fff;
+            }
+
+            .menu-back svg {
+                flex: none;
+                width: 16px;
+                height: 16px;
+                color: inherit;
+            }
 
         /* In the tool pill, past the divider: it rides next to the AI note tool it
            governs, and outside the menu because the Ai tab is one of the things it
@@ -2152,26 +2233,15 @@ input[type="checkbox"] {
             min-width: 290px;
         }
 
-.tablink {
-    padding: 4px 6px;
-    font-size: 14px;
-    cursor: pointer;
-    background-color: #222226;
-    transition: background-color 0.3s;
-    border: inset;
-    border-color: #8882;
+/* `.tablink` is now only ever a `.menu-row`, so the chip styling it used to carry --
+   a dark fill, an inset border, a grey-on-white hover -- is gone rather than
+   overridden. What is left is the mark for the panel currently open, which the
+   list view never shows anyway; it is here for the moment `openTab` writes it and
+   for the row a keyboard user comes back to. */
+.tablink.activeTab {
+    background-color: #ffffff14;
+    color: #fff;
 }
-
-    .tablink:hover {
-        background-color: #ddd;
-        color: #222226;
-        /* Change text color on hover so it's visible against the lighter background */
-    }
-
-    .tablink.activeTab {
-        background-color: #929292; /* Or the color you want for active tab */
-        color: #222226; /* Or the color you want for the text of active tab */
-    }
 
         .input-group {
             display: flex;
