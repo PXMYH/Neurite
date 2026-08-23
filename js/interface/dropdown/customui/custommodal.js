@@ -5,7 +5,11 @@ const Modals = {
     fileTreeModal: new Modal('fileTreeModal'),
     importLinkModalContent: new Modal('importLinkModalContent', "Import Text"),
     nodeConnectionModal: new Modal('nodeConnectionModal', "Connect Notes"),
-    noteModal: new Modal('noteModal', "Zettelkasten Settings", Tag.initializeInputs),
+    // Not openable: there is no `#noteModal` element to clone from. It is kept
+    // because it is the store id the Zettelkasten controls persist under, and
+    // `Modal.storeInputValue` keys its `ZetPath.updateOptions()` side effect off
+    // that id. The controls themselves are in the Settings tab.
+    noteModal: new Modal('noteModal', "Zettelkasten Settings"),
     ollamaManagerModal: new Modal('ollamaManagerModal', "Ollama Library"),
     promptLibraryModalContent: new Modal('promptLibraryModalContent', "Prompt Library"),
     vectorDbImportConfirmModal: new Modal('vectorDbImportConfirmModal', "Confirm Vector DB Import"),

@@ -4,31 +4,21 @@
     <div id="zetPaneContainer" class="zet-pane-container">
         <div for="zetPaneContent" class="button-label">
 
+            <!-- Search is what is left of this strip. The four that were beside it
+                 acted on the whole Archive -- switch, new, delete -- or opened the
+                 Zettelkasten settings, and as bare icons directly above a text
+                 editor they read as note-level: a plus next to an editor looks like
+                 "add a note", which is what the tool bar's Note icon does instead.
+
+                 The settings are in the Settings tab. The Archive controls are gone
+                 until they come back designed -- see issue #64, which also records
+                 what an Archive is. `switchPane` still runs when a Node in another
+                 Archive is clicked, so a saved graph with several of them stays
+                 usable; there is just no way to add or delete one by hand. -->
             <div id="zetPaneHeader" class="zet-pane-header">
-                <button id="notesSearchButton" class="linkbuttons search-button" title="Search Neurite">
+                <button id="notesSearchButton" class="linkbuttons search-button" title="Search Notes">
                     <svg class="icon">
                         <use xlink:href="#searchSVG"></use>
-                    </svg>
-                </button>
-                <!-- These three act on the whole Archive, not on one note. A bare
-                     plus beside a text editor reads as "add a note", which is what
-                     the tool bar's Note icon does instead -- it appends a Title to
-                     whichever Archive is selected here. So each title names the
-                     Archive, and the delete one says what goes with it. -->
-                <div title = "Switch Archive: new notes go into the one selected here"><select id="zetPaneDropdown" class="custom-select ignoreSetup"></select></div>
-                <button class="zet-add-pane-button linkbuttons search-button" title="New Archive: another document over the same canvas">
-                    <svg class="icon">
-                        <use xlink:href="#plus-icon"></use>
-                    </svg>
-                </button>
-                <button class="zet-delete-pane-button linkbuttons search-button" title="Delete this Archive and every note in it">
-                    <svg class="icon">
-                        <use xlink:href="#delete-icon"></use>
-                    </svg>
-                </button>
-                <button class="zet-settings-button linkbuttons search-button" title="Zettelkasten Settings">
-                    <svg class="icon">
-                        <use xlink:href="#gear-icon"></use>
                     </svg>
                 </button>
             </div>

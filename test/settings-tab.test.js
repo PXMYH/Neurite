@@ -125,6 +125,61 @@ test('the placement controls are wired now that no modal clones them', ()=>{
         'a change to a placement control no longer re-places the nodes');
 });
 
+test('the Zettelkasten tag inputs are in the page once and bound without a modal', ()=>{
+    // `Tag.init` reads these two out of `Modal.inputValues` by id, and `#onTagInput`
+    // decides which of the two it is from `data-key`, so both the id and the
+    // attribute are load-bearing. Two copies and the wrong one gets bound; no copy
+    // and the null-guard in `initializeInputs` returns without a word, leaving a
+    // typed Node Tag that works until the page reloads.
+    const settings = html['resources/html/tabs/settingstab.html'];
+    for (const [id, key] of [['node-tag', 'node'], ['ref-tag', 'ref']]) {
+        assert.deepEqual(ids[id], ['resources/html/tabs/settingstab.html'],
+            id + ' is not in the Settings tab exactly once');
+        assert.match(settings, new RegExp(`id="${id}" data-key="${key}"`),
+            id + ' lost its data-key, so the handler cannot tell the two tags apart');
+    }
+
+    const globals = read('js/globals.js');
+    assert.match(globals, /Modal\.wireControls\(\s*Elem\.byId\('zetTagSettings'\)\s*,\s*Modals\.noteModal\s*\)/);
+    assert.match(globals, /Tag\.initializeInputs\(\);/,
+        'no modal opens these now, so init has to be what calls this');
+    assert.ok(ids.zetTagSettings, 'nothing in the page carries that id');
+
+    // `#noteModal` is deleted. `Modals.noteModal` survives only as the store id, so
+    // a call to open it would find no element and log an error instead.
+    for (const file of ['js/interface/dropdown/tabs/notestab.js', 'js/globals.js']) {
+        assert.doesNotMatch(read(file), /Modal\.open\('noteModal'\)/,
+            file + ' opens a modal whose markup no longer exists');
+    }
+});
+
+test('the Archive controls are gone from the register as well as the page', ()=>{
+    // The dropdown was a second register of Panes -- its option list was the set of
+    // them and its value was the active one. Removing the markup while leaving those
+    // reads in place is the silent failure: `container.querySelector` gives null, and
+    // the throw lands in `new ZetPanes`, before `App.init` runs at all.
+    const src = read('js/interface/dropdown/tabs/notestab.js');
+    for (const gone of ['paneDropdown', 'zet-add-pane-button', 'zet-delete-pane-button',
+                        'zet-settings-button', 'removeSelectedPane']) {
+        assert.doesNotMatch(src, new RegExp(gone),
+            'ZetPanes still reaches for ' + gone + ', which is not in the page');
+    }
+    for (const id of ['zetPaneDropdown']) {
+        assert.equal(ids[id], undefined, id + ' is back in the page');
+    }
+
+    // What the removal must not break: three callers outside this file drive Panes
+    // directly, and a saved graph with several Archives depends on all three. Anchored
+    // to the class body's indent, because a bare `switchPane(` also matches the
+    // `this.switchPane(...)` calls inside the file -- which survive a rename of the
+    // definition and would report a method that is no longer there.
+    for (const method of ['addPane', 'restorePane', 'switchPane']) {
+        assert.match(src, new RegExp('^    ' + method + '\\(', 'm'),
+            method + ' is no longer defined here, but is called from outside this file');
+    }
+    assert.ok(ids.notesSearchButton, 'the search button went with them');
+});
+
 test('every control bound at startup by a literal id is in the page', ()=>{
     // `On.click(Elem.byId('x'), ...)` says the element is already there. The
     // Settings tab moved three of these between files; this is the check that a

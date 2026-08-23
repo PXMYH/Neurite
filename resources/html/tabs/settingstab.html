@@ -23,6 +23,25 @@
         <button id="controls-button" class="key-button">Adjust input settings…</button>
     </div>
 
+    <!-- `Tag.initializeInputs` wires this subtree, so the id is the handle it
+         reaches for. These two were the last thing behind the Zettelkasten gear in
+         the Notes pane header; the gear is gone, so they are here with the rest.
+
+         They are the syntax of the text, not decoration: `Tag.node` opens a Node
+         Section and `Tag.ref` declares an edge, and changing either reparses every
+         open Archive. `data-key` is what tells the handler which of the two it is. -->
+    <div class="settings-section" id="zetTagSettings">
+        <div class="button-label settings-heading">Zettelkasten</div>
+        <div class="settings-row" title="The characters that start a Node: the rest of the line becomes its Title.">
+            <label for="node-tag">Node Tag</label>
+            <input type="text" id="node-tag" data-key="node" value="##" style="width:80px;">
+        </div>
+        <div class="settings-row" title="The characters that open a reference to another Node, which draws an edge to it.">
+            <label for="ref-tag">Link Tag</label>
+            <input type="text" id="ref-tag" data-key="ref" value="[[" style="width:80px;">
+        </div>
+    </div>
+
     <!-- `ZetPath.init` wires this subtree, so the id is the handle it reaches for. -->
     <div class="settings-section" id="zetPlacementSettings">
         <div class="button-label settings-heading">Node placement</div>

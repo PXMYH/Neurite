@@ -393,38 +393,12 @@ CustomDropdown.createHtmlOptionDiv = function(select, optionsReplacer, selectedD
     optionsReplacer.appendChild(optionDiv);
 }
 
-function createZetContainerDropdown(option) {
-    const inputDiv = Html.make.div('option-input');
-    inputDiv.contentEditable = true;
-    inputDiv.innerText = option.text;
-
-    const optionContent = Html.make.div('option-content');
-    optionContent.appendChild(inputDiv);
-
-    // Event handler for input changes in the option
-    On.input(inputDiv, (e)=>{
-        option.text = inputDiv.innerText;
-
-        const pane = Elem.byId(option.value);
-        if (pane) pane.dataset.paneName = option.text;
-
-        if (option.selected) Select.updateSelectedOption(option.parentNode);
-    });
-
-    On.keydown(inputDiv, (e)=>{
-        if (e.key === 'Enter') e.preventDefault() // prevent adding new lines
-    });
-
-    On.paste(inputDiv, (e)=>{
-        e.preventDefault();
-        e.stopPropagation();
-    });
-
-    const onFocus = Select.selectOption.bind(Select, option.parentNode, option);
-    On.focus(inputDiv, onFocus);
-
-    return optionContent;
-}
+// `createZetContainerDropdown` was here. It rendered one Archive dropdown option as a
+// contentEditable div, so typing in it renamed the Archive -- the only rename this app
+// ever had, reachable only by noticing that an option in a dropdown took a caret. The
+// dropdown is gone with the rest of the Notes pane header, so this had no caller left.
+// Issue #64 covers a rename with a name on it; the version removed here is in the
+// history if it is wanted as a starting point.
 
 function refreshHtmlDropdownDisplay(select, createOptionContent) {
     const optionsReplacer = select.parentNode.querySelector('.options-replacer');

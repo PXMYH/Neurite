@@ -140,27 +140,17 @@ window.currentActiveZettelkastenMirror = null;
 class ZetPanes {
     paneContent = document.querySelector('.zet-pane-content');
     paneCounter = 1;
+    // `window.zetPaneList` is the register of Panes. It used to be two registers:
+    // that array, and the Archive dropdown's option list, which also held which Pane
+    // was active. The dropdown is gone (issue #64), so the array is the only one, and
+    // the methods below read it instead of reading the DOM back.
     constructor(container) {
         this.container = container;
-        this.paneDropdown = container.querySelector('#zetPaneDropdown');
-        this.addPaneButton = container.querySelector('.zet-add-pane-button');
-        this.deletePaneButton = container.querySelector('.zet-delete-pane-button');
         this.searchButton = container.querySelector('#notesSearchButton');
-        this.settingsButton = container.querySelector('.zet-settings-button');
     }
 
     init(){
-        CustomDropdown.setupHtmlOptions(this.paneDropdown, createZetContainerDropdown, false);
-
-        // + and X buttons
-        On.click(this.addPaneButton, this.addPane.bind(this));
-        On.click(this.deletePaneButton, this.removeSelectedPane);
-        On.change(this.paneDropdown, ()=>{ this.switchPane(this.paneDropdown.value) } );
         On.click(this.searchButton, ZetPanes.openSearchModal);
-        // These are Zettelkasten settings, so they belong beside the archive
-        // controls. They used to hang off a click on the node palette's note
-        // icon, where nothing suggested they existed.
-        On.click(this.settingsButton, ZetPanes.openSettingsModal);
 
         this.addPane();
     }
@@ -170,7 +160,6 @@ class ZetPanes {
         const paneName = 'Archive ' + this.paneCounter;
         const pane = this.createPane(paneId, paneName);
 
-        CustomDropdown.addHtmlOption(this.paneDropdown, { text: paneName, value: paneId }, createZetContainerDropdown);
         this.paneContent.appendChild(pane);
         this.switchPane(paneId);
 
@@ -232,33 +221,10 @@ class ZetPanes {
                 } else {
                     Logger.err("CodeMirror instance not found for the active pane.")
                 }
-
-                this.paneDropdown.value = paneId;
-                Select.updateSelectedOption(this.paneDropdown);
             } else {
                 pane.classList.remove('active');
             }
         });
-    }
-
-    removeSelectedPane = ()=>{
-        const selectedPaneId = this.paneDropdown.value;
-        if (!selectedPaneId) return;
-
-        const selectedPaneName = this.getPaneName(selectedPaneId);
-        if (this.paneDropdown.options.length === 1) return;
-
-        // "Archive" is the word on screen -- it is the name this pane is given and
-        // what the header's titles call it. This asked about a "slip-box", a third
-        // word for the same thing that appeared nowhere else, so the dialog read as
-        // being about something other than the row that opened it.
-        window.confirm(`Delete the Archive "${selectedPaneName}" and every note in it?`)
-            .then((confirmDelete) => {
-                if (confirmDelete) this.removePane(selectedPaneId);
-            })
-            .catch((error) => {
-                console.error("Confirmation failed:", error);
-            });
     }
 
     getPaneName(paneId) {
@@ -283,19 +249,11 @@ class ZetPanes {
 
         pane.remove();
 
-        const paneDropdown = this.paneDropdown;
-        const option = paneDropdown.querySelector(`option[value="${paneId}"]`);
-        if (!option) return;
-
-        const currentIndex = Array.from(paneDropdown.options).indexOf(option);
-        option.remove();
-        refreshHtmlDropdownDisplay(paneDropdown, createZetContainerDropdown);
-
-        if (paneDropdown.options.length > 0) {
-            const newIndex = (currentIndex >= paneDropdown.options.length ? currentIndex - 1 : currentIndex);
-            const newPaneId = paneDropdown.options[newIndex].value;
-            this.switchPane(newPaneId);
-        }
+        // Fall through to whichever Pane took this one's place in the register, or to
+        // the last one if this was the end of it. `resetAllPanes` runs this over every
+        // Pane, so the register does empty, and then there is nothing to switch to.
+        const next = window.zetPaneList[index] || window.zetPaneList.at(-1);
+        if (next) this.switchPane(next.paneId);
     }
 
     resetAllPanes() {
@@ -310,7 +268,6 @@ class ZetPanes {
         const paneId = `zet-pane-${this.paneCounter}`;
         const pane = this.createPane(paneId, paneName);
 
-        CustomDropdown.addHtmlOption(this.paneDropdown, { text: paneName, value: paneId }, createZetContainerDropdown);
         this.paneContent.appendChild(pane);
         this.switchPane(paneId);
 
@@ -337,9 +294,5 @@ class ZetPanes {
         Modal.open('zetSearchModal');
         setupZettelkastenSearchBar();
         performZettelkastenSearch(Elem.byId('Searchbar').value);
-    }
-
-    static openSettingsModal(){
-        Modal.open('noteModal'); // titled "Zettelkasten Settings"
     }
 }

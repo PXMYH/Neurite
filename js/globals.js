@@ -308,11 +308,18 @@ class Tag {
         Tag.node = Modal.inputValues['node-tag'] || "##";
         Tag.ref = Modal.inputValues['ref-tag'] || "[[";
         ZettelkastenParser.regexpNodeTitle = RegExp.forNodeTitle(Tag.node);
+        Tag.initializeInputs();
     }
     static initializeInputs(){
         const inputNodeTag = Elem.byId('node-tag');
         const inputRefTag = Elem.byId('ref-tag');
         if (!inputNodeTag || !inputRefTag) return;
+
+        // Opening a modal is what used to bind these, by cloning them into its body.
+        // They are in the Settings tab now, built once with the page, so the binding
+        // that persists an edit happens here instead. Still the `noteModal` store,
+        // because that is the id `Tag.init` above reads them back out of.
+        Modal.wireControls(Elem.byId('zetTagSettings'), Modals.noteModal);
 
         inputNodeTag.value = Tag.node;
         inputRefTag.value = Tag.ref;

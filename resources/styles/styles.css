@@ -2255,10 +2255,6 @@ input[type="checkbox"] {
         display: block;
     }
 
-.zet-add-pane-button {
-
-}
-
             .zettelkasten::-webkit-scrollbar {
                 width: 10px;
             }
