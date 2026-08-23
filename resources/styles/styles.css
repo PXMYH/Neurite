@@ -4000,8 +4000,8 @@ code.language-markdown {
     transform: scaleY(-1);
 }
 
-.toggle-panel:hover .toggle-icon svg path {
-    stroke: RGB(200,200,255);
+.toggle-panel:hover .toggle-icon svg {
+    color: RGB(200,200,255);
 }
 
 .toggle-panel:hover .toggle-icon {
