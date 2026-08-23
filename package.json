@@ -10,8 +10,6 @@
     "start:host": "vite --host",
     "test": "node --test",
     "typecheck": "tsc -p tsconfig.json",
-    "verify:served": "node scripts/verify-served.mjs",
-    "verify:dist": "node scripts/verify-served.mjs --dist",
     "build": "vite build",
     "postbuild": "shx cp -r js dist/js && shx cp -r resources dist/resources && shx cp -r wiki dist/wiki && tsc -p tsconfig.build.json && shx rm -f 'dist/js/**/*.ts'"
   },

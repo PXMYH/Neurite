@@ -8,6 +8,3 @@ database.db
 # Local secrets. Written as a glob so it also catches prod.env, local.env, etc.
 # The tracked template is localhost_servers/ai-proxy/.env.example.
 *.env
-
-# Screenshots and traces the Playwright MCP server writes beside the working directory.
-.playwright-mcp/
