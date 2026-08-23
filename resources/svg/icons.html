@@ -242,6 +242,18 @@ The complete notices and the id-to-icon mapping are in docs/icons.md.
                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m6 9 6 6 6-6" />
         </symbol>
+
+        <!-- A `symbol` rather than one of the hidden `svg` templates below, because
+             this one is reached both ways: the recorder builds a link around it in
+             script, and the Saves tab points a `use` at it from static markup. Only
+             a `symbol` serves both -- a `use` pointed at a `display: none` template
+             clones that property along with the artwork and renders nothing. -->
+        <symbol id="download-icon" data-lucide="download" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15V3" />
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="m7 10 5 5 5-5" />
+        </symbol>
     </defs>
 </svg>
 
@@ -249,14 +261,6 @@ The complete notices and the id-to-icon mapping are in docs/icons.md.
      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect width="7" height="7" x="6" y="6" rx="1" ry="1" />
     <path d="M4 10c-.55 0-1-.45-1-1V4c0-.55.45-1 1-1h5c.55 0 1 .45 1 1" />
-</svg>
-
-<svg id="download-icon" data-lucide="download" width="24" height="24" viewBox="0 0 24 24"
-     style="display: none;" fill="none" stroke="currentColor" stroke-width="2"
-     stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 15V3" />
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <path d="m7 10 5 5 5-5" />
 </svg>
 
 <svg id="aiNodeSettingsIcon" data-lucide="sliders-horizontal" viewBox="0 0 24 24"

@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 const root = new URL('../', import.meta.url);
 const read = (path)=> readFileSync(new URL(path, root), 'utf8');
@@ -121,6 +121,41 @@ test('every panel toggle uses the same Lucide chevron', ()=>{
     assert.equal(chevrons.length, 6, 'all six panel toggles should use chevron-down-icon');
     assert.doesNotMatch(markup, /<\/svg>\s*<path\b/,
         'a path after </svg> cannot render inside that SVG');
+});
+
+// The sprite holds two kinds of artwork that read alike in the file and behave
+// nothing alike in the page: `symbol`s inside `defs`, which exist to be pointed
+// at, and hidden `svg` templates, which exist to be cloned in script. Pointing a
+// `use` at a template clones its `display: none` too, so the control renders
+// blank -- with no error, no failing typecheck, and no sign of it in the markup.
+test('every `use` in the app points at a symbol, not a hidden template', ()=>{
+    const files = readdirSync(new URL('resources/html/', root), {recursive: true})
+        .filter( (name)=> name.endsWith('.html') )
+        .map( (name)=> 'resources/html/' + name )
+        .concat('index.html', 'js/globals.js',
+                'js/interface/dropdown/customui/record/record.js');
+
+    const symbols = new Set(
+        [...sprite.matchAll(/<symbol\b[^>]*\bid="([^"]+)"/g)].map( (match)=> match[1] )
+    );
+    const templates = new Set(
+        [...sprite.matchAll(/<svg\b[^>]*\bid="([^"]+)"[^>]*display:\s*none/g)]
+            .map( (match)=> match[1] )
+    );
+    assert.ok(templates.size > 0, 'the scan must find the hidden templates to reject');
+
+    const references = files.flatMap( (path)=>
+        [...read(path).matchAll(/<use\b[^>]*(?:xlink:)?href="#([^"]+)"/g)]
+            .map( (match)=> [path, match[1]] )
+    );
+    assert.ok(references.length > 20,
+        `parsed only ${references.length} icon references`);
+
+    const broken = references
+        .filter( ([, id])=> !symbols.has(id) )
+        .map( ([path, id])=> path + ' points at #' + id
+            + (templates.has(id) ? ', a hidden template' : ', which the sprite lacks') );
+    assert.deepEqual([...new Set(broken)], []);
 });
 
 test('the File tree tool describes and depicts a file tree only', ()=>{

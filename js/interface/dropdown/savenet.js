@@ -12,6 +12,26 @@
 class DiskMirror {
     static isSupported = (typeof window.showSaveFilePicker === 'function');
 
+    // Where there is no picker there is still a download, and every browser has
+    // one. It gives a copy taken now rather than a file that keeps itself
+    // current, which is worth saying out loud in the button's title -- but it is
+    // the difference between a graph that can leave the browser and one that
+    // cannot, so it is never the hidden option.
+    static download(filename, blob){
+        const url = URL.createObjectURL(blob);
+        const a = Html.new.a();
+        a.href = url;
+        a.download = filename;
+        a.click();
+        // Revoking in the same task cancels the download in Safari, which reads
+        // the object URL after the click returns rather than during it. A second
+        // is long enough for that and short enough that a graph carrying video
+        // does not sit twice in memory while a timer runs: the browser holds its
+        // own reference to the blob once the download has started.
+        setTimeout(URL.revokeObjectURL.bind(URL, url), 1000);
+        return filename;
+    }
+
     #handle = null;
     #state = null;
     #writing = null;
@@ -274,8 +294,13 @@ View.Graphs = class {
     #btnClearSure = Elem.byId('clear-sure-button');
     #btnClearUnsure = Elem.byId('clear-unsure-button');
     #btnDiskFile = Elem.byId('disk-file-button');
+    #btnOpenFile = Elem.byId('open-file-button');
     #divClearSure = Elem.byId('clear-sure');
     #dropArea = Elem.byId('saved-networks-container');
+    // A page cannot open a file dialog on its own either. Dropping a file on the
+    // list has always worked, but nothing on screen said so, and a gesture is no
+    // use to a keyboard or a phone: this is the same import behind a button.
+    #inputOpenFile = Elem.byId('open-file-input');
 
     #blobs = {};
     #graphs = [];
@@ -914,19 +939,74 @@ View.Graphs = class {
         if (document.visibilityState === 'hidden') this.#autosave();
     }
 
+    // Three states, and the one that used to hide the button is now the one that
+    // matters most: a browser with no picker is exactly the browser whose only
+    // copy of the graph is an evictable one, so it needs the download the most.
     #updateDiskFileButton = ()=>{
         const btn = this.#btnDiskFile;
         if (!btn) return;
-        if (!DiskMirror.isSupported) return Elem.hide(btn);
+
+        const label = btn.querySelector('.save-action-label') ?? btn;
+        if (!DiskMirror.isSupported) {
+            label.textContent = "Save to…";
+            btn.title = "Download this graph as a .neurite file. "
+                      + "This browser cannot keep writing to a file, so take "
+                      + "another copy after more work.";
+            return;
+        }
 
         const isActive = this.#stored.disk.isActive;
-        btn.text = (isActive ? "Saving to file" : "Save to file…");
+        label.textContent = (isActive ? "Saving to file" : "Save to…");
         btn.title = (isActive
             ? "Every autosave also writes to the file you picked. Click to pick another."
             : "Also write every autosave to a file on this computer.");
     }
     #onBtnDiskFileClicked = (e)=>{
-        this.#stored.disk.pick().then(this.#afterDiskFilePicked)
+        if (!DiskMirror.isSupported) return this.#downloadCopy();
+
+        this.#stored.disk.pick().then(this.#afterDiskFilePicked);
+    }
+    // The bundle is built from what is in the store, not from the screen, so the
+    // graph has to be banked first or the copy is up to eight seconds stale.
+    #downloadCopy(){
+        return this.#autosave().then(this.#downloadSelectedGraph)
+    }
+    #downloadSelectedGraph = ()=>{
+        const meta = this.#selectedGraph;
+        if (!meta) return Logger.warn("No graph to save yet");
+
+        return (new GraphExporter(meta, this.#stored)).export()
+            .then(DiskMirror.download.bind(DiskMirror, this.#fileNameForMeta(meta)))
+            .then(this.#afterDownload, this.#onDownloadFailed);
+    }
+    // A save's title is whatever the user typed in the list, so it reaches here
+    // with spaces, slashes and anything else a file name cannot hold. The pass is
+    // an allowlist of letters and digits in any script rather than of `\w`, which
+    // is ASCII: a graph titled in Chinese would otherwise download as `___`.
+    #fileNameForMeta(meta){
+        const title = String(meta.title || '').replace(/[^\p{L}\p{N} .\-_]+/gu, '_').trim();
+        return (title || 'neurite-graph') + '.neurite';
+    }
+    #afterDownload = (filename)=>{ Logger.info("Downloaded", filename) }
+    // Silence is the one thing this cannot do: the user clicked Save because they
+    // want the graph outside the browser, and a log line is not where they are
+    // looking. `alert` is what the app already uses when it must be sure a message
+    // arrives.
+    #onDownloadFailed = (err)=>{
+        Logger.err("Failed to build the file:", err);
+        alert("Could not build the file for this graph.");
+    }
+
+    #onBtnOpenFileClicked = (e)=>{ this.#inputOpenFile?.click() }
+    #onOpenFileInputChanged = (e)=>{
+        const input = e.target;
+        const file = input.files[0];
+        // Picking the same file twice would not fire `change` a second time, and
+        // reopening the file you just opened is a normal thing to want.
+        input.value = '';
+        if (!file) return;
+
+        this.#autosave().then(this.#import.bind(this, file));
     }
     #afterDiskFilePicked = (isPicked)=>{
         this.#updateDiskFileButton();
@@ -945,6 +1025,8 @@ View.Graphs = class {
         On.click(this.#btnClearSure, this.#onBtnClearSureClicked);
         On.click(this.#btnClearUnsure, this.#onBtnClearUnsureClicked);
         On.click(this.#btnDiskFile, this.#onBtnDiskFileClicked);
+        On.click(this.#btnOpenFile, this.#onBtnOpenFileClicked);
+        On.change(this.#inputOpenFile, this.#onOpenFileInputChanged);
         On.click(Elem.byId('resetSettings'), this.#onBtnResetSettingsClicked);
         On.click(Elem.byId('clearLocalStorage'), this.#onBtnClearLocalClicked);
 
@@ -1015,7 +1097,10 @@ View.Graphs = class {
         }
         #onResponseError = (err)=>{
             Logger.err("Failed to load state from file:", err);
-            displayErrorMessage("Failed to load the requested graph state.");
+            // `displayErrorMessage` stood here and is defined nowhere in the app, so
+            // this handler threw a ReferenceError of its own and buried the failure
+            // it was written to report.
+            alert("Failed to load the requested graph state.");
         }
     }
 

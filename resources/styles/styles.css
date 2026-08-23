@@ -1118,6 +1118,16 @@ input[type="text"i].title-input {
         gap: 4px;
     }
 
+    /* Both islands live on the top edge now, and the pill is about 260px wide.
+       Below this width a centred pill reaches back past the 56px the menu button
+       occupies, so it takes a second row instead of overlapping it. Phones and a
+       split-screen iPad are the sizes this covers. */
+    @media (max-width: 420px) {
+        .tool-bar {
+            top: 64px;
+        }
+    }
+
     /* Separates the controls that make nodes from the one that switches a feature
        off across the whole app. Without it the switch reads as a fifth tool. */
     .tool-bar-divider {
@@ -1127,13 +1137,18 @@ input[type="text"i].title-input {
         background-color: #8883;
     }
 
-        /* Bottom-left, the corner furthest from the tools, because settings are what
-           you reach for least. It used to be a bare 34px hit area at the end of the
-           strip, which supplied its surface; alone over the canvas it needs a body of
+        /* Top-left, where a hamburger is looked for. It sat bottom-left on the
+           reasoning that settings are reached for least, but the menu is not a
+           settings drawer any more: Open and Save to are in it, and they are the
+           two controls a graph's survival depends on. A control you need before
+           you lose something cannot be in the corner you learn last.
+
+           It used to be a bare 34px hit area at the end of a full-width strip,
+           which supplied its surface; alone over the canvas it needs a body of
            its own, or it is three grey lines floating on a fractal. */
         .menu-button {
             position: absolute;
-            bottom: 16px;
+            top: 16px;
             left: 16px;
             width: 40px;
             height: 40px;
@@ -1193,7 +1208,7 @@ input[type="text"i].title-input {
                 transform: translateY(-6px) rotate(-45deg);
             }
 
-/* Rises out of the menu button, so it is anchored to the same corner and leaves
+/* Drops out of the menu button, so it is anchored to the same corner and leaves
    the same way it arrived. It is hidden by transform and never by `display`, which
    is load-bearing: the panel holds two CodeMirror editors, and CodeMirror measures
    itself when it is constructed -- in a `display: none` container it comes up with
@@ -1201,12 +1216,14 @@ input[type="text"i].title-input {
 .dropdown-content {
     position: absolute;
     /* Clears the 40px button plus a gap the width of the screen gutter. */
-    bottom: 72px;
+    top: 72px;
     left: 16px;
-    /* The panel grows upward now. The fractal tab is 35 controls tall, so on a
-       short window it would run off the top of the screen -- where, unlike the
-       bottom, there is no scrollbar to bring it back. */
-    max-height: calc(100dvh - 104px);
+    /* The fractal tab is 35 controls tall, so on a short window the panel is
+       taller than the screen. Growing downward from a fixed top is what makes
+       that safe: the overflow lands at the bottom edge, where this element's own
+       scrollbar can reach it. Anchored to the bottom instead, a panel that
+       outgrew the window ran off the top, where nothing could. */
+    max-height: calc(100dvh - 88px);
     overflow-y: auto;
     /* Widths here are content-driven -- each tab sizes the panel to itself -- so a
        horizontal scrollbar can only ever come from something spilling sideways by a
@@ -1231,9 +1248,9 @@ input[type="text"i].title-input {
     grid-column-gap: 0px;
     grid-row-gap: 0px;
     z-index: 1;
-    /* Its own height plus the gutter it sits in, so it clears the bottom edge
+    /* Its own height plus the gutter it sits in, so it clears the top edge
        whatever the open tab makes it measure. */
-    transform: translateY(calc(100% + 88px));
+    transform: translateY(calc(-100% - 88px));
     transition: transform 0.3s ease;
 }
 
@@ -1270,6 +1287,77 @@ input[type="text"i].title-input {
                     background-color: #ddd;
                     color: #222226;
                 }
+
+            /* Open and Save to, as full-width labelled rows: an icon, then words,
+               with the whole row as the target. They were two bare links in a
+               cluster with Clear, which read as three equal footnotes and put the
+               only route out of the browser next to the one that empties it. */
+            .save-actions {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                /* Cancels `.submenu`'s padding on the sides only, so a row's hover
+                   fill runs the full width of the panel the way a menu item does,
+                   while the group keeps its vertical rhythm. */
+                margin: 0 -10px 4px;
+            }
+
+                .save-action {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    padding: 8px 12px;
+                    border: none;
+                    border-radius: var(--ui-radius-inner);
+                    background: none;
+                    color: #ddd;
+                    font: inherit;
+                    font-size: 14px;
+                    text-align: left;
+                    cursor: pointer;
+                    transition: background-color var(--ui-transition),
+                                color var(--ui-transition);
+                }
+
+                    .save-action:hover {
+                        background-color: #ffffff14;
+                        color: #fff;
+                    }
+
+                    /* Keyboard users get the accent rather than the hover grey: a
+                       row can be hovered and focused at once, and which one is
+                       which has to stay legible. */
+                    .save-action:focus-visible {
+                        outline: none;
+                        background-color: var(--ui-accent-dim);
+                        box-shadow: inset 0 0 0 1px var(--ui-accent);
+                        color: #fff;
+                    }
+
+                    .save-action svg {
+                        flex: none;
+                        width: 16px;
+                        height: 16px;
+                        /* The symbols are stroked with `currentColor`, so the icon
+                           follows the label through hover and focus on its own. */
+                        color: inherit;
+                    }
+
+            /* The file input behind Open. `display: none` would be simpler, but
+               Safari refuses to open a dialog for an input it treats as
+               unrendered, so this hides it while leaving it laid out. */
+            .visually-hidden {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                margin: -1px;
+                padding: 0;
+                border: 0;
+                overflow: hidden;
+                clip-path: inset(50%);
+                white-space: nowrap;
+            }
 
         input[type="range"] {
             display: block;

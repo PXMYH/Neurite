@@ -1,12 +1,39 @@
 <div class="submenu">
 
+    <!-- The two actions that move a graph across the browser's edge, as labelled
+         rows rather than as bare links in a cluster. They come first because they
+         are the only two things in here that a browser can lose for you: every
+         other control operates on storage the page evicts on its own terms.
+
+         Buttons, not anchors: they do something rather than go somewhere, and an
+         anchor with no href is not reachable by keyboard. The label lives in its
+         own span because the icon is a sibling of it and `savenet.js` rewrites
+         only the words. -->
+    <div class="save-actions">
+        <button type="button" class="save-action" id="open-file-button"
+                title="Open a .neurite file. It is added as a new save, so nothing on screen is overwritten.">
+            <svg aria-hidden="true"><use xlink:href="#folder-open-icon"></use></svg>
+            <span class="save-action-label">Open…</span>
+        </button>
+        <!-- The title is written by `savenet.js`: what this does depends on
+             whether the browser can hold a file open. -->
+        <button type="button" class="save-action" id="disk-file-button">
+            <svg aria-hidden="true"><use xlink:href="#download-icon"></use></svg>
+            <span class="save-action-label">Save to…</span>
+        </button>
+    </div>
+
+    <!-- Off-screen rather than `display: none`: Safari will not open a file
+         dialog for an input it considers unrendered. -->
+    <input type="file" id="open-file-input" class="visually-hidden"
+           accept=".neurite,.txt,application/octet-stream" />
+
     <div id="saved-networks-container" class="scrollable-list"></div>
 
 
     <div class="top-section">
         <div class="buttons-left">
             <span class="autosave-status" title="Every change is saved on its own, every 8 seconds and whenever this tab is hidden. There is no manual save.">Autosaving</span>
-            <a id="disk-file-button" title="Also write every autosave to a file on this computer.">Save to file…</a>
             <a id="clear-button">Clear</a>
             <div id="clear-sure" style="display:none">
                 <a id="clear-sure-button">Yes</a>

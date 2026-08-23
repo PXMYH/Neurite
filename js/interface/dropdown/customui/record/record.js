@@ -118,10 +118,9 @@ const Recorder = {
         On.mousedown(link, setBackColor.bind(link, '#cccccc')); // middle
         On.mouseup(link, setBackColor.bind(link, '#e6e6e6')); // back to lighter
 
-        const downloadSVG = Elem.deepClone(Elem.byId('download-icon'));
-        downloadSVG.style.display = "inline";  // Make visible
-
-        link.appendChild(downloadSVG);
+        // The sprite's symbol, reached the way `Svg.refresh` reaches its own. The
+        // stroke is `currentColor`, so the link's colour below reaches the icon.
+        link.innerHTML = '<svg width="24" height="24"><use xlink:href="#download-icon"></use></svg>';
         linkStyle.textDecoration = "none"; // to remove underline
         linkStyle.color = "#000";  // Set color for SVG
 
