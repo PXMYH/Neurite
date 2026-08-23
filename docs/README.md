@@ -7,6 +7,7 @@ Artifacts for understanding this codebase before changing it.
 | [`architecture.html`](architecture.html) | Interactive component diagram. Click a component for its files, key symbols and neighbours; pick a *flow* to trace one path (boot, notes⇄nodes, AI request, save/load, search, render tick). Open it directly in a browser — no build, no dependencies. |
 | this file | Same map as static text, for reading in a terminal or on GitHub. |
 | [`handoff.md`](handoff.md) | Start here when picking up development with no memory of the last session: what to read, how to run and verify, how issues are picked, what landed recently, and the working rules for this fork. |
+| [`ipad-spike.md`](ipad-spike.md) | Starting evidence for [#6](https://github.com/PXMYH/Neurite/issues/6): what the source already determines about the iPad (touch handler inventory, the two competing pinch paths, 153 fixed-px dimensions, CodeMirror's iOS input path, where the FPS readout is), plus the capture protocol for the parts that need the device. |
 | [`adr/`](adr/) | Decisions that would otherwise get re-proposed. [`0001`](adr/0001-keep-the-hand-ordered-script-array.md) is why `PageLoad.scripts` stays a hand-ordered array. |
 
 ## The one-paragraph version
