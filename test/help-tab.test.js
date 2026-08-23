@@ -19,8 +19,9 @@ const read = (p)=> readFileSync(new URL(p, root), 'utf8');
 
 const HELP = 'resources/html/tabs/helptab.html';
 const SAVES = 'resources/html/tabs/networkstab.html';
+const MENU = 'resources/html/tabs/dropdown.html';
 const help = read(HELP);
-const saves = read(SAVES);
+const menu = read(MENU);
 
 // The rows, as [keys, meaning] with the tags stripped. `<td>` order is the
 // contract: keys on the left, what they do on the right.
@@ -130,36 +131,67 @@ test('the keys the reference does not repeat are the ones the reader can rebind'
     }
 });
 
-test('Screenshot and Record are in the Saves tab, once, with their labels intact', ()=>{
+test('the four commands are rows of the menu, once each, with their labels intact', ()=>{
+    // Screenshot and Record came from this tab; Open and Save to… came from the Saves
+    // panel, which is one level further in. All four are commands, so they are rows of
+    // the menu itself rather than contents of a panel.
+    //
     // "The id is somewhere in the page" was true before the move and after it, so it
     // cannot see the move. Name the file.
-    for (const id of ['screenshotButton', 'recordButton']) {
-        const files = ['index.html', HELP, SAVES,
+    for (const id of ['open-file-button', 'disk-file-button', 'screenshotButton', 'recordButton']) {
+        const files = ['index.html', HELP, SAVES, MENU,
                        'resources/html/tabs/notestab.html',
                        'resources/html/tabs/aitab.html',
                        'resources/html/tabs/fractaltab.html',
                        'resources/html/tabs/settingstab.html']
             .filter( (p)=> new RegExp('\\sid="' + id + '"').test(read(p)) );
-        assert.deepEqual(files, [SAVES], id + ' is not in the Saves tab exactly once');
+        assert.deepEqual(files, [MENU], id + ' is not in the menu exactly once');
     }
 
-    // `.save-action` is the row pattern in this panel: an icon and a label span. The
-    // span is not cosmetic -- `Recorder.setRecordLabel` writes into it, and writing to
-    // the button instead would replace the icon along with the words.
-    for (const id of ['screenshotButton', 'recordButton']) {
-        const button = saves.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
+    // The label span is not cosmetic: `Recorder.setRecordLabel` and savenet's
+    // `#updateDiskFileButton` write into it, and writing to the button instead would
+    // replace the icon along with the words.
+    for (const id of ['open-file-button', 'disk-file-button', 'screenshotButton', 'recordButton']) {
+        const button = menu.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
         assert.ok(button, id + ' is no longer a button');
-        assert.match(button[0], /class="save-action"/, id + ' does not use the row pattern');
-        assert.match(button[0], /<span class="save-action-label">[^<]+<\/span>/,
+        assert.match(button[0], /class="menu-row"/, id + ' does not use the row pattern');
+        assert.match(button[0], /<span class="menu-row-label">[^<]+<\/span>/,
             id + ' has no label span for the icon to sit beside');
-        assert.match(button[0], /<use xlink:href="#file-\w+-icon">/,
-            id + ' lost its icon');
+        assert.match(button[0], /<use xlink:href="#[\w-]+-icon">/, id + ' lost its icon');
+        // A chevron says "this opens a panel", which a command does not.
+        assert.doesNotMatch(button[0], /menu-row-chevron/, id + ' promises a panel it does not open');
+    }
+    // Screenshot and Record are the two whose title text is the only place the reader
+    // learns what they capture. Open's is the same kind of promise; Save to…'s is
+    // written by `savenet.js`, which is why it is not asserted here.
+    for (const id of ['open-file-button', 'screenshotButton', 'recordButton']) {
+        const button = menu.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
         assert.match(button[0], /title="[^"]{20,}"/, id + ' says nothing on hover');
     }
 
+    // The commands come first and the panels after, with the hairline between them.
+    // Without this the group could scatter and every check above would still pass.
+    const iSeparator = menu.indexOf('class="menu-separator"');
+    assert.ok(iSeparator > 0, 'the commands and the panels are no longer separated');
+    assert.ok(menu.indexOf('id="recordButton"') < iSeparator,
+        'a command sits below the separator, among the panel rows');
+    assert.ok(iSeparator < menu.indexOf("openTab('tab4'"),
+        'a panel row sits above the separator, among the commands');
+
+    // Open's file input has to stay rendered for Safari to open a dialog for it, so it
+    // cannot live in `.menu-list`, which is `display: none` while a panel is open.
+    const iList = menu.indexOf('class="menu-list"');
+    const iInput = menu.indexOf('id="open-file-input"');
+    assert.ok(iInput > menu.indexOf('</nav>'),
+        'the file input is inside the list, which is display:none while a panel is open');
+    assert.ok(iInput > iList, 'the file input is gone from the menu');
+
     const record = read('js/interface/dropdown/customui/record/record.js');
-    assert.match(record, /setRecordLabel\(text\)\{[\s\S]*?\.save-action-label'\)\.textContent = text/,
+    assert.match(record, /setRecordLabel\(text\)\{[\s\S]*?\.menu-row-label'\)\.textContent = text/,
         'the label writer no longer targets the span');
+    assert.match(read('js/interface/dropdown/savenet.js'),
+        /querySelector\('\.menu-row-label'\) \?\? btn/,
+        'the Save to… label writer no longer targets the span');
     // Comments stripped: one of them quotes the write it warns against, and the
     // question here is what the file does, not what it says about itself.
     const code = record.replace(/^\s*\/\/.*$/gm, '');

@@ -1296,24 +1296,10 @@ input[type="text"i].title-input {
                     color: #222226;
                 }
 
-            /* Open and Save to, as full-width labelled rows: an icon, then words,
-               with the whole row as the target. They were two bare links in a
-               cluster with Clear, which read as three equal footnotes and put the
-               only route out of the browser next to the one that empties it.
-
-               `.menu-row` is the same shape used by the menu's own column, and is
-               the name to keep: `.save-action` goes when its markup moves up there. */
-            .save-actions {
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-                /* Cancels `.submenu`'s padding on the sides only, so a row's hover
-                   fill runs the full width of the panel the way a menu item does,
-                   while the group keeps its vertical rhythm. */
-                margin: 0 -10px 4px;
-            }
-
-                .save-action,
+            /* Every row in the menu: an icon, then words, with the whole row as the
+               target. Both kinds use it -- the four commands and the five rows that
+               open a panel -- so a command and a panel are the same size and the same
+               shape, and only the chevron says which is which. */
                 .menu-row {
                     display: flex;
                     align-items: center;
@@ -1332,7 +1318,6 @@ input[type="text"i].title-input {
                                 color var(--ui-transition);
                 }
 
-                    .save-action:hover,
                     .menu-row:hover {
                         background-color: #ffffff14;
                         color: #fff;
@@ -1341,7 +1326,6 @@ input[type="text"i].title-input {
                     /* Keyboard users get the accent rather than the hover grey: a
                        row can be hovered and focused at once, and which one is
                        which has to stay legible. */
-                    .save-action:focus-visible,
                     .menu-row:focus-visible {
                         outline: none;
                         background-color: var(--ui-accent-dim);
@@ -1349,7 +1333,6 @@ input[type="text"i].title-input {
                         color: #fff;
                     }
 
-                    .save-action svg,
                     .menu-row svg {
                         flex: none;
                         width: 16px;
@@ -2097,6 +2080,15 @@ input[type="checkbox"] {
             min-width: 260px;
             box-sizing: border-box;
         }
+
+            /* Between the commands and the panels. A hairline rather than a heading
+               for each group: two labels above four rows would be more words than
+               the rows themselves, and the chevron already says which kind a row is. */
+            .menu-separator {
+                height: 1px;
+                margin: 6px 4px;
+                background: #8882;
+            }
 
         /* One view at a time, and both may be `display: none`. The list holds nothing
            that measures itself; inside the detail, every `.tabcontent` is already

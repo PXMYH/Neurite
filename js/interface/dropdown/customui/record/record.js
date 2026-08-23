@@ -56,7 +56,7 @@ const Recorder = {
     // The button is an icon and a label, so its text is the label's, not its own.
     // `button.textContent = ...` would replace both children and delete the icon.
     setRecordLabel(text){
-        Elem.byId('recordButton').querySelector('.save-action-label').textContent = text
+        Elem.byId('recordButton').querySelector('.menu-row-label').textContent = text
     },
 
     onDataAvailable(e){

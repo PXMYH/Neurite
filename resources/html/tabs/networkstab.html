@@ -1,57 +1,13 @@
 <div class="submenu">
 
-    <!-- The two actions that move a graph across the browser's edge, as labelled
-         rows rather than as bare links in a cluster. They come first because they
-         are the only two things in here that a browser can lose for you: every
-         other control operates on storage the page evicts on its own terms.
+    <!-- Open…, Save to…, Screenshot and Record used to head this panel. They are rows
+         of the menu itself now (`dropdown.html`): they are commands, and a command that
+         needs a panel opened first is a command two clicks deep. The hidden file input
+         behind Open went with them, because it has to stay rendered and this panel does
+         not.
 
-         Buttons, not anchors: they do something rather than go somewhere, and an
-         anchor with no href is not reachable by keyboard. The label lives in its
-         own span because the icon is a sibling of it and `savenet.js` rewrites
-         only the words. -->
-    <div class="save-actions">
-        <button type="button" class="save-action" id="open-file-button"
-                title="Open a .neurite file. It is added as a new save, so nothing on screen is overwritten.">
-            <svg aria-hidden="true"><use xlink:href="#folder-open-icon"></use></svg>
-            <span class="save-action-label">Open…</span>
-        </button>
-        <!-- The title is written by `savenet.js`: what this does depends on
-             whether the browser can hold a file open. -->
-        <button type="button" class="save-action" id="disk-file-button">
-            <svg aria-hidden="true"><use xlink:href="#download-icon"></use></svg>
-            <span class="save-action-label">Save to…</span>
-        </button>
-    </div>
-
-    <!-- Screenshot and Record, from the ? tab, where they were the last two rows that
-         were not help. Its own group because they are not the group above: nothing
-         here writes a save. Both read the screen through `getDisplayMedia` and put
-         what they capture on the canvas as a node -- an image node for the shot
-         (`NodeView.addForImage`), a "Recorded Video" window holding a `<video>` and a
-         download link for the recording (`Recorder.handleBlob`). They sit beside Open
-         and Save to… because those are the other three controls in this panel that
-         reach outside the page; everything below operates on storage.
-
-         The label is a span, like the two above, and for a second reason: `record.js`
-         swaps it for a pause glyph while recording, and writing to the button's own
-         `textContent` would take the icon with it. -->
-    <div class="save-actions">
-        <button type="button" class="save-action" id="screenshotButton"
-                title="Capture the screen and drop it on the canvas as an image node.">
-            <svg aria-hidden="true"><use xlink:href="#file-image-icon"></use></svg>
-            <span class="save-action-label">Screenshot</span>
-        </button>
-        <button type="button" class="save-action" id="recordButton"
-                title="Record the screen. Stops on a second click, then makes a node holding the video and a download link.">
-            <svg aria-hidden="true"><use xlink:href="#file-video-icon"></use></svg>
-            <span class="save-action-label">Record</span>
-        </button>
-    </div>
-
-    <!-- Off-screen rather than `display: none`: Safari will not open a file
-         dialog for an input it considers unrendered. -->
-    <input type="file" id="open-file-input" class="visually-hidden"
-           accept=".neurite,.txt,application/octet-stream" />
+         What is left is everything that operates on storage the browser evicts on its
+         own terms -- the saves themselves, and the coordinates. -->
 
     <div id="saved-networks-container" class="scrollable-list"></div>
 

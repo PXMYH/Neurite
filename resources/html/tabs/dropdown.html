@@ -134,7 +134,47 @@
     <div class="dropdown-content">
         <div class="menu-panel">
             <nav class="menu-list" id="menuList" aria-label="Menu">
-                <!-- Every row here opens a panel, so every one carries a chevron.
+                <!-- The four commands, above the panels and separated from them, because
+                     they are the only rows that do something rather than go somewhere:
+                     no chevron, and the menu closes around them rather than descending a
+                     level. They were two rows deep -- Open and Save to… at the top of the
+                     Saves panel, Screenshot and Record below them -- and reaching a save
+                     of the graph took opening the menu, choosing a panel, and only then
+                     finding it.
+
+                     All four cross the page's edge: two move a `.neurite` file, two read
+                     the screen through `getDisplayMedia`. Nothing else in the menu leaves
+                     the browser, which is what makes them one group.
+
+                     `savenet.js`, `record.js` and `handledrop.js` bind by id, so moving
+                     the markup changes no wiring. The label is its own span for the same
+                     reason as before: `Recorder.setRecordLabel` and `savenet.js` write the
+                     words, and writing to the button would take the icon with them. -->
+                <button type="button" class="menu-row" id="open-file-button"
+                        title="Open a .neurite file. It is added as a new save, so nothing on screen is overwritten.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-open-icon"></use></svg>
+                    <span class="menu-row-label">Open…</span>
+                </button>
+                <!-- The title is written by `savenet.js`: what this does depends on
+                     whether the browser can hold a file open. -->
+                <button type="button" class="menu-row" id="disk-file-button">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#download-icon"></use></svg>
+                    <span class="menu-row-label">Save to…</span>
+                </button>
+                <button type="button" class="menu-row" id="screenshotButton"
+                        title="Capture the screen and drop it on the canvas as an image node.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-image-icon"></use></svg>
+                    <span class="menu-row-label">Screenshot</span>
+                </button>
+                <button type="button" class="menu-row" id="recordButton"
+                        title="Record the screen. Stops on a second click, then makes a node holding the video and a download link.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-video-icon"></use></svg>
+                    <span class="menu-row-label">Record</span>
+                </button>
+
+                <div class="menu-separator" role="separator"></div>
+
+                <!-- Every row below here opens a panel, so every one carries a chevron.
                      `openTab` is unchanged: it shows the panel, and the panel view
                      is what `MainMenu.showDetail` switches to. The `tablink` class
                      stays because `openTab` clears `activeTab` across it, and
@@ -219,6 +259,14 @@
                  recovers from on `refresh()`, zero width it does not. `.dropdown-content`
                  is only translated off-screen for the same reason. -->
             <div id="function-call-slot"></div>
+
+            <!-- The file input behind Open, and out here for the same reason as the
+                 console above it: `display: none` is what `.menu-list` hides with, and
+                 Safari will not open a file dialog for an input it treats as unrendered.
+                 Open is only reachable from the list, but the input is reachable from
+                 anywhere `savenet.js` decides to click it. -->
+            <input type="file" id="open-file-input" class="visually-hidden"
+                   accept=".neurite,.txt,application/octet-stream" />
         </div>
     </div>
 </div>

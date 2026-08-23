@@ -946,7 +946,7 @@ View.Graphs = class {
         const btn = this.#btnDiskFile;
         if (!btn) return;
 
-        const label = btn.querySelector('.save-action-label') ?? btn;
+        const label = btn.querySelector('.menu-row-label') ?? btn;
         if (!DiskMirror.isSupported) {
             label.textContent = "Save to…";
             btn.title = "Download this graph as a .neurite file. "
