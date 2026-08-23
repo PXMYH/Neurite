@@ -91,6 +91,13 @@ test('a help block is hidden from the page but not from the accessibility tree',
     const rule = css.slice(css.indexOf('.visually-hidden'), css.indexOf('}', css.indexOf('.visually-hidden')));
     assert.match(rule, /clip-path:\s*inset\(50%\)/, '.visually-hidden no longer clips its content');
     assert.doesNotMatch(rule, /display:\s*none/, '.visually-hidden now hides from screen readers too');
+
+    // Absolute with no offset means "stay where you would have been", and an
+    // `overflow: hidden` ancestor only clips absolute descendants it is the containing
+    // block for. These four sit in a collapsed panel that is not positioned, so
+    // without an offset their boxes escaped its clip and the Fractal panel scrolled
+    // 206px of nothing. Measured in the browser: 206 before, 0 after.
+    assert.match(rule, /top:\s*0/, '.visually-hidden sits at its static position again, which a collapsed panel does not clip');
 });
 
 test('the help text states the range the control actually accepts', ()=>{

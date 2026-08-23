@@ -1372,11 +1372,23 @@ input[type="text"i].title-input {
                         opacity: 0.45;
                     }
 
-            /* The file input behind Open. `display: none` would be simpler, but
-               Safari refuses to open a dialog for an input it treats as
-               unrendered, so this hides it while leaving it laid out. */
+            /* The file input behind Open, and the help text each Fractal control is
+               described by. `display: none` would be simpler, but Safari refuses to
+               open a dialog for an input it treats as unrendered, and a screen reader
+               cannot read what is not rendered either -- so this hides it while
+               leaving it laid out.
+
+               `top`/`left` are what keep it out of the scroll height. Without them an
+               absolute box stays at its static position, and `overflow: hidden` on an
+               ancestor only clips absolute descendants the ancestor is the containing
+               block for -- which an unpositioned one is not. Four of these sit inside
+               a collapsed `.fractal-settings-panel`, so their boxes escaped its clip
+               and gave the Fractal panel 206px of empty scroll. Pinned to the
+               containing block's origin they land inside it and measure nothing. */
             .visually-hidden {
                 position: absolute;
+                top: 0;
+                left: 0;
                 width: 1px;
                 height: 1px;
                 margin: -1px;
