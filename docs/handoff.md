@@ -26,15 +26,18 @@ component map. Open the HTML in a browser; it needs no server and no build.
 ## Run it and verify a change
 
 ```bash
-npm install
+npm install        # once in the primary checkout
 npm start          # vite on http://localhost:8999 — strictPort, so a busy port fails loudly
 npm test           # node --test
 ```
 
-`http://localhost:8999` is the only URL for local development. If something hands you a different
-port, that is [issue #53](https://github.com/PXMYH/Neurite/issues/53), not a convention.
+The `prestart` lifecycle links a fresh worktree to the primary checkout's dependencies, so this is the
+same command from either checkout and Vite still serves `public/`.
 
-There is no linter and no typechecker. There are **42 tests in 8 files** under `test/`, and they are
+`http://localhost:8999` is the only URL for local development. If something hands you a different
+port, that is a defect, not a convention.
+
+There is no linter and no typechecker. There are **46 tests in 9 files** under `test/`, and they are
 the only automated check that exists.
 
 ```bash
@@ -85,7 +88,6 @@ Two kinds of issue are open, and they are not interchangeable.
 - [#52 — Every icon comes from Lucide, and the collapse button stops being a bare circle](https://github.com/PXMYH/Neurite/issues/52).
   The recon is already in the body: all 47 sprite ids, where each is consumed, the proposed Lucide name
   for each, which ids are dead, and two defects found while measuring. Do not repeat that survey.
-- [#53 — Local development serves on http://localhost:8999 only, including from a worktree](https://github.com/PXMYH/Neurite/issues/53).
 - [#48 — Move `js/` to TypeScript](https://github.com/PXMYH/Neurite/issues/48). Large, and a
   prerequisite for porting Excalidraw's TypeScript source directly. Not started.
 - [#32 is reserved.](https://github.com/PXMYH/Neurite/issues/32) The settings panel. Labelled
@@ -130,8 +132,8 @@ Three Node-facing facts that came out of that work and are easy to rediscover th
 
 ## Working rules for this repository
 
-- **Isolate before editing.** Work in a git worktree under `.claude/worktrees/`. Note that
-  `npm install` has never run there, so `npm start` fails inside a worktree today — that is #53.
+- **Isolate before editing.** Work in a git worktree under `.claude/worktrees/`. Keep dependencies
+  installed in the primary checkout; `npm start` links a fresh worktree to them automatically.
 - **Push straight to `main`. No pull request is wanted on this fork.** From a worktree:
   `git push origin <branch>:main`. Never force-push, never rewrite history, never touch a branch that
   is checked out somewhere else.

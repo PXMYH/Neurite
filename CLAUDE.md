@@ -5,13 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm install
-npm start              # vite dev server on http://localhost:8999 (strictPort, so a busy port fails)
+npm install            # once in the primary checkout
+npm start              # http://localhost:8999; linked worktrees reuse the primary dependencies
 npm run start:host     # same, exposed on the LAN
 npm run build          # vite build -> dist/ (+ postbuild copies js/, resources/, wiki/)
 npm test               # node --test, auto-discovers test/
 node --test test/vec2.test.js   # one file (a bare directory arg is read as a module path and fails)
 ```
+
+The `prestart` lifecycle creates a worktree's missing `node_modules` as a link to the primary
+checkout. Keep the primary checkout installed; a fresh linked worktree then uses the same `npm start`
+command and Vite root, including `public/`. Port 8999 remains strict, so stop a running copy before
+starting another checkout.
 
 Optional backend (proxied AI calls, web scraping, Wolfram, wiki search, file tree):
 

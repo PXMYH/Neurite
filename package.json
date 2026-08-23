@@ -4,7 +4,9 @@
   "type": "module",
   "description": "fractal mind map",
   "scripts": {
+    "prestart": "node scripts/ensure-worktree-node-modules.js",
     "start": "vite",
+    "prestart:host": "node scripts/ensure-worktree-node-modules.js",
     "start:host": "vite --host",
     "test": "node --test",
     "build": "vite build",
