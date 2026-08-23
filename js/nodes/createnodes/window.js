@@ -75,6 +75,7 @@ class NodeView {
     }
 
     init(){
+        this.refreshControlIcons();
         this.bindDOMRefs();
         this.initCollapsed();
         this.model.dropdown = document.querySelector('.dropdown');
@@ -85,6 +86,31 @@ class NodeView {
         this.setTitleInputListeners();
         this.setResizeEventListeners();
         this.observeContentResize(); // unknown wrappers
+    }
+
+    refreshControlIcons(){
+        const header = this.headerContainer || this.div?.querySelector('.header-container');
+        if (!header) return;
+
+        const savedButtons = header.querySelector('.button-container');
+        const buttonTemplate = Elem.byId('elements')?.children[0];
+        if (savedButtons && buttonTemplate) {
+            const currentButtons = Elem.deepClone(buttonTemplate);
+            currentButtons.setAttribute('class', 'button-container');
+            savedButtons.replaceWith(currentButtons);
+            this.buttons = currentButtons;
+        }
+
+        const copyButton = header.querySelector('.copy-button');
+        const savedCopy = copyButton?.querySelector('svg');
+        const copyTemplate = Elem.byId('copy-icon-template');
+        if (savedCopy && copyTemplate) {
+            const currentCopy = Elem.deepClone(copyTemplate);
+            currentCopy.style.display = '';
+            currentCopy.setAttribute('class', 'copy-icon');
+            savedCopy.replaceWith(currentCopy);
+            this.copyBtn = copyButton;
+        }
     }
 
     bindDOMRefs() {
