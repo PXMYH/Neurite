@@ -1,6 +1,10 @@
 # Neurite — learning docs
 
-Artifacts for understanding this codebase before changing it.
+Artifacts for understanding this codebase before changing it. The feature guides split out of the main
+README — [`features.md`](features.md), [`controls.md`](controls.md), [`zettelkasten.md`](zettelkasten.md),
+[`fractalgpt.md`](fractalgpt.md), [`multi-agent.md`](multi-agent.md), [`neural-api.md`](neural-api.md),
+[`desktop.md`](desktop.md) and [`gallery.md`](gallery.md) — say what Neurite does; the files below say
+how it is built.
 
 | File | What it is |
 | --- | --- |
