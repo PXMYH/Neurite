@@ -15,7 +15,9 @@ const Modals = {
     vectorDbImportConfirmModal: new Modal('vectorDbImportConfirmModal', "Confirm Vector DB Import"),
     vectorDbModal: new Modal('vectorDbModal', "Vector Database"),
     vectorDbSearchModal: new Modal('vectorDbSearchModal', "Search Vector-DB"),
-    zetSearchModal: new Modal('zetSearchModal', "Search Notes"),
+    // Nodes, not notes: it walks every Node in the Graph and ignores Panes. The
+    // button that opens it is in the tool bar for the same reason.
+    zetSearchModal: new Modal('zetSearchModal', "Search Nodes"),
     'neurite-modal': new Modal('neurite-modal', "Neurite"),
     alertModal: Object.assign(new Modal('alertModal', 'Alert'), { customClass: 'alert-modal' }),
     confirmModal: new Modal('confirmModal', 'Confirm'),

@@ -153,7 +153,7 @@ test('the Zettelkasten tag inputs are in the page once and bound without a modal
     }
 });
 
-test('the Archive controls are gone from the register as well as the page', ()=>{
+test('the Notes pane header is gone, and search survived it in the tool bar', ()=>{
     // The dropdown was a second register of Panes -- its option list was the set of
     // them and its value was the active one. Removing the markup while leaving those
     // reads in place is the silent failure: `container.querySelector` gives null, and
@@ -177,7 +177,15 @@ test('the Archive controls are gone from the register as well as the page', ()=>
         assert.match(src, new RegExp('^    ' + method + '\\(', 'm'),
             method + ' is no longer defined here, but is called from outside this file');
     }
-    assert.ok(ids.notesSearchButton, 'the search button went with them');
+    // Search did not go with them, but it did not stay either: it walks every Node in
+    // the Graph, so it is in the tool bar now and `#zetPaneHeader`, which was the strip
+    // that held it, is gone. Named by file, because "the id exists somewhere" was true
+    // both before and after the move and so cannot see it. That the *binding* found it
+    // is the id-literal test below: `Elem.byId('nodeSearchButton')` has to name
+    // something in the page.
+    assert.deepEqual(ids.nodeSearchButton, ['resources/html/tabs/dropdown.html'],
+        'the search button is not in the tool bar, or is in the page twice');
+    assert.equal(ids.zetPaneHeader, undefined, 'the pane header is back in the page');
 });
 
 test('every control bound at startup by a literal id is in the page', ()=>{

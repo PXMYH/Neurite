@@ -25,7 +25,7 @@
          `.node-panel` is also the element `functioncallingpanel.js` hangs its
          event guards on, so the class stays even though the panel it was named
          for is long gone -- it is the tool group inside the pill now. -->
-    <div class="tool-bar" role="toolbar" aria-label="Create a node">
+    <div class="tool-bar" role="toolbar" aria-label="Graph tools">
         <div class="node-panel">
             <!-- Every title says what a click does first, then the drag, then the
                  canvas shortcut. They used to name only the shortcut, so the icons
@@ -62,6 +62,30 @@
                 <span>AI note</span>
             </div>
         </div>
+
+        <div class="tool-bar-divider" aria-hidden="true"></div>
+
+        <!-- Search came from the Notes pane header, where it sat directly above a
+             text editor and so read as "search this document". It never was that:
+             `performZettelkastenSearch` walks `Graph.forEachNode`, highlights the
+             Nodes that match anywhere on the canvas, and flies the camera to the
+             one you click. It is a Graph control, so it belongs on the Graph.
+
+             A real <button>, unlike the four creators, which have to be divs
+             because a draggable <button> does not fire `dragstart` everywhere.
+             Nothing is dragged out to search, so this gets Tab and Enter for
+             free -- and it must not take `.panel-icon`, or `handledrop.js` would
+             make it draggable and drop a Node type that does not exist.
+
+             After the creators, not before them, because the digit shortcuts 1-4
+             are the creators' positions in the pill and the titles promise it. -->
+        <button id="nodeSearchButton" class="tool-bar-action"
+                title="Search Nodes: highlights every match on the canvas.">
+            <svg aria-hidden="true">
+                <use xlink:href="#searchSVG"></use>
+            </svg>
+            <span>Search</span>
+        </button>
 
         <div class="tool-bar-divider" aria-hidden="true"></div>
 

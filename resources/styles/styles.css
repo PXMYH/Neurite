@@ -1133,8 +1133,10 @@ input[type="text"i].title-input {
         }
     }
 
-    /* Separates the controls that make nodes from the one that switches a feature
-       off across the whole app. Without it the switch reads as a fifth tool. */
+    /* Three groups, so two of these: the controls that make Nodes, the one that
+       acts on the Nodes already there, and the one that switches a feature off
+       across the whole app. Without them Search reads as a fifth creator and the
+       switch as a sixth. */
     .tool-bar-divider {
         width: 1px;
         align-self: stretch;
@@ -2221,13 +2223,6 @@ input[type="checkbox"] {
     min-width: 270px;
     height: 60vh;
     width: 270px;
-}
-
-.zet-pane-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-bottom: 10px;
 }
 
 .zet-pane-close {
@@ -3931,9 +3926,12 @@ code.language-markdown {
     }
 
 /*Node Panel*/
-/* The tools in the pill. Each is also a `.panel-icon`, which is where the drag
-   binding, the grab cursor and the transition come from; only the geometry and the
-   surface are set here.
+/* The tools in the pill: the four creators, and Search. A creator is also a
+   `.panel-icon`, which is where its drag binding, grab cursor and transition come
+   from; only the geometry and the surface are set here. Search is deliberately not
+   one -- nothing is dragged out to search -- so it shares this rule and nothing
+   else, which is why the two selectors are listed rather than merged into a class
+   both would carry.
 
    Qualified by the pill to outrank `.panel-icon`, which is otherwise the same
    specificity and sits later in this file -- `width`, `height`, `padding`,
@@ -3943,7 +3941,8 @@ code.language-markdown {
    Labels stay visible. Excalidraw's toolbar can be icon-only because a rectangle
    and an arrow are legible as shapes; a file tree and an AI note are not, and a
    nameless icon is exactly what made the note tool hard to find to begin with. */
-.tool-bar .node-add-item {
+.tool-bar .node-add-item,
+.tool-bar .tool-bar-action {
     display: flex;
     align-items: center;
     gap: 7px;
@@ -3960,7 +3959,17 @@ code.language-markdown {
     font-size: 13px;
 }
 
-    .tool-bar .node-add-item svg {
+    /* Search is a real <button>, so it arrives with chrome the divs never had and
+       with none of the text inheritance they get for free. Everything else about
+       it is the geometry above: one tool, one position in the pill. */
+    .tool-bar .tool-bar-action {
+        border: none;
+        font-family: inherit;
+        cursor: pointer;
+    }
+
+    .tool-bar .node-add-item svg,
+    .tool-bar .tool-bar-action svg {
         width: 20px;
         height: 20px;
         flex-shrink: 0;
@@ -3969,14 +3978,16 @@ code.language-markdown {
     /* `.panel-icon:hover` goes to a near-white fill, which was legible on a lone
        square over the canvas but blows a hole in a dark pill. A light wash over the
        pill's own surface is the same signal at the weight this context wants. */
-    .tool-bar .node-add-item:hover {
+    .tool-bar .node-add-item:hover,
+    .tool-bar .tool-bar-action:hover {
         color: #eee;
         background-color: #ffffff14;
     }
 
     /* Inset, because the tools sit 6px from the pill's edge and an outset ring
        would be drawn outside it. */
-    .tool-bar .node-add-item:focus-visible {
+    .tool-bar .node-add-item:focus-visible,
+    .tool-bar .tool-bar-action:focus-visible {
         outline: 2px solid var(--ui-accent);
         outline-offset: -2px;
     }

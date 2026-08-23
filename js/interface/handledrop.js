@@ -60,8 +60,8 @@ function makeIconDraggable(iconDiv) {
             // The other three icons open a modal because a link needs a URL and
             // a file tree needs a directory; this one used to open Zettelkasten
             // Settings, which is unrelated to creating a note and left the
-            // tooltip's promise unkept. Those settings now live on the gear in
-            // the Notes tab's pane header.
+            // tooltip's promise unkept. Those settings are a section in the
+            // Settings tab now.
             if (iconDiv.classList.contains('note-icon')) {
                 createNodeFromWindow('', '', true);
             }

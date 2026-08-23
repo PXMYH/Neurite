@@ -1,30 +1,19 @@
 <div class="submenu">
     <div id="zetHorizDragHandle" class="zet-drag-handle-horiz"></div>
     <div id="zetVertDragHandle" class="zet-drag-handle-vert"></div>
+    <!-- The editor and nothing above it. There was a strip of five icons here: a
+         dropdown to switch Archive, `+` to create one, trash to delete one, a gear
+         for the Zettelkasten settings, and Search. As bare icons directly above a
+         text editor they all read as note-level -- a `+` beside an editor looks like
+         "add a note", which is what the tool bar's Note icon does instead.
+
+         The settings are in the Settings tab and Search is in the tool bar, where a
+         control over every Node on the canvas belongs. The Archive controls are gone
+         until they come back designed -- see issue #64, which also records what an
+         Archive is. `switchPane` still runs when a Node in another Archive is
+         clicked, so a saved graph with several of them stays usable; there is just
+         no way to add or delete one by hand. -->
     <div id="zetPaneContainer" class="zet-pane-container">
-        <div for="zetPaneContent" class="button-label">
-
-            <!-- Search is what is left of this strip. The four that were beside it
-                 acted on the whole Archive -- switch, new, delete -- or opened the
-                 Zettelkasten settings, and as bare icons directly above a text
-                 editor they read as note-level: a plus next to an editor looks like
-                 "add a note", which is what the tool bar's Note icon does instead.
-
-                 The settings are in the Settings tab. The Archive controls are gone
-                 until they come back designed -- see issue #64, which also records
-                 what an Archive is. `switchPane` still runs when a Node in another
-                 Archive is clicked, so a saved graph with several of them stays
-                 usable; there is just no way to add or delete one by hand. -->
-            <div id="zetPaneHeader" class="zet-pane-header">
-                <button id="notesSearchButton" class="linkbuttons search-button" title="Search Notes">
-                    <svg class="icon">
-                        <use xlink:href="#searchSVG"></use>
-                    </svg>
-                </button>
-            </div>
-
-        </div>
-
         <div id="zetPaneContent" class="zet-pane-content"></div>
     </div>
     <form id="prompt-form" onsubmit="sendMessage(event);">

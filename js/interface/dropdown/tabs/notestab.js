@@ -146,12 +146,9 @@ class ZetPanes {
     // the methods below read it instead of reading the DOM back.
     constructor(container) {
         this.container = container;
-        this.searchButton = container.querySelector('#notesSearchButton');
     }
 
     init(){
-        On.click(this.searchButton, ZetPanes.openSearchModal);
-
         this.addPane();
     }
 
@@ -290,9 +287,8 @@ class ZetPanes {
         }
     }
 
-    static openSearchModal(){
-        Modal.open('zetSearchModal');
-        setupZettelkastenSearchBar();
-        performZettelkastenSearch(Elem.byId('Searchbar').value);
-    }
+    // `openSearchModal` was here, because the button that called it was in this
+    // container's header. It searches every Node in the Graph rather than anything
+    // about a Pane, so it moved to the tool bar with the button: `openNodeSearch`
+    // in `js/interface/searchapi/search.js`.
 }

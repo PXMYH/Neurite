@@ -75,6 +75,19 @@ function setupZettelkastenSearchBar() {
     });
 }
 
+// The tool bar's Search button. This lived on `ZetPanes` while the button was in
+// the Notes pane header, which put a control over every Node in the Graph inside
+// the chrome of one Pane. `Modal.open` clones the template into the modal body, so
+// the bar has to be rebound on every open -- the same shape as the vector-DB
+// button below, which is the other search this file opens.
+function openNodeSearch(){
+    Modal.open('zetSearchModal');
+    setupZettelkastenSearchBar();
+    performZettelkastenSearch(Elem.byId('Searchbar').value);
+}
+
+On.click(Elem.byId('nodeSearchButton'), openNodeSearch);
+
 
 On.click(Elem.byId('vectorDbSearchButton'), (e)=>{
     Modal.open('vectorDbSearchModal');
