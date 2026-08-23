@@ -91,10 +91,12 @@ loop: autopilot → SVG viewbox → mouse orbit path → FPS → nodes → edges
 ### Zettelkasten ↔ mind map bi-directional sync
 
 `ZettelkastenProcessor` (`js/zettelkasten/zettelkasten.js`) is the sync engine. Each notes pane owns a
-CodeMirror instance plus its own `ZettelkastenParser`, `ZettelkastenUI`, and `ZettelkastenProcessor`,
-registered into the parallel arrays `window.codeMirrorInstances`, `window.zettelkastenParsers`,
-`window.zettelkastenUIs`, `window.zettelkastenProcessors` (`ZetPanes` in
-`js/interface/dropdown/tabs/notestab.js`).
+CodeMirror instance plus its own `ZettelkastenParser`, `ZettelkastenUI`, and `ZettelkastenProcessor`.
+All four are held together in **one** array of records, `window.zetPaneList`, whose entries are
+`{paneId, cm, parser, ui, processor}` (`ZetPanes.createPane` in
+`js/interface/dropdown/tabs/notestab.js:208`). `window.currentActiveZettelkastenMirror` is the CodeMirror
+of the pane on screen, and it is the handle most code reaches for. There are no parallel arrays keyed by
+index — reach a pane's parser or processor through its `zetPaneList` record.
 
 - Text → graph: `processInput` (on CodeMirror `change`) walks lines, `Tag.node` (default `##`) opens a
   node section, `Tag.ref` (default `[[`) declares edges, `LLM_TAG` (`AI:`) makes an AI node.
