@@ -86,6 +86,9 @@
                 <button class="tablink" id="tablink-ai" title="Change AI model and settings" onclick="openTab('tab4', this)">Ai</button>
                 <button class="tablink" title="Adjust fractal rendering" onclick="openTab('tab2', this)">Fractal</button>
                 <button class="tablink" title="Teleport to interesting locations" onclick="openTab('tab6', this)">Saves</button>
+                <!-- Second from the end, before help: settings are read less often
+                     than any tab that holds content, and more often than help. -->
+                <button class="tablink" title="Input, node placement and stored data" onclick="openTab('tab5', this)">Settings</button>
                 <button class="tablink" title="help" onclick="openTab('tab3', this)">?</button>
             </div>
 
@@ -101,6 +104,9 @@
             </div>
             <div id="tab6" class="tabcontent">
                 <!-- Tab 6 content will be loaded here -->
+            </div>
+            <div id="tab5" class="tabcontent">
+                <!-- Tab 5 content will be loaded here -->
             </div>
             <div id="tab3" class="tabcontent">
                 <!-- Tab 3 content will be loaded here -->

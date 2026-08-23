@@ -175,8 +175,14 @@
     </div>
 </div>
 
+<!-- Two tags, and nothing else. This modal used to carry the node placement
+     controls as well, which decide where on the canvas a Node lands -- a graph
+     setting, reached only through the Notes pane's gear. Those are in the
+     Settings tab now (`tabs/settingstab.html`).
+
+     Node Tag and Link Tag stay: they are the syntax of the text in the editor
+     the gear sits on top of. -->
 <div id="noteModal" style="display: none;">
-    <!-- Content for the note modal -->
     <div style="display: flex; flex-direction: column; align-items: center;">
         <div style="padding-bottom: 20px;">
             <label for="node-tag">Node Tag:</label>
@@ -185,86 +191,6 @@
         <div>
             <label for="ref-tag">Link Tag:</label>
             <input type="text" id="ref-tag" data-key="ref" value="[[" style="width:80px;" />
-        </div>
-    </div>
-    <br />
-    <div style="display: flex; justify-content: space-evenly; align-items: center;">
-        <label for="zetPathTypeDropdown" style="margin-right: 10px;">Placement Style</label>
-        <div class="dropdown-container" title="Determine what path the Zettelkasten decides to place nodes on.">
-            <select id="zetPathTypeDropdown" class="model-selector custom-select ignoreSetup">
-                <option value="Radial">Radial</option>
-                <option value="Spiral">Spiral</option>
-                <option value="Branching">Branching</option>
-                <option value="Random">Random</option>
-            </select>
-        </div>
-    </div>
-    <br />
-    <div class="gridLayout">
-
-        <!-- Node Count Slider : For Radial-->
-        <div class="settingsSlider radial-slider" title="Defines the number of steps or nodes in the path.">
-            <label for="radialPathLengthSlider"># of Nodes</label>
-            <input type="range" id="radialPathLengthSlider" name="radial-path-length-slider" min="1" max="64" step="1">
-        </div>
-        <!-- Distance Slider: : For Radial-->
-        <div class="settingsSlider radial-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
-            <label for="radialPathDistanceSlider">Node Spacing</label>
-            <input type="range" id="radialPathDistanceSlider" name="radial-path-distance-slider" min="0.1" max="8" step="0.1">
-        </div>
-        <!-- Scale Slider : For Radial-->
-        <div class="settingsSlider radial-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
-            <label for="radialScaleSlider">Node Size</label>
-            <input type="range" id="radialScaleSlider" name="radial-scale-slider" min="0.1" max="2" step="0.01">
-        </div>
-        <!-- Radial Branch Depth Slider: For Radial -->
-        <div class="settingsSlider radial-slider" title="Sets the starting radius from the center for the first node.">
-            <label for="radialDepthSlider"> of Radii</label>
-            <input type="range" id="radialDepthSlider" name="radial-depth-slider" min="1" max="32" step="1">
-        </div>
-
-        <!-- Node Count Slider : For Spiral-->
-        <div class="settingsSlider spiral-slider" title="Defines the number of steps or nodes in the path.">
-            <label for="spiralPathLengthSlider"># of Nodes</label>
-            <input type="range" id="spiralPathLengthSlider" name="spiral-path-length-slider" min="1" max="100" step="1">
-        </div>
-        <!-- Distance Slider: : For Spiral-->
-        <div class="settingsSlider spiral-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
-            <label for="spiralPathDistanceSlider">Node Spacing</label>
-            <input type="range" id="spiralPathDistanceSlider" name="spiral-path-distance-slider" min="0.1" max="4" step="0.1">
-        </div>
-        <!-- Scale Slider : For Spiral-->
-        <div class="settingsSlider spiral-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
-            <label for="spiralScaleSlider">Node Size</label>
-            <input type="range" id="spiralScaleSlider" name="spiral-scale-slider" min="0.1" max="2" step="0.01">
-        </div>
-        <!-- Curl Slider: For Spiral -->
-        <div class="settingsSlider spiral-slider" title="Adjusts the curl of the spiral. Negative values create counterclockwise spirals, while positive values create clockwise spirals.">
-            <label for="curlSlider">Curl</label>
-            <input type="range" id="curlSlider" name="curl-slider" min="-1" max="1" step="0.01">
-        </div>
-
-
-
-        <!-- Node Count Slider : For Branching-->
-        <div class="settingsSlider branching-slider" title="Defines the number of steps or nodes in the path.">
-            <label for="branchingPathLengthSlider"># of Nodes</label>
-            <input type="range" id="branchingPathLengthSlider" name="branching-path-length-slider" min="1" max="100" value="64" step="1">
-        </div>
-        <!-- Distance Slider: : For Branching-->
-        <div class="settingsSlider branching-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
-            <label for="pathDistanceSlider">Node Spacing</label>
-            <input type="range" id="branchingPathDistanceSlider" name="path-distance-slider" min="0.1" max="4" value="1" step="0.1">
-        </div>
-        <!-- Scale Slider : For Branching-->
-        <div class="settingsSlider branching-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
-            <label for="branchingScaleSlider">Node Size</label>
-            <input type="range" id="branchingScaleSlider" name="branching-scale-slider" min="0.1" max="2" value="0.98" step="0.01">
-        </div>
-        <!-- Branching Factor Slider: For Branching -->
-        <div class="settingsSlider branching-slider" title="Controls the number of branches emanating from each node.">
-            <label for="branchingFactorSlider">Branching Factor</label>
-            <input type="range" id="branchingFactorSlider" name="branching-factor-slider" min="2" max="12" value="4" step="1">
         </div>
     </div>
 </div>

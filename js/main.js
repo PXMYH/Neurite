@@ -330,6 +330,7 @@ class PageLoad {
         'tab4': 'aitab.html',
         'tab2': 'fractaltab.html',
         'tab6': 'networkstab.html',
+        'tab5': 'settingstab.html',
         'tab3': 'helptab.html'
     }
 }

@@ -827,6 +827,11 @@ input[type="text"i].title-input {
 .modal-header {
     display: flex;
     justify-content: space-between;
+    /* `space-between` alone leaves nothing between the title and the close button
+       once the body is narrower than the header -- and it can be, because
+       `.modal-content` is `width: fit-content` and the body is what it fits to.
+       The Zettelkasten modal went that way when its sliders moved to Settings. */
+    gap: 10px;
     align-items: center;
     padding-inline: 20px;
     background-color: #222226;
@@ -1358,6 +1363,43 @@ input[type="text"i].title-input {
                 clip-path: inset(50%);
                 white-space: nowrap;
             }
+
+            /* The Settings tab collects controls that arrived from three different
+               places, so the grouping is doing the explaining -- a reader has to see
+               at a glance that Node placement is not part of Input. */
+            .settings-section {
+                margin-bottom: 16px;
+            }
+
+                .settings-section:last-child {
+                    margin-bottom: 0;
+                }
+
+                /* `.button-label` is what draws a rule out to each side of the words,
+                   which is what makes a heading read as a section break here; the
+                   Fractal and Ai tabs use it the same way. It is built for a label
+                   that opens a panel, so the pointer cursor comes back off. */
+                .settings-heading {
+                    cursor: default;
+                    margin-bottom: 10px;
+                }
+
+                .settings-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 10px;
+                    margin-bottom: 10px;
+                }
+
+                    /* Buttons keep their own width and sit together from the left,
+                       rather than being pushed to opposite edges as a label and its
+                       control are. */
+                    .settings-row-buttons {
+                        justify-content: flex-start;
+                        flex-wrap: wrap;
+                        margin-bottom: 0;
+                    }
 
         input[type="range"] {
             display: block;

@@ -1,0 +1,118 @@
+<!-- Settings that belong to no one feature.
+
+     What is here was scattered: the input controls and the two reset buttons sat
+     under the `?` tab, which is help, and the node placement controls sat behind
+     the gear in the Notes pane header, which is the Zettelkasten's own settings.
+     Placement is not about notes -- it decides where on the canvas a Node lands
+     -- so it reads as a graph setting and now sits with the others.
+
+     The Zettelkasten gear keeps Node Tag and Link Tag. Those are the syntax of
+     the text you are typing, so they belong beside the editor that reads them.
+
+     Sections are flat rather than collapsible. The panel scrolls, this tab is a
+     third the height of the Fractal one, and a setting you visit twice a month
+     is not worth a click to reveal. -->
+
+<div class="submenu">
+
+    <div class="settings-section">
+        <div class="button-label settings-heading">Input</div>
+        <!-- The modal is left where it is. Its key inputs are rebuilt and rebound
+             every time it opens (`openControlsModal`), so inlining them here would
+             mean rewriting that wiring for no gain the reader can see. -->
+        <button id="controls-button" class="key-button">Adjust input settings…</button>
+    </div>
+
+    <!-- `ZetPath.init` wires this subtree, so the id is the handle it reaches for. -->
+    <div class="settings-section" id="zetPlacementSettings">
+        <div class="button-label settings-heading">Node placement</div>
+        <div class="settings-row">
+            <label for="zetPathTypeDropdown">Placement Style</label>
+            <div class="dropdown-container" title="Determine what path the Zettelkasten decides to place nodes on.">
+                <select id="zetPathTypeDropdown" class="model-selector custom-select ignoreSetup">
+                    <option value="Radial">Radial</option>
+                    <option value="Spiral">Spiral</option>
+                    <option value="Branching">Branching</option>
+                    <option value="Random">Random</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- One group per style. `adjustSliderVisibilityBasedOnPathType` shows the
+             group the current style names and hides the other two, so all three
+             live here at once and only one is ever on screen. -->
+        <div class="gridLayout">
+
+            <!-- Node Count Slider : For Radial-->
+            <div class="settingsSlider radial-slider" title="Defines the number of steps or nodes in the path.">
+                <label for="radialPathLengthSlider"># of Nodes</label>
+                <input type="range" id="radialPathLengthSlider" name="radial-path-length-slider" min="1" max="64" step="1">
+            </div>
+            <!-- Distance Slider: : For Radial-->
+            <div class="settingsSlider radial-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
+                <label for="radialPathDistanceSlider">Node Spacing</label>
+                <input type="range" id="radialPathDistanceSlider" name="radial-path-distance-slider" min="0.1" max="8" step="0.1">
+            </div>
+            <!-- Scale Slider : For Radial-->
+            <div class="settingsSlider radial-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
+                <label for="radialScaleSlider">Node Size</label>
+                <input type="range" id="radialScaleSlider" name="radial-scale-slider" min="0.1" max="2" step="0.01">
+            </div>
+            <!-- Radial Branch Depth Slider: For Radial -->
+            <div class="settingsSlider radial-slider" title="Sets the starting radius from the center for the first node.">
+                <label for="radialDepthSlider"># of Radii</label>
+                <input type="range" id="radialDepthSlider" name="radial-depth-slider" min="1" max="32" step="1">
+            </div>
+
+            <!-- Node Count Slider : For Spiral-->
+            <div class="settingsSlider spiral-slider" title="Defines the number of steps or nodes in the path.">
+                <label for="spiralPathLengthSlider"># of Nodes</label>
+                <input type="range" id="spiralPathLengthSlider" name="spiral-path-length-slider" min="1" max="100" step="1">
+            </div>
+            <!-- Distance Slider: : For Spiral-->
+            <div class="settingsSlider spiral-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
+                <label for="spiralPathDistanceSlider">Node Spacing</label>
+                <input type="range" id="spiralPathDistanceSlider" name="spiral-path-distance-slider" min="0.1" max="4" step="0.1">
+            </div>
+            <!-- Scale Slider : For Spiral-->
+            <div class="settingsSlider spiral-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
+                <label for="spiralScaleSlider">Node Size</label>
+                <input type="range" id="spiralScaleSlider" name="spiral-scale-slider" min="0.1" max="2" step="0.01">
+            </div>
+            <!-- Curl Slider: For Spiral -->
+            <div class="settingsSlider spiral-slider" title="Adjusts the curl of the spiral. Negative values create counterclockwise spirals, while positive values create clockwise spirals.">
+                <label for="curlSlider">Curl</label>
+                <input type="range" id="curlSlider" name="curl-slider" min="-1" max="1" step="0.01">
+            </div>
+
+            <!-- Node Count Slider : For Branching-->
+            <div class="settingsSlider branching-slider" title="Defines the number of steps or nodes in the path.">
+                <label for="branchingPathLengthSlider"># of Nodes</label>
+                <input type="range" id="branchingPathLengthSlider" name="branching-path-length-slider" min="1" max="100" value="64" step="1">
+            </div>
+            <!-- Distance Slider: : For Branching-->
+            <div class="settingsSlider branching-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
+                <label for="pathDistanceSlider">Node Spacing</label>
+                <input type="range" id="branchingPathDistanceSlider" name="path-distance-slider" min="0.1" max="4" value="1" step="0.1">
+            </div>
+            <!-- Scale Slider : For Branching-->
+            <div class="settingsSlider branching-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
+                <label for="branchingScaleSlider">Node Size</label>
+                <input type="range" id="branchingScaleSlider" name="branching-scale-slider" min="0.1" max="2" value="0.98" step="0.01">
+            </div>
+            <!-- Branching Factor Slider: For Branching -->
+            <div class="settingsSlider branching-slider" title="Controls the number of branches emanating from each node.">
+                <label for="branchingFactorSlider">Branching Factor</label>
+                <input type="range" id="branchingFactorSlider" name="branching-factor-slider" min="2" max="12" value="4" step="1">
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <div class="button-label settings-heading">Data</div>
+        <div class="settings-row settings-row-buttons">
+            <button id="resetSettings" class="key-button" title="Return every setting to its default. Saved graphs are untouched.">Reset Settings</button>
+            <button id="clearLocalStorage" class="key-button" title="Clear settings, API keys and view history. Saved graphs live in IndexedDB and are untouched.">Clear Local Storage</button>
+        </div>
+    </div>
+</div>

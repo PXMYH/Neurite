@@ -253,5 +253,14 @@ ZetPath.init = function(){
     }
     ['Branching', 'Radial', 'Spiral'].forEach(setDefaultValue);
 
+    // These controls used to be cloned into the modal body every time the
+    // Zettelkasten gear was opened, which is what bound them. They live in the
+    // Settings tab now, built once with the page, so they are bound once here --
+    // after the defaults above, because the stored value has to win over them.
+    // Still the `noteModal` store: that is where `updateOptions` reads from, and
+    // what makes a change to any of these re-place the nodes. Unguarded, like the
+    // loop above -- if the tab did not load, that threw first and said so.
+    Modal.wireControls(Elem.byId('zetPlacementSettings'), Modals.noteModal);
+
     ZetPath.updateOptions();
 }

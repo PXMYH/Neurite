@@ -75,22 +75,27 @@ Modal.open = function (contentId) {
         Modal.currentCustomClass = modal.customClass;
     }
 
-    const storeInputValue = Modal.storeInputValue;
+    Modal.wireControls(modalBody, modal);
+}
+// Nothing here reads the DOM for a value: `Modal.inputValues` is the store, keyed
+// by element id and backed by localStorage, and a control's only job is to edit
+// it. So controls do not have to be inside a modal to belong to one. The Settings
+// tab keeps the node placement controls in the page rather than in a modal body,
+// and calls this with `Modals.noteModal` to get the same three things a modal
+// gets: values restored on load, changes persisted, and the `storeInputValue`
+// side effect for that id -- which for `noteModal` is `ZetPath.updateOptions()`.
+Modal.wireControls = function (root, modal) {
+    root.querySelectorAll('select.custom-select').forEach(Modal.setupSelect, modal);
+    root.querySelectorAll('input[type=range]').forEach(Modal.setupSlider, modal);
+    root.querySelectorAll('input:not([type=range]), textarea').forEach(Modal.setupInput, modal);
+}
+Modal.setupSelect = function (select) {
+    CustomDropdown.setupModelSelect(select);
 
-    modalBody.querySelectorAll('select.custom-select').forEach(select => {
-        CustomDropdown.setupModelSelect(select);
+    const stored = Modal.inputValues[select.id];
+    if (stored !== undefined) select.value = stored;
 
-        const stored = Modal.inputValues[select.id];
-        if (stored !== undefined) select.value = stored;
-
-        On.change(select, storeInputValue.bind(null, select, contentId));
-    });
-
-    const modalSliders = modalBody.querySelectorAll('input[type=range]');
-    modalSliders.forEach(Modal.setupSlider, modal);
-
-    const modalInputs = modalBody.querySelectorAll('input:not([type=range]), textarea');
-    modalInputs.forEach(Modal.setupInput, modal);
+    On.change(select, Modal.storeInputValue.bind(null, select, this.id));
 }
 Modal.setupSlider = function (slider) {
     const stored = Modal.inputValues[slider.id];
