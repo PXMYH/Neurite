@@ -6,6 +6,7 @@ Artifacts for understanding this codebase before changing it.
 | --- | --- |
 | [`architecture.html`](architecture.html) | Interactive component diagram. Click a component for its files, key symbols and neighbours; pick a *flow* to trace one path (boot, notes⇄nodes, AI request, save/load, search, render tick). Open it directly in a browser — no build, no dependencies. |
 | this file | Same map as static text, for reading in a terminal or on GitHub. |
+| [`handoff.md`](handoff.md) | Start here when picking up development with no memory of the last session: what to read, how to run and verify, how issues are picked, what landed recently, and the working rules for this fork. |
 | [`adr/`](adr/) | Decisions that would otherwise get re-proposed. [`0001`](adr/0001-keep-the-hand-ordered-script-array.md) is why `PageLoad.scripts` stays a hand-ordered array. |
 
 ## The one-paragraph version
@@ -120,8 +121,10 @@ flowchart LR
   persistence replays `dataset.node_extras` through `Node.Extensions`.
 - **Never hardcode `##` or `[[`.** They are `Tag.node` / `Tag.ref` and the user can change them.
 - **Geometry goes through `vec2`** (`cmult`, `cadd`, `rot`), not plain x/y math.
-- **No tests, no linter, no typechecker.** Verification is the browser, or `GET localhost:8081/screenshot`
-  from the automation server.
+- **No linter and no typechecker.** There are 42 tests under `test/`, run with `node --test test/*.test.js`
+  — nothing under `js/` exports, so they read source as text or slice a class into a `node:vm` context.
+  Everything else is verified in the browser at `http://localhost:8999`, or through
+  `GET localhost:8081/screenshot` from the automation server.
 
 See [`../CLAUDE.md`](../CLAUDE.md) for the same material aimed at coding agents, plus the naming and
 callback conventions used throughout (`Logger.*`, `On.click`, `Html.new.div()`, the `this`-bound static
