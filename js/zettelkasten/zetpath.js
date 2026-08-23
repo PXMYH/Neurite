@@ -230,15 +230,26 @@ ZetPath.updateOptions = function(targetProcessor = null){
 
 function adjustSliderVisibilityBasedOnPathType(styleName) {
     // Scoped to the one section these sliders live in. `document.querySelectorAll`
-    // reached the Fractal tab as well, where sixteen unrelated controls carry
-    // `.settingsSlider`, so changing the placement style forced all of them to
-    // `display: block` -- including `#inversion-settings` and
-    // `#hue-rotation-settings`, which that tab hides on purpose.
+    // reached all thirty-five elements that carry `.settingsSlider` -- sixteen in the
+    // Fractal tab, twelve here, four in the Ai tab, three in the modals -- so changing
+    // the placement style wrote `display: block` inline on every one of them.
     //
-    // The line that showed "general sliders (without any specific class)" is gone
-    // with it. All twelve sliders in here carry a style class, so within this
-    // section it matched nothing; every element it did reach was in the Fractal tab.
-    // Nothing here hides a class-less slider either, so there is nothing to re-show.
+    // The harm is the layout, not the visibility. `.settingsSlider` is
+    // `display: flex; flex-direction: column` (styles.css:3575), which `display: block`
+    // inline overrides, so a label and its slider stop stacking. Nothing became
+    // visible: all sixteen in the Fractal tab sit inside `.fractal-settings-panel` or
+    // `.color-settings-panel`, both `.hidden`, which is `display: none` -- an inline
+    // `display: block` on a descendant of a hidden ancestor shows nothing. It waits
+    // instead: `togglepanel.js` opens a panel by removing `.hidden` and sizing it from
+    // `scrollHeight`, so the reader meets the broken stack, measured at the wrong
+    // height, the next time they expand either one.
+    //
+    // The line that showed "general sliders (without any specific class)" is gone with
+    // it. Its selector was `.settingsSlider:not(.spiral-slider):not(.branching-slider)`,
+    // which does not exclude `.radial-slider` -- so it re-showed this section's four
+    // radial sliders one line after they were hidden, along with everything above.
+    // All twelve sliders here carry a style class and nothing hides a class-less one,
+    // so there is nothing left for it to re-show.
     const section = Elem.byId('zetPlacementSettings');
 
     section.querySelectorAll('.spiral-slider, .branching-slider, .radial-slider')

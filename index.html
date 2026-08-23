@@ -43,7 +43,13 @@
 
     <script src="https://cdn.jsdelivr.net/npm/codemirror@5/addon/hint/show-hint.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/codemirror@5/addon/hint/anyword-hint.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.0.0/addon/display/placeholder.min.js"></script>
+    <!-- The placeholder add-on went with the placeholder. It read a `placeholder`
+         option or the source textarea's attribute, and neither of the two editors
+         built here has either: the zet panes pass no such option (`notestab.js:179`)
+         and `#neurite-function-cm` carries no attribute. The plain textareas that do
+         -- `#prompt`, `#function-prompt`, `#importLinkTextarea` -- are never converted,
+         so the browser draws those. It was also the one CodeMirror piece pinned to
+         5.0.0 against a 5.65.21 core. -->
 
     <!-- Modes -->
     <script src="https://cdn.jsdelivr.net/npm/codemirror@5/mode/meta.js"></script>

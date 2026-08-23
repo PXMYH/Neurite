@@ -171,9 +171,10 @@ Two adjacent facts for the same pass:
   changes `visualViewport` — and nothing in the repo reads `visualViewport`. So the clamp keeps the
   full-height value while the keyboard covers the bottom 40% of it. Expect the caret to end up under
   the keyboard.
-- The placeholder add-on is pinned to `codemirror/5.0.0` on cdnjs while the core floats at 5.65.21
-  (`index.html`, two CDN lines apart), and `htmlmixed` is pinned to 5.62.3. If the placeholder from
-  `generateCmPlaceholder()` misbehaves, that skew is the first suspect, on any platform.
+- `htmlmixed` is pinned to `codemirror/5.62.3` on cdnjs while the core floats at 5.65.21
+  (`index.html`, one CDN line apart). If highlighting inside an HTML text node misbehaves, that skew
+  is the first suspect, on any platform. The placeholder add-on used to be the worse case — 5.0.0
+  against the same core — but the editor's placeholder is gone and the add-on went with it.
 
 ### Frame rate is already on screen — no Web Inspector needed for it
 

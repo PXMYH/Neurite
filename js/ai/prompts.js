@@ -72,11 +72,11 @@ ${nodeTag} Essential Controls
 
 ${nodeTag} Zettelkasten:
 - Type notes in the Zettelkasten text area using ${nodeTag} and ${tagValues.refTag} (node reference tag) format.
-    -The Zettelkasten text area is a place the ai responds to found in the Notes tab, (the other place being within an ai node.)
-- Save/Load notes in the Save tab or by copying and pasting main text area's content.
+    -The Zettelkasten text area is a place the ai responds to, (the other place being within an ai node.) Do not tell the user which tab it is in: it has no menu row, and an answer that names one sends them looking for a tab that is not there.
+- Saving happens on its own. The menu's Saves panel lists every save; the menu's own Open... and Save to... rows move a .neurite file in and out of the browser.
 
 ${nodeTag} Advanced Controls:
-- Checkboxes below main text area provide additional features.
+- Checkboxes beside the prompt in the Ai tab provide additional features.
 - API key setup needed for Open-Ai, Google Search, and Wolfram Alpha. API key inputs are in the Ai tab. LocalHost servers required for Extracts, Wolfram, and Wiki. Instructions are in Github link at the ? tab.
 - Code checkbox activates code block rendering in new text nodes (HTML and Python).
 - Search checkbox displays relevant webpages or pdfs. Requires Google Search API key unless a direct link is input as your prompt. Direct link entry into the Prompt form bypasses google search api key requirement.
