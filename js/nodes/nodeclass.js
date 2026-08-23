@@ -1,6 +1,11 @@
 class Node {
     static prev = null;
 
+    // How far the pointer travels before a press counts as a drag rather than a click.
+    // A press under this distance keeps the pending Edge alive, so Shift plus a click
+    // can still start one; past it the press is moving the Node instead.
+    static dragThreshold = 10;
+
     anchor = new vec2(0, 0);
     anchorForce = 0;
     createdAt = new Date().toISOString();
@@ -58,7 +63,6 @@ class Node {
         On.click(div, this.onClick);
         On.dblclick(div, this.onDblClick);
         On.mousedown(div, this.onMouseDown);
-        On.mousemove(document, this.onMouseMove);
         On.mouseup(document, this.onMouseUp);
         On.wheel(div, this.onWheel);
     }
@@ -287,10 +291,12 @@ class Node {
 
         const dx = e.clientX - this._initialMousePos.x;
         const dy = e.clientY - this._initialMousePos.y;
-        const distanceSq = dx * dx + dy * dy;
+        const threshold = Node.dragThreshold;
 
-        if (distanceSq > 4) {
+        if (dx * dx + dy * dy > threshold * threshold) {
             this._hasAddedGrabbing = true;
+            // The press is a drag, so it moves this Node. Discard any Edge it had started.
+            Node.prev = null;
             OverlayHelper.add('grabbing');
             Off.mousemove(window, this._maybeAddGrabbing); // Remove listener after adding
         }
@@ -317,14 +323,6 @@ class Node {
             this.followingMouse = 0;
             Graph.draggedNode = undefined;
         }
-    }
-    onMouseMove = (e)=>{
-        if (this === Graph.draggedNode) Node.prev = null;
-        /*if (this.followingMouse){
-        this.pos = this.pos.plus(toDZ(new vec2(e.movementX,e.movementY)));
-        this.draw()
-        //e.stopPropagation();
-        }*/
     }
     onWheel = (e)=>{
         if (!App.nodeMode) return;

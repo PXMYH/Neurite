@@ -126,8 +126,7 @@ class NodeView {
                 const distanceMoved = Math.sqrt(
                     Math.pow(e.clientX - clickStartX, 2) + Math.pow(e.clientY - clickStartY, 2)
                 );
-                const dragThreshold = 10; // pixels
-                if (distanceMoved < dragThreshold) App.selectedNodes.toggleNode(node);
+                if (distanceMoved < Node.dragThreshold) App.selectedNodes.toggleNode(node);
             }
 
             if (e.button !== 2) App.menuContext.hide(); // not right mouse button
