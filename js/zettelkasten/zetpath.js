@@ -229,18 +229,30 @@ ZetPath.updateOptions = function(targetProcessor = null){
 }
 
 function adjustSliderVisibilityBasedOnPathType(styleName) {
-    // Show general sliders (without any specific class) by default
-    document.querySelectorAll('.settingsSlider:not(.spiral-slider):not(.branching-slider)')
-    .forEach(Elem.displayBlock);
+    // Scoped to the one section these sliders live in. `document.querySelectorAll`
+    // reached the Fractal tab as well, where sixteen unrelated controls carry
+    // `.settingsSlider`, so changing the placement style forced all of them to
+    // `display: block` -- including `#inversion-settings` and
+    // `#hue-rotation-settings`, which that tab hides on purpose.
+    //
+    // The line that showed "general sliders (without any specific class)" is gone
+    // with it. All twelve sliders in here carry a style class, so within this
+    // section it matched nothing; every element it did reach was in the Fractal tab.
+    // Nothing here hides a class-less slider either, so there is nothing to re-show.
+    const section = Elem.byId('zetPlacementSettings');
 
-    document.querySelectorAll('.spiral-slider, .branching-slider, .radial-slider')
+    section.querySelectorAll('.spiral-slider, .branching-slider, .radial-slider')
     .forEach(Elem.hide); // prevent overlap in visibility settings
 
-    // Show specific sliders
+    // Show the group this style names. `Random` names none, and it has to return
+    // here rather than fall through: an empty string is not a selector, so
+    // `querySelectorAll('')` throws a DOMException and took the rest of
+    // `updateOptions`' caller with it. Random places nodes with no sliders at all,
+    // so all three groups hidden is the right end state.
     const sliderClass = (styleName === 'Branching') ? '.branching-slider'
                       : (styleName === 'Spiral') ? '.spiral-slider'
                       : (styleName === 'Radial') ? '.radial-slider' : ''
-    document.querySelectorAll(sliderClass).forEach(Elem.displayBlock);
+    if (sliderClass) section.querySelectorAll(sliderClass).forEach(Elem.displayBlock);
 }
 
 ZetPath.init = function(){

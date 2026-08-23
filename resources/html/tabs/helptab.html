@@ -1,22 +1,206 @@
+<!-- The controls reference. The README already points here -- "Full controls are
+     listed in the ? tab within Neurite's main dropdown" -- and until now this tab
+     held a checkbox, two links and the Screenshot/Record pair, so that sentence
+     promised a page that did not exist. Screenshot and Record are in the Saves tab
+     now; they capture the screen into a node and were never help.
+
+     Every key below was read out of the handler that implements it, not out of the
+     README, which still names an "Edit Tab" that is called Fractal. Sources:
+     `createnodes.js` (the double-click branches), `movenodes.js` (`directionMap`),
+     `edgeclass.js` (`onClick` / `onDblClick` / `onWheel`), `mandelbrot.js` (the
+     Alt-key switch), `dropdown.js` (`toolShortcuts`), `togglenodestate.js` (the
+     drag box), `nodemode.js` (Escape).
+
+     Shift, Alt and Control are the defaults, not constants: they are
+     `controls.shiftKey` / `altKey` / `controlKey` in `globals.js` and the control
+     settings rebind them, which is why the first line says so instead of each row
+     repeating it. -->
 <div id="howto" class="howto custom-scrollbar">
-    <table>
+
+    <p class="howto-intro">
+        Nodes live inside the Mandelbrot set. Scroll to move through it, and the
+        space you make is where new nodes go.
+    </p>
+
+    <div class="button-label settings-heading">Move</div>
+    <table class="howto-controls">
         <tr>
-            <td><strong>AI HOW-TO</strong></td>
-            <td><input type="checkbox" id="instructions-checkbox"><label for="instructions-checkbox">Prompt the Ai to explain Neurite</label></td>
+            <td><kbd>Drag</kbd></td>
+            <td>Move around the fractal.</td>
         </tr>
+        <tr>
+            <td><kbd>Scroll</kbd></td>
+            <td>Zoom. Zoom in before making nodes, so they have room to grow.</td>
+        </tr>
+        <tr>
+            <td><kbd>Esc</kbd></td>
+            <td>Drop a node that is following the pointer.</td>
+        </tr>
+    </table>
+
+    <div class="button-label settings-heading">Make a node</div>
+    <table class="howto-controls">
+        <tr>
+            <td><kbd>Shift</kbd> + double-click</td>
+            <td>Text node, on empty space.</td>
+        </tr>
+        <tr>
+            <td><kbd>Alt</kbd> + double-click</td>
+            <td>Ai node. Does nothing while Ai features are off.</td>
+        </tr>
+        <tr>
+            <td><kbd>Ctrl</kbd> + double-click</td>
+            <td>Link node, for a web page or a file.</td>
+        </tr>
+        <tr>
+            <td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td>
+            <td>
+                The four tools in the bar at the top: note, link, edges, Ai. Drag one
+                onto the canvas to choose where it lands, or press its number.
+            </td>
+        </tr>
+        <tr>
+            <td>Drop a file</td>
+            <td>
+                Anywhere on the canvas. Text, image, audio, video and PDF each become
+                the node type that fits.
+            </td>
+        </tr>
+    </table>
+
+    <div class="button-label settings-heading">Connect</div>
+    <table class="howto-controls">
+        <tr>
+            <td><kbd>Shift</kbd> + click two nodes</td>
+            <td>Join them with an edge.</td>
+        </tr>
+        <tr>
+            <td>Click an edge</td>
+            <td>
+                Turn the arrow: one way, the other way, then none. Release
+                <kbd>Shift</kbd> first.
+            </td>
+        </tr>
+        <tr>
+            <td><kbd>Shift</kbd> + double-click an edge</td>
+            <td>Delete it.</td>
+        </tr>
+        <tr>
+            <td><kbd>Shift</kbd> + scroll an edge</td>
+            <td>Change its length.</td>
+        </tr>
+    </table>
+
+    <div class="button-label settings-heading">Select and arrange</div>
+    <table class="howto-controls">
+        <tr>
+            <td><kbd>Ctrl</kbd> + click</td>
+            <td>
+                Select a node. Click it again to deselect, or click empty space to
+                clear the whole selection.
+            </td>
+        </tr>
+        <tr>
+            <td><kbd>Ctrl</kbd> + drag the canvas</td>
+            <td>Draw a box and select everything it touches.</td>
+        </tr>
+        <tr>
+            <td><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd></td>
+            <td>Move the selection. Two at once move on the diagonal.</td>
+        </tr>
+        <tr>
+            <td><kbd>f</kbd> / <kbd>d</kbd></td>
+            <td>Grow or shrink the selection.</td>
+        </tr>
+        <tr>
+            <td>Double-click a window</td>
+            <td>
+                Anchor it, so the fractal stops carrying it. Again releases it. Inside
+                a text box, hold <kbd>Alt</kbd> as well.
+            </td>
+        </tr>
+        <tr>
+            <td>Right-click a node</td>
+            <td>Its own menu: delete, connect, extract text, zoom to, and more.</td>
+        </tr>
+        <tr>
+            <td>Drag a title bar</td>
+            <td>Move one window. <kbd>Shift</kbd> + scroll over it resizes it.</td>
+        </tr>
+        <tr>
+            <td><kbd>Alt</kbd> + drag or click</td>
+            <td>
+                Reach the node underneath a text box, instead of typing into it.
+            </td>
+        </tr>
+    </table>
+
+    <div class="button-label settings-heading">Write the graph as text</div>
+    <table class="howto-controls">
+        <tr>
+            <td><code>## Title</code></td>
+            <td>
+                Starts a node. The lines under it are its text. The Ai prompt in the Ai
+                tab writes this for you; there is no editor to type it into.
+            </td>
+        </tr>
+        <tr>
+            <td><code>[[Title]]</code></td>
+            <td>
+                An edge to the node with that title. Editing a node on the canvas
+                rewrites this text, and the reverse, so the two are one thing.
+            </td>
+        </tr>
+        <tr>
+            <td>Both tags</td>
+            <td>Rebindable in Settings, under Zettelkasten.</td>
+        </tr>
+    </table>
+
+    <div class="button-label settings-heading">Fractal lines</div>
+    <table class="howto-controls">
+        <tr>
+            <td><kbd>Alt</kbd> + <kbd>f</kbd></td>
+            <td>Keep the lines on screen as the view moves.</td>
+        </tr>
+        <tr>
+            <td><kbd>Alt</kbd> + <kbd>c</kbd></td>
+            <td>Release every kept line.</td>
+        </tr>
+        <tr>
+            <td><kbd>Alt</kbd> + <kbd>s</kbd></td>
+            <td>Save the lines as a PNG file.</td>
+        </tr>
+        <tr>
+            <td>Fractal tab</td>
+            <td>Line count, length, width and colour. Lower them if the view lags.</td>
+        </tr>
+    </table>
+
+    <div class="button-label settings-heading">Ask the Ai about Neurite</div>
+    <table class="howto-controls">
+        <tr>
+            <td>
+                <input type="checkbox" id="instructions-checkbox">
+                <label for="instructions-checkbox">How-to</label>
+            </td>
+            <td>
+                Sends this app's own instructions with your next prompt, so the Ai can
+                answer questions about Neurite. It replaces the notes it would
+                otherwise have sent as context, so turn it off for ordinary work.
+            </td>
+        </tr>
+    </table>
+
+    <p class="howto-intro">
+        Shift, Alt and Control are defaults. Rebind them, and the mouse buttons, in
+        the control settings.
+    </p>
+
+    <table class="howto-controls">
         <tr>
             <td><a href="https://github.com/satellitecomponent/Neurite" id="clickable-link">Github</a></td>
             <td><button id="sign-in-btn" class="key-button">Sign In</button></td>
-        </tr>
-        <!-- Capture, not help. These two are the last things here that are neither:
-             they are exports of the canvas, so the Saves tab is where they belong.
-             Left in place for now rather than moved without being asked. -->
-        <tr>
-            <td><strong>CAPTURE</strong></td>
-            <td>
-                <button id="screenshotButton" class="key-button">Screenshot</button>
-                <button id="recordButton" class="key-button">Record</button>
-            </td>
         </tr>
     </table>
 </div>

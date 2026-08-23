@@ -174,13 +174,14 @@ class ZetPanes {
         textarea.cols = 50;
         pane.appendChild(textarea);
 
+        // No `placeholder`: the editor opens empty. It used to hold a four-line
+        // sample of the syntax, which is in the ? tab now -- see `zetcodemirror.js`.
         const cm = CodeMirror.fromTextArea(textarea, {
             lineWrapping: true,
             scrollbarStyle: 'simple',
             theme: 'default',
             mode: 'custom',
-            virtualRendering: true,
-            placeholder: generateCmPlaceholder()
+            virtualRendering: true
         });
 
         const zettelkastenParser = new ZettelkastenParser(cm);

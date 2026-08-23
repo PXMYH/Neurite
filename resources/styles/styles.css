@@ -2547,11 +2547,86 @@ td {
             border-color: #8882;
         }
 
+        /* The panel is a content-sized grid, so each tab decides how wide the menu is:
+           Notes settles at ~300px, Saves at ~530px. `width: 100%` was circular here --
+           it resolved against a track the content had already stretched -- and thirty
+           rows of sentences stretched it to the whole window. Declared in px, and
+           clamped so a phone gets the viewport instead of a horizontal scrollbar. */
         #howto {
             max-height: 500px; /* adjust this value as needed */
-            width: 100%;
+            width: min(500px, 92vw);
             overflow-y: auto;
         }
+
+            #howto .howto-intro {
+                margin: 0 0 14px;
+                color: #bbb;
+                font-size: 13px;
+                line-height: 1.5;
+            }
+
+            /* The global `th, td` rule pads 15px, centres the text and draws a border
+               on every cell. That reads as a data grid, which is right for the two-cell
+               rows this tab used to hold and wrong for thirty rows of key-and-meaning:
+               centred keys do not line up to be scanned, and 15px makes the tab eight
+               screens long. Overridden here only, by id, so every other table in the
+               app keeps the grid. */
+            #howto .howto-controls {
+                width: 100%;
+                margin-bottom: 18px;
+                background: none;
+                /* Fixed, or a long description in the right column squeezes the key in
+                   the left one onto three lines. */
+                table-layout: fixed;
+            }
+
+                #howto .howto-controls td {
+                    padding: 3px 0;
+                    border: none;
+                    text-align: left;
+                    vertical-align: top;
+                    font-size: 13px;
+                    line-height: 1.45;
+                }
+
+                    /* The keys column. Narrow enough that the meanings share a left
+                       edge to scan down, wide enough for "Shift + double-click an
+                       edge" on two lines rather than four. */
+                    #howto .howto-controls td:first-child {
+                        width: 42%;
+                        padding-right: 12px;
+                        color: #ddd;
+                    }
+
+                    #howto .howto-controls td:last-child {
+                        color: #999;
+                    }
+
+                #howto kbd,
+                #howto .howto-controls code {
+                    /* Not a border: a keycap outline next to the words `+ double-click`
+                       draws more attention to the box than to the key. This is the same
+                       inset grey the panel's own inputs use. */
+                    padding: 1px 5px;
+                    border-radius: 3px;
+                    background-color: #ffffff14;
+                    color: #eee;
+                    font-family: inherit;
+                    font-size: 12px;
+                    white-space: nowrap;
+                }
+
+                /* The tag examples are literal text to type, so they keep a mono face
+                   where the key names do not. */
+                #howto .howto-controls code {
+                    font-family: monospace;
+                }
+
+                /* The How-To row holds a control rather than a key name, and a checkbox
+                   with its label needs the two on one line. */
+                #howto .howto-controls td:first-child label {
+                    margin-left: 6px;
+                }
 
 #clickable-link {
     color: #0572eb;

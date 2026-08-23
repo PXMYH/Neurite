@@ -99,15 +99,16 @@
 
     <!-- Bottom-left, the corner furthest from the tools: settings are the thing
          you reach for least. -->
-    <div class="menu-button" title="Menu: notes, AI, fractal and saves">
+    <div class="menu-button" title="Menu: AI, fractal, saves and settings">
         <div class="menu-icon" id="menu-icon"></div>
     </div>
 
     <div class="dropdown-content">
         <div>
             <div class="tabs">
-                <button class="tablink" title="Take notes and interact with AI" onclick="openTab('tab1', this)">Notes</button>
-                <button class="tablink" id="tablink-ai" title="Change AI model and settings" onclick="openTab('tab4', this)">Ai</button>
+                <!-- Ai is first, and it is what the menu opens on: the prompt that used
+                     to sit under the notes editor is at the top of it now. -->
+                <button class="tablink" id="tablink-ai" title="Prompt the AI, change model and keys" onclick="openTab('tab4', this)">Ai</button>
                 <button class="tablink" title="Adjust fractal rendering" onclick="openTab('tab2', this)">Fractal</button>
                 <button class="tablink" title="Teleport to interesting locations" onclick="openTab('tab6', this)">Saves</button>
                 <!-- Second from the end, before help: settings are read less often
@@ -117,6 +118,18 @@
             </div>
 
             <!-- Tab content placeholders -->
+
+            <!-- No tablink points here any more: the Notes tab is gone. The div and its
+                 `PageLoad.tabs` entry stay because the app reads what loads into it and
+                 would throw without it -- `App.init` builds `ZetPanes` from
+                 `#zetPaneContainer`, and `openTab` refreshes
+                 `currentActiveZettelkastenMirror` on every tab switch. It also keeps
+                 text-to-graph sync alive: an AI answer with no target node is streamed
+                 into that editor, and the sync pass turns it into nodes.
+
+                 So this is invisible, not dead. Issue #65 records the 14 mirror sites and
+                 the 18 `zetPaneList` sites, and holds the choice between giving the editor
+                 a designed home and deleting it outright. -->
             <div id="tab1" class="tabcontent">
                 <!-- Tab 1 content will be loaded here -->
             </div>

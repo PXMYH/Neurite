@@ -23,6 +23,31 @@
         </button>
     </div>
 
+    <!-- Screenshot and Record, from the ? tab, where they were the last two rows that
+         were not help. Its own group because they are not the group above: nothing
+         here writes a save. Both read the screen through `getDisplayMedia` and put
+         what they capture on the canvas as a node -- an image node for the shot
+         (`NodeView.addForImage`), a "Recorded Video" window holding a `<video>` and a
+         download link for the recording (`Recorder.handleBlob`). They sit beside Open
+         and Save to… because those are the other three controls in this panel that
+         reach outside the page; everything below operates on storage.
+
+         The label is a span, like the two above, and for a second reason: `record.js`
+         swaps it for a pause glyph while recording, and writing to the button's own
+         `textContent` would take the icon with it. -->
+    <div class="save-actions">
+        <button type="button" class="save-action" id="screenshotButton"
+                title="Capture the screen and drop it on the canvas as an image node.">
+            <svg aria-hidden="true"><use xlink:href="#file-image-icon"></use></svg>
+            <span class="save-action-label">Screenshot</span>
+        </button>
+        <button type="button" class="save-action" id="recordButton"
+                title="Record the screen. Stops on a second click, then makes a node holding the video and a download link.">
+            <svg aria-hidden="true"><use xlink:href="#file-video-icon"></use></svg>
+            <span class="save-action-label">Record</span>
+        </button>
+    </div>
+
     <!-- Off-screen rather than `display: none`: Safari will not open a file
          dialog for an input it considers unrendered. -->
     <input type="file" id="open-file-input" class="visually-hidden"

@@ -334,7 +334,8 @@ class Tag {
         ZettelkastenParser.regexpNodeTitle = RegExp.forNodeTitle(Tag.node);
         updateAllZetMirrorModes();
         updateAllZettelkastenProcessors();
-        updateAllCodeMirrorPlaceholders();
+        // A third call re-wrote the editor's placeholder so its sample used the new
+        // tags. There is no placeholder now -- see `zetcodemirror.js`.
     }
 }
 

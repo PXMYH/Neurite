@@ -1,0 +1,211 @@
+// The ? tab is documentation, and documentation is the one part of the app that
+// can be wrong while every test passes: a key that no handler implements still
+// renders, and a reader who tries it learns nothing except that the page lies.
+// So each group below is pinned to the source that implements it, and the two
+// controls that left this tab are pinned to the file they left for.
+//
+// Read as text, the way settings-tab.test.js does: nothing under js/ exports, and
+// the questions here are about the shape of the markup and of the handlers.
+//
+// What this cannot check is whether the sentences are clear. It checks that every
+// promise the tab makes still has code behind it.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const root = new URL('../', import.meta.url);
+const read = (p)=> readFileSync(new URL(p, root), 'utf8');
+
+const HELP = 'resources/html/tabs/helptab.html';
+const SAVES = 'resources/html/tabs/networkstab.html';
+const help = read(HELP);
+const saves = read(SAVES);
+
+// The rows, as [keys, meaning] with the tags stripped. `<td>` order is the
+// contract: keys on the left, what they do on the right.
+function rows(html){
+    return [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map( (tr)=>
+        [...tr[1].matchAll(/<td>([\s\S]*?)<\/td>/g)]
+            .map( (td)=> td[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() )
+    );
+}
+
+test('the ? tab is a controls reference rather than a pair of links', ()=>{
+    // What it held before: a checkbox, two links, and the Screenshot/Record pair.
+    // The size checks are the floor -- a rewrite that drops half the reference
+    // passes every other test in this file, because each of those only asks that
+    // what is left is true.
+    const headings = [...help.matchAll(/class="button-label settings-heading">([^<]+)</g)]
+        .map( (m)=> m[1].trim() );
+    assert.ok(headings.length >= 7,
+        'the reference has ' + headings.length + ' groups: ' + headings.join(', '));
+
+    // A heading with no table under it is a group whose rows were deleted, which
+    // reads as a finished section rather than as a gap.
+    for (const heading of headings) {
+        assert.match(help.slice(help.indexOf('>' + heading + '<')),
+            /^[^<]*<\/div>\s*<table class="howto-controls">\s*<tr>/,
+            heading + ' has no rows under it');
+    }
+
+    const body = rows(help);
+    assert.ok(body.length >= 25, 'only ' + body.length + ' control rows');
+    assert.deepEqual(body.filter( (cells)=> cells.length !== 2 ), [],
+        'a row is not a key/meaning pair');
+    assert.deepEqual(body.filter( ([keys, meaning])=> !keys || meaning.length < 5 ), [],
+        'a row names a control without saying what it does');
+
+    // `.settings-heading` is defined inside `.dropdown-content`, which is what makes
+    // it usable in this tab at all; and the group headings have to be the same shape
+    // as the Settings tab's, or the two panels read as different applications.
+    assert.match(read('resources/html/tabs/settingstab.html'),
+        /class="button-label settings-heading"/,
+        'the Settings tab no longer uses this heading, so the ? tab now looks foreign');
+});
+
+test('the reference overrides the grid the global table rule would draw', ()=>{
+    // Thirty rows of centred, 15px-padded, bordered cells is a spreadsheet eight
+    // screens long. The override is by id so no other table changes; this pins both
+    // halves, so that deleting the global rule shows up here as dead weight rather
+    // than as a silent duplicate.
+    const css = read('resources/styles/styles.css');
+    const global = css.slice(css.indexOf('\nth,\ntd {'), css.indexOf('}', css.indexOf('\nth,\ntd {')));
+    assert.match(global, /text-align:\s*center/, 'the global cell rule is gone; drop the override');
+    assert.match(global, /border:\s*1px/);
+
+    const start = css.indexOf('#howto .howto-controls td {');
+    assert.notEqual(start, -1, 'the ? tab has no cell rule of its own');
+    const scoped = css.slice(start, css.indexOf('}', start));
+    for (const declaration of [/border:\s*none/, /text-align:\s*left/, /padding:\s*3px/]) {
+        assert.match(scoped, declaration);
+    }
+
+    // `#howto` sits inside `.dropdown-content` in this stylesheet, and so does the
+    // `table { background-color }` rule these tables inherit from.
+    assert.match(css.slice(css.indexOf('#howto .howto-controls {'),
+                           css.indexOf('}', css.indexOf('#howto .howto-controls {'))),
+        /background:\s*none/, 'the reference tables keep the panel-input background');
+});
+
+// Each entry: a claim the tab makes, and the code that has to still be there for the
+// claim to hold. These are the rows most likely to rot, because each one names a
+// literal that lives in exactly one handler.
+const CLAIMS = [
+    {row: /Alt<\/kbd> \+ <kbd>s/, says: /PNG/,
+     file: 'js/mandelbrot/mandelbrot.js', code: /a\.download = name \+ "\.png"/,
+     why: 'the fractal-line export writes a PNG, whatever the row says'},
+    {row: /<kbd>1<\/kbd>/, says: /note, link, edges, Ai/,
+     file: 'js/interface/dropdown/dropdown.js', code: /const toolShortcuts = \{/,
+     why: 'the digit shortcuts are gone, so the row promises four keys that do nothing'},
+    {row: /<kbd>f<\/kbd>/, says: /Grow or shrink/,
+     file: 'js/nodes/nodeinteraction/movenodes.js', code: /'f': 'scaleUp'/,
+     why: 'f no longer scales the selection'},
+    {row: /Esc/, says: /following the pointer/,
+     file: 'js/nodes/nodeinteraction/nodemode.js', code: /Escape/,
+     why: 'Escape no longer drops a node that follows the mouse'},
+    {row: /instructions-checkbox/, says: /instructions/,
+     file: 'js/ai/aimessage.js', code: /Elem\.byId\('instructions-checkbox'\)\.checked/,
+     why: 'the How-To checkbox is read nowhere, so ticking it changes nothing'},
+];
+
+test('every control the reference names is still implemented', ()=>{
+    for (const claim of CLAIMS) {
+        const match = help.match(new RegExp('<tr>[\\s\\S]*?' + claim.row.source + '[\\s\\S]*?</tr>'));
+        assert.ok(match, 'no row matches ' + claim.row + '; this test is stale');
+        assert.match(match[0], claim.says, 'the row no longer says what it did');
+        assert.match(read(claim.file), claim.code, claim.why);
+    }
+});
+
+test('the keys the reference does not repeat are the ones the reader can rebind', ()=>{
+    // Shift, Alt and Control are defaults, not constants, so the tab says so once
+    // instead of hedging in thirty rows. That sentence is only true while the three
+    // are read through `controls.*`.
+    assert.match(help, /Shift, Alt and Control are defaults/);
+    const globals = read('js/globals.js');
+    for (const key of ['shiftKey', 'altKey', 'controlKey']) {
+        assert.match(globals, new RegExp(key + ':\\s*\\{'),
+            key + ' is no longer a rebindable control, so the closing sentence is wrong');
+    }
+});
+
+test('Screenshot and Record are in the Saves tab, once, with their labels intact', ()=>{
+    // "The id is somewhere in the page" was true before the move and after it, so it
+    // cannot see the move. Name the file.
+    for (const id of ['screenshotButton', 'recordButton']) {
+        const files = ['index.html', HELP, SAVES,
+                       'resources/html/tabs/notestab.html',
+                       'resources/html/tabs/aitab.html',
+                       'resources/html/tabs/fractaltab.html',
+                       'resources/html/tabs/settingstab.html']
+            .filter( (p)=> new RegExp('\\sid="' + id + '"').test(read(p)) );
+        assert.deepEqual(files, [SAVES], id + ' is not in the Saves tab exactly once');
+    }
+
+    // `.save-action` is the row pattern in this panel: an icon and a label span. The
+    // span is not cosmetic -- `Recorder.setRecordLabel` writes into it, and writing to
+    // the button instead would replace the icon along with the words.
+    for (const id of ['screenshotButton', 'recordButton']) {
+        const button = saves.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
+        assert.ok(button, id + ' is no longer a button');
+        assert.match(button[0], /class="save-action"/, id + ' does not use the row pattern');
+        assert.match(button[0], /<span class="save-action-label">[^<]+<\/span>/,
+            id + ' has no label span for the icon to sit beside');
+        assert.match(button[0], /<use xlink:href="#file-\w+-icon">/,
+            id + ' lost its icon');
+        assert.match(button[0], /title="[^"]{20,}"/, id + ' says nothing on hover');
+    }
+
+    const record = read('js/interface/dropdown/customui/record/record.js');
+    assert.match(record, /setRecordLabel\(text\)\{[\s\S]*?\.save-action-label'\)\.textContent = text/,
+        'the label writer no longer targets the span');
+    // Comments stripped: one of them quotes the write it warns against, and the
+    // question here is what the file does, not what it says about itself.
+    const code = record.replace(/^\s*\/\/.*$/gm, '');
+    assert.equal((code.match(/textContent\s*=/g) || []).length, 1,
+        'record.js writes textContent somewhere other than the label writer');
+    assert.doesNotMatch(code, /button\.textContent/,
+        'a write to the button itself would delete the icon');
+    // Four call sites used to write the label directly; all of them go through the
+    // helper now, including the two that reset it when the reader stops sharing.
+    assert.ok((record.match(/Recorder\.setRecordLabel\(/g) || []).length >= 4,
+        'a label reset was dropped, so the button stays on the pause glyph');
+});
+
+test('the notes editor opens empty, and the syntax it taught is in the ? tab', ()=>{
+    // The placeholder was four lines of sample syntax inside the editor. It was
+    // rebuilt from the current tags on every tag change, which is why three functions
+    // and a call in `Tag.#onTagInput` went with it.
+    for (const gone of ['generateCmPlaceholder', 'updateAllCodeMirrorPlaceholders',
+                        'updatePlaceholder']) {
+        for (const file of ['js/zettelkasten/zetcodemirror.js', 'js/globals.js',
+                            'js/interface/dropdown/tabs/notestab.js']) {
+            const source = read(file);
+            // The names survive in comments that say where the syntax went; a call
+            // does not have a backtick in front of it.
+            assert.doesNotMatch(source, new RegExp('[^`]\\b' + gone + '\\('),
+                file + ' still calls ' + gone);
+        }
+    }
+
+    // The CodeMirror options, up to the closing brace of the call.
+    const notes = read('js/interface/dropdown/tabs/notestab.js');
+    const options = notes.slice(notes.indexOf('CodeMirror.fromTextArea(textarea, {'),
+                                notes.indexOf('});', notes.indexOf('CodeMirror.fromTextArea(textarea, {')));
+    assert.doesNotMatch(options, /placeholder/, 'the editor is given a placeholder again');
+    assert.match(options, /mode: 'custom'/, 'the options parse is stale');
+
+    // The tag change still has to recompile the mode: the tags are baked into the
+    // highlighter, so dropping this call leaves the colours wrong with no error.
+    assert.match(read('js/globals.js'), /updateAllZetMirrorModes\(\);/,
+        'a tag change no longer recompiles the editor mode');
+
+    // The claim the removal rests on. Both examples use the default tags, which is
+    // what the placeholder did too.
+    const syntax = rows(help).filter( ([keys])=> /## Title|\[\[Title\]\]/.test(keys) );
+    assert.equal(syntax.length, 2,
+        'the ? tab does not teach both the title tag and the reference tag');
+    assert.match(help, /Rebindable in Settings/,
+        'the ? tab does not say the tags can be changed');
+});

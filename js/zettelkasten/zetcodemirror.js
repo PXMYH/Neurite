@@ -273,11 +273,6 @@ class ZettelkastenParser {
 
         cm.refresh();
     }
-    updatePlaceholder() {
-        const newPlaceholder = generateCmPlaceholder();
-        this.cm.setOption("placeholder", newPlaceholder);
-        this.cm.refresh();
-    }
 }
 
 function updateAllZetMirrorModes() {
@@ -296,35 +291,17 @@ function updateAllZettelkastenProcessors() {
     });
 }
 
-function updateAllCodeMirrorPlaceholders() {
-    const panes = window.zetPaneList || [];
-    panes.forEach(pane => {
-      const parser = pane.parser;
-      if (typeof parser?.updatePlaceholder === 'function') parser.updatePlaceholder();
-    });
-  }
-
-  function generateCmPlaceholder() {
-    const nodeTag = tagValues.nodeTag;
-    const refTag = tagValues.refTag;
-
-    let refExample;
-    if (isBracketLinks) {
-      const closingBracket = bracketsMap[refTag];
-      refExample = `${refTag}Reference${closingBracket}`;
-    } else {
-      refExample = `${refTag}Reference`;
-    }
-
-    return `
-  To create notes...
-
-  ${nodeTag} Title Header
-
-  Plain Text
-
-  ${refExample}`;
-  }
+// A `generateCmPlaceholder` built the editor's ghost text here -- "To create
+// notes... / ## Title Header / Plain Text / [[Reference]]" -- and an
+// `updateAllCodeMirrorPlaceholders` re-ran it through a `parser.updatePlaceholder`
+// whenever the tag inputs changed, so the sample always used the current tags.
+// All three are gone. The syntax it taught is in the ? tab now, where it can say
+// what a Title and a Reference *do* instead of only how they are spelled, and the
+// editor opens empty.
+//
+// `updateAllZetMirrorModes` above is the one that still has to run on a tag change:
+// the tags are compiled into the CodeMirror mode, so the highlighting is wrong until
+// it does. Only the sample text was cosmetic.
 
 CodeMirror.defineMode("custom", function (config, parserConfig) {
     const Prompt = `${PROMPT_IDENTIFIER}`;

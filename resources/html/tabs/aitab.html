@@ -1,4 +1,43 @@
 <div class="submenu">
+    <!-- The main prompt, from the Notes tab. First in the tab because it is the action
+         and everything under it is configuration. Nothing was rewired: `sendMessage`,
+         `autoGrow`, `#aiLoadingIcon`, `#aiErrorIcon` and `#regen-button` all bind by id,
+         and `body.ai-disabled #prompt-form` in styles.css still hides it -- redundantly
+         now, since it hides `#tab4` around it as well. Issue #65. -->
+    <form id="prompt-form" onsubmit="sendMessage(event);">
+        <div style="display: flex; width: 100%; padding-bottom: 12px;">
+
+            <!-- Textarea for main prompt -->
+            <textarea id="prompt" class="custom-scrollbar" rows="1" oninput="autoGrow(event);" placeholder="Enter prompt..." required></textarea>
+
+            <!-- Status icons positioned similarly to function prompt -->
+            <div class="status-icons-container" style="position: relative; right: 45px; top: 6px;">
+                <!-- Status icons (Loader and Error) -->
+                <div class="loader" id="aiLoadingIcon" style="display:none;"></div>
+                <div class="error-icon-css" id="aiErrorIcon" style="display:none;">
+                    <div class="error-x-mark">
+                        <span class="error-x-mark-left"></span>
+                        <span class="error-x-mark-right"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Run button (Play icon) -->
+            <button type="submit" title="Submit prompt">
+                <svg width="18" height="18">
+                    <use xlink:href="#play-icon"></use>
+                </svg>
+            </button>
+
+            <!-- Regenerate button (Refresh icon) -->
+            <button id="regen-button" type="button" title="Refresh/Halt response">
+                <svg width="18" height="18">
+                    <use xlink:href="#refresh-icon"></use>
+                </svg>
+            </button>
+        </div>
+    </form>
+
     <div class="label-bar-container">
         <label for="modelSelectContainer" class="button-label" onclick="toggleModelSelectPanel()">Select Ai</label>
         <div class="model-select-container" id="modelSelectContainer">

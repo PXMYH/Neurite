@@ -53,6 +53,12 @@ const Recorder = {
         }
     },
 
+    // The button is an icon and a label, so its text is the label's, not its own.
+    // `button.textContent = ...` would replace both children and delete the icon.
+    setRecordLabel(text){
+        Elem.byId('recordButton').querySelector('.save-action-label').textContent = text
+    },
+
     onDataAvailable(e){
         if (e.data.size > 0) Recorder.recordedChunks.push(e.data)
     },
@@ -74,7 +80,7 @@ const Recorder = {
                 track.onended = () => {
                     if (this.mediaRecorder?.state === 'recording') {
                         this.stopRecording();
-                        Elem.byId('recordButton').textContent = "Record";
+                        Recorder.setRecordLabel("Record");
                     }
                 };
             });
@@ -85,7 +91,7 @@ const Recorder = {
             this.mediaRecorder.start();
         } catch (err) {
             Logger.info("Screen sharing canceled");
-            Elem.byId('recordButton').textContent = "Record";
+            Recorder.setRecordLabel("Record");
         }
     },
 
@@ -149,13 +155,12 @@ const Recorder = {
     },
 
     onRecordButtonClicked(e){
-        const button = e.currentTarget;
         if (Recorder.mediaRecorder?.state === 'recording') {
             Recorder.stopRecording();
-            button.textContent = "Record";
+            Recorder.setRecordLabel("Record");
         } else {
             Recorder.startRecording();
-            button.textContent = '\u275A\u275A'; // Double Vertical Bar unicode
+            Recorder.setRecordLabel('\u275A\u275A'); // Double Vertical Bar unicode
         }
     }
 }

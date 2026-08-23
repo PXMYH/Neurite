@@ -123,17 +123,14 @@ On.click(menuButton, (e)=>{
 
     // If the dropdown is opened, manually set the first tab to active and display its content
     if (dropdownContent.classList.contains("open")) {
-        var tablinks = document.getElementsByClassName("tablink");
-        var tabcontent = document.getElementsByClassName("tabcontent");
-
-        // Remove active class from all tablinks and hide all tabcontent
-        for (var i = 0; i < tablinks.length; i++) {
-            tablinks[i].classList.remove("active");
-            tabcontent[i].style.display = "none";
-        }
-
-        // Open the first tab
-        openTab('tab1', tablinks[0]);
+        // Ai, the first tablink. It used to be Notes, which no longer has one; `#tab1`
+        // is still loaded and still holds the editor, but nothing opens it -- issue #65.
+        //
+        // The loop that stood here removed a class nobody adds (`active`, where `openTab`
+        // writes `activeTab`) and hid `tabcontent[i]` for as many i as there are
+        // tablinks -- one short of the tabs, now that one tab has no link. `openTab`
+        // hides every `.tabcontent` and clears every `activeTab` itself.
+        openTab('tab4', document.getElementsByClassName('tablink')[0]);
 
         // If there's any selected text, deselect it
         if (window.getSelection) {
@@ -212,8 +209,10 @@ On.change(aiFeaturesCheckbox, (e)=>{
 
     // `openTab` writes an inline `display: block` on the tab it opens, so the Ai
     // tab has to be left rather than merely restyled if it is the one showing.
+    // Fractal, the second tablink: the Ai tab is the first one, and it is the tab
+    // being left. Notes was the old landing place and has no tablink now.
     const aiTabContent = Elem.byId('tab4');
     if (!AiFeatures.enabled && aiTabContent.style.display === 'block') {
-        openTab('tab1', document.getElementsByClassName('tablink')[0]);
+        openTab('tab2', document.getElementsByClassName('tablink')[1]);
     }
 });
