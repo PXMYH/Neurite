@@ -10,13 +10,18 @@
                         <use xlink:href="#searchSVG"></use>
                     </svg>
                 </button>
-                <div title = "Select Archive"><select id="zetPaneDropdown" class="custom-select ignoreSetup"></select></div>
-                <button class="zet-add-pane-button linkbuttons search-button" title="New Archive">
+                <!-- These three act on the whole Archive, not on one note. A bare
+                     plus beside a text editor reads as "add a note", which is what
+                     the tool bar's Note icon does instead -- it appends a Title to
+                     whichever Archive is selected here. So each title names the
+                     Archive, and the delete one says what goes with it. -->
+                <div title = "Switch Archive: new notes go into the one selected here"><select id="zetPaneDropdown" class="custom-select ignoreSetup"></select></div>
+                <button class="zet-add-pane-button linkbuttons search-button" title="New Archive: another document over the same canvas">
                     <svg class="icon">
                         <use xlink:href="#plus-icon"></use>
                     </svg>
                 </button>
-                <button class="zet-delete-pane-button linkbuttons search-button" title="Delete Archive">
+                <button class="zet-delete-pane-button linkbuttons search-button" title="Delete this Archive and every note in it">
                     <svg class="icon">
                         <use xlink:href="#delete-icon"></use>
                     </svg>

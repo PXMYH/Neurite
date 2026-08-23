@@ -248,7 +248,11 @@ class ZetPanes {
         const selectedPaneName = this.getPaneName(selectedPaneId);
         if (this.paneDropdown.options.length === 1) return;
 
-        window.confirm(`Delete the slip-box "${selectedPaneName}"?`)
+        // "Archive" is the word on screen -- it is the name this pane is given and
+        // what the header's titles call it. This asked about a "slip-box", a third
+        // word for the same thing that appeared nowhere else, so the dialog read as
+        // being about something other than the row that opened it.
+        window.confirm(`Delete the Archive "${selectedPaneName}" and every note in it?`)
             .then((confirmDelete) => {
                 if (confirmDelete) this.removePane(selectedPaneId);
             })
