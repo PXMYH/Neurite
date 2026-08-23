@@ -93,11 +93,28 @@ test('a help block is hidden from the page but not from the accessibility tree',
     // now names the class, explaining that `#open-file-input` inherits the menu's
     // `visibility` because this sets none. The slice became that comment, and all four
     // assertions below read a paragraph of English for CSS declarations.
-    const iRule = css.indexOf('.visually-hidden {');
+    // And the selectors before the slice, or the slice can be aimed somewhere else: this
+    // takes the first `indexOf`, which an indented `.foo, .visually-hidden {` above the
+    // real rule satisfies, and every assertion below would then read that decoy while the
+    // rule it is about says whatever it likes. Comments are stripped first because one 130
+    // lines above the rule names the class in prose.
+    const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.deepEqual([...cssCode.matchAll(/([^{}]+)\{/g)].map( (m)=> m[1].trim() )
+        .filter( (s)=> s.includes('visually-hidden') ), ['.visually-hidden'],
+        'a second rule reaches .visually-hidden and can undo what is read below');
+    const iRule = cssCode.indexOf('.visually-hidden {');
     assert.notEqual(iRule, -1, 'the .visually-hidden rule is gone; this test is stale');
-    const rule = css.slice(iRule, css.indexOf('}', iRule));
+    const rule = cssCode.slice(iRule, cssCode.indexOf('}', iRule));
     assert.match(rule, /clip-path:\s*inset\(50%\)/, '.visually-hidden no longer clips its content');
     assert.doesNotMatch(rule, /display:\s*none/, '.visually-hidden now hides from screen readers too');
+    // `visibility: hidden` is the quieter version of the same mistake, and it costs more
+    // here than the four help boxes: the back button's name is built out of a
+    // `.visually-hidden` span, so the whole menu's back button goes from "Back to
+    // Fractal" to "Fractal" -- a name that reads as a heading, not as a way out. This
+    // rule is shared, so a change made for one caller lands on the other.
+    assert.doesNotMatch(rule, /visibility:\s*hidden/,
+        '.visually-hidden hides from screen readers too, which also cuts "Back to" out of '
+        + 'the menu back button\'s name');
 
     // Absolute with no offset means "stay where you would have been", and an
     // `overflow: hidden` ancestor only clips absolute descendants it is the containing

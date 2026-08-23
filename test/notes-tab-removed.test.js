@@ -32,6 +32,13 @@ const iShowList = dropdownJs.indexOf('\n    showList(');
 const iShowDetail = dropdownJs.indexOf('\n    showDetail(');
 const listBody = dropdownJs.slice(iShowList, iShowDetail);
 const detailBody = dropdownJs.slice(iShowDetail, dropdownJs.indexOf('\n}', iShowDetail));
+// Code only, for anything that reads statement order. `showList` carries a long comment
+// that names both statements it is about, so leaving comments in lets the order be faked:
+// move the class removal below the guard, mention it in a comment above the guard, and an
+// `indexOf` comparison still sees the earlier position. Over-stripping is safe here --
+// nothing in this function is a string holding `//`, and if that changed the patterns
+// below would stop matching and fail rather than pass.
+const listCode = listBody.replace(/\/\/[^\n]*/g, '');
 const assertViewsFound = ()=> assert.ok(iShowList > 0 && iShowDetail > iShowList,
     'the two menu views are no longer showList then showDetail; this test reads nothing');
 
@@ -141,26 +148,43 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
     // an earlier note named: that is the textarea CodeMirror hides behind itself, and it
     // is `display: none` and 0x0 whether this works or not.
     //
-    // Rule counts, not just the first rule's contents. This reads one rule out of the
-    // middle of a 4,000-line stylesheet, and the cascade is the part source text cannot
-    // see: appending `.dropdown-content { visibility: visible; }` at the end of the file
-    // puts every control in the closed menu back in the focus order, at equal
-    // specificity and later, and leaves the two assertions below matching the rule up
-    // here. Same for the open state, where a second rule could take `visibility` away.
-    assert.equal((css.match(/^\.dropdown-content \{/gm) || []).length, 1,
-        'a second .dropdown-content rule can override the visibility this test is reading');
-    assert.equal((css.match(/\.dropdown-content\.open \{/g) || []).length, 1,
-        'a second .dropdown-content.open rule can override the visibility this test is reading');
+    // Every rule that can reach this element, not the first thing that looks like one.
+    // This reads two rules out of the middle of a 4,000-line stylesheet, and the cascade
+    // is the part source text cannot see. A count anchored to column 0 with a slice taken
+    // by plain `indexOf` was worse than no count at all, because the two could disagree:
+    // an indented decoy above the real rule --
+    //     .menu-panel, .dropdown-content { visibility: hidden; }
+    // -- left the count at 1 and moved every assertion below onto the decoy, after which
+    // the real rule could say `visibility: visible` or `display: none` and stay green.
+    // `.dropdown-content[class~="open"] { display: none; }` slipped past both counts and
+    // both slices, and gives a 0x0 panel with the menu open.
+    //
+    // So: list the selectors that name this element and require exactly the two that
+    // should exist. One assertion refuses the indented duplicate, a grouped selector, a
+    // copy inside `@media`, a higher-specificity `#dropdowndiv .dropdown-content`, and
+    // the attribute spelling of `.open`. Comments are stripped first, or the prose above
+    // `z-index` that mentions the class would count as a rule.
+    const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const selectors = [...cssCode.matchAll(/([^{}]+)\{/g)].map( (m)=> m[1].trim() )
+        .filter( (s)=> s.includes('dropdown-content') ).sort();
+    assert.deepEqual(selectors, ['.dropdown-content', '.dropdown-content.open'],
+        'another rule reaches the menu panel, and it can undo the visibility read below');
 
-    const closed = css.slice(css.indexOf('.dropdown-content {'), css.indexOf('}', css.indexOf('.dropdown-content {')));
+    // The same anchored selector both times, so the slice cannot read a rule the check
+    // above did not see.
+    const ruleFor = (selector)=> {
+        const i = cssCode.indexOf(selector + ' {');
+        assert.notEqual(i, -1, selector + ' is gone; this test reads nothing');
+        return cssCode.slice(i, cssCode.indexOf('}', i));
+    };
+
+    const closed = ruleFor('.dropdown-content');
     assert.match(closed, /visibility:\s*hidden/,
         'the closed menu is only translated away, so its commands still take Tab and Space');
     assert.doesNotMatch(closed, /display:\s*none/,
         'display:none gives the function console a zero-width CodeMirror it never recovers from');
 
-    const iOpen = css.indexOf('.dropdown-content.open {');
-    assert.notEqual(iOpen, -1, 'the open state of the menu is gone');
-    const open = css.slice(iOpen, css.indexOf('}', iOpen));
+    const open = ruleFor('.dropdown-content.open');
     assert.match(open, /visibility:\s*visible/,
         'the menu opens without restoring visibility, so it can never be reached at all');
     // The open state as well as the closed one. `display: none` here is the same zero-width
@@ -271,31 +295,47 @@ test('switching menu view carries focus with it, rather than dropping it on the 
     // Back goes to the row `openTab` marked, not to the top of the column: the reader
     // returns to the row they left. This is the only thing that reads `activeTab` for
     // that, which is what the note above `.tablink.activeTab` in styles.css claims.
-    assert.match(listBody, /querySelector\('\.menu-row\.activeTab'\)/,
-        'going back does not return focus to the row whose panel was open');
-    assert.match(listBody, /\.focus\(\)/, 'going back moves focus nowhere');
-    // And that one row only. A `?? querySelector('.menu-row')` fallback read here for a
+    // One statement, whole. A `?? querySelector('.menu-row')` fallback read here for a
     // first open, which cannot happen -- every route into the panel view runs `openTab`
     // and `openTab` writes `activeTab` -- and resolved to `#open-file-button`, where
-    // Space opens a file dialog. Counting the reads is what keeps a second one out:
-    // `??` swapped for `||`, or the operands swapped, would leave both matches above green.
-    assert.equal((listBody.match(/querySelector/g) || []).length, 1,
-        'showList looks for a second row to focus; the only one it may focus is activeTab');
+    // Space opens a file dialog. Counting `querySelector` reads is not enough to keep it
+    // out, because the defect can come back spelled another way: `?? Elem.byId(
+    // 'open-file-button')` restores exactly the old behaviour with one `querySelector`
+    // still in the file, and `Elem.byId` is this codebase's own convention, so it is the
+    // likely rewrite rather than a contrived one. So: the statement is matched entire,
+    // one focus call is allowed, and a defaulting operator is refused outright.
+    assert.match(listCode, /MainMenu\.div\.querySelector\('\.menu-row\.activeTab'\)\?\.focus\(\);/,
+        'going back does not return focus to the row whose panel was open');
+    assert.equal((listCode.match(/\.focus\(/g) || []).length, 1,
+        'showList moves focus twice; the second one decides, and it is not the marked row');
+    assert.doesNotMatch(listCode, /\?\?|\|\|/,
+        'showList falls back to another element when no row is marked; that case cannot happen, '
+        + 'and the fallback it had focused #open-file-button, where Space opens a file dialog');
 
     // And not for the two callers that pass no event. Without the guard, opening the
     // menu pulls focus off the menu button on every click, and switching AI features off
     // pulls it off the checkbox that did it -- a checkbox outside the menu entirely.
-    const iGuard = listBody.indexOf('if (!e) return');
+    const iGuard = listCode.search(/if \(!e\) return|if \(arguments\.length === 0\) return/);
     assert.notEqual(iGuard, -1,
         'showList moves focus even when no click brought it there, so opening the menu steals it');
 
     // Order, because the guard returning early is only safe once the view has switched.
-    // Moving the guard above the class removal is a two-line edit that leaves both
-    // assertions above matching, and it stops the menu-open path closing the panel view:
+    // Moving the guard above the class removal is a two-line edit that leaves every
+    // assertion above matching, and it stops the menu-open path closing the panel view:
     // the menu then reopens showing the last panel, and with AI features off that panel
     // is hidden and the menu is an empty box -- the bug this file is named for. Measured:
     // with the two lines swapped, 116 of 116 passed.
-    assert.ok(listBody.indexOf("classList.remove('detail-open')") < iGuard,
+    //
+    // Comparing two `indexOf`s is only as good as its inputs, so three things hold it up:
+    // comments are stripped, or naming the statement in the prose above the guard fakes
+    // the position; the quotes are either kind, or `remove("detail-open")` matches
+    // nothing; and exactly one `return` may exist, or the removal can move into a helper
+    // that is called after a guard which still reads first.
+    assert.equal((listCode.match(/\breturn\b/g) || []).length, 1,
+        'showList has a second exit; the order checked below is not the order it runs in');
+    const iRemove = listCode.search(/classList\.remove\(["']detail-open["']\)/);
+    assert.notEqual(iRemove, -1, 'showList shows the row list without closing the panel view');
+    assert.ok(iRemove < iGuard,
         'showList returns before it closes the panel view, so opening the menu keeps showing a panel');
 });
 
@@ -321,22 +361,59 @@ test('every menu row describes what it does, and the heading is not overridden',
     // Each panel row's title tied to the panel it opens, not merely to being long
     // enough. Length alone is satisfied by any five sentences in any order: swapping the
     // Settings and Help titles left every row describing a different panel from the one
-    // it opens, and 116 of 116 passed. The word is read back out of the panel's own
-    // markup as well, so a title cannot be pinned to a word the panel does not use.
+    // it opens, and 116 of 116 passed.
+    //
+    // Three things make the tie hold, each closing a way the first version could pass on
+    // a wrong title:
+    //
+    // - The word has to be *exclusive* to its own panel's text. `fractal` for tab2 and
+    //   `control` for tab3 were not: the Help panel says both, so those two titles could
+    //   be swapped and both halves still passed. Measured over all five files, the words
+    //   below are each in one panel and no other, and every current title already
+    //   contains its own -- so this pins the titles rather than rewriting them.
+    // - The word is read out of *visible text*, not out of the file. Markup carries the
+    //   vocabulary in ids and comments: rename every "Coordinates" a reader can see in
+    //   networkstab.html and `id="savedCoordinatesContainer"` alone keeps the old check
+    //   green, with the row now describing a panel that no longer says it.
+    // - A title may not contain another panel's word, or one sentence can name two
+    //   panels and pass as both -- "Adjust how the fractal is drawn: every control for
+    //   it, in one list." reads like the Fractal panel and was on the Help row.
     const PANELS = {
         tab4: ['aitab.html', 'API'],
-        tab2: ['fractaltab.html', 'fractal'],
+        tab2: ['fractaltab.html', 'drawn'],
         tab6: ['networkstab.html', 'coordinates'],
-        tab5: ['settingstab.html', 'Zettelkasten'],
-        tab3: ['helptab.html', 'control'],
+        tab5: ['settingstab.html', 'placement'],
+        tab3: ['helptab.html', 'mouse'],
     };
+    // What a reader sees: comments and scripts out, then tags, so ids and attributes go
+    // with them.
+    const visibleText = (file)=> read('resources/html/tabs/' + file)
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<(script|style)[\s\S]*?<\/\1>/g, '')
+        .replace(/<[^>]*>/g, ' ');
+    const seen = Object.fromEntries(Object.values(PANELS).map( ([f])=> [f, visibleText(f)] ));
+
     for (const [tab, [file, word]] of Object.entries(PANELS)) {
+        const re = new RegExp(word, 'i');
         const row = rows.find( (r)=> r.includes("openTab('" + tab + "'") );
         assert.ok(row, 'no menu row opens ' + tab + ' any more; check this table');
-        assert.match(row, new RegExp('title="[^"]*' + word + '[^"]*"', 'i'),
-            'the row for ' + tab + ' no longer describes that panel: ' + row.replace(/\s+/g, ' ').slice(0, 70));
-        assert.match(read('resources/html/tabs/' + file), new RegExp(word, 'i'),
-            file + ' never says "' + word + '", so the title above describes something else');
+        const title = row.match(/\stitle="([^"]*)"/);
+        assert.ok(title, 'the row for ' + tab + ' says nothing on hover');
+        assert.match(title[1], re,
+            'the row for ' + tab + ' no longer describes that panel: ' + title[1]);
+        assert.match(seen[file], re,
+            file + ' no longer shows the word "' + word + '", so the title above describes '
+            + 'something the panel does not say');
+
+        for (const [other, [otherFile, otherWord]] of Object.entries(PANELS)) {
+            if (other === tab) continue;
+            assert.doesNotMatch(seen[otherFile], re,
+                '"' + word + '" is in ' + otherFile + ' too, so the titles for ' + tab
+                + ' and ' + other + ' can be swapped and both still pass');
+            assert.doesNotMatch(title[1], new RegExp(otherWord, 'i'),
+                'the title on the row for ' + tab + ' also names the panel ' + other
+                + ' opens, so it reads as a description of that one: ' + title[1]);
+        }
     }
 
     const savenetJs = read('js/interface/dropdown/savenet.js');
@@ -361,4 +438,11 @@ test('every menu row describes what it does, and the heading is not overridden',
         'the back button declares its own name again, which hides the panel it heads');
     assert.match(back, /class="visually-hidden">Back to<\/span>[\s\S]*?id="menuDetailTitle"/,
         'the back button no longer reads as going back, or says so after the panel name');
+    // The span whole, because the line above anchors on `class="..."` and attributes have
+    // no order: `<span aria-hidden="true" class="visually-hidden">Back to</span>` matches
+    // it and takes the words straight back out of the name, leaving "Fractal, button".
+    const span = back.match(/<span[^>]*>Back to<\/span>/);
+    assert.ok(span, 'the "Back to" wrapper is no longer one span; this check reads nothing');
+    assert.doesNotMatch(span[0], /aria-hidden/,
+        'the words "Back to" are hidden from the name they exist to build');
 });
