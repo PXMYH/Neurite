@@ -108,16 +108,21 @@
         </div>
     </div>
 
-    <!-- Bottom-left, the corner furthest from the tools: settings are the thing
-         you reach for least.
+    <!-- Top-left, where a hamburger is looked for. The reasoning for bottom-left was
+         that settings are reached for least, and it stopped holding once Open and
+         Save to became rows of this menu: they are the two controls a graph's
+         survival depends on, and a control you need before you lose something cannot
+         be in the corner you learn last. `styles.css:1148` carries the same note.
 
          `aria-label` as well as the tooltip, because `data-tooltip` is invisible to
          a screen reader where the `title` it replaced was not. Chrome's AX tree had
          this island unnamed the moment the attribute changed.
 
-         The tooltip no longer names notes: that tab has no tablink any more, and a
-         hover that promises one is a hover that lies. -->
-    <div class="menu-button" aria-label="Menu" data-tooltip="Menu: AI, fractal, saves and settings">
+         The tooltip names the commands first, in the order the rows are in. It named
+         only the panels, which was the whole menu when it was a strip of tabs; four
+         commands sit above them now. It does not name notes either: that tab has no
+         tablink any more, and a hover that promises one is a hover that lies. -->
+    <div class="menu-button" aria-label="Menu" data-tooltip="Menu: open, save, screenshot, record, and the AI, fractal and settings panels">
 
         <div class="menu-icon" id="menu-icon"></div>
     </div>

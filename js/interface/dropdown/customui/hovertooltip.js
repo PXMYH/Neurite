@@ -53,9 +53,13 @@ class HoverTooltip {
         const left = Math.min(Math.max(gap, rect.left + (rect.width - box.width) / 2),
                               window.innerWidth - box.width - gap);
 
-        // Below by default: everything in the top island has the whole canvas under
-        // it. Above only when the box would fall off the bottom, which is where the
-        // menu button in the opposite corner puts it.
+        // Below by default: every control that opts in is near the top of the screen
+        // -- the pill at the centre, the menu button at the left -- so each has the
+        // whole canvas under it. Above only when the box would fall off the bottom,
+        // which at these positions needs a viewport shorter than the control's own
+        // offset plus the box. The branch is kept because the menu button was
+        // bottom-left until the file commands moved into it, and either corner is a
+        // layout decision this function should not have an opinion about.
         let top = rect.bottom + gap;
         if (top + box.height > window.innerHeight) top = rect.top - box.height - gap;
 
