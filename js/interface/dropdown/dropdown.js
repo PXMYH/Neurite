@@ -123,14 +123,22 @@ On.click(menuButton, (e)=>{
 
     // If the dropdown is opened, manually set the first tab to active and display its content
     if (dropdownContent.classList.contains("open")) {
-        // Ai, the first tablink. It used to be Notes, which no longer has one; `#tab1`
-        // is still loaded and still holds the editor, but nothing opens it -- issue #65.
+        // Ai, the first tablink, when AI features are on; Fractal, the second, when
+        // they are off. `body.ai-disabled` hides `#tab4` and `#tablink-ai` with
+        // `!important`, so landing on Ai there opens the menu on an empty box -- and
+        // AI features are off until switched on. Notes used to be the landing tab and
+        // was always visible; it has no tablink now -- issue #65.
+        //
+        // A hidden tablink still holds its place in the collection, so the indices are
+        // the ones in the markup either way.
         //
         // The loop that stood here removed a class nobody adds (`active`, where `openTab`
         // writes `activeTab`) and hid `tabcontent[i]` for as many i as there are
         // tablinks -- one short of the tabs, now that one tab has no link. `openTab`
         // hides every `.tabcontent` and clears every `activeTab` itself.
-        openTab('tab4', document.getElementsByClassName('tablink')[0]);
+        const iLanding = AiFeatures.enabled ? 0 : 1;
+        openTab(AiFeatures.enabled ? 'tab4' : 'tab2',
+                document.getElementsByClassName('tablink')[iLanding]);
 
         // If there's any selected text, deselect it
         if (window.getSelection) {

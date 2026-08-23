@@ -100,8 +100,14 @@ test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>
 test('the menu lands on the Ai tab, and nothing opens tab1 by hand', ()=>{
     assert.doesNotMatch(dropdownJs, /openTab\('tab1'/,
         'something still opens a tab with no tablink');
-    assert.match(dropdownJs, /openTab\('tab4', document\.getElementsByClassName\('tablink'\)\[0\]\)/,
-        'the menu does not land on the Ai tab');
+    // The landing tab is conditional, and the condition is not cosmetic: AI features
+    // are off until switched on, and `body.ai-disabled` hides `#tab4` and
+    // `#tablink-ai` with `!important`, so an unconditional land on Ai opens the menu
+    // on a 214x48 empty box. Measured in the browser before this branch was fixed.
+    assert.match(dropdownJs, /AiFeatures\.enabled \? 'tab4' : 'tab2'/,
+        'the menu lands on the same tab whether or not AI features are on');
+    assert.match(dropdownJs, /const iLanding = AiFeatures\.enabled \? 0 : 1;/,
+        'the tablink to mark active is not chosen alongside the tab');
     // Leaving the Ai tab when AI features are switched off. It cannot go to tab4 (the
     // tab being left) and it cannot go to tab1 (no tablink to mark active).
     assert.match(dropdownJs, /openTab\('tab2', document\.getElementsByClassName\('tablink'\)\[1\]\)/,
