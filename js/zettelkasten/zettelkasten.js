@@ -83,6 +83,10 @@ class ZettelkastenProcessor {
     prevNoteInputLines = [];
     wrapPerLine = {};
     wrapPerTitle = {};
+    // Node sections whose refs named a title the pass had not reached yet, keyed
+    // by section title, to retry once the pass has seen every title. See
+    // deferRefTags. Null only while the retry itself runs.
+    deferredRefs = null;
     constructor(codeMirrorInstance, parser){
         this.noteInput = codeMirrorInstance;
         this.parser = parser;
@@ -147,12 +151,15 @@ class ZettelkastenProcessor {
         this.forEachNodeWrap(this.initializeNodeWrap, this);
         this.noteInputLines = this.noteInput.getValue().split('\n');
         let currentNodeTitle = '';
+        this.deferredRefs = new Map();
 
         this.noteInputLines.forEach((line, index) => {
             currentNodeTitle = this.processLine(line, index, currentNodeTitle)
         });
 
         if (!mode.full) this.processChangedNode(this.noteInputLines);
+
+        this.drainDeferredRefs();
 
         this.deleteInactiveNodesFromDict(this.wrapPerTitle);
         this.deleteInactiveNodesFromDict(this.wrapPerLine);
@@ -508,16 +515,42 @@ class ZettelkastenProcessor {
 
         thisNode.edges = Array.from(currentEdges.values());
 
-        // Add new edges for references
+        // Add new edges for references. connectDistance pushes the edge onto both
+        // of its nodes, so thisNode.edges grows from the call itself -- pushing it
+        // again here listed every new edge on this node twice.
+        let unresolved = false;
         references.forEach(reference => {
             const refUUID = wrapPerTitle[reference]?.node?.uuid;
-            if (!refUUID || currentEdges.has(refUUID)) return;
+            if (!refUUID) {
+                unresolved = true;
+                return;
+            }
+            if (currentEdges.has(refUUID)) return;
 
-            const otherNode = wrapPerTitle[reference].node;
-            const newEdge = connectDistance(thisNode, otherNode);
-            thisNode.edges.push(newEdge);
-            currentEdges.set(refUUID, newEdge);
+            currentEdges.set(refUUID, connectDistance(thisNode, wrapPerTitle[reference].node));
         });
+        if (unresolved) this.deferRefTags(references, currentNodeTitle);
+    }
+
+    // A ref can name a node whose section appears further down the text. The pass
+    // walks lines top-down and resolves a ref against the nodes it has made so
+    // far, so a ref pointing forward found nothing and made no edge -- silently,
+    // and for every ref in the section but the ones pointing backwards. Queue the
+    // section instead and retry it after the walk.
+    //
+    // The whole reference set is queued, not just the part that did not resolve:
+    // handleRefTags also removes the edges absent from the set it is given, so a
+    // retry carrying a subset would delete the edges the walk had just made.
+    deferRefTags(references, title){
+        this.deferredRefs?.set(title, references);
+    }
+    // Retry each queued section now that every title in the pass exists. The queue
+    // is null for the duration, so a ref that still resolves to nothing names a
+    // node that is genuinely absent, and is dropped rather than queued again.
+    drainDeferredRefs(){
+        const deferred = this.deferredRefs;
+        this.deferredRefs = null;
+        deferred?.forEach(this.handleRefTags, this);
     }
 
     forEachBracketedReferenceInLine(openingBracket, line, cb, ct){
