@@ -202,6 +202,10 @@ class PageLoad {
         'js/interface/dropdown/customui/displaysavedcoords.js',
         'js/interface/dropdown/customui/customsliders.js',
         'js/interface/dropdown/customui/customtooltip.js',
+        // Binds its listeners to `document`, so it runs before the markup it serves
+        // exists and needs nothing from it. Beside customtooltip.js because the two
+        // are the same idea at different sizes.
+        'js/interface/dropdown/customui/hovertooltip.js',
         'js/interface/dropdown/customui/customdialog.js',
         'js/interface/dropdown/customui/loadingicon.js',
         'js/interface/dropdown/tabs/notestab.js',

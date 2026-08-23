@@ -172,7 +172,7 @@ On.keydown(toolBar, (e)=>{
     item.click();
 });
 
-// 1-4, in the order the tools sit in the pill. The titles name the digit, so
+// 1-4, in the order the tools sit in the pill. The tooltips name the digit, so
 // these have to work.
 const toolShortcuts = {
     '1': 'note-icon',

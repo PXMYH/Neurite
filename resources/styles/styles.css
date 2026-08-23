@@ -1123,11 +1123,12 @@ input[type="text"i].title-input {
         gap: 4px;
     }
 
-    /* Both islands live on the top edge now, and the pill is about 260px wide.
-       Below this width a centred pill reaches back past the 56px the menu button
-       occupies, so it takes a second row instead of overlapping it. Phones and a
-       split-screen iPad are the sizes this covers. */
-    @media (max-width: 420px) {
+    /* Both islands live on the top edge now. The pill measures 310px icon-only and
+       the menu button ends at 56px, so a centred pill clears it down to about 440px
+       of viewport (2 x 64 + 310) and reaches back over it below that -- where it
+       takes a second row instead of overlapping. Phones and a split-screen iPad are
+       the sizes this covers. */
+    @media (max-width: 440px) {
         .tool-bar {
             top: 64px;
         }
@@ -3938,25 +3939,28 @@ code.language-markdown {
    `background-color`, `box-shadow` and `border-radius` would all come from the
    square icon these used to be.
 
-   Labels stay visible. Excalidraw's toolbar can be icon-only because a rectangle
-   and an arrow are legible as shapes; a file tree and an AI note are not, and a
-   nameless icon is exactly what made the note tool hard to find to begin with. */
+   Square and icon-only, like Excalidraw's toolbar. The labels were there because a
+   `title` takes about a second to appear, so an unnamed icon had no answer in the
+   moment you needed one; the tooltip in hovertooltip.js answers instantly, and five
+   spelled-out names were costing 577px of pill -- wider than a phone -- to caption
+   glyphs that read at a glance. */
 .tool-bar .node-add-item,
 .tool-bar .tool-bar-action {
     display: flex;
     align-items: center;
-    gap: 7px;
-    width: auto;
+    justify-content: center;
+    width: 38px;
     height: 38px;
-    padding: 0 10px;
+    padding: 0;
     color: #bbb;
     /* The pill is the surface. One per tool as well made the group read as four
        buttons crammed into a box rather than as one control with four positions. */
     background-color: transparent;
     box-shadow: none;
-    /* `.panel-icon` sets `15%`, which on an element this wide curves to a lozenge. */
+    /* `.panel-icon` sets `15%`, which on a 38px box is 6px -- close enough to the
+       pill's own corner to read as concentric. Named rather than inherited so the
+       tool does not change shape if that percentage moves. */
     border-radius: var(--ui-radius-inner);
-    font-size: 13px;
 }
 
     /* Search is a real <button>, so it arrives with chrome the divs never had and
@@ -3990,6 +3994,49 @@ code.language-markdown {
     .tool-bar .tool-bar-action:focus-visible {
         outline: 2px solid var(--ui-accent);
         outline-offset: -2px;
+    }
+
+/* The chrome's tooltip, from hovertooltip.js: what the tool labels turned into.
+   Excalidraw's `.excalidraw-tooltip` in shape -- a small dark box under the
+   control, never at the cursor -- in this app's colours rather than in black, so it
+   reads as another piece of the chrome floating over the fractal.
+
+   `left` and `top` in px rather than any use of `inset`: `body` carries a
+   `transform` (dropdown.js), which makes it the containing block for a fixed child,
+   and it sits at the document origin of a page that does not scroll, so viewport
+   coordinates still land where they read. Same reason the islands above are sized
+   in viewport units. */
+.ui-tooltip {
+    position: fixed;
+    /* Above the islands at 100 and level with the snippet tooltip, below the modals
+       at 1000: nothing in a modal has one of these. */
+    z-index: 500;
+    display: none;
+    /* Long enough for a sentence, short enough that a phrase does not stretch into
+       a line the eye has to track back across. `balance` because at this width a
+       three-line hint otherwise leaves two words stranded on the last line. */
+    max-width: 38ch;
+    text-wrap: balance;
+    /* Measured before it is placed, so the box must take the width of its text and
+       not of the body it hangs from. */
+    width: max-content;
+    padding: 6px 9px;
+    background: #0c0c12f2;
+    backdrop-filter: blur(6px);
+    border: 1px solid #8882;
+    border-radius: var(--ui-radius-inner);
+    box-shadow: var(--ui-shadow-raised);
+    color: #ddd;
+    font-size: 13px;
+    line-height: 1.45;
+    text-align: center;
+    /* Never a pointer target. A box under the cursor takes the `mouseout` that
+       hides it, which un-hides it, which takes the next one. */
+    pointer-events: none;
+}
+
+    .ui-tooltip.ui-tooltip-visible {
+        display: block;
     }
 
 /* Lives at the foot of the dropdown now, so it takes the dropdown's width instead
