@@ -110,10 +110,23 @@ const CLAIMS = [
      why: 'the How-To checkbox is read nowhere, so ticking it changes nothing'},
 ];
 
+// "Any character" tempered to stop at the row's own end. `[\s\S]*?` is lazy but
+// crosses `</tr>` freely, so `<tr>[\s\S]*?KEYS[\s\S]*?</tr>` began at the table's
+// first row every time -- the Alt+s claim spanned 26 rows and 5KB -- and `claim.says`
+// was then checked against the whole prefix instead of the row. Measured: rewriting
+// the Alt+s row to promise an SVG file, which `mandelbrot.js` contradicts, failed as
+// it should; putting the word PNG back in an earlier row's text passed 113 of 113
+// with the lie still on screen. A comment did it too.
+const IN_ROW = '(?:(?!<\\/tr>)[\\s\\S])*?';
+
 test('every control the reference names is still implemented', ()=>{
     for (const claim of CLAIMS) {
-        const match = help.match(new RegExp('<tr>[\\s\\S]*?' + claim.row.source + '[\\s\\S]*?</tr>'));
+        const match = help.match(new RegExp('<tr>' + IN_ROW + claim.row.source + IN_ROW + '<\\/tr>'));
         assert.ok(match, 'no row matches ' + claim.row + '; this test is stale');
+        // One row, so that a later loosening of the pattern shows up here rather than
+        // as five claims quietly checked against the table around them.
+        assert.doesNotMatch(match[0].slice('<tr>'.length, -'</tr>'.length), /<\/tr>/,
+            claim.row + ' matched more than its own row');
         assert.match(match[0], claim.says, 'the row no longer says what it did');
         assert.match(read(claim.file), claim.code, claim.why);
     }
