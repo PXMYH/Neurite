@@ -8,8 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm install            # once in the primary checkout
 npm start              # http://localhost:8999; linked worktrees reuse the primary dependencies
 npm run start:host     # same, exposed on the LAN
-npm run build          # vite build -> dist/ (+ postbuild copies js/, resources/, wiki/)
+npm run build          # vite build -> dist/ (+ postbuild copies js/, resources/, wiki/ and emits js/**/*.ts)
 npm test               # node --test, auto-discovers test/
+npm run typecheck      # tsc --noEmit over js/ (.ts files are checked, .js files only supply globals)
 node --test test/vec2.test.js   # one file (a bare directory arg is read as a module path and fails)
 ```
 
@@ -30,7 +31,8 @@ Each sub-server gets `npm install` run for it automatically on first start, exce
 (install Playwright there manually). The frontend auto-detects the gateway by polling
 `GET localhost:7070/check` (`Host.checkServer`) and flips the global `useProxy`.
 
-There is no linter and no typechecker, and the test suite is deliberately thin — `node --test` with
+There is no linter. There is a typechecker (`npm run typecheck`) and it only checks the `.ts` files;
+the test suite is deliberately thin — `node --test` with
 no runner dependency. Most verification is still manual in the browser (or via the automation
 server's `GET localhost:8081/screenshot`, which returns a base64 PNG of a Playwright-driven
 instance). `git remote` points at the fork `PXMYH/Neurite`.
@@ -47,6 +49,9 @@ Nothing under `js/` exports anything, so a test cannot import it. There are two 
   often touch the DOM, so the stubs have to exist before the file is parsed into existence; and a
   top-level `class` or `let` is a lexical binding that never lands on the sandbox global, so the
   names you want out have to be exported explicitly.
+- **A `.ts` file needs one transpile hop first** — `ts.transpileModule(src, ...)` from `typescript`,
+  then the same `node:vm` slice (`test/zetsplit.test.js`). `transpileModule` strips types and checks
+  nothing; `npm run typecheck` is what checks.
 
 ## Architecture
 
@@ -71,6 +76,12 @@ Consequences that bite:
   entry in `PageLoad.scripts` (see `bundlecode.js:MODULE`, `imagenode.js:MODULE`, `savenet.js:MODULE`).
   Converting one leaf file at a time this way is welcome; a planned migration of all 81 is not — see
   [`docs/adr/0001`](docs/adr/0001-keep-the-hand-ordered-script-array.md).
+- **A file under `js/` may be TypeScript, and the array entry does not change.** It keeps its `.js`
+  spelling at the same position; Vite's dev server answers `js/x.js` with `x.ts` transpiled, and
+  `postbuild` runs `tsc -p tsconfig.build.json` for the `dist/` copy. A `.ts` file that neither imports
+  nor exports is a *script*, so it shares the one global scope like every other file and reads
+  `Logger`, `Graph`, `tagValues` with nothing declared. `js/zettelkasten/zetsplitter.ts` is the worked
+  example — see [`docs/adr/0002`](docs/adr/0002-typescript-in-the-load-path.md).
 - Vite only ever sees `index.html`, which is why `postbuild` shells out to copy `js/`, `resources/`, and
   `wiki/` into `dist/`. Third-party libs (CodeMirror 5, Prism, marked, DOMPurify, localforage, pdf.js)
   come from CDN `<script>` tags in `index.html`, not from `package.json`.

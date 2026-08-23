@@ -8,7 +8,7 @@ Artifacts for understanding this codebase before changing it.
 | this file | Same map as static text, for reading in a terminal or on GitHub. |
 | [`handoff.md`](handoff.md) | Start here when picking up development with no memory of the last session: what to read, how to run and verify, how issues are picked, what landed recently, and the working rules for this fork. |
 | [`ipad-spike.md`](ipad-spike.md) | Starting evidence for [#6](https://github.com/PXMYH/Neurite/issues/6): what the source already determines about the iPad (touch handler inventory, the two competing pinch paths, 153 fixed-px dimensions, CodeMirror's iOS input path, where the FPS readout is), plus the capture protocol for the parts that need the device. |
-| [`adr/`](adr/) | Decisions that would otherwise get re-proposed. [`0001`](adr/0001-keep-the-hand-ordered-script-array.md) is why `PageLoad.scripts` stays a hand-ordered array. |
+| [`adr/`](adr/) | Decisions that would otherwise get re-proposed. [`0001`](adr/0001-keep-the-hand-ordered-script-array.md) is why `PageLoad.scripts` stays a hand-ordered array; [`0002`](adr/0002-typescript-in-the-load-path.md) is why a file in it may be TypeScript without a bundler, a watch process, or a change to the array. |
 
 ## The one-paragraph version
 
@@ -122,10 +122,16 @@ flowchart LR
   persistence replays `dataset.node_extras` through `Node.Extensions`.
 - **Never hardcode `##` or `[[`.** They are `Tag.node` / `Tag.ref` and the user can change them.
 - **Geometry goes through `vec2`** (`cmult`, `cadd`, `rot`), not plain x/y math.
-- **No linter and no typechecker.** There are 42 tests under `test/`, run with `node --test test/*.test.js`
-  — nothing under `js/` exports, so they read source as text or slice a class into a `node:vm` context.
+- **No linter, one typechecker.** `npm run typecheck` (`tsc --noEmit`) checks the `.ts` files under
+  `js/`; the `.js` files only supply their globals. There are 56 tests under `test/`, run with
+  `node --test test/*.test.js`
+  — nothing under `js/` exports, so they read source as text or slice a class into a `node:vm` context
+  (a `.ts` file goes through `ts.transpileModule` first — `test/zetsplit.test.js`).
   Everything else is verified in the browser at `http://localhost:8999`, or through
   `GET localhost:8081/screenshot` from the automation server.
+- **A file under `js/` may be `.ts`.** Its entry in `PageLoad.scripts` keeps the `.js` spelling and its
+  position; the dev server transpiles on request and `postbuild` emits for `dist/`. See
+  [`adr/0002`](adr/0002-typescript-in-the-load-path.md).
 
 See [`../CLAUDE.md`](../CLAUDE.md) for the same material aimed at coding agents, plus the naming and
 callback conventions used throughout (`Logger.*`, `On.click`, `Html.new.div()`, the `this`-bound static

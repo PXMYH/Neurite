@@ -3,6 +3,10 @@
 - **Status:** accepted
 - **Date:** 2026-08-21
 - **Context issue:** [#18](https://github.com/PXMYH/Neurite/issues/18) (declined)
+- **Amended:** 2026-08-23 by [`0002`](0002-typescript-in-the-load-path.md) — the decision below stands
+  unchanged and `0002` depends on it. One sentence of the reasoning no longer holds: there *is* now a
+  build step for app code, in `postbuild` only, because `js/` may hold `.ts` files. See the note under
+  *Reasons*.
 
 ## Context
 
@@ -54,6 +58,13 @@ right" is the shape that ships a subtle boot-order bug.
 for app code at all; `postbuild` copies `js/` into `dist/` verbatim, and the dev
 loop is edit-then-refresh. A module migration either keeps that and pays 81
 sequential network requests, or replaces it with a bundler and a watch process.
+
+> **Amended 2026-08-23.** Half of that is no longer true, and the half that changed is
+> the cheap half. `js/` may hold TypeScript, so `postbuild` now runs `tsc` for the
+> release copy and no longer copies `js/` purely verbatim. The dev loop is untouched —
+> Vite's dev server answers `js/x.js` with `x.ts` transpiled, so there is still no build
+> step and no watch process between an edit and a refresh, and still no bundler. See
+> [`0002`](0002-typescript-in-the-load-path.md).
 
 **The incremental path is strictly better and needs no plan.** `:MODULE` works
 today. A leaf file converted while it is already open costs nothing extra and

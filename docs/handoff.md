@@ -18,7 +18,10 @@ an issue.
    is an **HTML window** while the Fractal and every Edge are **SVG**. Anything that must draw across
    both, or capture a pointer across both, crosses that split.
 3. **[`adr/0001-keep-the-hand-ordered-script-array.md`](adr/0001-keep-the-hand-ordered-script-array.md)**
-   — why that array stays. Do not propose replacing it with a module graph.
+   — why that array stays. Do not propose replacing it with a module graph. Read
+   [`adr/0002-typescript-in-the-load-path.md`](adr/0002-typescript-in-the-load-path.md) with it: a file
+   under `js/` may be TypeScript, its entry in the array keeps the `.js` spelling and its position, and
+   the dev loop still has no build step.
 
 [`README.md`](README.md) in this folder and [`architecture.html`](architecture.html) beside it are the
 component map. Open the HTML in a browser; it needs no server and no build.
@@ -29,6 +32,7 @@ component map. Open the HTML in a browser; it needs no server and no build.
 npm install        # once in the primary checkout
 npm start          # vite on http://localhost:8999 — strictPort, so a busy port fails loudly
 npm test           # node --test
+npm run typecheck  # tsc --noEmit; checks the .ts files under js/, and nothing else
 ```
 
 The `prestart` lifecycle links a fresh worktree to the primary checkout's dependencies, so this is the
@@ -37,8 +41,11 @@ same command from either checkout and Vite still serves `public/`.
 `http://localhost:8999` is the only URL for local development. If something hands you a different
 port, that is a defect, not a convention.
 
-There is no linter and no typechecker. There are **46 tests in 9 files** under `test/`, and they are
-the only automated check that exists.
+There is no linter. There are two automated checks: **56 tests in 12 files** under `test/`, and
+`npm run typecheck`, which checks the TypeScript files under `js/` — today that is one file. The 81
+`.js` files are in the same program so their globals have types, but they are not themselves checked
+(`checkJs` on them reports 1,917 errors, so it is off; see
+[`adr/0002`](adr/0002-typescript-in-the-load-path.md)).
 
 ```bash
 node --test test/*.test.js      # the whole suite
@@ -47,7 +54,7 @@ node --test test/vec2.test.js   # one file
 
 Use the glob, not the directory: `node --test test/` reads the argument as a module path and fails.
 
-Nothing under `js/` exports anything, so a test cannot import it. Two routes in, both with a worked
+Nothing under `js/` exports anything, so a test cannot import it. Three routes in, each with a worked
 example in `test/`:
 
 - **Read the source as text** when the question is about the code's shape —
@@ -60,6 +67,10 @@ example in `test/`:
   global, so append `;globalThis.exported = TheClass;` to the slice. And an array built **inside** the
   vm carries that realm's `Array` prototype, so it is not `deepStrictEqual` to a plain one — spread it
   first.
+- **Transpile first when the file is TypeScript** — `test/zetsplit.test.js` runs
+  `js/zettelkasten/zetsplitter.ts` through `ts.transpileModule` and then slices it exactly as above.
+  Type annotations are not JavaScript, so a `.ts` file cannot go straight into a vm.
+  `transpileModule` checks nothing; `npm run typecheck` is the check.
 
 **Earn a baseline before you trust a new test.** Revert the fix, run the new tests, and confirm they
 fail. A test that passes against the broken tree measures nothing. Same for a grep-based check: a hit
@@ -88,8 +99,11 @@ Two kinds of issue are open, and they are not interchangeable.
 - [#52 — Every icon comes from Lucide, and the collapse button stops being a bare circle](https://github.com/PXMYH/Neurite/issues/52).
   The recon is already in the body: all 47 sprite ids, where each is consumed, the proposed Lucide name
   for each, which ids are dead, and two defects found while measuring. Do not repeat that survey.
-- [#48 — Move `js/` to TypeScript](https://github.com/PXMYH/Neurite/issues/48). Large, and a
-  prerequisite for porting Excalidraw's TypeScript source directly. Not started.
+- [#48 — Move `js/` to TypeScript](https://github.com/PXMYH/Neurite/issues/48). **Decided and opened,
+  not finished.** [`adr/0002`](adr/0002-typescript-in-the-load-path.md) settles the shape: a `.ts` file
+  is allowed in `js/`, `PageLoad.scripts` does not change, no build step enters the dev loop, and
+  `checkJs` stays off. One leaf file (`js/zettelkasten/zetsplitter.ts`) is converted as the proof.
+  Converting more is opportunistic, one file at a time — do not plan a sweep of the other 81.
 - [#32 is reserved.](https://github.com/PXMYH/Neurite/issues/32) The settings panel. Labelled
   `ready-for-human`. Leave it alone until it is discussed.
 
@@ -115,6 +129,8 @@ that justified it.
 
 | Commit | What changed |
 | --- | --- |
+| `2b25a56` | `js/zettelkasten/zetsplitter.ts` is the first TypeScript file in `js/`, and typing 66 lines found two defects: a condition that tested a function object instead of calling it (so a Ref Tag with no closing half wrote the string `"undefined"` into the Pane), and an unchecked array index. Its entry in `PageLoad.scripts` is unchanged. |
+| `1b4c56f` | A file under `js/` may be TypeScript. The dev server already served `js/x.js` from `x.ts`, so no build step entered the dev loop and the array did not change; `postbuild` gained one `tsc` emit for `dist/`. `npm run typecheck` is the second automated check this repo has. |
 | `f7488e5` | A Ref naming a Node written **lower** in the Pane now builds its Edge. `processInput` walks lines top-down, so a forward Ref used to resolve to nothing and was dropped in silence; a Node with several Refs kept only the ones pointing back up the text. Unresolved sections are queued and retried after the walk. |
 | `dd1efb2` | The Shift + click + click connect gesture works. It existed the whole time and failed on the first pixel of click drift; one shared `Node.dragThreshold` of 10 px now separates a click from a drag. |
 | `919a69f` | Autosave is the only save, mirrored to a file on disk. |
