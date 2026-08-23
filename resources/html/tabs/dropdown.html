@@ -183,30 +183,50 @@
                      `openTab` is unchanged: it shows the panel, and the panel view
                      is what `MainMenu.showDetail` switches to. The `tablink` class
                      stays because `openTab` clears `activeTab` across it, and
-                     `#tablink-ai` is the id `body.ai-disabled` hides. -->
-                <button class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)">
+                     `#tablink-ai` is the id `body.ai-disabled` hides.
+
+                     A `title` each, as the four command rows above have. These five
+                     carried one as chips and lost it becoming rows, so a five-word
+                     column was the only description of what any panel holds. `title`
+                     rather than the `data-tooltip` the pill and the menu button use:
+                     that exists because a name arriving a second late in an OS box
+                     over the canvas reads as an accident, and none of that applies to
+                     a row of a menu already open and already labelled -- while two
+                     hover mechanisms in one list would answer the same gesture two
+                     different ways depending on which row you were over.
+
+                     Each says what the panel holds, read out of the panel. The old
+                     chip titles described a Saves tab that Open… and Save to… have
+                     since left, and a Settings tab that has since gained the node
+                     placement controls. -->
+                <button class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
+                        title="Prompt the AI, choose the model, and hold the API keys.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
                     <span class="menu-row-label">Ai</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button class="menu-row tablink" onclick="openTab('tab2', this)">
+                <button class="menu-row tablink" onclick="openTab('tab2', this)"
+                        title="Adjust how the fractal is drawn, and its colours.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>
                     <span class="menu-row-label">Fractal</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button class="menu-row tablink" onclick="openTab('tab6', this)">
+                <button class="menu-row tablink" onclick="openTab('tab6', this)"
+                        title="Every saved graph, and the coordinates to teleport back to.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-icon"></use></svg>
                     <span class="menu-row-label">Saves</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
                 <!-- Second from the end, before help: settings are read less often
                      than any tab that holds content, and more often than help. -->
-                <button class="menu-row tablink" onclick="openTab('tab5', this)">
+                <button class="menu-row tablink" onclick="openTab('tab5', this)"
+                        title="Input, the Zettelkasten tags, and where a new node lands.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#gear-icon"></use></svg>
                     <span class="menu-row-label">Settings</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button class="menu-row tablink" onclick="openTab('tab3', this)">
+                <button class="menu-row tablink" onclick="openTab('tab3', this)"
+                        title="Every mouse and keyboard control, in one list.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#question-mark"></use></svg>
                     <span class="menu-row-label">Help</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
@@ -215,10 +235,23 @@
 
             <!-- One panel at a time, with the way back at the top of it. The heading
                  is written by `MainMenu.showDetail` from the row's own label, so a
-                 renamed row cannot disagree with the heading it opens. -->
+                 renamed row cannot disagree with the heading it opens.
+
+                 The name is built out of the button's own contents, not declared. An
+                 `aria-label="Back to the menu"` here overrode the subtree it labels,
+                 and this subtree is the only place the open panel is named: a screen
+                 reader was read "Back to the menu, button" over a panel of fractal
+                 sliders with nothing anywhere saying Fractal. A hidden "Back to" in
+                 front of the heading makes the name "Back to Fractal" and tracks
+                 whatever `showDetail` writes.
+
+                 Not a heading role on the title: it is inside a button, where a
+                 heading is not exposed. The button's name is what carries the panel
+                 name, which is what a reader landing here by keyboard is read. -->
             <div class="menu-detail" id="menuDetail">
-                <button type="button" class="menu-back" id="menuBackButton" aria-label="Back to the menu">
+                <button type="button" class="menu-back" id="menuBackButton">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#caret-left-icon"></use></svg>
+                    <span class="visually-hidden">Back to</span>
                     <span class="menu-row-label" id="menuDetailTitle">Menu</span>
                 </button>
 

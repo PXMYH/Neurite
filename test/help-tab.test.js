@@ -192,11 +192,27 @@ test('the four commands are rows of the menu, once each, with their labels intac
         'a panel row sits above the separator, among the commands');
 
     // Open's file input has to stay rendered for Safari to open a dialog for it, so it
-    // cannot live in `.menu-list`, which is `display: none` while a panel is open.
+    // cannot live in either view: `.menu-list` and `.menu-detail` take turns at
+    // `display: none`, so a box in one of them is unrendered half the time.
+    //
+    // Past the end of the detail view, not merely past the end of the list. Being after
+    // `</nav>` was all that was asserted, and `.menu-detail` opens immediately after that
+    // nav -- so moving the input inside it kept both of the old checks green while
+    // putting it back in a container that is `display: none` whenever the list is up.
+    // The close is found by counting divs rather than by matching the next `</div>`,
+    // which belongs to a tab placeholder six levels in.
     const iList = menu.indexOf('class="menu-list"');
     const iInput = menu.indexOf('id="open-file-input"');
-    assert.ok(iInput > menu.indexOf('</nav>'),
-        'the file input is inside the list, which is display:none while a panel is open');
+    const iDetail = menu.indexOf('id="menuDetail"');
+    assert.ok(iDetail > 0, 'the detail view is gone from the menu');
+    let depth = 0, iEndOfDetail = -1;
+    for (const m of menu.slice(iDetail).matchAll(/<div\b|<\/div>/g)) {
+        depth += m[0] === '</div>' ? -1 : 1;
+        if (depth === 0) { iEndOfDetail = iDetail + m.index + m[0].length; break }
+    }
+    assert.ok(iEndOfDetail > iDetail, 'the detail view never closes; this test is stale');
+    assert.ok(iInput > iEndOfDetail,
+        'the file input is inside a view that is display:none half the time');
     assert.ok(iInput > iList, 'the file input is gone from the menu');
 
     const record = read('js/interface/dropdown/customui/record/record.js');

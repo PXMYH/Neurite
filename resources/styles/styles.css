@@ -1220,7 +1220,23 @@ input[type="text"i].title-input {
    the same way it arrived. It is hidden by transform and never by `display`, which
    is load-bearing: the panel holds two CodeMirror editors, and CodeMirror measures
    itself when it is constructed -- in a `display: none` container it comes up with
-   zero dimensions and stays that way. */
+   zero dimensions and stays that way.
+
+   `visibility` is the third state between those two, and it is why the transform is
+   not hiding this on its own. A transformed box is still a rendered box, so every
+   control in the closed menu stayed in the sequential focus order: from a fresh
+   load, seven Tabs reached Open... at y = -354 and Space opened a file dialog for a
+   button nowhere on screen, nine reached Screenshot, and ten started a screen
+   recording with no visible control to stop it. `visibility: hidden` takes the
+   subtree out of the focus order -- Tab and `.focus()` both -- while leaving the box
+   laid out, so CodeMirror still measures a real width and the reason above still
+   holds. `.visually-hidden` sets no `visibility` of its own, so `#open-file-input`
+   inherits this and stops being a stop too; Safari still opens its dialog, because
+   that only ever happens with the menu open.
+
+   In the transition because visibility interpolates discretely and keeps the
+   `visible` end for the whole run: it turns on as the panel starts sliding in and
+   off only once it has finished sliding out, so neither direction is clipped. */
 .dropdown-content {
     position: absolute;
     /* Clears the 40px button plus a gap the width of the screen gutter. */
@@ -1259,11 +1275,13 @@ input[type="text"i].title-input {
     /* Its own height plus the gutter it sits in, so it clears the top edge
        whatever the open tab makes it measure. */
     transform: translateY(calc(-100% - 88px));
-    transition: transform 0.3s ease;
+    visibility: hidden;
+    transition: transform 0.3s ease, visibility 0.3s ease;
 }
 
     .dropdown-content.open {
         transform: translateY(0);
+        visibility: visible;
     }
 
         .submenu {

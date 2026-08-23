@@ -22,6 +22,18 @@ const NOTES = 'resources/html/tabs/notestab.html';
 const AI = 'resources/html/tabs/aitab.html';
 const dropdownHtml = read('resources/html/tabs/dropdown.html');
 const dropdownJs = read('js/interface/dropdown/dropdown.js');
+const css = read('resources/styles/styles.css');
+
+// The two view switchers, each sliced out at its definition. Anchored on the newline and
+// the four-space indent of the object literal, not on the bare name: `showList` appears at
+// three call sites as well, and `indexOf('showList(')` would read whichever came first.
+// Ending the second slice at a brace in column 0 works because `showDetail` is last.
+const iShowList = dropdownJs.indexOf('\n    showList(');
+const iShowDetail = dropdownJs.indexOf('\n    showDetail(');
+const listBody = dropdownJs.slice(iShowList, iShowDetail);
+const detailBody = dropdownJs.slice(iShowDetail, dropdownJs.indexOf('\n}', iShowDetail));
+const assertViewsFound = ()=> assert.ok(iShowList > 0 && iShowDetail > iShowList,
+    'the two menu views are no longer showList then showDetail; this test reads nothing');
 
 // Every menu row, as [tabId, label] in DOM order. The label is the text of the row's
 // own `.menu-row-label`, which is also what `MainMenu.showDetail` copies into the
@@ -101,7 +113,6 @@ test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>
     // 113 -- including this assertion, whose message says the prompt is no longer
     // hidden. `!important` is load-bearing too: `openTab` writes `display: block`
     // inline on the panel it opens, and without the flag that inline value wins.
-    const css = read('resources/styles/styles.css');
     const iRule = css.indexOf('body.ai-disabled #tablink-ai,');
     assert.notEqual(iRule, -1, 'the AI-off rule no longer starts at #tablink-ai');
     const rule = css.slice(iRule, css.indexOf('}', iRule));
@@ -112,6 +123,30 @@ test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>
     }
     assert.match(rule, /display:\s*none\s*!important/,
         'the AI-off rule names every AI surface and then hides none of them');
+});
+
+test('the closed menu is out of the keyboard\'s reach, not merely off screen', ()=>{
+    // A transformed box is still a rendered box, so translating the panel off screen left
+    // every control in it focusable. Measured with real Tab presses on a fresh load, menu
+    // closed: stop 7 was `#open-file-button` at y = -354, where Space opens a file
+    // dialog; stop 9 was Screenshot; stop 10 was Record, which starts a screen recording
+    // with no visible control to stop it. `#open-file-input` was reachable too.
+    //
+    // `visibility` is the fix and `display` is not: the panel holds the function-calling
+    // console, whose CodeMirror measures itself at construction and never recovers a zero
+    // width. `visibility: hidden` drops the subtree from the focus order and keeps the
+    // box, so both hold at once -- verified after the fix: all four unfocusable while
+    // closed, `#neurite-function-cm` still 302x320, and all nine rows 286x34 when open.
+    const closed = css.slice(css.indexOf('.dropdown-content {'), css.indexOf('}', css.indexOf('.dropdown-content {')));
+    assert.match(closed, /visibility:\s*hidden/,
+        'the closed menu is only translated away, so its commands still take Tab and Space');
+    assert.doesNotMatch(closed, /display:\s*none/,
+        'display:none gives the function console a zero-width CodeMirror it never recovers from');
+
+    const iOpen = css.indexOf('.dropdown-content.open {');
+    assert.notEqual(iOpen, -1, 'the open state of the menu is gone');
+    assert.match(css.slice(iOpen, css.indexOf('}', iOpen)), /visibility:\s*visible/,
+        'the menu opens without restoring visibility, so it can never be reached at all');
 });
 
 test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
@@ -137,7 +172,14 @@ test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
     assert.ok(iEndOfHandler > 0, 'the menu-open handler was not found');
     assert.doesNotMatch(onOpen.slice(0, iEndOfHandler), /openTab\(/,
         'opening the menu opens a panel again; a hidden one leaves the menu empty');
-    assert.match(dropdownJs, /if \(dropdownContent\.classList\.contains\("open"\)\) \{[\s\S]*?MainMenu\.showList\(\)/,
+    // The same slice as the assertion above, and for the same reason. Anchoring on the
+    // `if` and reaching forward with `[\s\S]*?` looks bounded and is not: lazy stops at
+    // the first match, but nothing stops it leaving the handler, so deleting this very
+    // call let the pattern run 80 lines on to the `MainMenu.showList()` in the
+    // AI-features handler and pass. Measured: with the call gone -- the defect this line
+    // names -- 4 of 4 tests passed. Worse, the assertion 5 lines below pins that other
+    // call by name, so one call satisfied both and either could vanish unnoticed.
+    assert.match(onOpen.slice(0, iEndOfHandler), /MainMenu\.showList\(\)/,
         'opening the menu does not go to the list');
 
     // Leaving the Ai panel when AI features are switched off. Back to the list: every
@@ -150,8 +192,18 @@ test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
     // every row would look dead; and the heading has to come from the row itself.
     assert.match(dropdownJs, /MainMenu\.showDetail\(element\)/,
         'openTab shows a panel without switching to the panel view');
-    assert.match(dropdownJs, /classList\.remove\('detail-open'\)/, 'showList shows no list');
-    assert.match(dropdownJs, /classList\.add\('detail-open'\)/, 'showDetail shows no panel');
+    // Each call inside the function that should hold it, and the other call ruled out of
+    // it. Both were bare presence checks against the whole file, which two lines 6 apart
+    // satisfy in either arrangement: swapping the bodies, so that showList opens a panel
+    // and showDetail closes one, left every row of the menu doing the opposite of its
+    // name and both assertions green.
+    assertViewsFound();
+    assert.match(listBody, /classList\.remove\('detail-open'\)/, 'showList shows no list');
+    assert.doesNotMatch(listBody, /classList\.add\('detail-open'\)/,
+        'showList opens a panel instead of closing one');
+    assert.match(detailBody, /classList\.add\('detail-open'\)/, 'showDetail shows no panel');
+    assert.doesNotMatch(detailBody, /classList\.remove\('detail-open'\)/,
+        'showDetail closes the panel it just opened');
     assert.match(dropdownJs, /On\.click\(Elem\.byId\('menuBackButton'\), MainMenu\.showList\)/,
         'the back button is not bound, so the panel view has no way out');
     for (const id of ['menuList', 'menuDetail', 'menuBackButton', 'menuDetailTitle']) {
@@ -174,4 +226,69 @@ test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
         'a loop pairs tab divs with tablinks by index again; the counts differ');
     assert.doesNotMatch(code, /classList\.remove\("active"\)/,
         'a loop clears a class nothing adds');
+});
+
+test('switching menu view carries focus with it, rather than dropping it on the document', ()=>{
+    // The control that switches the view is inside the view that goes `display: none`,
+    // and the browser resets focus to `<body>` when that happens. Measured two frames
+    // after the click, because the reset is not synchronous and a same-tick read still
+    // names the button: clicking a row left focus on BODY, and so did clicking Back --
+    // from where the panel that had just opened was seven Tabs away, at the top of the
+    // document, past the whole tool bar.
+    assertViewsFound();
+
+    assert.match(detailBody, /Elem\.byId\('menuBackButton'\)\.focus\(\)/,
+        'opening a panel leaves focus on a row that is now display:none, so it falls to <body>');
+
+    // Back goes to the row `openTab` marked, not to the top of the column: the reader
+    // returns to the row they left. This is the only thing that reads `activeTab` for
+    // that, which is what the note above `.tablink.activeTab` in styles.css claims.
+    assert.match(listBody, /querySelector\('\.menu-row\.activeTab'\)/,
+        'going back does not return focus to the row whose panel was open');
+    assert.match(listBody, /\.focus\(\)/, 'going back moves focus nowhere');
+
+    // And not for the two callers that pass no event. Without the guard, opening the
+    // menu pulls focus off the menu button on every click, and switching AI features off
+    // pulls it off the checkbox that did it -- a checkbox outside the menu entirely.
+    assert.match(listBody, /if \(!e\) return/,
+        'showList moves focus even when no click brought it there, so opening the menu steals it');
+});
+
+test('every menu row describes what it does, and the heading is not overridden', ()=>{
+    // The five panel rows carried a `title` as chips and got nothing in exchange when
+    // they became rows, leaving one or two words as the whole description of a panel --
+    // while the four command rows directly above them kept theirs. So this reads all
+    // nine: a hover that works on four rows out of nine is the shape the gap had.
+    const iList = dropdownHtml.indexOf('class="menu-list"');
+    const iDetail = dropdownHtml.indexOf('id="menuDetail"');
+    assert.ok(iList > 0 && iDetail > iList, 'the list and the panel are no longer in that order');
+    const rows = [...dropdownHtml.slice(iList, iDetail)
+        .matchAll(/<button[^>]*class="menu-row[^"]*"[^>]*>/g)].map( (m)=> m[0] );
+    assert.equal(rows.length, 9, 'the menu no longer has nine rows; check what this is reading');
+
+    for (const row of rows) {
+        // Save to… is the one exception, and it is written at runtime: what that row
+        // does depends on whether the browser can hold a file open.
+        if (row.includes('id="disk-file-button"')) continue;
+        assert.match(row, /\stitle="[^"]{16,}"/,
+            'a menu row says nothing on hover: ' + row.replace(/\s+/g, ' ').slice(0, 70));
+    }
+    const savenetJs = read('js/interface/dropdown/savenet.js');
+    const iUpdate = savenetJs.indexOf('#updateDiskFileButton = ()=>{');
+    assert.ok(iUpdate > 0, 'nothing updates the Save to… row any more; check this test');
+    assert.match(savenetJs.slice(iUpdate, savenetJs.indexOf('\n    }', iUpdate)), /btn\.title = /,
+        'nothing writes the Save to… title, so that row says nothing on hover either');
+
+    // The back button takes its name from its own contents, so the name carries the open
+    // panel's. An `aria-label` here overrode that subtree, and the subtree is the only
+    // place the panel is ever named: a screen reader was read "Back to the menu, button"
+    // over a panel of fractal sliders, with nothing anywhere saying Fractal.
+    const iBack = dropdownHtml.indexOf('id="menuBackButton"');
+    assert.ok(iBack > 0, 'the back button is gone');
+    const back = dropdownHtml.slice(dropdownHtml.lastIndexOf('<button', iBack),
+                                   dropdownHtml.indexOf('</button>', iBack));
+    assert.doesNotMatch(back, /aria-label=/,
+        'the back button declares its own name again, which hides the panel it heads');
+    assert.match(back, /class="visually-hidden">Back to<\/span>[\s\S]*?id="menuDetailTitle"/,
+        'the back button no longer reads as going back, or says so after the panel name');
 });

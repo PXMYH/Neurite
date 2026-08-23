@@ -88,8 +88,26 @@ const MainMenu = {
     div: document.querySelector('.menu-panel'),
     divTitle: Elem.byId('menuDetailTitle'),
 
-    showList(){
+    // Focus follows the view, or switching view throws focus away: the control that
+    // switched it is inside the view that just became `display: none`, so the browser
+    // resets focus to `<body>` and what opened is then seven Tabs away, back at the
+    // top of the document. Measured two frames after the click, because the reset is
+    // not synchronous and a same-tick read still names the old button: clicking a row
+    // left focus on BODY, and so did clicking Back.
+    //
+    // Only when a click or a key brought us here. `showList` is the Back button's
+    // handler and so is handed the event, while both other callers pass nothing: the
+    // menu-open path, where taking focus off the menu button on every click would be
+    // wrong, and the AI-features toggle, where focus is on a checkbox outside the
+    // menu that is not going anywhere. The row to return to is the one `openTab`
+    // marked -- what the `activeTab` note in `styles.css` is for -- and the first row
+    // instead on the first open, when no panel has been opened yet.
+    showList(e){
         MainMenu.div.classList.remove('detail-open');
+        if (!e) return;
+        const row = MainMenu.div.querySelector('.menu-row.activeTab')
+                 ?? MainMenu.div.querySelector('.menu-row');
+        row?.focus();
     },
 
     // The heading is the row's own label, so a row and the panel it opens cannot
@@ -98,6 +116,9 @@ const MainMenu = {
         const label = row && row.querySelector('.menu-row-label');
         if (label) MainMenu.divTitle.textContent = label.textContent;
         MainMenu.div.classList.add('detail-open');
+        // The way back, which is also the panel's heading, so a reader arriving by
+        // keyboard is told which panel opened and Tab carries on into its contents.
+        Elem.byId('menuBackButton').focus();
     }
 }
 

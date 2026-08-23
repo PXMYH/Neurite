@@ -88,7 +88,14 @@ test('a help block is hidden from the page but not from the accessibility tree',
     }
 
     const css = read('resources/styles/styles.css');
-    const rule = css.slice(css.indexOf('.visually-hidden'), css.indexOf('}', css.indexOf('.visually-hidden')));
+    // The rule, found by its opening brace. Anchored on the bare class name, this took
+    // the first *mention* anywhere in the file -- and a comment 130 lines above the rule
+    // now names the class, explaining that `#open-file-input` inherits the menu's
+    // `visibility` because this sets none. The slice became that comment, and all four
+    // assertions below read a paragraph of English for CSS declarations.
+    const iRule = css.indexOf('.visually-hidden {');
+    assert.notEqual(iRule, -1, 'the .visually-hidden rule is gone; this test is stale');
+    const rule = css.slice(iRule, css.indexOf('}', iRule));
     assert.match(rule, /clip-path:\s*inset\(50%\)/, '.visually-hidden no longer clips its content');
     assert.doesNotMatch(rule, /display:\s*none/, '.visually-hidden now hides from screen readers too');
 
@@ -97,7 +104,11 @@ test('a help block is hidden from the page but not from the accessibility tree',
     // block for. These four sit in a collapsed panel that is not positioned, so
     // without an offset their boxes escaped its clip and the Fractal panel scrolled
     // 206px of nothing. Measured in the browser: 206 before, 0 after.
+    // Both offsets. `top` alone was asserted, and `left` is the one that stops the box
+    // sitting at its static x: dropping it inflates the panel's width rather than its
+    // height, which the scroll assertion above measures in the wrong axis to catch.
     assert.match(rule, /top:\s*0/, '.visually-hidden sits at its static position again, which a collapsed panel does not clip');
+    assert.match(rule, /left:\s*0/, '.visually-hidden keeps its static x, which widens the panel instead of scrolling it');
 });
 
 test('the help text states the range the control actually accepts', ()=>{
