@@ -1,15 +1,34 @@
+// The first file in js/ written in TypeScript. See
+// docs/adr/0002-typescript-in-the-load-path.md for why the language changed and why
+// nothing about the load path did: the entry in PageLoad.scripts still reads
+// 'js/zettelkasten/zetsplitter.js', at the same position it always held.
+//
+// ZetSplit cuts one run of prose into Node Sections a Pane can hold: a Title line
+// built from the first few words, then the prose, optionally with a Ref to the
+// section before and after so the Nodes arrive already connected.
+
+// Nothing is imported and nothing is declared: `tagValues`, `getClosingBracket` and
+// `checkBracketsMap` come from js/globals.js, which loads first. A TypeScript file
+// with no import and no export is a *script*, and scripts share one global scope --
+// the same arrangement PageLoad.scripts builds at runtime -- so the types cross the
+// file boundary even though nothing else does.
+
 class ZetSplit {
-    constructor(maxSentencesPerNote = 5, maxCharsPerNote = 500, connectNotes = false) {
+    maxSentencesPerNote: number;
+    maxCharsPerNote: number;
+    connectNotes: boolean;
+
+    constructor(maxSentencesPerNote: number = 5, maxCharsPerNote: number = 500, connectNotes: boolean = false){
         this.maxSentencesPerNote = maxSentencesPerNote;
         this.maxCharsPerNote = maxCharsPerNote;
         this.connectNotes = connectNotes;
     }
 
-    splitText(text) {
-        let sections = [];
+    splitText(text: string): string[] {
+        const sections: string[] = [];
         const paragraphs = text.split(/\n\n+/);
 
-        paragraphs.forEach(paragraph => {
+        paragraphs.forEach( (paragraph)=>{
             const sentences = paragraph.match(/[^.!?]+[.!?]/g) || [paragraph];
             if (sentences.length > this.maxSentencesPerNote) {
                 this._processLongParagraph(sentences, sections);
@@ -21,9 +40,9 @@ class ZetSplit {
         return this._formatSections(sections);
     }
 
-    _processLongParagraph(sentences, sections) {
+    _processLongParagraph(sentences: string[], sections: string[]): void {
         let currentChunk = '';
-        sentences.forEach(sentence => {
+        sentences.forEach( (sentence)=>{
             if (currentChunk.length + sentence.length > this.maxCharsPerNote) {
                 sections.push(currentChunk.trim());
                 currentChunk = sentence;
@@ -36,30 +55,37 @@ class ZetSplit {
         }
     }
 
-    _formatSections(sections) {
-        const formattedSections = sections.map((section, index) => {
-            const titleWords = section.split(/\s+/).slice(0, 4).join(' ');
+    // A Ref is written with the reader's own Ref Tag, and closed only when that tag is
+    // one half of a bracket pair. `checkBracketsMap` is the question, so it has to be
+    // called: the two call sites here read `checkBracketsMap ?`, which is a function
+    // object and therefore always truthy, so a Ref Tag with no closing half used to
+    // append the string "undefined" to the text. TypeScript reports that as TS2774 --
+    // it is the first defect the conversion found, and test/zetsplit.test.js pins it.
+    #ref(title: string): string {
+        if (!checkBracketsMap()) return tagValues.refTag + title;
+
+        return tagValues.refTag + title + getClosingBracket(tagValues.refTag);
+    }
+
+    static #titleOf(section: string): string {
+        return section.split(/\s+/).slice(0, 4).join(' ');
+    }
+
+    _formatSections(sections: string[]): string[] {
+        return sections.map( (section, index)=>{
+            const titleWords = ZetSplit.#titleOf(section);
             const title = titleWords.length > 4 ? titleWords : section.slice(0, 30);
             let formattedSection = `${tagValues.nodeTag} ${title}\n${section}`;
 
             if (this.connectNotes) {
-                if (index > 0) {
-                    const prevTitle = sections[index - 1].split(/\s+/).slice(0, 4).join(' ');
-                    const prevConnectionFormat = checkBracketsMap ? `${tagValues.refTag}${prevTitle}${getClosingBracket(tagValues.refTag)}` : `${tagValues.refTag}${prevTitle}`;
-                    formattedSection += `\n\n${prevConnectionFormat}`;
-                }
-
-                if (index < sections.length - 1) {
-                    const nextTitle = sections[index + 1].split(/\s+/).slice(0, 4).join(' ');
-                    const nextConnectionFormat = checkBracketsMap ? `${tagValues.refTag}${nextTitle}${getClosingBracket(tagValues.refTag)}` : `${tagValues.refTag}${nextTitle}`;
-                    formattedSection += `\n\n${nextConnectionFormat}`;
-                }
+                const prev = sections[index - 1];
+                const next = sections[index + 1];
+                if (prev !== undefined) formattedSection += '\n\n' + this.#ref(ZetSplit.#titleOf(prev));
+                if (next !== undefined) formattedSection += '\n\n' + this.#ref(ZetSplit.#titleOf(next));
             }
 
             return formattedSection;
         });
-
-        return formattedSections;
     }
 }
 
