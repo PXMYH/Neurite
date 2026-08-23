@@ -136,7 +136,22 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
     // console, whose CodeMirror measures itself at construction and never recovers a zero
     // width. `visibility: hidden` drops the subtree from the focus order and keeps the
     // box, so both hold at once -- verified after the fix: all four unfocusable while
-    // closed, `#neurite-function-cm` still 302x320, and all nine rows 286x34 when open.
+    // closed, all nine rows 286x34 when open, and the console's `div.CodeMirror` still
+    // 302x320 with the menu closed. That element and not `#neurite-function-cm`, which
+    // an earlier note named: that is the textarea CodeMirror hides behind itself, and it
+    // is `display: none` and 0x0 whether this works or not.
+    //
+    // Rule counts, not just the first rule's contents. This reads one rule out of the
+    // middle of a 4,000-line stylesheet, and the cascade is the part source text cannot
+    // see: appending `.dropdown-content { visibility: visible; }` at the end of the file
+    // puts every control in the closed menu back in the focus order, at equal
+    // specificity and later, and leaves the two assertions below matching the rule up
+    // here. Same for the open state, where a second rule could take `visibility` away.
+    assert.equal((css.match(/^\.dropdown-content \{/gm) || []).length, 1,
+        'a second .dropdown-content rule can override the visibility this test is reading');
+    assert.equal((css.match(/\.dropdown-content\.open \{/g) || []).length, 1,
+        'a second .dropdown-content.open rule can override the visibility this test is reading');
+
     const closed = css.slice(css.indexOf('.dropdown-content {'), css.indexOf('}', css.indexOf('.dropdown-content {')));
     assert.match(closed, /visibility:\s*hidden/,
         'the closed menu is only translated away, so its commands still take Tab and Space');
@@ -145,8 +160,14 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
 
     const iOpen = css.indexOf('.dropdown-content.open {');
     assert.notEqual(iOpen, -1, 'the open state of the menu is gone');
-    assert.match(css.slice(iOpen, css.indexOf('}', iOpen)), /visibility:\s*visible/,
+    const open = css.slice(iOpen, css.indexOf('}', iOpen));
+    assert.match(open, /visibility:\s*visible/,
         'the menu opens without restoring visibility, so it can never be reached at all');
+    // The open state as well as the closed one. `display: none` here is the same zero-width
+    // console, and it reaches it by the state a reader is least likely to check: the menu
+    // that works is the closed one.
+    assert.doesNotMatch(open, /display:\s*none/,
+        'the open menu is display:none, which is where the zero-width console comes from');
 });
 
 test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
@@ -235,6 +256,13 @@ test('switching menu view carries focus with it, rather than dropping it on the 
     // names the button: clicking a row left focus on BODY, and so did clicking Back --
     // from where the panel that had just opened was seven Tabs away, at the top of the
     // document, past the whole tool bar.
+    //
+    // Measure it with real clicks and a frame in between, or the probe fails on its own.
+    // Opening the menu and clicking a row in one tick leaves focus on BODY even with the
+    // fix in: the panel is still `visibility: hidden` at that instant, and `.focus()` on
+    // a hidden element does nothing. A frame later the same click focuses the back
+    // button, which is every path a hand can take -- `openTab` only runs from a row, and
+    // a row can only be clicked once the menu is on screen.
     assertViewsFound();
 
     assert.match(detailBody, /Elem\.byId\('menuBackButton'\)\.focus\(\)/,
@@ -246,12 +274,29 @@ test('switching menu view carries focus with it, rather than dropping it on the 
     assert.match(listBody, /querySelector\('\.menu-row\.activeTab'\)/,
         'going back does not return focus to the row whose panel was open');
     assert.match(listBody, /\.focus\(\)/, 'going back moves focus nowhere');
+    // And that one row only. A `?? querySelector('.menu-row')` fallback read here for a
+    // first open, which cannot happen -- every route into the panel view runs `openTab`
+    // and `openTab` writes `activeTab` -- and resolved to `#open-file-button`, where
+    // Space opens a file dialog. Counting the reads is what keeps a second one out:
+    // `??` swapped for `||`, or the operands swapped, would leave both matches above green.
+    assert.equal((listBody.match(/querySelector/g) || []).length, 1,
+        'showList looks for a second row to focus; the only one it may focus is activeTab');
 
     // And not for the two callers that pass no event. Without the guard, opening the
     // menu pulls focus off the menu button on every click, and switching AI features off
     // pulls it off the checkbox that did it -- a checkbox outside the menu entirely.
-    assert.match(listBody, /if \(!e\) return/,
+    const iGuard = listBody.indexOf('if (!e) return');
+    assert.notEqual(iGuard, -1,
         'showList moves focus even when no click brought it there, so opening the menu steals it');
+
+    // Order, because the guard returning early is only safe once the view has switched.
+    // Moving the guard above the class removal is a two-line edit that leaves both
+    // assertions above matching, and it stops the menu-open path closing the panel view:
+    // the menu then reopens showing the last panel, and with AI features off that panel
+    // is hidden and the menu is an empty box -- the bug this file is named for. Measured:
+    // with the two lines swapped, 116 of 116 passed.
+    assert.ok(listBody.indexOf("classList.remove('detail-open')") < iGuard,
+        'showList returns before it closes the panel view, so opening the menu keeps showing a panel');
 });
 
 test('every menu row describes what it does, and the heading is not overridden', ()=>{
@@ -273,6 +318,27 @@ test('every menu row describes what it does, and the heading is not overridden',
         assert.match(row, /\stitle="[^"]{16,}"/,
             'a menu row says nothing on hover: ' + row.replace(/\s+/g, ' ').slice(0, 70));
     }
+    // Each panel row's title tied to the panel it opens, not merely to being long
+    // enough. Length alone is satisfied by any five sentences in any order: swapping the
+    // Settings and Help titles left every row describing a different panel from the one
+    // it opens, and 116 of 116 passed. The word is read back out of the panel's own
+    // markup as well, so a title cannot be pinned to a word the panel does not use.
+    const PANELS = {
+        tab4: ['aitab.html', 'API'],
+        tab2: ['fractaltab.html', 'fractal'],
+        tab6: ['networkstab.html', 'coordinates'],
+        tab5: ['settingstab.html', 'Zettelkasten'],
+        tab3: ['helptab.html', 'control'],
+    };
+    for (const [tab, [file, word]] of Object.entries(PANELS)) {
+        const row = rows.find( (r)=> r.includes("openTab('" + tab + "'") );
+        assert.ok(row, 'no menu row opens ' + tab + ' any more; check this table');
+        assert.match(row, new RegExp('title="[^"]*' + word + '[^"]*"', 'i'),
+            'the row for ' + tab + ' no longer describes that panel: ' + row.replace(/\s+/g, ' ').slice(0, 70));
+        assert.match(read('resources/html/tabs/' + file), new RegExp(word, 'i'),
+            file + ' never says "' + word + '", so the title above describes something else');
+    }
+
     const savenetJs = read('js/interface/dropdown/savenet.js');
     const iUpdate = savenetJs.indexOf('#updateDiskFileButton = ()=>{');
     assert.ok(iUpdate > 0, 'nothing updates the Save to… row any more; check this test');
@@ -287,7 +353,11 @@ test('every menu row describes what it does, and the heading is not overridden',
     assert.ok(iBack > 0, 'the back button is gone');
     const back = dropdownHtml.slice(dropdownHtml.lastIndexOf('<button', iBack),
                                    dropdownHtml.indexOf('</button>', iBack));
-    assert.doesNotMatch(back, /aria-label=/,
+    // Both attributes: `aria-labelledby="menuDetailTitle"` overrides the subtree exactly
+    // as `aria-label` did, points at the title, and so silently drops the "Back to" the
+    // line below is checking for -- with the name still reading "Fractal", which looks
+    // right until the reader tries to work out what the button does.
+    assert.doesNotMatch(back, /aria-label(ledby)?=/,
         'the back button declares its own name again, which hides the panel it heads');
     assert.match(back, /class="visually-hidden">Back to<\/span>[\s\S]*?id="menuDetailTitle"/,
         'the back button no longer reads as going back, or says so after the panel name');

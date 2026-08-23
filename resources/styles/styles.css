@@ -1218,9 +1218,18 @@ input[type="text"i].title-input {
 
 /* Drops out of the menu button, so it is anchored to the same corner and leaves
    the same way it arrived. It is hidden by transform and never by `display`, which
-   is load-bearing: the panel holds two CodeMirror editors, and CodeMirror measures
-   itself when it is constructed -- in a `display: none` container it comes up with
-   zero dimensions and stays that way.
+   is load-bearing: the panel holds the function-calling console, and CodeMirror
+   measures itself when it is constructed -- in a `display: none` container it comes
+   up with zero dimensions and stays that way.
+
+   The element to measure is `div.CodeMirror` inside `div.function-codemirror-container`.
+   It reads 302x320 with the menu closed and 330x320 with the Ai panel open, which is
+   the whole reason for the paragraph below. Not `#neurite-function-cm`, which is the
+   backing textarea CodeMirror always hides: that is `display: none` and 0x0 in every
+   state, so it cannot tell the working case from the broken one. The proof that the
+   broken case is real is one element away -- the editor in `#zet-pane-1` measures 0x0
+   here too, because `#tab1` has no menu row, so `openTab` never shows it and it is
+   still `display: none` (issue #65).
 
    `visibility` is the third state between those two, and it is why the transform is
    not hiding this on its own. A transformed box is still a rendered box, so every
@@ -1236,7 +1245,11 @@ input[type="text"i].title-input {
 
    In the transition because visibility interpolates discretely and keeps the
    `visible` end for the whole run: it turns on as the panel starts sliding in and
-   off only once it has finished sliding out, so neither direction is clipped. */
+   off only once it has finished sliding out, so neither direction is clipped. The
+   cost is that the closing panel stays keyboard-reachable for the 0.3s it takes to
+   leave -- Tab during that window still stops on rows sliding off screen. Left as
+   is: dropping the duration from the transition would make the panel vanish instead
+   of leaving, and the window closes by itself. */
 .dropdown-content {
     position: absolute;
     /* Clears the 40px button plus a gap the width of the screen gutter. */
@@ -1379,13 +1392,22 @@ input[type="text"i].title-input {
                cannot read what is not rendered either -- so this hides it while
                leaving it laid out.
 
-               `top`/`left` are what keep it out of the scroll height. Without them an
-               absolute box stays at its static position, and `overflow: hidden` on an
-               ancestor only clips absolute descendants the ancestor is the containing
-               block for -- which an unpositioned one is not. Four of these sit inside
-               a collapsed `.fractal-settings-panel`, so their boxes escaped its clip
-               and gave the Fractal panel 206px of empty scroll. Pinned to the
-               containing block's origin they land inside it and measure nothing. */
+               `position: absolute` with a `top` is what keeps it out of the scroll
+               height. Without the offset an absolute box stays at its static position,
+               and `overflow: hidden` on an ancestor only clips absolute descendants the
+               ancestor is the containing block for -- which an unpositioned one is not.
+               Four of these sit inside a collapsed `.fractal-settings-panel`, which is
+               static, so their boxes escaped its clip and landed below it.
+
+               `top` alone carries that, measured by dropping one declaration at a time
+               with the Fractal panel open: with both, the panel is 343px wide and
+               scrolls 0. Drop `left` and it is still 343 and 0 -- the box moves from
+               x=16 to x=42 and nothing else changes. Drop `top` and the panel scrolls
+               196px and measures 358px wide, and the extra 15px is the scrollbar that
+               scroll opens, not a sideways spill: `scrollWidth` stays 341 in all four
+               combinations. `left: 0` is kept because it belongs to the recipe and pins
+               the box to the containing block's origin rather than to whatever x its
+               nesting gives it, but nothing measurable rests on it. */
             .visually-hidden {
                 position: absolute;
                 top: 0;

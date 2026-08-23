@@ -99,15 +99,23 @@ const MainMenu = {
     // handler and so is handed the event, while both other callers pass nothing: the
     // menu-open path, where taking focus off the menu button on every click would be
     // wrong, and the AI-features toggle, where focus is on a checkbox outside the
-    // menu that is not going anywhere. The row to return to is the one `openTab`
-    // marked -- what the `activeTab` note in `styles.css` is for -- and the first row
-    // instead on the first open, when no panel has been opened yet.
+    // menu that is not going anywhere.
     showList(e){
+        // Above the guard, never below it: this line is the only one every caller
+        // needs. Below it, opening the menu leaves `detail-open` set and the menu
+        // comes back showing whichever panel was last open -- and with AI features
+        // off that panel is hidden, which is the empty-menu bug this whole list
+        // exists to end. Swapping these two lines passed 116 of 116 tests.
         MainMenu.div.classList.remove('detail-open');
         if (!e) return;
-        const row = MainMenu.div.querySelector('.menu-row.activeTab')
-                 ?? MainMenu.div.querySelector('.menu-row');
-        row?.focus();
+        // The row `openTab` marked -- what the `activeTab` note in `styles.css` is
+        // for -- and nothing at all when there is none. A `?? '.menu-row'` fallback
+        // read here first, for a first open with no panel opened yet; but no route
+        // into the panel view avoids `openTab`, and `openTab` always writes
+        // `activeTab`, so the fallback could only ever fire if it were wrong, and
+        // what it resolved to was `#open-file-button`, where Space opens a file
+        // dialog. Deleted rather than corrected.
+        MainMenu.div.querySelector('.menu-row.activeTab')?.focus();
     },
 
     // The heading is the row's own label, so a row and the panel it opens cannot

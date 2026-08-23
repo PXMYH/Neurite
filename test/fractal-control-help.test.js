@@ -103,12 +103,19 @@ test('a help block is hidden from the page but not from the accessibility tree',
     // `overflow: hidden` ancestor only clips absolute descendants it is the containing
     // block for. These four sit in a collapsed panel that is not positioned, so
     // without an offset their boxes escaped its clip and the Fractal panel scrolled
-    // 206px of nothing. Measured in the browser: 206 before, 0 after.
-    // Both offsets. `top` alone was asserted, and `left` is the one that stops the box
-    // sitting at its static x: dropping it inflates the panel's width rather than its
-    // height, which the scroll assertion above measures in the wrong axis to catch.
+    // 196px of nothing.
+    //
+    // `position` as well as the offset, because an offset on a static box is ignored
+    // and this rule would then hide four boxes in the flow. And `top` only: a comment
+    // here claimed `left` was what stopped the panel widening, which measuring one
+    // declaration at a time in the browser refutes -- with both, the panel is 343px
+    // wide and scrolls 0; dropping `left` leaves 343 and 0, moving the box from x=16 to
+    // x=42 and changing nothing else; dropping `top` gives 196px of scroll and 358px of
+    // width, where the extra 15px is the scrollbar that scroll opens rather than a
+    // sideways spill (`scrollWidth` is 341 either way). So `left: 0` stays in the
+    // stylesheet as part of the recipe and is not asserted: there is nothing it breaks.
+    assert.match(rule, /position:\s*absolute/, '.visually-hidden ignores its offsets now, so the four boxes are back in the flow');
     assert.match(rule, /top:\s*0/, '.visually-hidden sits at its static position again, which a collapsed panel does not clip');
-    assert.match(rule, /left:\s*0/, '.visually-hidden keeps its static x, which widens the panel instead of scrolling it');
 });
 
 test('the help text states the range the control actually accepts', ()=>{
