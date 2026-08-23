@@ -4902,6 +4902,10 @@ input:focus-visible,
 textarea:focus-visible,
 .Searchbar:focus-visible,
 .expand-button:focus-visible,
+/* The div that stands in for a `select.custom-select`. It is in the tab order now
+   (`CustomDropdown.carryAccessibility`), so it needs a ring like the select it
+   replaced -- it is the only control here that is not a real form element. */
+.select-replacer:focus-visible,
 textarea#rawTextArea:focus-visible,
 textarea#prompt:focus-visible,
 textarea[id^='custom-instructions-textarea-']:focus-visible,

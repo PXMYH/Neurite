@@ -3,7 +3,10 @@ const Select = {};
 Select.deselect = function(select){
     const optionsReplacer = select.parentNode.querySelector('.options-replacer');
     Elem.forEachChild(optionsReplacer,
-        (child)=>child.classList.remove('selected')
+        (child)=>{
+            child.classList.remove('selected');
+            child.setAttribute('aria-selected', 'false');
+        }
     );
 }
 Select.selectOption = function(select, option){
@@ -58,9 +61,47 @@ CustomDropdown.setup = function(select, delayListeners = false){
     container.appendChild(select);
     select.style.display = 'none'; // Hide the original select
 
+    CustomDropdown.carryAccessibility(select, selectReplacer, optionsReplacer);
+
     CustomDropdown.populateOptions(select, optionsReplacer, selectedDiv);
 
     if (!delayListeners) CustomDropdown.addEventListeners(select);
+}
+
+// `display: none` on the select takes it out of the accessibility tree and out of
+// the tab order, and the replacer that stands in for it is a plain div: no name, no
+// role, no way to reach it with a keyboard. So a `title` or an `aria-describedby`
+// written on the select in the markup describes an element nobody can get to. These
+// are the things the select was carrying and the replacer was not; the keys a select
+// answers are wired in `addKeyListeners`.
+CustomDropdown.carryAccessibility = function(select, selectReplacer, optionsReplacer){
+    selectReplacer.setAttribute('role', 'combobox');
+    selectReplacer.setAttribute('aria-haspopup', 'listbox');
+    selectReplacer.setAttribute('aria-expanded', 'false');
+    selectReplacer.setAttribute('tabindex', '0');
+    optionsReplacer.setAttribute('role', 'listbox');
+
+    if (select.id) {
+        optionsReplacer.id = select.id + '-options';
+        selectReplacer.setAttribute('aria-controls', optionsReplacer.id);
+    }
+    // The name and the description stay written on the select in the markup, next
+    // to the control they belong to, and are copied here rather than duplicated.
+    for (const name of ['aria-label', 'aria-describedby', 'title']) {
+        const value = select.getAttribute(name);
+        if (value) selectReplacer.setAttribute(name, value);
+    }
+}
+
+CustomDropdown.open = function(selectReplacer, optionsReplacer){
+    optionsReplacer.classList.add('show');
+    selectReplacer.classList.remove('closed');
+    selectReplacer.setAttribute('aria-expanded', 'true');
+}
+CustomDropdown.close = function(selectReplacer, optionsReplacer){
+    optionsReplacer.classList.remove('show');
+    selectReplacer.classList.add('closed');
+    selectReplacer.setAttribute('aria-expanded', 'false');
 }
 
 CustomDropdown.populateOptions = function(select, optionsReplacer, selectedDiv){
@@ -71,6 +112,8 @@ CustomDropdown.createOptionDiv = function(select, optionsReplacer, selectedDiv, 
     const optionDiv = Html.make.div('dropdown-option');
     optionDiv.dataset.value = option.value;
     optionDiv.innerText = option.innerText;
+    optionDiv.setAttribute('role', 'option');
+    optionDiv.setAttribute('aria-selected', option.selected ? 'true' : 'false');
 
     if (option.selected) optionDiv.classList.add('selected');
 
@@ -81,6 +124,7 @@ CustomDropdown.createOptionDiv = function(select, optionsReplacer, selectedDiv, 
 
         // Set this option as the selected one
         optionDiv.classList.add('selected');
+        optionDiv.setAttribute('aria-selected', 'true');
         select.value = option.value;
         selectedDiv.innerText = option.innerText;
 
@@ -119,8 +163,7 @@ CustomDropdown.addEventListeners = function(select){
         if (optionsReplacer.classList.contains('show')) {
             // Dropdown is open, so close it
             window.requestAnimationFrame(() => {
-                optionsReplacer.classList.remove('show');
-                selectReplacer.classList.add('closed');
+                CustomDropdown.close(selectReplacer, optionsReplacer);
                 container.style.zIndex = "20"; // Reset the z-index of the parent container
                 isPendingFrame = false;
             });
@@ -128,8 +171,7 @@ CustomDropdown.addEventListeners = function(select){
         } else {
             // Close all other dropdowns
             document.querySelectorAll('.options-replacer.show').forEach(el => {
-                el.classList.remove('show');
-                el.parentElement.classList.add('closed');
+                CustomDropdown.close(el.parentElement, el);
                 el.parentElement.parentElement.style.zIndex = "20"; // Reset the z-index of other dropdowns
             });
 
@@ -137,14 +179,15 @@ CustomDropdown.addEventListeners = function(select){
             container.style.zIndex = "30"; // Increase the z-index of the parent container
             if (!isPendingFrame) {
                 window.requestAnimationFrame(() => {
-                    optionsReplacer.classList.add('show');
-                    selectReplacer.classList.remove('closed');
+                    CustomDropdown.open(selectReplacer, optionsReplacer);
                     isPendingFrame = false;
                 });
                 isPendingFrame = true;
             }
         }
     });
+
+    CustomDropdown.addKeyListeners(select, selectReplacer, optionsReplacer, container);
 
     // Close dropdown when clicking outside
     On.mousedown(document, (e)=>{
@@ -154,12 +197,62 @@ CustomDropdown.addEventListeners = function(select){
     });
     On.mouseup(document, (e)=>{
         if (container.dataset.outsideClick === 'true' && !container.contains(e.target)) {
-            optionsReplacer.classList.remove('show');
-            selectReplacer.classList.add('closed');
+            CustomDropdown.close(selectReplacer, optionsReplacer);
             container.style.zIndex = "20"; // Reset the z-index of the parent container
         }
         container.removeAttribute('data-outside-click');
     });
+}
+
+// The keys a native select answers, on the div that replaced it: Enter and Space
+// open and close the list, Escape closes it, and the arrows move the selection the
+// way a closed select does. Without these, `tabindex` would only put focus
+// somewhere it cannot act.
+CustomDropdown.addKeyListeners = function(select, selectReplacer, optionsReplacer, container){
+    On.keydown(selectReplacer, (e)=>{
+        const isOpen = optionsReplacer.classList.contains('show');
+        switch (e.key) {
+            case 'Enter':
+            case ' ':
+                if (isOpen) CustomDropdown.close(selectReplacer, optionsReplacer);
+                else CustomDropdown.open(selectReplacer, optionsReplacer);
+                container.style.zIndex = (isOpen ? "20" : "30");
+                break;
+            case 'Escape':
+                if (!isOpen) return;
+                CustomDropdown.close(selectReplacer, optionsReplacer);
+                container.style.zIndex = "20";
+                break;
+            case 'ArrowDown':
+            case 'ArrowRight':
+                CustomDropdown.stepSelection(select, 1);
+                break;
+            case 'ArrowUp':
+            case 'ArrowLeft':
+                CustomDropdown.stepSelection(select, -1);
+                break;
+            default: return;
+        }
+        // The arrows move selected Nodes and Space is a Node Mode key, both bound on
+        // `window`. A key answered here is not also a command to the Graph.
+        e.preventDefault();
+        e.stopPropagation();
+    });
+}
+
+// Moves the selection one option, as a focused select does with its list closed.
+// The `change` event is what every reader of these dropdowns is bound to, so it is
+// dispatched here exactly as a click on an option does.
+CustomDropdown.stepSelection = function(select, step){
+    const count = select.options.length;
+    if (count < 1) return;
+
+    const next = Math.min(Math.max(select.selectedIndex + step, 0), count - 1);
+    if (next === select.selectedIndex) return;
+
+    select.selectedIndex = next;
+    Select.updateSelectedOption(select);
+    select.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 }
 
 CustomDropdown.setupModelSelect = function(selectElement){
@@ -199,7 +292,9 @@ Select.updateSelectedOptionHighlighting = function(selectElement){
 
     const selectedValue = selectElement.value;
     optionsReplacer.querySelectorAll('div').forEach( (div)=>{
-        div.classList.toggle('selected', div.dataset.value === selectedValue)
+        const isSelected = div.dataset.value === selectedValue;
+        div.classList.toggle('selected', isSelected);
+        div.setAttribute('aria-selected', isSelected ? 'true' : 'false');
     });
 }
 

@@ -12,7 +12,8 @@
                             (<span id="julia-x">0.256</span>, <span id="julia-y">0.01</span>)
                         </div>
                         <div class="dropdown-container" title="Select the current fractal equation">
-                            <select id="fractal-select" class="model-selector custom-select">
+                            <select id="fractal-select" class="model-selector custom-select"
+                                    aria-label="Fractal equation" aria-describedby="fractal-select-help">
                                 <option value="mandelbrot">Mandelbrot</option>
                                 <option value="julia">Julia Set</option>
                                 <option value="burningShip">Burning Ship</option>
@@ -22,15 +23,24 @@
                                 <option value="ikeda">Ikeda Map</option>
                                 <!--<option value="inverseMandelbrot">Inverse Brot</option>-->
                             </select>
+                            <!-- The same words as the `title` above, in the accessibility tree:
+                                 a title is hover-only, so it reaches neither the keyboard nor a
+                                 screen reader. `CustomDropdown.setup` hides this select behind a
+                                 div replacer and carries both the name and this description over
+                                 to it. -->
+                            <p id="fractal-select-help" class="visually-hidden">Which equation draws the Fractal under the Graph and pulls Nodes toward its boundary. Julia Set adds a constant, shown beside the equation, that can be dragged to change it.</p>
                         </div>
                     </div>
-                    <input id="exponent" type="range" min="1" max="8" value="2">
+                    <input id="exponent" type="range" min="1" max="8" value="2"
+                           aria-label="Exponent" aria-describedby="exponent-help">
+                    <p id="exponent-help" class="visually-hidden">The power the equation raises z to, from 1 to 8. It appears in the equation beside the menu; the Henon and Ikeda maps have no exponent to raise.</p>
                 </div>
                 <div class="settingsSlider centered" title="Adjust smoothness of fractal lines. Lower to reduce lag" style="margin-bottom: 10px;">
                     <div style="display:flex; justify-content: space-between;">
                         <div class="number-input-wrapper" style="width: 45%">
                             <div id="quality_value">Quality:</div>
-                            <input id="quality_value_number" class="number-input" type="number" min="0" max="100" value="16" step="0.1">
+                            <input id="quality_value_number" class="number-input" type="number" min="0" max="100" value="16" step="0.1"
+                                   aria-label="Quality" aria-describedby="quality-help">
                         </div>
                         <div class="number-input-wrapper" style="width: 30%" title="Add idleness to save energy">
                             <div id="frames_delay_value">Delay:</div>
@@ -38,7 +48,9 @@
                         </div>
                         <div id="fps" style="text-align: right; width: 20%">?? fps (Is javascript enabled?)</div>
                     </div>
-                    <input id="quality" type="range" min="0" max="100" value="16">
+                    <input id="quality" type="range" min="0" max="100" value="16"
+                           aria-label="Quality" aria-describedby="quality-help">
+                    <p id="quality-help" class="visually-hidden">How finely the Fractal's lines are traced, from 0 to 100. Every step up costs frame rate, and the fps reading beside it is what it is costing now.</p>
                 </div>
                 <div class="gridLayout">
 
@@ -76,9 +88,14 @@
                     <div class="settingsSlider" title="Adjusts cursor's control of line generation">
                         <div class="number-input-wrapper">
                             <label for="flashlightStrength">Strength:</label>
-                            <input id="flashlightStrength_value" class="number-input" type="number" min="0" max="100" value="0" step="1">
+                            <input id="flashlightStrength_value" class="number-input" type="number" min="0" max="100" value="0" step="1"
+                                   aria-label="Strength" aria-describedby="flashlightStrength-help">
                         </div>
-                        <input id="flashlightStrength" type="range" min="0" max="100" value="0" step="1">
+                        <!-- No aria-label on the slider: the label above already names it, and
+                             an aria-label would replace that name rather than add to it. -->
+                        <input id="flashlightStrength" type="range" min="0" max="100" value="0" step="1"
+                               aria-describedby="flashlightStrength-help">
+                        <p id="flashlightStrength-help" class="visually-hidden">The share of new Fractal lines drawn near the pointer instead of across the whole view, from 0 to 100. Radius sets how wide near is.</p>
                     </div>
 
                     <div class="settingsSlider" title="Adjusts radius of line generation around cursor">
