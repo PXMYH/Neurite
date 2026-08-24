@@ -257,6 +257,13 @@ On.keydown(document, (e)=>{
     // not, and the reader has to click back into the node to carry on. Read before the
     // click, not after: by then the panel is inert and the browser has already blurred
     // out of it, so the same question answers `false` every time.
+    //
+    // Reads `false` for a reader who opened the menu with Enter and never left the
+    // hamburger, because the hamburger is the panel's sibling rather than its
+    // descendant. That looks like the bug this line exists to fix and is not one:
+    // focus never went anywhere, so there is nothing to put back. Measured -- Enter on
+    // the hamburger, then Escape: menu closed, `aria-expanded="false"`, `inert` true,
+    // focus still on the hamburger.
     const focusWasInMenu = dropdownContent.contains(document.activeElement);
     menuButton.click();
     if (focusWasInMenu) menuButton.focus();
