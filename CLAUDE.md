@@ -256,4 +256,6 @@ See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 Single-context: `CONTEXT.md` at the repo root is the domain glossary — read it before naming anything.
-`docs/adr/` does not exist yet. See `docs/agents/domain.md`.
+`docs/adr/` holds the decisions that are settled: `0001` on keeping the hand-ordered script array,
+`0002` on TypeScript in the load path. Both are linked from the architecture section above.
+See `docs/agents/domain.md`.
