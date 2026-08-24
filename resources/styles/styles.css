@@ -1160,6 +1160,15 @@ input[type="text"i].title-input {
             left: 16px;
             width: 40px;
             height: 40px;
+            /* Both of these are the element's, not the design's. This was a div until
+               the menu needed a keyboard route in, and a `<button>` resolves the UA
+               stylesheet's `box-sizing: border-box` and `padding: 1px 6px` where a div
+               resolves neither -- which took the rendered box from 42x42 to 40x40 and
+               moved the icon's centre from (37,37) to (36,36). There is no global
+               box-sizing reset in this file to inherit instead: all 21 declarations of
+               it name their own rule. */
+            box-sizing: content-box;
+            padding: 0;
             background: #1a1921f2;
             backdrop-filter: blur(6px);
             border: 1px solid #8882;

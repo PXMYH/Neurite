@@ -258,10 +258,25 @@ test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
         /get enabled\(\)\{ return localStorage\.getItem\(AiFeatures\.#key\) !== 'false' \}/,
         'AI features no longer default to on, so the note above is stale');
 
-    const onOpen = dropdownJs.slice(dropdownJs.indexOf("dropdownContent.classList.contains(\"open\")"));
-    const iEndOfHandler = onOpen.indexOf('On.mousedown');
-    assert.ok(iEndOfHandler > 0, 'the menu-open handler was not found');
-    assert.doesNotMatch(onOpen.slice(0, iEndOfHandler), /openTab\(/,
+    // Anchored on the handler itself, not on a line inside it. This read `indexOf` of
+    // `dropdownContent.classList.contains("open")` and ended at `On.mousedown`, and both
+    // ends moved the moment the handler took an `isOpen` local and grew an Escape
+    // handler between it and that listener: the start vanished, `indexOf` returned -1,
+    // `slice(-1)` handed back the file's last character, and the assertions below then
+    // read one byte. A missing start anchor has to fail loudly, hence `notEqual`, and
+    // the end has to be the handler's own close rather than whatever listener happens
+    // to come next -- `On.keydown` sits there now and did not before.
+    const iOpen = dropdownJs.indexOf('On.click(menuButton');
+    assert.notEqual(iOpen, -1, 'the menu-open handler was not found');
+    const iEndOfHandler = dropdownJs.indexOf('\n});\n', iOpen);
+    assert.ok(iEndOfHandler > iOpen,
+        'the menu-open handler has no close at column 0, so this slice reads past it');
+    const onOpen = dropdownJs.slice(iOpen, iEndOfHandler);
+    assert.doesNotMatch(onOpen, /\nOn\./,
+        'the slice ran out of the handler into the next listener, so everything below '
+        + 'reads code that is not the menu-open path');
+
+    assert.doesNotMatch(onOpen, /openTab\(/,
         'opening the menu opens a panel again; a hidden one leaves the menu empty');
     // The same slice as the assertion above, and for the same reason. Anchoring on the
     // `if` and reaching forward with `[\s\S]*?` looks bounded and is not: lazy stops at
@@ -270,7 +285,7 @@ test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
     // AI-features handler and pass. Measured: with the call gone -- the defect this line
     // names -- 4 of 4 tests passed. Worse, the assertion 5 lines below pins that other
     // call by name, so one call satisfied both and either could vanish unnoticed.
-    assert.match(onOpen.slice(0, iEndOfHandler), /MainMenu\.showList\(\)/,
+    assert.match(onOpen, /MainMenu\.showList\(\)/,
         'opening the menu does not go to the list');
 
     // Leaving the Ai panel when AI features are switched off. Back to the list: every

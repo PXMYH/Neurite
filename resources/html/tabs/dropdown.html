@@ -121,11 +121,28 @@
          The tooltip names the commands first, in the order the rows are in. It named
          only the panels, which was the whole menu when it was a strip of tabs; four
          commands sit above them now. It does not name notes either: that tab has no
-         tablink any more, and a hover that promises one is a hover that lies. -->
-    <div class="menu-button" aria-label="Menu" data-tooltip="Menu: open, save, screenshot, record, and the AI, fractal and settings panels">
+         tablink any more, and a hover that promises one is a hover that lies.
 
-        <div class="menu-icon" id="menu-icon"></div>
-    </div>
+         A `<button>`, because a div was the whole keyboard surface of the menu and
+         there was none. Measured before: Tab from the top of the document made six
+         stops -- the four pill tools, `#nodeSearchButton`, `#ai-features-enabled` --
+         and wrapped, so nine rows, five panels, every API key, Open, Save to,
+         Screenshot, Record and the function console had no keyboard route at all.
+         The div read `tabIndex: -1`, `focus()` on it was a no-op, and its AX role was
+         `generic` with the name "Menu" -- a named nothing, with no state and no way
+         in. As a button it is the 7th Tab stop, Enter and Space open it, the global
+         `button:focus-visible` ring applies, and `HoverTooltip`'s `focus` path names
+         it on arrival, which a non-focusable div could never reach.
+
+         `aria-expanded` because the name alone does not say whether the menu is
+         open, and the two `classList.toggle`s in `dropdown.js` are the only writes to
+         that state in the tree. -->
+    <button type="button" class="menu-button" aria-label="Menu" aria-expanded="false"
+            data-tooltip="Menu: open, save, screenshot, record, and the AI, fractal and settings panels">
+        <!-- A span, not the div it was: a `<button>` takes phrasing content, and the
+             three bars are `position: absolute`, so the box is identical either way. -->
+        <span class="menu-icon" id="menu-icon"></span>
+    </button>
 
     <!-- The menu is a column of rows, and one row at a time is a whole panel. It was
          a strip of five chips over the panel they switched: five 14px labels laid
@@ -141,8 +158,14 @@
             <nav class="menu-list" id="menuList" aria-label="Menu">
                 <!-- The four commands, above the panels and separated from them, because
                      they are the only rows that do something rather than go somewhere:
-                     no chevron, and the menu closes around them rather than descending a
-                     level. They were two rows deep -- Open and Save to… at the top of the
+                     no chevron, because there is no level to descend to. The menu does
+                     not close around them either -- the only writes to the `open` class
+                     in the tree are the two toggles in the hamburger's own handler, so
+                     Screenshot photographs the screen with this menu over it and Record
+                     starts the same way. That was equally true when both lived inside the
+                     Saves panel, so it is not new here; it is left as it was rather than
+                     described as something it is not.
+                     They were two rows deep -- Open and Save to… at the top of the
                      Saves panel, Screenshot and Record below them -- and reaching a save
                      of the graph took opening the menu, choosing a panel, and only then
                      finding it.
@@ -198,20 +221,36 @@
                      Each says what the panel holds, read out of the panel. The old
                      chip titles described a Saves tab that Open… and Save to… have
                      since left, and a Settings tab that has since gained the node
-                     placement controls. -->
-                <button class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
+                     placement controls.
+
+                     `aria-haspopup` because the chevron that tells a reader these five
+                     descend a level is `aria-hidden`, as an icon carrying no
+                     information a label does not should be. Without it these rows are
+                     indistinguishable from the four commands above the separator to
+                     anyone not looking at the screen, and the `title` description is
+                     the only clue. Not `role="menu"`: that would take arrow-key
+                     navigation and a focus-management contract this list does not
+                     implement, and a nav of buttons is already understood.
+
+                     `type="button"` as the four commands above already carry. A button
+                     with no `type` is `type="submit"`, which does nothing here only
+                     because `closest('form')` is null for all nine rows today -- and
+                     `aitab.html` does contain a `<form>`, so the day this nav lands
+                     inside one, clicking a panel row reloads the page. -->
+
+                <button type="button" aria-haspopup="true" class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
                         title="Prompt the AI, choose the model, and hold the API keys.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
                     <span class="menu-row-label">Ai</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button class="menu-row tablink" onclick="openTab('tab2', this)"
+                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab2', this)"
                         title="Adjust how the fractal is drawn, and its colours.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>
                     <span class="menu-row-label">Fractal</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button class="menu-row tablink" onclick="openTab('tab6', this)"
+                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab6', this)"
                         title="Every saved graph, and the coordinates to teleport back to.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-icon"></use></svg>
                     <span class="menu-row-label">Saves</span>
@@ -219,13 +258,13 @@
                 </button>
                 <!-- Second from the end, before help: settings are read less often
                      than any tab that holds content, and more often than help. -->
-                <button class="menu-row tablink" onclick="openTab('tab5', this)"
+                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab5', this)"
                         title="Input, the Zettelkasten tags, node placement, and how to reset it all.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#gear-icon"></use></svg>
                     <span class="menu-row-label">Settings</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button class="menu-row tablink" onclick="openTab('tab3', this)"
+                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab3', this)"
                         title="Every mouse and keyboard control, in one list.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#question-mark"></use></svg>
                     <span class="menu-row-label">Help</span>

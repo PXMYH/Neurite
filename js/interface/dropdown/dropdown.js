@@ -160,6 +160,15 @@ const menuButton = document.querySelector(".menu-button");
 const dropdownContent = document.querySelector(".dropdown-content");
 const nodePanel = document.querySelector(".node-panel");
 
+// The menu starts closed, and the class it starts without is the one the handler
+// below keeps in step with `inert`. Set here rather than in the markup because
+// `inert` as an attribute would need removing on every open anyway, and this is the
+// one place that already knows which way round it is. It costs the panel nothing
+// measurable: `inert` is not a layout property, so the function console's CodeMirror
+// still measures itself the way the note on `.dropdown-content` in `styles.css`
+// requires -- which `display: none` is what would break.
+dropdownContent.inert = true;
+
 On.paste(dropdownContent, (e)=>{
 });
 On.wheel(dropdownContent, Event.stopPropagation);
@@ -172,9 +181,24 @@ On.click(menuButton, (e)=>{
     // The node panel is deliberately not in here: it is always on screen, so
     // hiding it with the dropdown made every way to create a note vanish.
     menuButton.classList.toggle("open");
-    dropdownContent.classList.toggle("open");
+    const isOpen = dropdownContent.classList.toggle("open");
 
-    if (dropdownContent.classList.contains("open")) {
+    // `visibility` is in the panel's `transition`, so it reads `visible` for the
+    // whole 0.3s slide out -- and a panel that is still visible is still
+    // hit-testable and still in the focus order. Measured on the way out: a real
+    // click at (200, 30) landed on `SPAN.menu-row-label` at 60ms and on
+    // `DIV.dropdown-content` at 150ms, and one Tab at 30ms landed on
+    // `#open-file-button`. Closing a menu to reach what was behind it and clicking
+    // straight away is an ordinary gesture, and `Record` is one of the rows under
+    // the pointer. `inert` is not a transitionable property, so it takes the whole
+    // subtree out of hit-testing, the focus order and the AX tree on this tick
+    // while leaving the slide itself exactly as it was.
+    dropdownContent.inert = !isOpen;
+    // The name alone does not say whether the menu is open. These two lines are the
+    // only writes to that state, as the two `toggle`s above are for the class.
+    menuButton.setAttribute('aria-expanded', isOpen);
+
+    if (isOpen) {
         // The list, every time. Opening straight into a panel meant choosing one that
         // is visible, and there is no longer a row that always is: Notes was, and has
         // none any more (issue #65), while `body.ai-disabled` hides Ai and `#tab4`
@@ -195,6 +219,26 @@ On.click(menuButton, (e)=>{
             document.selection.empty();
         }
     }
+});
+
+// Escape, one level at a time, because there was no way out by keyboard at all: the
+// panel view's only exit was the Back button and the menu's only exit was a second
+// click on what was then a div. Panel -> list -> closed is the exact reverse of the
+// two steps in, and focus lands back where each step came from, so Escape twice
+// returns a keyboard reader to the hamburger rather than to `<body>` seven Tabs away.
+//
+// Guarded on `open`, so a closed menu leaves Escape to whoever else wants it, and
+// the panel check comes first or one press would close the menu from two levels
+// down. `menuButton.click()` rather than a second copy of the toggle: the handler
+// above is the only writer of the `open` class, `inert` and `aria-expanded`, and a
+// synthetic click is how this keeps it that way.
+On.keydown(document, (e)=>{
+    if (e.key !== 'Escape' || !dropdownContent.classList.contains('open')) return;
+
+    if (MainMenu.div.classList.contains('detail-open')) return MainMenu.showList(e);
+
+    menuButton.click();
+    menuButton.focus();
 });
 
 On.mousedown(dropdownContent, Event.stopPropagation);
