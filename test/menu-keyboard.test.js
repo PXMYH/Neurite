@@ -200,6 +200,27 @@ test('Escape leaves by the same two steps it came in', ()=>{
     assert.match(body, /menuButton\.focus\(\)/,
         'closing by Escape drops focus to <body>, which puts the hamburger seven Tabs '
         + 'away at the top of the document');
+
+    // ...but only when focus was in the menu. The menu stays open while a reader works
+    // on the canvas, so the caret is often elsewhere. Measured with the refocus
+    // unconditional: caret in a note's `.title-input`, a real 198x20 field, and Escape
+    // moved focus to the hamburger -- text kept, caret lost, and the reader has to click
+    // back into the node. Anchored on `if (`, so the condition cannot be inverted or
+    // dropped and still read as present.
+    assert.match(body, /if \(focusWasInMenu\) menuButton\.focus\(\)/,
+        'Escape pulls focus to the hamburger even when focus was never in the menu, so '
+        + 'it takes the caret out of whatever the reader was typing in');
+
+    // Read before the click, or the answer is always `false`: by then the panel is inert
+    // and the browser has already moved focus out of it.
+    const iRead = body.search(/const focusWasInMenu = dropdownContent\.contains\(document\.activeElement\)/);
+    assert.notEqual(iRead, -1,
+        'the focus test is not `dropdownContent.contains(document.activeElement)` read '
+        + 'into `focusWasInMenu`, so it may be asking a different question');
+    assert.ok(iRead < iClose,
+        'the focus test is read after `menuButton.click()`, where the panel is already '
+        + 'inert and focus has already left it, so it answers false every time and the '
+        + 'refocus never happens at all');
 });
 
 test('every menu row is a button that says what it does', ()=>{
@@ -215,14 +236,18 @@ test('every menu row is a button that says what it does', ()=>{
             + '<form>. Row: ' + row.slice(0, 60));
     }
 
-    // The chevron that tells a reader these five descend a level is `aria-hidden`, as an
-    // icon carrying nothing the label does not should be -- so without this the five
-    // panel rows are indistinguishable from the four commands above the separator.
-    const popups = rows.filter( (r)=> r.includes('aria-haspopup') );
     const tablinks = rows.filter( (r)=> r.includes('tablink') );
     assert.equal(tablinks.length, 5, 'the five panel rows are no longer five');
-    assert.deepEqual(popups, tablinks,
-        'the rows that open a panel and the rows that say they open a panel are not the '
-        + 'same five. Not `role="menu"`: that takes arrow-key navigation and a '
-        + 'focus-management contract this list does not implement');
+
+    // This asserted the opposite for one commit. `aria-haspopup="true"` is defined by
+    // ARIA as equivalent to `menu`, and Chrome's AX tree read back `hasPopup: "menu"` on
+    // these rows, which promises a menu widget with arrow-key navigation and delivers a
+    // panel with a Back button. `aria-expanded` is no substitute, because opening a panel
+    // hides the list the row is in, so the state would never be observable. The five
+    // being undistinguished from the four commands is a gap; announcing a widget that
+    // does not exist is a false statement.
+    assert.doesNotMatch(htmlCode, /aria-haspopup/,
+        'a menu row claims to open a popup menu. It opens a panel, and the AX tree '
+        + 'normalises the claim to `hasPopup: "menu"`, so a screen reader is told to '
+        + 'expect arrow keys that do nothing here');
 });

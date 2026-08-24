@@ -223,14 +223,25 @@
                      since left, and a Settings tab that has since gained the node
                      placement controls.
 
-                     `aria-haspopup` because the chevron that tells a reader these five
-                     descend a level is `aria-hidden`, as an icon carrying no
-                     information a label does not should be. Without it these rows are
-                     indistinguishable from the four commands above the separator to
-                     anyone not looking at the screen, and the `title` description is
-                     the only clue. Not `role="menu"`: that would take arrow-key
-                     navigation and a focus-management contract this list does not
-                     implement, and a nav of buttons is already understood.
+                     No `aria-haspopup`, though it sat here for one commit. The chevron
+                     that tells a reader these five descend a level is `aria-hidden`, as
+                     an icon carrying no information a label does not should be, so
+                     without some marker the five are indistinguishable from the four
+                     commands above the separator to anyone not looking at the screen.
+                     `aria-haspopup="true"` is the wrong marker: ARIA defines it as
+                     equivalent to `menu`, and Chrome's AX tree duly reported
+                     `hasPopup: "menu"` on these rows. That promises a menu widget with
+                     arrow-key semantics and delivers a panel with a Back button. Not
+                     `role="menu"` for the same reason, plus the focus-management
+                     contract it takes and this list does not implement.
+
+                     Not `aria-expanded` in its place either: opening a panel hides the
+                     whole list, so the row's own expanded state is never observable by
+                     the reader it would be describing. What is left is a plain button
+                     that says what it does. Leaving the five undistinguished is a gap;
+                     announcing a menu that does not exist is a false statement, and the
+                     gap is the better of the two until the nav grows a shape that can
+                     be described truthfully.
 
                      `type="button"` as the four commands above already carry. A button
                      with no `type` is `type="submit"`, which does nothing here only
@@ -238,19 +249,19 @@
                      `aitab.html` does contain a `<form>`, so the day this nav lands
                      inside one, clicking a panel row reloads the page. -->
 
-                <button type="button" aria-haspopup="true" class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
+                <button type="button" class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
                         title="Prompt the AI, choose the model, and hold the API keys.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
                     <span class="menu-row-label">Ai</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab2', this)"
+                <button type="button" class="menu-row tablink" onclick="openTab('tab2', this)"
                         title="Adjust how the fractal is drawn, and its colours.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>
                     <span class="menu-row-label">Fractal</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab6', this)"
+                <button type="button" class="menu-row tablink" onclick="openTab('tab6', this)"
                         title="Every saved graph, and the coordinates to teleport back to.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-icon"></use></svg>
                     <span class="menu-row-label">Saves</span>
@@ -258,13 +269,13 @@
                 </button>
                 <!-- Second from the end, before help: settings are read less often
                      than any tab that holds content, and more often than help. -->
-                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab5', this)"
+                <button type="button" class="menu-row tablink" onclick="openTab('tab5', this)"
                         title="Input, the Zettelkasten tags, node placement, and how to reset it all.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#gear-icon"></use></svg>
                     <span class="menu-row-label">Settings</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <button type="button" aria-haspopup="true" class="menu-row tablink" onclick="openTab('tab3', this)"
+                <button type="button" class="menu-row tablink" onclick="openTab('tab3', this)"
                         title="Every mouse and keyboard control, in one list.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#question-mark"></use></svg>
                     <span class="menu-row-label">Help</span>

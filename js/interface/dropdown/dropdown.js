@@ -249,8 +249,17 @@ On.keydown(document, (e)=>{
 
     if (MainMenu.div.classList.contains('detail-open')) return MainMenu.showList(e);
 
+    // Only pull focus back if it was in the menu to begin with. The menu stays open
+    // while a reader works on the canvas -- the hamburger is the only thing that closes
+    // it -- so the caret is often somewhere else entirely. Measured with this
+    // unconditional: caret in a note's `.title-input`, a real 198x20 field holding its
+    // text, and Escape moved focus to the hamburger. The text survived; the caret did
+    // not, and the reader has to click back into the node to carry on. Read before the
+    // click, not after: by then the panel is inert and the browser has already blurred
+    // out of it, so the same question answers `false` every time.
+    const focusWasInMenu = dropdownContent.contains(document.activeElement);
     menuButton.click();
-    menuButton.focus();
+    if (focusWasInMenu) menuButton.focus();
 });
 
 On.mousedown(dropdownContent, Event.stopPropagation);
