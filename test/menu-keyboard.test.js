@@ -158,6 +158,27 @@ test('Escape leaves by the same two steps it came in', ()=>{
         'Escape is handled with the menu closed, so it is taken from whatever else in '
         + 'the app wants it');
 
+    // And guarded on a modal, which the menu does not close for: a panel launching
+    // Custom Endpoint or Vector Database leaves the menu open underneath it. Measured
+    // without this line: with the AI panel open and a modal on top, Escape left the
+    // modal on screen and took the menu back to the list behind it. `window.alert` and
+    // `window.confirm` bind no Escape at all, so at that point the key had no visible
+    // effect on the layer the reader was looking at and a silent one on the layer
+    // below. Before the `detail-open` branch, or the guard is unreachable from a panel,
+    // which is the only place a modal is launched from.
+    // Anchored on `if (`, not on `Modal.current) return`, because the inverted guard
+    // `if (!Modal.current) return` contains that as a substring: it passed this
+    // assertion as an `indexOf` while making Escape work only when a modal is open,
+    // which is the exact opposite of the line's purpose. A mutation run found it, and
+    // it is the second time the same substring lie has landed in this file.
+    const iModal = body.search(/if \(Modal\.current\) return/);
+    assert.notEqual(iModal, -1,
+        'Escape reaches the menu through an open modal, so it steps a menu the reader '
+        + 'cannot see past a dialog that ignores the same key');
+    assert.ok(iModal < body.indexOf('detail-open'),
+        'the modal guard sits after the panel branch, so Escape from a panel with a '
+        + 'modal over it still closes the panel');
+
     // The panel branch first. Measured on the fix: Escape from the Fractal panel goes to
     // the list with focus on the `activeTab` row, and Escape again closes the menu with
     // focus back on the hamburger -- `aria-expanded="false"`, `inert` true. Reversed,

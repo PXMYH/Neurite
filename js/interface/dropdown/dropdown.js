@@ -232,8 +232,20 @@ On.click(menuButton, (e)=>{
 // down. `menuButton.click()` rather than a second copy of the toggle: the handler
 // above is the only writer of the `open` class, `inert` and `aria-expanded`, and a
 // synthetic click is how this keeps it that way.
+//
+// A modal takes Escape ahead of the menu, because the menu does not close when a
+// panel launches one -- Custom Endpoint, Vector Database, Ollama Library, Connect
+// Notes and the rest all come up over an open menu. `window.alert` and
+// `window.confirm` bind no Escape at all and `window.prompt`'s textarea handler does
+// not stop propagation, so without this line a reader looking at a modal presses
+// Escape, sees the modal ignore it, and finds the menu behind it has stepped a level
+// or closed. `Modal.current` is that state: `Modal.open` sets it, `Modal.close`
+// clears it. The other two Escape consumers need no guard -- `CustomDropdown` calls
+// `stopPropagation` while its list is open, so this never sees that key, and
+// `NodeMode`'s Escape only stops nodes following the mouse.
 On.keydown(document, (e)=>{
     if (e.key !== 'Escape' || !dropdownContent.classList.contains('open')) return;
+    if (Modal.current) return;
 
     if (MainMenu.div.classList.contains('detail-open')) return MainMenu.showList(e);
 
