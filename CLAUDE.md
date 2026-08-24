@@ -1,6 +1,13 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is the project context for every coding agent working in this repository
+(Claude Code reads it by name; pi loads it as a context file the same way). Global
+working agreements live in `~/.agents/AGENTS.core.md`; this file only holds what is
+true of this repo, and it wins where the two disagree.
+
+Do not add an `AGENTS.md` beside this file — pi loads the first match per directory
+and `AGENTS.md` outranks `CLAUDE.md`, so a second file would silently replace this
+one for one harness and not the other.
 
 ## Commands
 
@@ -40,6 +47,40 @@ the test suite is deliberately thin — `node --test` with
 no runner dependency. Most verification is still manual in the browser (or via the automation
 server's `GET localhost:8081/screenshot`, which returns a base64 PNG of a Playwright-driven
 instance). `git remote` points at the fork `PXMYH/Neurite`.
+
+## Working in this repo
+
+- **Develop in a worktree**, not in the primary checkout: `git worktree add
+  .claude/worktrees/<name> -b <branch>`. `prestart` links the worktree's `node_modules`
+  to the primary checkout's, and `node --test` resolves `typescript` by walking up, so a
+  fresh worktree needs no install. `.claude/` is untracked and stays that way — never
+  stage it.
+- **The primary checkout usually holds port 8999**, and the port is strict. That server
+  is the reader's, not yours: never kill it. Start your own on another port instead
+  (`vite --port 9123 --strictPort`, run from the worktree so Vite's root is your copy).
+  The gateway is 7070 and the automation server is 8081; the same rule applies to both.
+- **Other worktrees and branches belong to other sessions.** Some are locked. Read them
+  if it helps, change nothing.
+- **Merging is by fast-forward, not by pull request.** Rebase the branch onto
+  `origin/main`, prove the rebase was clean, re-run `npm test` and `npm run typecheck`
+  *after* the rebase, confirm `git merge-base --is-ancestor origin/main main`, then
+  `git merge --ff-only` and push. Report the revision range that moved. Nothing is
+  committed or pushed unless Capitan X asks for it.
+- **Verification that counts here**: `npm test` and `npm run typecheck`, plus a real
+  browser pass — most of this app cannot be checked any other way. For UI work, drive
+  Playwright and read Chrome's accessibility tree through CDP
+  (`Accessibility.getFullAXTree`) when the change is about names, roles or
+  descriptions; a screenshot cannot show those.
+- **Tests must not need the backend's dependencies.** Nothing installs `express` for
+  `npm test`, so a server under `localhost_servers/` is testable only if its request
+  handlers sit in a module that does not import express (see
+  `direct-access/file-access.js`, driven by `test/directaccess-path-confinement.test.js`).
+- **Clean up after a task**: remove the worktree and merged branch you created, the
+  scratch servers you started, and the temp files you wrote. Leave everything you did
+  not create, including other sessions' `/tmp` artifacts.
+- Commit messages follow the existing log: a plain imperative subject, then a body that
+  explains the trap the change avoids and how it was verified. `git log` is the style
+  guide.
 
 Nothing under `js/` exports anything, so a test cannot import it. There are two ways in, and
 `test/` has one example of each:
