@@ -332,9 +332,18 @@ On.keydown(document, (e)=>{
 
     // A digit is text before it is a shortcut. CodeMirror types into a hidden
     // textarea, so editors are covered by the tag check.
+    //
+    // The menu is the third case, and the other two do not cover it: its rows are
+    // `<button>`s, so a reader on one of them is neither in a field nor in an editor.
+    // The pill sits behind the open panel, which is what makes the miss silent --
+    // measured, with focus on `#tablink-ai` and the menu open, `1` added a fifth node
+    // window titled `26-08-23 ~ 21:11:04.191` behind the panel, focus never moved,
+    // and nothing on screen said so. `contains` needs no open check of its own: a
+    // closed menu is `inert`, so it cannot hold focus in the first place.
     const focused = document.activeElement;
-    if (focused && (focused.isContentEditable ||
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName))) return;
+    if (focused && (focused.isContentEditable
+        || ['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName)
+        || dropdownContent.contains(focused))) return;
 
     const tool = toolBar.querySelector('.' + iconClass);
     // `offsetParent` is null while AI features are off, which hides the AI tool.

@@ -293,3 +293,40 @@ test('every menu row is a button that says what it does', ()=>{
         + 'picks it up through `label.textContent` and the panel heading now reads '
         + '"Ai panel" instead of "Ai"');
 });
+
+test('a digit is not a tool shortcut while the reader is inside the menu', ()=>{
+    const iShortcuts = jsCode.indexOf('const toolShortcuts = {');
+    assert.notEqual(iShortcuts, -1,
+        'the digit shortcuts are gone; this test reads nothing');
+
+    // `focused` is what the guard asks about, so it has to be what holds focus.
+    assert.match(jsCode.slice(iShortcuts), /const focused = document\.activeElement;/,
+        '`focused` is not read from `document.activeElement`, so the guard below may be '
+        + 'asking about something else entirely');
+
+    // The whole guard as one string, not a prefix. The menu is the third case and the
+    // other two do not reach it: the rows are `<button>`s, so a reader on one is neither
+    // in a field nor in an editor. Measured without the `contains` clause -- focus on
+    // `#tablink-ai`, menu open, `1` pressed: a fifth node window appeared behind the
+    // panel, focus stayed on the row, and nothing on screen said a node had been made.
+    // An equality rather than a `match` for the reason the Escape condition above is one:
+    // a prefix cannot tell three clauses from two, and this file has been bitten by that
+    // three times.
+    const iGuard = jsCode.indexOf('if (focused && (focused.isContentEditable', iShortcuts);
+    assert.notEqual(iGuard, -1,
+        'the digit shortcuts no longer guard on what holds focus, so a digit typed '
+        + 'anywhere fires a tool');
+    const guard = jsCode.slice(iGuard, jsCode.indexOf('return;', iGuard) + 7).replace(/\s+/g, ' ');
+    assert.equal(guard,
+        'if (focused && (focused.isContentEditable '
+        + "|| ['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName) "
+        + '|| dropdownContent.contains(focused))) return;',
+        'the digit-shortcut guard is not the three clauses it was measured as. Dropping '
+        + '`contains` puts a node behind the open menu with nothing on screen to say so; '
+        + 'dropping either of the others fires a tool while the reader is typing');
+
+    // Before the click, or the guard is decoration.
+    assert.ok(iGuard < jsCode.indexOf('tool.click()', iShortcuts),
+        'the focus guard sits after `tool.click()`, so the tool has already fired by the '
+        + 'time the guard decides it should not have');
+});
