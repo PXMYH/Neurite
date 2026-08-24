@@ -5,6 +5,14 @@ package-lock.json
 .vscode
 database.db
 
+# Agent worktrees and local harness config. `git worktree add .claude/worktrees/<name>`
+# puts a second checkout in here, so without this the primary checkout's `git status`
+# lists every file in it as untracked.
+.claude/
+
+# Ruff's cache, dropped by Python helper scripts run from the repo root.
+.ruff_cache/
+
 # Local secrets. Written as a glob so it also catches prod.env, local.env, etc.
 # The tracked template is localhost_servers/ai-proxy/.env.example.
 *.env
