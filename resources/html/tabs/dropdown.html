@@ -237,11 +237,19 @@
 
                      Not `aria-expanded` in its place either: opening a panel hides the
                      whole list, so the row's own expanded state is never observable by
-                     the reader it would be describing. What is left is a plain button
-                     that says what it does. Leaving the five undistinguished is a gap;
-                     announcing a menu that does not exist is a false statement, and the
-                     gap is the better of the two until the nav grows a shape that can
-                     be described truthfully.
+                     the reader it would be describing. Measured, with the Ai panel open:
+                     `#menuList` computes `display: none`, `#tablink-ai` measures 0x0,
+                     `focus()` on it does not take, and the AX tree returns no role and
+                     no name for that node at all. `aria-expanded="true"` there would
+                     describe a node no reader can reach.
+
+                     So the marker is in the name instead, where it is not state and
+                     cannot go stale: `.visually-hidden` -- the idiom the Back button
+                     three lines up already uses -- makes the name "Ai panel" against
+                     "Screenshot". A *sibling* of `.menu-row-label`, never a child of it,
+                     because `MainMenu.showDetail` sets the panel heading from
+                     `label.textContent` and a nested span would retitle the heading to
+                     "Ai panel" too.
 
                      `type="button"` as the four commands above already carry. A button
                      with no `type` is `type="submit"`, which does nothing here only
@@ -253,18 +261,21 @@
                         title="Prompt the AI, choose the model, and hold the API keys.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
                     <span class="menu-row-label">Ai</span>
+                    <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
                 <button type="button" class="menu-row tablink" onclick="openTab('tab2', this)"
                         title="Adjust how the fractal is drawn, and its colours.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>
                     <span class="menu-row-label">Fractal</span>
+                    <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
                 <button type="button" class="menu-row tablink" onclick="openTab('tab6', this)"
                         title="Every saved graph, and the coordinates to teleport back to.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-icon"></use></svg>
                     <span class="menu-row-label">Saves</span>
+                    <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
                 <!-- Second from the end, before help: settings are read less often
@@ -273,12 +284,14 @@
                         title="Input, the Zettelkasten tags, node placement, and how to reset it all.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#gear-icon"></use></svg>
                     <span class="menu-row-label">Settings</span>
+                    <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
                 <button type="button" class="menu-row tablink" onclick="openTab('tab3', this)"
                         title="Every mouse and keyboard control, in one list.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#question-mark"></use></svg>
                     <span class="menu-row-label">Help</span>
+                    <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
             </nav>

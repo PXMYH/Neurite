@@ -201,23 +201,46 @@ test('Escape leaves by the same two steps it came in', ()=>{
         'closing by Escape drops focus to <body>, which puts the hamburger seven Tabs '
         + 'away at the top of the document');
 
-    // ...but only when focus was in the menu. The menu stays open while a reader works
-    // on the canvas, so the caret is often elsewhere. Measured with the refocus
-    // unconditional: caret in a note's `.title-input`, a real 198x20 field, and Escape
-    // moved focus to the hamburger -- text kept, caret lost, and the reader has to click
-    // back into the node. Anchored on `if (`, so the condition cannot be inverted or
-    // dropped and still read as present.
-    assert.match(body, /if \(focusWasInMenu\) menuButton\.focus\(\)/,
-        'Escape pulls focus to the hamburger even when focus was never in the menu, so '
-        + 'it takes the caret out of whatever the reader was typing in');
+    // ...but only when the reader loses nothing by it. Measured with the refocus
+    // unconditional: caret at offset 3 in a note's `.title-input`, a real 198x20 field,
+    // and Escape moved focus to the hamburger -- text kept, caret lost, and the reader
+    // has to click back into the node. Anchored on `if (`, so the condition cannot be
+    // inverted or dropped and still read as present.
+    assert.match(body, /if \(noFocusToLose\) menuButton\.focus\(\)/,
+        'Escape pulls focus to the hamburger unconditionally, so it takes the caret out '
+        + 'of whatever the reader was typing in');
+
+    // The whole condition, compared as one string rather than matched as a prefix.
+    // `assert.match` on the opening clauses cannot tell this expression from the same
+    // expression widened by `|| true`, and that mutation makes the refocus unconditional
+    // -- byte-for-byte the caret theft above. Measured: it passed all 121 tests. This is
+    // the third time a substring match has lied in this file, after `Modal.current` and
+    // `button:focus-visible`, so the shape here is an equality that runs to the `;`.
+    //
+    // Every clause is load-bearing and each names a measured state:
+    // `!active` and `documentElement` -- no element holds focus, so none is lost.
+    // `document.body` -- a click on the canvas or on the panel's own chrome parks focus
+    // there; treating it as a caret leaves a keyboard reader seven Tabs from the
+    // hamburger, or eight from inside the panel.
+    // `contains(active)` -- focus in the menu is about to be made inert.
+    const iDecl = body.indexOf('const noFocusToLose =');
+    assert.notEqual(iDecl, -1,
+        'the refocus is no longer decided by a `noFocusToLose` declaration, so the '
+        + 'assertion below reads nothing');
+    const decl = body.slice(iDecl, body.indexOf(';', iDecl) + 1).replace(/\s+/g, ' ');
+    assert.equal(decl,
+        'const noFocusToLose = !active || active === document.body '
+        + '|| active === document.documentElement || dropdownContent.contains(active);',
+        'the focus condition is not the four clauses it was measured as. A dropped clause '
+        + 'and an added one both land here: `|| true` makes the refocus unconditional, '
+        + 'and dropping `document.body` strands a reader who clicked the canvas');
 
     // Read before the click, or the answer is always `false`: by then the panel is inert
     // and the browser has already moved focus out of it.
-    const iRead = body.search(/const focusWasInMenu = dropdownContent\.contains\(document\.activeElement\)/);
-    assert.notEqual(iRead, -1,
-        'the focus test is not `dropdownContent.contains(document.activeElement)` read '
-        + 'into `focusWasInMenu`, so it may be asking a different question');
-    assert.ok(iRead < iClose,
+    assert.match(body, /const active = document\.activeElement;/,
+        '`active` is not read from `document.activeElement`, so the condition above may '
+        + 'be asking about something else entirely');
+    assert.ok(iDecl < iClose,
         'the focus test is read after `menuButton.click()`, where the panel is already '
         + 'inert and focus has already left it, so it answers false every time and the '
         + 'refocus never happens at all');
@@ -250,4 +273,23 @@ test('every menu row is a button that says what it does', ()=>{
         'a menu row claims to open a popup menu. It opens a panel, and the AX tree '
         + 'normalises the claim to `hasPopup: "menu"`, so a screen reader is told to '
         + 'expect arrow keys that do nothing here');
+
+    // What distinguishes the five instead: a word in the name rather than a state
+    // attribute. Measured in the AX tree -- `name: "Ai panel"` against `name:
+    // "Screenshot"`, `haspopup: null`, `expanded: null`, and the panel heading still
+    // reads "Ai".
+    const panelSpans = htmlCode.match(/<span class="visually-hidden"> panel<\/span>/g) || [];
+    assert.equal(panelSpans.length, 5,
+        'the five panel rows no longer carry the word that tells a reader they descend a '
+        + 'level. The chevron that says so on screen is `aria-hidden`, so without this '
+        + 'they are indistinguishable from the four commands above the separator');
+
+    // A sibling of the label, never a child: `MainMenu.showDetail` reads the panel
+    // heading out of `label.textContent`, so nesting the span retitles the heading to
+    // "Ai panel" as well. Anchored on the closing tag of the label so the check is about
+    // nesting rather than about order.
+    assert.doesNotMatch(htmlCode, /<span class="menu-row-label">[^<]*<span/,
+        'the visually-hidden word is inside `.menu-row-label`, so `MainMenu.showDetail` '
+        + 'picks it up through `label.textContent` and the panel heading now reads '
+        + '"Ai panel" instead of "Ai"');
 });

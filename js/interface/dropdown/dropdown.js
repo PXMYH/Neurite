@@ -249,24 +249,42 @@ On.keydown(document, (e)=>{
 
     if (MainMenu.div.classList.contains('detail-open')) return MainMenu.showList(e);
 
-    // Only pull focus back if it was in the menu to begin with. The menu stays open
-    // while a reader works on the canvas -- the hamburger is the only thing that closes
-    // it -- so the caret is often somewhere else entirely. Measured with this
-    // unconditional: caret in a note's `.title-input`, a real 198x20 field holding its
-    // text, and Escape moved focus to the hamburger. The text survived; the caret did
-    // not, and the reader has to click back into the node to carry on. Read before the
-    // click, not after: by then the panel is inert and the browser has already blurred
-    // out of it, so the same question answers `false` every time.
+    // Take the hamburger only when the reader loses nothing by it, which is two cases
+    // and not one.
     //
-    // Reads `false` for a reader who opened the menu with Enter and never left the
-    // hamburger, because the hamburger is the panel's sibling rather than its
-    // descendant. That looks like the bug this line exists to fix and is not one:
-    // focus never went anywhere, so there is nothing to put back. Measured -- Enter on
-    // the hamburger, then Escape: menu closed, `aria-expanded="false"`, `inert` true,
-    // focus still on the hamburger.
-    const focusWasInMenu = dropdownContent.contains(document.activeElement);
+    // Focus inside the menu is the obvious one: it is about to be made inert, so it has
+    // to go somewhere and the hamburger is where the menu came from. Focus *outside* the
+    // menu is a caret, and pulling it here destroys an edit in progress. Measured with
+    // an unconditional `menuButton.focus()`: caret at offset 3 in a note's
+    // `.title-input`, a real 198x20 field, and Escape moved focus to the hamburger. The
+    // text survived; the caret did not, and the reader has to click back into the node.
+    //
+    // `<body>` is neither, and it is the ordinary state rather than a corner: any click
+    // that lands on something taking no focus parks focus there. That includes the
+    // canvas, which is the whole reason the menu stays open -- measured, a real click at
+    // (900,500) hits `svg#svg_bg` and leaves `document.activeElement` at `BODY#body` --
+    // and the panel's own chrome, where the nav's 4px padding is not focusable. Reading
+    // `<body>` as a caret to protect reinstates exactly the exile the refocus exists to
+    // prevent: Tab from a clean `<body>` reaches the hamburger on press seven, and eight
+    // from a click inside the panel, because that click set the sequential-focus start
+    // point inside a subtree Escape has just made inert and the first Tab is swallowed.
+    // A focused field is never `document.body`, so this cannot bring the caret theft
+    // back. `documentElement` and a null `activeElement` are the same argument.
+    //
+    // Read before the click, not after: by then the panel is inert and the browser has
+    // already blurred out of it, so `contains` answers `false` every time and the
+    // refocus never happens at all.
+    //
+    // The hamburger itself is the panel's sibling rather than its descendant, so a
+    // reader who opened the menu with Enter and never left the button reads `false` on
+    // the `contains` clause. That looks like the defect this line exists to fix and is
+    // not one: focus never went anywhere. Measured -- Enter, then Escape: menu closed,
+    // `aria-expanded="false"`, `inert` true, focus still on the hamburger.
+    const active = document.activeElement;
+    const noFocusToLose = !active || active === document.body
+        || active === document.documentElement || dropdownContent.contains(active);
     menuButton.click();
-    if (focusWasInMenu) menuButton.focus();
+    if (noFocusToLose) menuButton.focus();
 });
 
 On.mousedown(dropdownContent, Event.stopPropagation);
