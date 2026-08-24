@@ -35,10 +35,24 @@ const detailBody = dropdownJs.slice(iShowDetail, dropdownJs.indexOf('\n}', iShow
 // Code only, for anything that reads statement order. `showList` carries a long comment
 // that names both statements it is about, so leaving comments in lets the order be faked:
 // move the class removal below the guard, mention it in a comment above the guard, and an
-// `indexOf` comparison still sees the earlier position. Over-stripping is safe here --
-// nothing in this function is a string holding `//`, and if that changed the patterns
-// below would stop matching and fail rather than pass.
-const listCode = listBody.replace(/\/\/[^\n]*/g, '');
+// `indexOf` comparison still sees the earlier position.
+//
+// Whole-line comments only, and then no `//` may survive. Stripping every `//` to end of
+// line was fail-*open*, not fail-safe as an earlier note here claimed: a `//` can sit
+// inside a string, which is code, and everything after it on that line goes invisible. For
+// an `assert.match` that is safe -- the pattern stops matching and the test goes red -- but
+// three of the checks below are a `doesNotMatch` or a count, and one line defeats all
+// three at once:
+//     if (!e) { Logger.debug('list view: https://git.io/menu'); return; }
+// which strips to `if (!e) { Logger.debug('list view: https:`, keeping the `return` count
+// at 1 and hiding this guard so the ordering check finds the real one lower down and
+// passes. Measured end to end: open a panel, close the menu, reopen -- `detail-open` still
+// set, the row list `display: none`, 0 of 9 rows visible. The same trick hides a second
+// `.focus()` call from both the count and the `??` refusal.
+//
+// So a trailing comment in this function is refused outright. Nothing here has one; the
+// file's style is a whole-line comment above the code it explains.
+const listCode = listBody.replace(/^[ \t]*\/\/[^\n]*$/gm, '');
 const assertViewsFound = ()=> assert.ok(iShowList > 0 && iShowDetail > iShowList,
     'the two menu views are no longer showList then showDetail; this test reads nothing');
 
@@ -165,10 +179,42 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
     // the attribute spelling of `.open`. Comments are stripped first, or the prose above
     // `z-index` that mentions the class would count as a rule.
     const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // `visibility` is inherited, and that is the hole every selector-based check has: a
+    // rule that never names this class can still undo it. One declaration added to the
+    // existing `.menu-list` rule --
+    //     .menu-list { visibility: visible; }
+    // -- leaves the panel's own `visibility: hidden` true and untouched, and puts all nine
+    // rows back in the focus order. Measured on the closed menu: panel `hidden`, list
+    // `visible`, rows `visible`, 9 of 9 focusable. Every assertion below reads a true
+    // statement about a subject that is false.
+    //
+    // So this is the assertion that actually holds the property, and it is a stylesheet-wide
+    // one: the whole file may contain exactly these two declarations. There is no third
+    // today, no `backface-visibility` anywhere, and `.hidden-visibility` sets none despite
+    // its name. That also catches what the selector list cannot see -- a declaration nested
+    // inside the rule via `@media`, and a selector carrying `}` in an attribute value
+    // (`.dropdown-content:not([data-x="}"])`), which breaks the `[^{}]+` run below and
+    // hides the class name behind it.
+    //
+    // Deliberately absolute: a legitimate third `visibility` anywhere fails here. That is
+    // the safe direction, and the message says what to do about it.
+    assert.deepEqual(
+        [...cssCode.matchAll(/[\w-]*visibility\s*:\s*[^;}]+/g)].map( (m)=> m[0].trim() ),
+        ['visibility: hidden', 'visibility: visible'],
+        'a third visibility declaration exists in styles.css. `visibility` is inherited, so '
+        + 'any descendant of .dropdown-content that sets it puts the closed menu back in the '
+        + 'keyboard focus order. Check that, then extend this list');
+
     const selectors = [...cssCode.matchAll(/([^{}]+)\{/g)].map( (m)=> m[1].trim() )
         .filter( (s)=> s.includes('dropdown-content') ).sort();
+    // Deliberately stricter than the hole needs: a responsive `@media` override of, say,
+    // `max-height` cannot undo any of this, and would still fail here. That is the safe
+    // direction -- it fails loudly and reads its own fix -- so the message says what to do
+    // rather than claiming the new rule must be a bug.
     assert.deepEqual(selectors, ['.dropdown-content', '.dropdown-content.open'],
-        'another rule reaches the menu panel, and it can undo the visibility read below');
+        'another rule reaches the menu panel. If it cannot change the visibility or display '
+        + 'read below, add its selector to this list; if it can, that is the bug');
 
     // The same anchored selector both times, so the slice cannot read a rule the check
     // above did not see.
@@ -289,6 +335,12 @@ test('switching menu view carries focus with it, rather than dropping it on the 
     // a row can only be clicked once the menu is on screen.
     assertViewsFound();
 
+    // Nothing may hide behind a `//` on a line of code -- a trailing comment, or a `//`
+    // inside a string, which is what makes the strip above safe rather than merely tidy.
+    assert.doesNotMatch(listCode, /\/\//,
+        'a `//` sits on a line of code in showList, so everything after it on that line is '
+        + 'invisible to the checks below; move it to its own line');
+
     assert.match(detailBody, /Elem\.byId\('menuBackButton'\)\.focus\(\)/,
         'opening a panel leaves focus on a row that is now display:none, so it falls to <body>');
 
@@ -385,12 +437,27 @@ test('every menu row describes what it does, and the heading is not overridden',
         tab5: ['settingstab.html', 'placement'],
         tab3: ['helptab.html', 'mouse'],
     };
-    // What a reader sees: comments and scripts out, then tags, so ids and attributes go
-    // with them.
+    // What a reader sees: comments, scripts and unrendered templates out, then tags, so ids
+    // and attributes go with them. Two details, each of which let a panel keep a word it no
+    // longer shows -- both measured against renaming every visible "Coordinates" in
+    // networkstab.html, which must be red:
+    //
+    // - `<template>` content is parsed but never rendered, so it is not visible text; it
+    //   also is not a comment, so nothing else here removes it.
+    // - the tag pattern is quote-aware, because `<[^>]*>` ends the tag at the first `>`
+    //   even inside an attribute value, and the rest of that attribute is then read as
+    //   text: `data-tip="width > 4: coordinates"` kept the word with nothing on screen
+    //   saying it.
+    //
+    // A `<title>` element goes too, and that is a judgement rather than a fact: it is a
+    // hover tooltip and an accessible name, so it is presented to somebody. It is excluded
+    // for consistency -- a `title="..."` attribute is exactly the same tooltip, and every
+    // attribute is already gone with its tag, so counting one spelling and not the other
+    // would let a word live in whichever of the two this pattern happened not to reach.
     const visibleText = (file)=> read('resources/html/tabs/' + file)
         .replace(/<!--[\s\S]*?-->/g, '')
-        .replace(/<(script|style)[\s\S]*?<\/\1>/g, '')
-        .replace(/<[^>]*>/g, ' ');
+        .replace(/<(script|style|template|title)[\s\S]*?<\/\1>/g, '')
+        .replace(/<[a-zA-Z\/!][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>/g, ' ');
     const seen = Object.fromEntries(Object.values(PANELS).map( ([f])=> [f, visibleText(f)] ));
 
     for (const [tab, [file, word]] of Object.entries(PANELS)) {

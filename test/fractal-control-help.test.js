@@ -77,8 +77,20 @@ test('each control points at a help block that exists once and says something', 
 
 test('a help block is hidden from the page but not from the accessibility tree', ()=>{
     // `.visually-hidden` is the project's existing way of doing this (the Open file
-    // input in networkstab.html uses it). `display: none` or `hidden` would take the
-    // text out of the accessibility tree as well, which is the whole point of it.
+    // input in networkstab.html uses it).
+    //
+    // The reason to refuse `display: none` here is not the one this note used to give.
+    // "It would take the text out of the accessibility tree as well" is false for these
+    // four: name and description computation follows `aria-describedby` into a hidden
+    // subtree by design, and measuring it confirms that -- with `.visually-hidden` set to
+    // `display: none`, `#exponent` still reports "The power the equation raises z to, from
+    // 1 to 8...". That is exactly why the pattern exists for a *describedby target*.
+    //
+    // The real cost is on the other user of this shared rule. The menu's back button
+    // builds its own name out of a `.visually-hidden` span, and subtree text is not
+    // exempt: `display: none` there turns "Back to Fractal" into "Fractal", a name that
+    // reads as a heading rather than as a way out. So the assertion stays and the reason
+    // moves -- a change made for the help blocks lands on the button.
     for (const id of new Set(CONTROLS.map( (c)=> c.help ))) {
         const tag = tagWithId(id);
         assert.match(attr(tag, 'class') || '', /\bvisually-hidden\b/,
@@ -101,20 +113,20 @@ test('a help block is hidden from the page but not from the accessibility tree',
     const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
     assert.deepEqual([...cssCode.matchAll(/([^{}]+)\{/g)].map( (m)=> m[1].trim() )
         .filter( (s)=> s.includes('visually-hidden') ), ['.visually-hidden'],
-        'a second rule reaches .visually-hidden and can undo what is read below');
+        'a second rule reaches .visually-hidden. If it cannot change the clipping or the '
+        + 'positioning read below, add its selector to this list; if it can, that is the bug');
     const iRule = cssCode.indexOf('.visually-hidden {');
     assert.notEqual(iRule, -1, 'the .visually-hidden rule is gone; this test is stale');
     const rule = cssCode.slice(iRule, cssCode.indexOf('}', iRule));
     assert.match(rule, /clip-path:\s*inset\(50%\)/, '.visually-hidden no longer clips its content');
-    assert.doesNotMatch(rule, /display:\s*none/, '.visually-hidden now hides from screen readers too');
-    // `visibility: hidden` is the quieter version of the same mistake, and it costs more
-    // here than the four help boxes: the back button's name is built out of a
-    // `.visually-hidden` span, so the whole menu's back button goes from "Back to
-    // Fractal" to "Fractal" -- a name that reads as a heading, not as a way out. This
-    // rule is shared, so a change made for one caller lands on the other.
+    // Both spellings, for the reason set out at the top of this test: each one cuts
+    // "Back to" out of the menu back button's name, leaving "Fractal".
+    assert.doesNotMatch(rule, /display:\s*none/,
+        '.visually-hidden cuts "Back to" out of the menu back button\'s name, which shares '
+        + 'this rule and builds its name from its own subtree');
     assert.doesNotMatch(rule, /visibility:\s*hidden/,
-        '.visually-hidden hides from screen readers too, which also cuts "Back to" out of '
-        + 'the menu back button\'s name');
+        '.visually-hidden cuts "Back to" out of the menu back button\'s name, which shares '
+        + 'this rule and builds its name from its own subtree');
 
     // Absolute with no offset means "stay where you would have been", and an
     // `overflow: hidden` ancestor only clips absolute descendants it is the containing
