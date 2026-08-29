@@ -52,6 +52,13 @@ function addEventsToUserInputTextarea(userInputTextarea, textarea, node, display
 
     On.change(textarea, (e)=>{
         if (isEditableDivProgrammaticChange) return;
+        // Never overwrite the copy being typed into. This fires on the echo of the
+        // reader's own keystroke coming back around: the card writes the note, the note
+        // rewrites the pane, a pass rewrites the note from the pane, and `TextArea.update`
+        // dispatches this. That echo is one keystroke behind, so applying it dropped the
+        // character typed in between. While the card has focus it is the newer copy, and
+        // `On.blur` below takes whatever the note gained meanwhile.
+        if (document.activeElement === userInputTextarea) return;
 
         syncInputTextareaWithHiddenTextarea(userInputTextarea, textarea);
         if (displayDiv) {
@@ -75,6 +82,14 @@ function addEventsToUserInputTextarea(userInputTextarea, textarea, node, display
 
     // Highlight Codemirror text on focus of contenteditable div
     On.focus(userInputTextarea, syncScroll);
+
+    // Focus held the echo off, so the note may have moved on without the card --
+    // an AI streaming into this node, or another pane rewriting it. Catch up now,
+    // while there is no keystroke left to lose.
+    On.blur(userInputTextarea, (e)=>{
+        syncInputTextareaWithHiddenTextarea(userInputTextarea, textarea);
+        if (displayDiv) ZetSyntaxDisplay.syncAndHighlight(displayDiv, userInputTextarea);
+    });
 
     On.mousedown(userInputTextarea, (e)=>{
         if (userInputTextarea.contains(e.target) && !e.getModifierState(controls.altKey.value)) {
@@ -111,11 +126,18 @@ function addEventsToUserInputTextarea(userInputTextarea, textarea, node, display
 let isEditableDivProgrammaticChange = false;
 let isHiddenTextareaProgrammaticChange = false;
 
+// A text node keeps its body twice: `node.textarea` is the whole of it, and is
+// what the notes pane and the saved graph are written from, while `.editable-div`
+// is the copy on the card that a reader types into and the highlight overlay is
+// built from. The two functions below are the only crossing between them, so they
+// are also the one place the card's copy can differ from the note -- which is what
+// keeps a link-only line off the card. See `splitTrailingRefs`.
+
 function syncInputTextareaWithHiddenTextarea(userInputTextarea, textarea) {
     if (!isHiddenTextareaProgrammaticChange) {
         isEditableDivProgrammaticChange = true;
         let previousContent = userInputTextarea.value;
-        const currentContent = textarea.value;
+        const currentContent = ZettelkastenParser.splitTrailingRefs(textarea.value).body;
 
         if (previousContent !== currentContent) {
             const selectionStart = userInputTextarea.selectionStart;
@@ -137,11 +159,23 @@ function syncHiddenTextareaWithInputTextarea(textarea, contentEditable) {
         const contentEditableValue = contentEditable.value;
         const textareaValue = textarea.value;
 
-        // Count leading empty lines in the textarea
-        const leadingEmptyLines = (textareaValue.match(/^(\n*)/) || [''])[0];
+        // The card never held the note's trailing link lines, so typing in it must
+        // not be read as deleting them. They come back off the note's own text,
+        // which is still the copy this is about to overwrite -- there is no second
+        // store of them to fall out of step with this one.
+        const {body, refs} = ZettelkastenParser.splitTrailingRefs(textareaValue);
+        // Count leading empty lines in the prose, which is what the card was given
+        // -- counting them in the whole note would count the newline above the
+        // links as well, and re-adding it every sync grew the note a line at a time.
+        const leadingEmptyLines = (body.match(/^(\n*)/) || [''])[0];
+        const prose = contentEditableValue.trimStart();
+        // The links own their lines, never the newline above them: a note whose
+        // prose is gone starts at its links, and one that has prose again puts a
+        // newline back rather than running the two together.
+        const links = refs.replace(/^\n/, '');
 
         // Combine leading empty lines with the content editable value
-        const newValue = leadingEmptyLines + contentEditableValue.trimStart();
+        const newValue = leadingEmptyLines + prose + (prose && links ? '\n' : '') + links;
 
         if (textareaValue !== newValue) {
             textarea.value = newValue;

@@ -284,6 +284,46 @@ class ZettelkastenParser {
         const withoutRefs = line.replace(new RegExp(`${escTag}.*?${escClose}`, 'g'), '');
         return withoutRefs.replace(/[\s,]/g, '') === '';
     }
+
+    // A note's trailing link-only lines, split off from its prose, so that
+    // `body + refs` is the text again.
+    //
+    // A line that is nothing but refs is a list of edges written as text. The card
+    // shows that list as chips under the title already, so painting it a second
+    // time as `[[Title]]` is the same fact twice -- once in a notation the reader
+    // never asked for. Only the card's editable copy drops it: the refs stay in
+    // this note's text, which is the one place an edge between two text notes is
+    // stored, and `handleRefTags` deletes any edge whose ref it cannot find there.
+    //
+    // Trailing, not anywhere. The visible copy is then a prefix of the real text,
+    // so one caret offset means the same position in both and the sync between
+    // them carries it across untouched. It is also the only place `addEdge` writes
+    // a ref of its own.
+    static splitTrailingRefs(text) {
+        const refTag = tagValues.refTag;
+        const closingBracket = bracketsMap[refTag];
+        const escTag = escapeRegExp(refTag);
+        const escClose = escapeRegExp(closingBracket || refTag);
+
+        const lines = text.split('\n');
+        let cut = lines.length;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i];
+            // Blank lines carry over a ref line above them -- the text's own final
+            // newline makes one -- but a run of blanks under prose is the note's
+            // spacing, and nothing is cut until a ref line is actually reached.
+            if (line.trim() === '') continue;
+            if (!line.includes(refTag)) break;
+            if (!ZettelkastenParser.#isRefList(line, refTag, escTag, escClose, closingBracket)) break;
+            cut = i;
+        }
+        if (cut === lines.length) return {body: text, refs: ''};
+
+        const body = lines.slice(0, cut).join('\n');
+        // Sliced, not re-joined: `refs` then holds the newline that separated it
+        // from the prose, and the two halves are the original text exactly.
+        return {body, refs: text.slice(body.length)};
+    }
 }
 
 function updateAllZetMirrorModes() {
