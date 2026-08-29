@@ -440,8 +440,10 @@ class ZettelkastenProcessor {
             const linesToAdd = [wrap.plainText, line].filter(Boolean);
             wrap.plainText = linesToAdd.join('\n');
 
-            const targetTextarea = wrap.node.content.children[0].children[1].children[0];
-            targetTextarea.value = wrap.plainText;
+            // By accessor, not by child index: the card's children are not fixed --
+            // the link strip added one, which silently made this walk land on a chip
+            // and write a node's body onto a span.
+            TextArea.ofNode(wrap.node).value = wrap.plainText;
         }
     }
 
@@ -623,7 +625,7 @@ class ZettelkastenProcessor {
                 delete wrapPerTitle[wrap.title];
                 wrap.title = nodeTitle;
                 wrap.live = true;
-                wrap.node.content.children[0].children[0].children[1].value = nodeTitle;
+                wrap.node.view.titleInput.value = nodeTitle;
             } else {
                 const sx = (Math.random() - 0.5) * 1.8;
                 const sy = (Math.random() - 0.5) * 1.8;
@@ -644,7 +646,7 @@ class ZettelkastenProcessor {
     }
 
     initLlmWrap(wrap){
-        On.input(wrap.node.content.children[0].children[0].children[1], (e)=>{
+        On.input(wrap.node.view.titleInput, (e)=>{
             const oldName = wrap.title;
             let newName = e.target.value.trim().replace(',', '');
             if (newName === oldName) return;
