@@ -221,57 +221,68 @@ class ZettelkastenParser {
         }
     }
 
+    // Unlinking removes the link, not the words. A ref sitting on a line of its own
+    // is a "see also" entry, so the whole entry goes; a ref inside a sentence is a
+    // mention, so only its markup goes. Deleting an inline ref's text left a hole in
+    // the prose -- "and  is the one it leans on" -- and the words are what lets the
+    // same mention be promoted back into a link afterwards.
     removeEdge(fromTitle, toTitle, cm) {
         if (!fromTitle || !toTitle) {
             Logger.err("One or both titles are empty or undefined.");
             return;
         }
 
-        const lineCount = cm.lineCount();
-        const closingBracket = bracketsMap[Tag.ref];
-
         const nodeLine = this.getNodeTitleLine(fromTitle);
-        if (nodeLine !== undefined) {
-            for (let j = nodeLine + 1; j < lineCount; j++) {
-                let nextLine = cm.getLine(j);
-                if (nextLine.startsWith(Tag.node)) break;
+        if (nodeLine === undefined) return;
 
-                let escapedRefTag = escapeRegExp(tagValues.refTag);
-                let lineHasRefTag = new RegExp(escapedRefTag).test(nextLine);
+        const closingBracket = bracketsMap[Tag.ref];
+        const refTag = tagValues.refTag;
+        const escTag = escapeRegExp(refTag);
+        // Without a closing bracket the tag itself closes the ref.
+        const escClose = escapeRegExp(closingBracket || refTag);
+        const escTitle = escapeRegExp(toTitle);
 
-                if (lineHasRefTag) {
-                    let escapedTargetTitle = escapeRegExp(toTitle);
+        for (let j = nodeLine + 1; j < cm.lineCount(); j++) {
+            const line = cm.getLine(j);
+            if (line.startsWith(Tag.node)) break;
+            if (!line.includes(refTag)) continue;
 
-                    let regExp;
-                    if (closingBracket) {
-                        regExp = new RegExp(`(${escapedRefTag}\\s*${escapedTargetTitle}\\s*${escapeRegExp(closingBracket)})|(,?\\s*${escapedTargetTitle}\\s*,?)`, 'g');
-                    } else {
-                        regExp = new RegExp(`(${escapedRefTag}\\s*${escapedTargetTitle}\\s*${escapedRefTag})|(,?\\s*${escapedTargetTitle}\\s*,?)`, 'g');
-                    }
+            const isList = ZettelkastenParser.#isRefList(line, refTag, escTag, escClose, closingBracket);
+            // The bare-title arm is for a comma-separated ref line (`ref: A, B`),
+            // where a title stands alone as a member. On a line of prose it would
+            // also match every other mention of the same words, so it is only used
+            // on the lines it was written for.
+            const ref = `${escTag}\\s*${escTitle}\\s*${escClose}`;
+            const regExp = new RegExp(isList ? `(${ref})|(,?\\s*${escTitle}\\s*,?)` : `(${ref})`, 'g');
 
-                    nextLine = nextLine.replace(regExp, (match, p1, p2) => {
-                        if (p1) return '';
-                        if (p2) return (p2.startsWith(',') ? ',' : '');
-                    }).trim();
+            let next = line.replace(regExp, (match, p1, p2) => {
+                if (p1) return (isList ? '' : toTitle);
+                return (p2.startsWith(',') ? ',' : '');
+            });
 
-                    nextLine = nextLine.replace(/,\s*$/, '').trim();
-
-                    if (closingBracket) {
-                        let emptyBracketsRegExp = new RegExp(`${escapedRefTag}\\s*${escapeRegExp(closingBracket)}`, 'g');
-                        if (emptyBracketsRegExp.test(nextLine)) {
-                            nextLine = nextLine.replace(emptyBracketsRegExp, '');
-                        }
-                    } else {
-                        let lonelyRefTag = new RegExp(`^${escapedRefTag}\\s*$`);
-                        if (lonelyRefTag.test(nextLine)) nextLine = '';
-                    }
-
-                    cm.replaceRange(nextLine, { line: j, ch: 0 }, { line: j, ch: cm.getLine(j).length });
-                }
+            if (isList) {
+                next = next.trim().replace(/,\s*$/, '').trim();
+                // Dropping the last member leaves markup with nothing inside it.
+                next = (closingBracket
+                    ? next.replace(new RegExp(`${escTag}\\s*${escClose}`, 'g'), '')
+                    : next.replace(new RegExp(`^${escTag}\\s*$`), ''));
             }
+
+            cm.replaceRange(next, { line: j, ch: 0 }, { line: j, ch: line.length });
         }
 
         cm.refresh();
+    }
+
+    // A line holding nothing but refs and the separators between them is a list of
+    // links; anything else is a sentence that contains one. With no closing bracket
+    // a ref has no end of its own, so the tag can only own a whole line -- which is
+    // the only shape `addEdge` writes it in.
+    static #isRefList(line, refTag, escTag, escClose, closingBracket) {
+        if (!closingBracket) return line.trim().startsWith(refTag);
+
+        const withoutRefs = line.replace(new RegExp(`${escTag}.*?${escClose}`, 'g'), '');
+        return withoutRefs.replace(/[\s,]/g, '') === '';
     }
 }
 
