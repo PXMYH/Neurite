@@ -140,6 +140,9 @@ class Node {
         this.applyAnchorForce();
         this.handleMouseInteraction(dt);
         this.draw();
+        // Returns immediately unless this card's links changed since the last
+        // frame. See linkstrip.js for why the row is polled and not pushed to.
+        LinkStrip.refresh(this.view);
     }
 
     clampDt(dt) {

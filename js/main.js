@@ -226,6 +226,7 @@ class PageLoad {
         'js/nodes/edgeclass.js',
         'js/nodes/nodeutilities.js',
         'js/nodes/createnodes/window.js',
+        'js/nodes/createnodes/linkstrip.js',
         'js/nodes/createnodes/createnodes.js',
         'js/nodes/nodeinteraction/nodemode.js',
         'js/nodes/nodeinteraction/movenodes.js',
