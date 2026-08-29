@@ -123,8 +123,153 @@ class ZetSyntaxDisplay {
         content += '\n'; // Adds visual spacing
 
         displayDiv.innerHTML = content;
+
+        // Every span in here was just replaced, so a chip still pointing at one is
+        // pointing at a detached node at a stale position.
+        ZetPromote.hide();
     }
 }
+
+
+// A bare mention of another note's title is already highlighted, and already
+// click-navigates -- `applyNodeTitleHighlighting` above wraps every occurrence of
+// every known title, brackets or not. The one thing a bare mention does not do is
+// draw an edge, because an edge is stored as `Tag.ref` markup in the prose and
+// nothing but typing has ever put it there.
+//
+// That missing step is what this fills: hover a mention and a chip offers to
+// promote it in place, wrapping words that are already written. The chip's label
+// is the markup it inserts, which is also how the syntax gets taught now that
+// nobody has to type it.
+//
+// The chip lives in `.editor-wrapper`, never in the overlay. The overlay is
+// `pointer-events: none`, its `innerHTML` is rebuilt from the textarea on every
+// keystroke, and it has to stay glyph-for-glyph aligned with that textarea -- so
+// nothing may be added to it, and nothing may change a span's `textContent`, which
+// the click handler below reads as the title.
+class ZetPromote {
+    static #btn = null;
+    static #span = null;
+
+    static get #openTag(){ return tagValues.refTag }
+    // Only a bracket-style ref tag can wrap a phrase mid-sentence. A bare tag like
+    // `Ref:` claims the rest of its line, so promoting in place would swallow the
+    // sentence around the mention. No closing tag, no chip.
+    static get #closeTag(){ return bracketsMap[tagValues.refTag] }
+
+    static onMouseOver(e){
+        if (e.target.classList.contains('node-title-sd')) ZetPromote.#show(e.target);
+    }
+    static onMouseOut(e){
+        const to = e.relatedTarget;
+        if (to === ZetPromote.#btn || to === ZetPromote.#span) return;
+        // Reaching the chip means crossing the note's own text, which is neither of
+        // those two, so the chip stays for as long as the pointer is in this note.
+        // `parentElement` is the `.editor-wrapper` it was appended to.
+        if (to && ZetPromote.#btn?.parentElement?.contains(to)) return;
+        ZetPromote.hide();
+    }
+    static hide(){
+        ZetPromote.#span = null;
+        ZetPromote.#btn?.remove();
+    }
+
+    static #show(span){
+        ZetPromote.hide();
+        if (ZetPromote.#offsetOf(span) === -1) return;
+
+        const overlay = span.closest('.syntax-display-div');
+        const wrapper = span.closest('.editor-wrapper');
+        const btn = ZetPromote.#btn ??= ZetPromote.#makeBtn();
+        btn.textContent = ZetPromote.#openTag + ' ' + ZetPromote.#closeTag;
+        btn.title = 'Link this note to "' + span.textContent + '"';
+        ZetPromote.#span = span;
+        // `offsetParent` is the wrapper -- the overlay between them is static -- so
+        // a span's offsets are already in the wrapper's own coordinates, untouched
+        // by the canvas transform above it. Only the overlay's scroll comes off.
+        // The chip's own size is measurable only once it is in the document.
+        wrapper.appendChild(btn);
+        const top = span.offsetTop - overlay.scrollTop;
+        // Above the mention, the way a selection toolbar sits. Beside it would cover
+        // the rest of the sentence being read, which is the habit this is meant to
+        // break. Below when the mention is on the note's first line.
+        btn.style.top = (top >= btn.offsetHeight ? top - btn.offsetHeight
+                                                 : top + span.offsetHeight) + 'px';
+        // The note body clips, so a mention near the right edge needs its chip
+        // pulled back inside.
+        const left = span.offsetLeft - overlay.scrollLeft;
+        btn.style.left = Math.min(left, wrapper.clientWidth - btn.offsetWidth) + 'px';
+    }
+
+    static #makeBtn(){
+        const btn = Html.make.button('zet-promote');
+        On.click(btn, ZetPromote.#promote);
+        // It floats over the note body, which is also a drag handle for the card.
+        On.mousedown(btn, Event.stopPropagation);
+        return btn;
+    }
+
+    // Where in the editable textarea the hovered mention sits, or -1 when
+    // promoting it would be wrong or cannot be verified. The overlay is a separate
+    // element from the textarea it mirrors, so a span carries no character offset
+    // of its own; a Range from the overlay's start to the span's start measures one.
+    static #offsetOf(span){
+        const closeTag = ZetPromote.#closeTag;
+        if (!closeTag) return -1;
+
+        const wrapper = span.closest('.editor-wrapper');
+        const overlay = span.closest('.syntax-display-div');
+        const textarea = wrapper?.querySelector('.editable-div');
+        if (!overlay || !textarea) return -1;
+
+        const title = span.textContent;
+        // A note mentioning its own title would promote to an edge to itself.
+        const ownTitle = wrapper.closest('.window')?.querySelector('.title-input')?.value;
+        if (title === ownTitle?.trim()) return -1;
+
+        const range = document.createRange();
+        range.setStart(overlay, 0);
+        range.setEnd(span, 0);
+        const offset = range.toString().length;
+
+        // The overlay is escaped HTML wrapped in spans, so the walk above can drift
+        // from the plain text it was built from -- and a drifted offset would splice
+        // brackets into the middle of a sentence rather than fail. Reading the title
+        // back at the offset is what proves it did not drift.
+        const value = textarea.value;
+        if (value.substr(offset, title.length) !== title) {
+            Logger.warn("Mention", JSON.stringify(title), "did not read back at offset", offset);
+            return -1;
+        }
+        // `applyNodeTitleHighlighting` runs before the ref markup is spanned, so a
+        // title already inside the tag is highlighted too. Nothing left to promote.
+        const openTag = ZetPromote.#openTag;
+        if (value.slice(offset - openTag.length, offset) === openTag) return -1;
+
+        return offset;
+    }
+
+    static #promote(){
+        const span = ZetPromote.#span;
+        const offset = (span?.isConnected ? ZetPromote.#offsetOf(span) : -1);
+        if (offset === -1) return ZetPromote.hide();
+
+        const title = span.textContent;
+        const textarea = span.closest('.editor-wrapper').querySelector('.editable-div');
+        const value = textarea.value;
+        textarea.value = value.slice(0, offset)
+                       + ZetPromote.#openTag + title + ZetPromote.#closeTag
+                       + value.slice(offset + title.length);
+        ZetPromote.hide();
+        // The event a keystroke fires, and the only way in: the card's own `input`
+        // handler is what copies this into the hidden textarea the Zettelkasten
+        // processor listens to, and that pass is what draws the edge.
+        textarea.dispatchEvent(new Event('input'));
+    }
+}
+
+On.mouseover(document, ZetPromote.onMouseOver);
+On.mouseout(document, ZetPromote.onMouseOut);
 
 On.click(document, (e)=>{
     if (e.target.classList.contains('node-title-sd')) {

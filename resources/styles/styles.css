@@ -480,6 +480,37 @@ body {
     line-height: inherit;
 }
 
+/* The chip that turns a plainly-written mention into a reference. Absolute inside
+   `.editor-wrapper`, which is the nearest positioned ancestor: it cannot live in
+   the overlay it points into, because that overlay is `pointer-events: none` and
+   its markup is rebuilt on every keystroke.
+
+   Filled `--ui-accent` rather than outlined in `.cm-ref`'s blue: it floats over
+   prose, so it has to read as a control at a glance and not as note content. Its
+   own `font-size` and `letter-spacing`, because the body sets both for prose and
+   this is chrome. */
+.zet-promote {
+    position: absolute;
+    z-index: 2;
+    padding: 0 5px;
+    border: none;
+    border-radius: var(--ui-radius-inner);
+    background-color: var(--ui-accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 17px;
+    letter-spacing: 0;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: var(--ui-shadow);
+    transition: var(--ui-transition);
+}
+
+    .zet-promote:hover {
+        background-color: #7396d4;
+    }
+
 .editable-div *, .syntax-display-div * {
     color: inherit;
 }
