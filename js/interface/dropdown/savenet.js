@@ -5,9 +5,13 @@
 // A web page cannot write to disk on its own. The user has to name the file
 // once, in a real click, and only then may the page keep writing to it. Chrome
 // remembers that grant across restarts, so after the one click every autosave
-// lands in that file with no further prompting. Safari -- and every browser on
-// iOS -- has no file picker at all, so there this stays off and the copy in
-// IndexedDB is the only one. That is why `isSupported` is checked before the
+// lands in that file with no further prompting.
+//
+// Where there is no picker at all, this stays off and the evictable copy in
+// IndexedDB is the only one. That is not just Safari and iOS: Brave ships with
+// the File System Access API disabled, so `showSaveFilePicker` is `undefined`
+// there too and `Save to…` is a plain download into the browser's own folder.
+// Measured, not assumed -- and it is why `isSupported` is checked before the
 // button is even shown, rather than failing at the moment of the click.
 class DiskMirror {
     static isSupported = (typeof window.showSaveFilePicker === 'function');
@@ -427,7 +431,20 @@ View.Graphs = class {
                 .#updateGraphs()
         }
 
+        // The only irreversible control in the panel, and until now the only one that
+        // asked nothing: it dropped the graph, its blobs and its meta on one click, while
+        // Clear -- which deletes nothing at all -- asked Yes or No first. The graph is
+        // named in the question, because a list of saves is a list of near-identical rows
+        // and "are you sure" is not an answer to "which one".
         #onBtnDeleteClicked = (e)=>{
+            const title = this.meta.title || "this graph";
+            const msg = 'Delete "' + title + '"? This is the only copy in the browser, '
+                      + 'and it cannot be undone.';
+            window.confirm(msg).then(this.#handleConfirmDelete);
+        }
+        #handleConfirmDelete = (confirmed)=>{
+            if (!confirmed) return;
+
             const meta = this.meta;
             const mom = this.mom;
             const graphIndex = mom.#graphs.findIndex(Object.isThis, meta);

@@ -75,11 +75,26 @@ automation server as its first argument (`node automation.js http://localhost:91
   *after* the rebase, confirm `git merge-base --is-ancestor origin/main main`, then
   `git merge --ff-only` and push. Report the revision range that moved. Nothing is
   committed or pushed unless Capitan X asks for it.
-- **Verification that counts here**: `npm test` and `npm run typecheck`, plus a real
-  browser pass — most of this app cannot be checked any other way. For UI work, drive
-  Playwright and read Chrome's accessibility tree through CDP
-  (`Accessibility.getFullAXTree`) when the change is about names, roles or
-  descriptions; a screenshot cannot show those.
+- **Verification that counts here, and in this order: the browser first, the test
+  second.** The suite reads source as text or slices a file into a `node:vm`, so it can
+  only ever agree with the shape of the code that was just written — it cannot see
+  wiring. Two bugs walked past a green suite that way: a renderer handing out *copies* of
+  the objects a delete had to find by identity, and a file picker nobody was calling with
+  the name it accepted. One click in a browser found each of them. So: make the change,
+  drive it in a browser, and only then write the test that locks the behaviour down.
+  `npm test` and `npm run typecheck` after that, never instead of it. For UI work read
+  Chrome's accessibility tree through CDP (`Accessibility.getFullAXTree`) when the change
+  is about names, roles or descriptions; a screenshot cannot show those.
+- **Measure a browser's capabilities; never recall them.** `DiskMirror.isSupported` is the
+  worked example: Brave ships with the File System Access API off, so
+  `showSaveFilePicker`, `showOpenFilePicker` and `showDirectoryPicker` are all `undefined`
+  there and `Save to…` is a plain download — the same as Safari and every browser on iOS.
+  A `typeof` in the browser under test costs one line and is the only thing that settles
+  it.
+- **Grep every caller before editing a function, not after the fix misbehaves.** Nothing
+  under `js/` exports, so a function's callers are found by name across the tree and there
+  is no import graph to lean on. `getSavedViewsFromCache` had two, and reading the second
+  one is what would have shown the copy bug above before it was written.
 - **Tests must not need the backend's dependencies.** Nothing installs `express` for
   `npm test`, so a server under `localhost_servers/` is testable only if its request
   handlers sit in a module that does not import express (see

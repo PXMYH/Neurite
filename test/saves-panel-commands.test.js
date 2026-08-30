@@ -55,6 +55,29 @@ test('the selected save grows without cutting off its own title', ()=>{
         + 'past the left edge of the panel');
 });
 
+test('deleting a save asks first, and names the save it is asking about', ()=>{
+    // The one irreversible control in the panel. It used to drop the graph, its blobs and
+    // its meta on a single click, while Clear -- which deletes nothing -- asked Yes or No.
+    // Anchored on the handler's own definition: `#handleConfirmDelete` holds the deletion
+    // now, and a `window.confirm` anywhere else in the file would satisfy a whole-file
+    // search while this button still deleted on the first click.
+    const clicked = savenet.match(/#onBtnDeleteClicked = \(e\)=>\{[\s\S]*?\n {8}\}/);
+    assert.ok(clicked, '#onBtnDeleteClicked is gone or no longer a field at that indent');
+    assert.match(clicked[0], /window\.confirm\(msg\)\.then\(this\.#handleConfirmDelete\)/,
+        'X deletes a save without asking again');
+    // The title, because a list of saves is a list of near-identical rows and "are you
+    // sure" does not answer "which one".
+    assert.match(clicked[0], /this\.meta\.title/,
+        'the question no longer names the graph it is about');
+
+    const handler = savenet.match(/#handleConfirmDelete = \(confirmed\)=>\{[\s\S]*?\n {8}\}/);
+    assert.ok(handler, '#handleConfirmDelete is gone or no longer a field at that indent');
+    assert.match(handler[0], /if \(!confirmed\) return/,
+        'the save is deleted whatever the reader answers');
+    assert.match(handler[0], /deleteForMeta\(meta\)/,
+        'the confirmed branch no longer deletes anything');
+});
+
 test('the Saves panel no longer narrates autosave', ()=>{
     // The negative control for this whole test: if stripping ever stops working, the
     // comment that explains the removal satisfies every assertion below.
