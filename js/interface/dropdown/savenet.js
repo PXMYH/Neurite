@@ -329,7 +329,6 @@ View.Graphs = class {
         const stored = this.#stored;
         this.#blobs = {};
         this.#graphs = [];
-        if (this.#selectedGraph) this.#selectedGraph.title = ''; // for autosave
         return stored.forEachMetaAndGraphId(this.#appendMeta)
             .then(stored.forEachBlobMetaAndGraphId
                     .bind(stored, this.#processBlobMeta));
@@ -839,17 +838,21 @@ View.Graphs = class {
         img.src = URL.createObjectURL(blob);
     }
 
-    // Autosave is the only way a graph is written, so it can never decline to
-    // run: with nothing selected it opens a save of its own instead of dropping
-    // the work. The one case it does skip is a blank title, which #updateGraphs
-    // sets while it rebuilds the list -- that is a save in progress, not an
-    // unsaved graph.
+    // Autosave is the only way a graph is written, so it can never decline to run: with
+    // nothing selected it opens a save of its own instead of dropping the work.
+    //
+    // It used to have a second exit -- `if (!selected.title) return Promise.resolve()` --
+    // for the window in which `#updateGraphs` blanked that title while it rebuilt the list
+    // of saves. There is no list to rebuild any more, and that exit was a silent one: a
+    // tick landing inside the window wrote nothing, and if the title was ever left blank
+    // the graph stopped being saved for the rest of the session with nothing to show it.
+    // A save that declines to run is the one thing this must never be, so both the
+    // blanking and the exit are gone.
     #autosave = ()=>{
         const selected = this.#selectedGraph;
         if (!selected) return this.#saver.saveWithTitle(this.#titleForNewGraph());
-        if (!selected.title) return Promise.resolve();
 
-        return this.#saver.saveWithTitle(selected.title);
+        return this.#saver.saveWithTitle(selected.title || this.#titleForNewGraph());
     }
     // #maxGraphId only ever climbs, so this cannot collide with a title already
     // in the list, and it stays readable in the way a timestamp would not.
@@ -900,9 +903,13 @@ View.Graphs = class {
         const meta = this.#selectedGraph;
         return (meta ? this.#fileNameForMeta(meta) : 'neurite-graph.neurite');
     }
-    // The bundle is built from what is in the store, not from the screen, so the
-    // graph has to be banked first or the copy is up to eight seconds stale.
+    // The bundle is built from what is in the store, not from the screen, so the graph has
+    // to be banked first or the copy is up to eight seconds stale -- and the bank has to be
+    // one that cannot be skipped. `saveMetaAndData` returns early when the data matches the
+    // last write, which is right for a timer and wrong here: it is the difference between
+    // "nothing changed" and "nothing was written", and a file is the only copy there is.
     #downloadCopy(){
+        this.#stored.forgetLastWritten();
         return this.#autosave().then(this.#askNameThenDownload)
     }
     // A picker asks for the name itself. A download does not: it drops the file in
@@ -939,6 +946,25 @@ View.Graphs = class {
     #downloadAs = (name)=>{
         if (name === null) return Logger.info("Save cancelled");
 
+        // The check that would have caught this bug instead of shipping it in a file. The
+        // bytes come out of the store, the screen is what the reader believes they are
+        // saving, and the two disagreeing is silent in every other direction: a 6 KB file
+        // full of settings and no notes looks like a save that worked.
+        if (Object.keys(Graph.nodes).length > 0) {
+            return this.#stored.dataForMeta(this.#selectedGraph)
+                .then(this.#downloadIfDataHoldsTheNodes.bind(this, name))
+        }
+        return this.#writeFile(name);
+    }
+    #downloadIfDataHoldsTheNodes = (name, data)=>{
+        if (String(data || '').includes('data-node_json')) return this.#writeFile(name);
+
+        Logger.err("Refusing to save an empty file: the store holds no nodes for",
+                   this.#selectedGraph?.graphId);
+        alert("This graph could not be saved: what is on screen has not been recorded "
+            + "yet. Nothing was written. Please try again in a moment.");
+    }
+    #writeFile = (name)=>{
         // The name is also the graph's title from here on, so the next save offers what
         // the reader typed rather than reverting to `Graph 4`.
         const meta = this.#selectedGraph;

@@ -112,10 +112,66 @@ test('Save to… asks what to call the file when the browser will not', ()=>{
     assert.ok(then, '#downloadAs is gone or no longer a field at that indent');
     assert.match(then[0], /if \(name === null\) return/,
         'cancelling the prompt still writes a file');
-    // The answer sticks, or the next save offers "Graph 4" again and the reader renames
-    // the same graph every time.
-    assert.match(then[0], /meta\.title = /, 'the name typed is not kept as the graph title');
-    assert.match(then[0], /saveMeta\(meta\)/, 'the kept title is never written to the store');
+
+    // The answer sticks, or the next save offers `Graph.neurite` again and the reader
+    // renames the same graph every time.
+    const write = savenet.match(/#writeFile = \(name\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(write, '#writeFile is gone or no longer a field at that indent');
+    assert.match(write[0], /meta\.title = /, 'the name typed is not kept as the graph title');
+    assert.match(write[0], /saveMeta\(meta\)/, 'the kept title is never written to the store');
+});
+
+test('a file is never written without the nodes that are on screen', ()=>{
+    // The bug this exists for shipped a real file: 6,529 bytes of settings, saved views and
+    // an empty Pane, with `data-node_json` appearing zero times in it, while two notes sat
+    // on the canvas. Every part of that failure is quiet -- the download runs, the file has
+    // a plausible size, and it opens without error into an empty graph.
+    //
+    // Two changes, and the order matters. First the bank cannot be skipped:
+    // `saveMetaAndData` returns early when the data equals the last write, which is right
+    // for an 8-second timer and wrong for the one copy that leaves the browser.
+    const download = savenet.match(/#downloadCopy\(\)\{[\s\S]*?\n {4}\}/);
+    assert.ok(download, '#downloadCopy is gone or no longer a method at that indent');
+    assert.match(download[0], /this\.#stored\.forgetLastWritten\(\)/,
+        'the save before a download can be skipped as unchanged again');
+    const iForget = download[0].indexOf('forgetLastWritten');
+    const iSave = download[0].indexOf('#autosave()');
+    assert.ok(iForget < iSave, 'the skip is cleared after the save, which is no clearing');
+
+    // Then the bytes are checked against the screen before they reach a file.
+    const guard = savenet.match(/#downloadIfDataHoldsTheNodes = \(name, data\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(guard, '#downloadIfDataHoldsTheNodes is gone or no longer a field at that indent');
+    assert.match(guard[0], /includes\('data-node_json'\)/,
+        'nothing checks that the data being written holds any node');
+    assert.match(guard[0], /alert\(/,
+        'a refused save is silent, which is the failure this replaces');
+    assert.doesNotMatch(guard[0], /#writeFile\(name\)[\s\S]*#writeFile\(name\)/,
+        'the file is written on both branches');
+
+    // The comparison is against the live graph, so an empty canvas still saves.
+    const decide = savenet.match(/#downloadAs = \(name\)=>\{[\s\S]*?\n {4}\}/)[0];
+    assert.match(decide, /Object\.keys\(Graph\.nodes\)\.length > 0/,
+        'the guard no longer asks the graph what is on screen');
+});
+
+test('autosave cannot decline to save', ()=>{
+    // It had a second exit for a window `#updateGraphs` opened: that function blanked the
+    // selected record's title while it rebuilt the list of saves, and `#autosave` treated a
+    // blank title as "a save is in progress" and returned without writing. There is no list
+    // to rebuild now, and the exit was silent in the worst way -- a title left blank meant
+    // every tick for the rest of the session wrote nothing, with nothing on screen to say
+    // the graph had stopped being saved.
+    const auto = savenet.match(/#autosave = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(auto, '#autosave is gone or no longer a field at that indent');
+    assert.doesNotMatch(auto[0], /if \(!selected\.title\) return/,
+        'autosave can silently do nothing again');
+    assert.match(auto[0], /saveWithTitle\(selected\.title \|\| this\.#titleForNewGraph\(\)\)/,
+        'a record with no title no longer gets one, so the save has nothing to key on');
+
+    const update = savenet.match(/#updateGraphs = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(update, '#updateGraphs is gone or no longer a field at that indent');
+    assert.doesNotMatch(update[0], /\.title = ''/,
+        'the rebuild blanks the selected title again, which is what made a save skippable');
 });
 
 test('a dropped .neurite file is a graph, not a node full of JSON', ()=>{
