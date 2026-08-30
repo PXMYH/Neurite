@@ -1,0 +1,46 @@
+<div class="submenu">
+
+    <!-- Places on the Plane, kept so the reader can come back to them. Every one of
+         these moves the *view* and nothing else: `returnToSavedView` reads a stored pan
+         and zoom and hands them to `Animation.goToCoords`, so no Node moves and the
+         Fractal's equation does not change.
+
+         They were the lower two-thirds of the Saves panel, under the list of Saved
+         Graphs, which put two unrelated jobs behind one row: one about what is stored in
+         the browser, the other about where the reader is looking. They also fought that
+         panel's layout -- `distributeCoordinates` split them across three containers of
+         fixed height, indented to clear a `position: fixed` button column, which is why
+         they read in the wrong order with gaps between them. One container that wraps is
+         what they always wanted.
+
+         Which of them show depends on `fractal-select`, which lives in the Fractal panel:
+         each equation has its own landmarks, and `savedViews.all` holds the ones that
+         make sense under any of them. That listener is in `displaysavedcoords.js`, not
+         here. -->
+
+    <div class="button-label settings-heading">Places</div>
+    <div id="savedCoordinatesContainer" class="saved-coordinates-container"></div>
+
+    <!-- Store reads the current pan and zoom and asks for a name; Delete removes the one
+         last clicked, which is the only thing that marks a place as selected. -->
+    <div class="view-buttons">
+        <a id="saveCoordinatesBtn">Store Coordinates</a>
+        <a id="deleteCoordinatesBtn">Delete Coordinates</a>
+    </div>
+
+    <!-- Not a readout: both boxes are inputs, and typing in one moves the view. That is
+         the same journey a place above makes, written as numbers -- which is the only way
+         to reach a point nobody has named. `interface.js` parses what is typed and sets
+         `App.interface.coordsLive = false` while it does, so the live position stops
+         overwriting the digits mid-word. -->
+    <div id="coordinates" class="coordinates-container">
+        <div class="coordinate-field">
+            <span>pan</span>
+            <input id="pan" type="text" value="0+0i" style="background:none; border:none;" size="28" />
+        </div>
+        <div class="coordinate-field">
+            <span>zoom</span>
+            <input id="zoom" type="text" value="1" style="background:none; border:none;" size="25" />
+        </div>
+    </div>
+</div>

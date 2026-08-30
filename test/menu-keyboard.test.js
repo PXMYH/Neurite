@@ -248,19 +248,19 @@ test('Escape leaves by the same two steps it came in', ()=>{
 
 test('every menu row is a button that says what it does', ()=>{
     const rows = htmlCode.match(/<button[^>]*class="[^"]*menu-row[^"]*"[^>]*>/g) || [];
-    assert.equal(rows.length, 11,
-        'the menu no longer holds eleven rows as <button> open tags; every count below '
+    assert.equal(rows.length, 12,
+        'the menu no longer holds twelve rows as <button> open tags; every count below '
         + 'reads this list');
 
     for (const row of rows) {
         assert.match(row, /type="button"/,
             'a menu row has no type, so it is a submit button: harmless only while '
-            + '`closest(\'form\')` is null for all eleven, and `aitab.html` does contain a '
+            + '`closest(\'form\')` is null for all twelve, and `aitab.html` does contain a '
             + '<form>. Row: ' + row.slice(0, 60));
     }
 
     const tablinks = rows.filter( (r)=> r.includes('tablink') );
-    assert.equal(tablinks.length, 5, 'the five panel rows are no longer five');
+    assert.equal(tablinks.length, 6, 'the six panel rows are no longer six');
 
     // This asserted the opposite for one commit. `aria-haspopup="true"` is defined by
     // ARIA as equivalent to `menu`, and Chrome's AX tree read back `hasPopup: "menu"` on
@@ -279,8 +279,8 @@ test('every menu row is a button that says what it does', ()=>{
     // "Screenshot"`, `haspopup: null`, `expanded: null`, and the panel heading still
     // reads "Ai".
     const panelSpans = htmlCode.match(/<span class="visually-hidden"> panel<\/span>/g) || [];
-    assert.equal(panelSpans.length, 5,
-        'the five panel rows no longer carry the word that tells a reader they descend a '
+    assert.equal(panelSpans.length, 6,
+        'the six panel rows no longer carry the word that tells a reader they descend a '
         + 'level. The chevron that says so on screen is `aria-hidden`, so without this '
         + 'they are indistinguishable from the six commands above the separator');
 

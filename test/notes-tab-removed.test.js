@@ -67,6 +67,7 @@ test('no menu row opens the Notes tab, and the ones left are in a known order', 
         ['tab4', 'Ai'],
         ['tab2', 'Fractal'],
         ['tab6', 'Saves'],
+        ['tab7', 'Views'],
         ['tab5', 'Settings'],
         ['tab3', 'Help'],
     ], 'the menu column changed; check that every row still has a label to open under');
@@ -407,16 +408,16 @@ test('switching menu view carries focus with it, rather than dropping it on the 
 });
 
 test('every menu row describes what it does, and the heading is not overridden', ()=>{
-    // The five panel rows carried a `title` as chips and got nothing in exchange when
+    // The panel rows carried a `title` as chips and got nothing in exchange when
     // they became rows, leaving one or two words as the whole description of a panel --
-    // while the command rows directly above them kept theirs. So this reads all eleven: a
+    // while the command rows directly above them kept theirs. So this reads all twelve: a
     // hover that works on half the rows is the shape the gap had.
     const iList = dropdownHtml.indexOf('class="menu-list"');
     const iDetail = dropdownHtml.indexOf('id="menuDetail"');
     assert.ok(iList > 0 && iDetail > iList, 'the list and the panel are no longer in that order');
     const rows = [...dropdownHtml.slice(iList, iDetail)
         .matchAll(/<button[^>]*class="menu-row[^"]*"[^>]*>/g)].map( (m)=> m[0] );
-    assert.equal(rows.length, 11, 'the menu no longer has eleven rows; check what this is reading');
+    assert.equal(rows.length, 12, 'the menu no longer has twelve rows; check what this is reading');
 
     for (const row of rows) {
         // Save to… is the one exception, and it is written at runtime: what that row
@@ -448,7 +449,8 @@ test('every menu row describes what it does, and the heading is not overridden',
     const PANELS = {
         tab4: ['aitab.html', 'API'],
         tab2: ['fractaltab.html', 'drawn'],
-        tab6: ['networkstab.html', 'coordinates'],
+        tab6: ['networkstab.html', 'saved'],
+        tab7: ['viewstab.html', 'coordinates'],
         tab5: ['settingstab.html', 'placement'],
         tab3: ['helptab.html', 'mouse'],
     };

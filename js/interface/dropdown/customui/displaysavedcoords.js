@@ -351,25 +351,12 @@ Coordinate.resetSelected = function () {
     this.selectedIndex = null;
 }
 
-function distributeCoordinates(savedViews) {
-    const mainCount = Math.round(savedViews.length * 0.50); // 50% for main
-    const topCount = Math.round(savedViews.length * 0.32); // 32% for top
-    // For the bottom, we use the remaining views
-    const bottomCount = savedViews.length - mainCount - topCount; // 15% for bottom
-
-    return {
-        mainViews: savedViews.slice(0, mainCount),
-        topViews: savedViews.slice(mainCount, mainCount + topCount),
-        bottomViews: savedViews.slice(mainCount + topCount)
-    };
-}
-
-function appendViewsToContainer(views, containerId, startIndex) {
+function appendViewsToContainer(views, containerId) {
     const container = Elem.byId(containerId);
     container.innerHTML = '';
 
     views.forEach((view, index) => {
-        const globalIndex = startIndex + index;
+        const globalIndex = index;
         const coordElement = Html.make.div('saved-coordinate-item');
         coordElement.textContent = view.title;
 
@@ -406,8 +393,11 @@ function displaySavedCoordinates() {
     const allViews = savedViews.all || [];
     const combinedViews = [...currentFractalViews, ...allViews];
 
-    const { mainViews, topViews, bottomViews } = distributeCoordinates(combinedViews);
-    appendViewsToContainer(mainViews, 'savedCoordinatesContainer', 0);
-    appendViewsToContainer(topViews, 'savedCoordinatesContainerTop', mainViews.length);
-    appendViewsToContainer(bottomViews, 'savedCoordinatesContainerBottom', mainViews.length + topViews.length);
+    // One container that wraps. It was three, of fixed height, fed by a
+    // `distributeCoordinates` that sliced the list 50% / 32% / the rest -- so the places
+    // read out of order with dead bands between them, and the first container was
+    // indented 100px to clear a `position: fixed` column of buttons that no longer
+    // exists. The split was never about the places; it was about fitting around the
+    // saves panel they used to share.
+    appendViewsToContainer(combinedViews, 'savedCoordinatesContainer');
 }

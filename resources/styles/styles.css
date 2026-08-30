@@ -2992,21 +2992,14 @@ td {
 
 
 
-.top-section, .bottom-section {
+/* Store and Delete, side by side under the places they act on. This was
+   `.buttons-right`, a column pinned to the right of a coordinate row with a hairline
+   down its left edge -- a divider that only made sense while something sat to its
+   left. In a panel of its own there is nothing to divide from. */
+.view-buttons {
     display: flex;
-    justify-content: flex-start;
-}
-
-.buttons-right {
-    display: flex;
-    flex-direction: column; /* Stack buttons vertically */
-    border-left: 2px solid #727272;
-    background-color: #222226;
-}
-
-.top-section {
-    display: flex;
-    flex-direction: row; /* Align children in a row */
+    gap: 12px;
+    padding: 6px 0;
 }
 
 #disk-file-button {
@@ -3032,28 +3025,13 @@ td {
     flex-wrap: wrap;
 }
 
+/* No fixed height. The three containers this replaces were 90px, 140px and 60px tall
+   whatever they held, which is where the empty bands between the places came from: a
+   container sized for the list it might hold rather than the one it has. */
 #savedCoordinatesContainer {
-    /* Specific styles for the main container */
-    height: 140px;
     align-items: center;
+    row-gap: 6px;
     margin-top: 5px;
-}
-
-#savedCoordinatesContainerTop {
-    /* Specific styles for the top container */
-    align-items: center;
-    height: 90px;
-    justify-content: flex-end;
-    /* The 100px indent here was the width of `.buttons-left`, which was
-       `position: fixed` and so sat over this row rather than beside it. Both are
-       gone with Clear, and the indent had no other reason to exist. */
-}
-
-#savedCoordinatesContainerBottom {
-    /* Specific styles for the bottom container */
-    align-items: flex-start;
-    height: 60px;
-    width: 43%;
 }
 
 .saved-coordinate-item {

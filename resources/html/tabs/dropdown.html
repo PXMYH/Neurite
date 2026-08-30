@@ -303,9 +303,24 @@
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
                 <button type="button" class="menu-row tablink" onclick="openTab('tab6', this)"
-                        title="Every saved graph, and the coordinates to teleport back to.">
+                        title="Every graph this browser has saved, by name.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-icon"></use></svg>
                     <span class="menu-row-label">Saves</span>
+                    <span class="visually-hidden"> panel</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
+                <!-- Beside Saves, because the two were one panel until now and the reader
+                     who looked there for a place will look next to it. Not inside the
+                     Fractal panel, though `fractal-select` is what filters the list: the
+                     equation being drawn is why a place is in the list, but coming back to
+                     a place is not an adjustment to how anything is drawn.
+
+                     An eye, because these are places to look at rather than things to
+                     store -- and it is the one icon already in the sprite that says so. -->
+                <button type="button" class="menu-row tablink" onclick="openTab('tab7', this)"
+                        title="Places on the plane, kept so you can fly back to their coordinates.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#eyeball-symbol"></use></svg>
+                    <span class="menu-row-label">Views</span>
                     <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
@@ -373,6 +388,9 @@
                 </div>
                 <div id="tab6" class="tabcontent">
                     <!-- Tab 6 content will be loaded here -->
+                </div>
+                <div id="tab7" class="tabcontent">
+                    <!-- Tab 7 content will be loaded here -->
                 </div>
                 <div id="tab5" class="tabcontent">
                     <!-- Tab 5 content will be loaded here -->
