@@ -293,6 +293,7 @@ View.Graphs = class {
     #btnClear = Elem.byId('clear-button');
     #btnDiskFile = Elem.byId('disk-file-button');
     #btnOpenFile = Elem.byId('open-file-button');
+    #btnSaveGraph = Elem.byId('save-graph-button');
     #dropArea = Elem.byId('saved-networks-container');
     // A page cannot open a file dialog on its own either. Dropping a file on the
     // list has always worked, but nothing on screen said so, and a gesture is no
@@ -518,6 +519,28 @@ View.Graphs = class {
             if (!loadAnyway) return;
             this.#setSelectedGraph(null).#loadGraph(content);
         }
+    }
+
+    // Fork: keep the graph as it is now under a new title, and carry on in the
+    // copy. Banking first is what makes the two identical at the moment of the
+    // click -- without it the entry left behind is up to eight seconds older than
+    // the one carried on in, which is not a fork of anything the reader saw.
+    //
+    // Nothing selected is the one case this must not fork. `#autosave` opens a
+    // save of its own rather than dropping the work, so the bank below *is* the
+    // new save, and forking after it would leave two identical entries from one
+    // click.
+    #onBtnSaveGraphClicked = (e)=>{
+        const isSaved = Boolean(this.#selectedGraph);
+        const prom = this.#autosave();
+        if (isSaved) prom.then(this.#forkGraph);
+    }
+    // `saveWithTitle` selects the new save and rebuilds the list on its own, and
+    // the title is the same one autosave uses for a graph that has none: taken
+    // from `#maxGraphId`, which only ever climbs, so it cannot name a save that
+    // is already in the list.
+    #forkGraph = ()=>{
+        return this.#saver.saveWithTitle(this.#titleForNewGraph())
     }
 
     // The question is asked through the app's modal rather than by growing a
@@ -1020,6 +1043,7 @@ View.Graphs = class {
 
         On.click(this.#btnClear, this.#onBtnClearClicked);
         On.click(this.#btnDiskFile, this.#onBtnDiskFileClicked);
+        On.click(this.#btnSaveGraph, this.#onBtnSaveGraphClicked);
         On.click(this.#btnOpenFile, this.#onBtnOpenFileClicked);
         On.change(this.#inputOpenFile, this.#onOpenFileInputChanged);
         On.click(Elem.byId('resetSettings'), this.#onBtnResetSettingsClicked);

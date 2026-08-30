@@ -69,6 +69,37 @@ test('autosave has no switch', ()=>{
         'autosave now reads a setting, so it can be turned off');
 });
 
+test('Save graph forks the graph rather than saving over it', ()=>{
+    assert.match(menu, /id="save-graph-button"/, 'Save graph is not a row of the menu');
+    // Before it, the only way to keep a graph as it is and carry on was Save to… then
+    // Open… -- a round trip through the disk to copy something that never left the
+    // browser. `saveWithTitle` on a *new* title is what makes it a copy: on an existing
+    // title `CoreSaver.save` overwrites every save of that name instead.
+    const handler = savenet.match(/#onBtnSaveGraphClicked = \(e\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(handler, '#onBtnSaveGraphClicked is gone or no longer a field at that indent');
+    assert.match(handler[0], /this\.#autosave\(\)/,
+        'the graph is not banked first, so the save left behind is up to eight seconds '
+        + 'older than the copy carried on in, and the two are a fork of nothing the '
+        + 'reader saw');
+    assert.match(handler[0], /this\.#selectedGraph/,
+        'nothing checks whether a save exists yet. With none selected `#autosave` opens '
+        + 'one of its own, so forking after it leaves two identical entries per click');
+
+    const fork = savenet.match(/#forkGraph = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(fork, '#forkGraph is gone or no longer a field at that indent');
+    assert.match(fork[0], /saveWithTitle\(this\.#titleForNewGraph\(\)\)/,
+        'the fork no longer takes a fresh title, so it overwrites the save it came from');
+
+    // The title has to be one no save holds, and `#maxGraphId` only climbing is the whole
+    // reason it is. A timestamp or a counter of its own would collide after a delete.
+    const title = savenet.match(/#titleForNewGraph\(\)\{[^\n]*\}/);
+    assert.ok(title, '#titleForNewGraph is gone or no longer a one-line method');
+    assert.match(title[0], /this\.#maxGraphId \+ 1/, 'the new title is no longer taken from #maxGraphId');
+    assert.doesNotMatch(savenet, /#maxGraphId -= |#maxGraphId = 0;(?!\n)/,
+        '#maxGraphId is reset or decremented somewhere, so a new title can name a save '
+        + 'that already exists and the fork silently overwrites it');
+});
+
 test('Clear is a command row that asks through the modal', ()=>{
     assert.doesNotMatch(saves, /clear-button/, 'Clear is back inside the panel');
     assert.match(menu, /id="clear-button"/, 'Clear is not a row of the menu');

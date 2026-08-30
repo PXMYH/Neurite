@@ -193,6 +193,21 @@
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#download-icon"></use></svg>
                     <span class="menu-row-label">Save to…</span>
                 </button>
+                <!-- The one command that keeps a graph without sending it anywhere. Autosave
+                     writes the graph you are in, over and over, and until this row there
+                     was no way to keep a graph *as it is now* and carry on from it: the
+                     only fork was Save to… followed by Open…, a round trip through the
+                     disk to copy something that never had to leave the browser.
+
+                     It banks the graph you are in first, so the entry you leave behind and
+                     the entry you carry on in are identical at the moment of the click and
+                     diverge only afterwards. The new one is selected, which is what makes
+                     the next autosave land in the copy rather than back in the original. -->
+                <button type="button" class="menu-row" id="save-graph-button"
+                        title="Keep this graph as a new save and carry on in the copy. The save you were in stays exactly as it is now.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#plus-icon"></use></svg>
+                    <span class="menu-row-label">Save graph</span>
+                </button>
                 <!-- Clear asks before it acts, and it asks through `window.confirm`, which
                      is the app's own modal. In the panel it asked with a Yes/No pair that
                      appeared beside it and a label that rewrote itself to "Are you sure?"
