@@ -1314,10 +1314,19 @@ input[type="text"i].title-input {
             z-index: 10; /* higher than dropdown-content */
         }
 
+            /* `left: 0` is not redundant. With `left: auto` an absolutely positioned box
+               falls back to its static position, and the static position of these two is
+               measured inside a `<button>`, whose UA stylesheet sets `text-align: center`
+               -- which resolved to `left: 10px`, half the bar's own width, on both. So the
+               top and bottom bars sat 10px right of the middle one and ran to the edge of
+               the 42px button. It arrived with the change from `<div>` to `<button>`, which
+               is also where the box went from 42x42 to 40x40; that half was noticed and
+               this half was not. Measured, both before and after. */
             .menu-icon::before,
             .menu-icon::after {
                 content: "";
                 position: absolute;
+                left: 0;
                 width: 20px;
                 height: 2px;
                 background-color: #bbb;
@@ -2925,14 +2934,49 @@ td {
             
         }
 
+/* Sized for the panel it used to live in: a fixed 190px box with a hairline over it,
+   which held that much space whether it had one graph in it or none. In the menu it is
+   one group among several, so it takes the height it needs and caps rather than reserves.
+   The hairline is gone too -- the menu already separates its groups. */
 .scrollable-list {
-    height: 190px;
-    width: 95%;
+    max-height: 168px;
+    width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 5px;
-    margin-top: 10px;
-    border-top: 2px solid #727272;
+    padding: 2px 0;
+    box-sizing: border-box;
+}
+
+/* The group, so the heading and the list scroll and indent as one thing. */
+.menu-graphs {
+    padding: 2px 12px 6px;
+}
+
+/* Not a row: it opens nothing and takes no click. Sized and coloured like the panel
+   headings elsewhere, quieter than a `.menu-row-label`, and it carries the one fact that
+   distinguishes this list from the two rows above it. */
+.menu-graphs-heading {
+    padding: 2px 0 4px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: #8a8a8a;
+    cursor: default;
+}
+
+/* A row is [title][Load][X] and the title is the part worth reading, so it takes the
+   space the two buttons do not. In the panel the input was a fixed 100px against a
+   full-width row, which left a bar of empty background beside every save. */
+#saved-networks-container > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+#saved-networks-container input {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
             .scrollable-list::-webkit-scrollbar {
@@ -2970,24 +3014,21 @@ td {
     border: none;
 }
 
-#saved-networks-container div {
-    margin: 5px 0;
-    overflow-x: hidden;
-}
-
 #saved-networks-container button {
-    margin-right: 10px;
+    flex: 0 0 auto;
 }
 
+/* Marked by colour, not by size. It was `transform: scale(1.05)`, which grows the row
+   2.5% of its width past each end -- and the row is as wide as its container, so one end
+   always leaves. Centred, it cut the title input on the left; anchored left, it pushed the
+   X button 13px past the right edge of the menu, where the list is 262px wide and the
+   scaled row 275px. Compensating for a transform with padding is chasing it; a selected
+   row does not have to change size to look selected. The accent bar is what replaces the
+   size, and it is drawn inside the row so it costs no width. */
 .selected-save {
     background-color: #3b484d;
-    transform: scale(1.05); /* Slightly enlarge the selected save */
-    /* From the left edge, not the centre. A centred scale grows the row 2.5% of its
-       width in each direction, and the row is as wide as the list, so the left end
-       leaves the panel: the title input is first in the row and it is the title that
-       gets cut. The save being edited was the one whose name could not be read. */
-    transform-origin: left center;
-    transition: transform 0.3s ease;
+    box-shadow: inset 2px 0 0 var(--ui-accent);
+    transition: background-color 0.3s ease;
 }
 
 

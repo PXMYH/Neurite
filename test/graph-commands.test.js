@@ -1,4 +1,6 @@
-// Two things left the Saves panel together, and each is easy to half-undo.
+// The commands that keep, fork and drop a graph, and the list of the graphs this browser
+// holds. All of it is in the menu itself now -- there is no Saves panel and no row named
+// Saves -- and each piece below is easy to half-undo.
 //
 // "Autosaving" was a status for a state that has no other value: `#startAutosave` runs
 // from `init` and nothing stops it. A label that can only ever read one way is not a
@@ -25,34 +27,34 @@ const noHtmlComments = (s)=> s.replace(/<!--[\s\S]*?-->/g, '');
 const noBlockComments = (s)=> s.replace(/\/\*[\s\S]*?\*\//g, '');
 const noLineComments = (s)=> s.replace(/^\s*\/\/.*$/gm, '');
 
-const SAVES = 'resources/html/tabs/networkstab.html';
 const MENU = 'resources/html/tabs/dropdown.html';
 const CSS = 'resources/styles/styles.css';
 const SAVENET = 'js/interface/dropdown/savenet.js';
 
-const saves = noHtmlComments(read(SAVES));
 const menu = noHtmlComments(read(MENU));
 const css = noBlockComments(read(CSS));
 const savenet = noLineComments(read(SAVENET));
 
-test('the selected save grows without cutting off its own title', ()=>{
-    // `transform: scale(1.05)` with the default centre origin moves the row's left edge
-    // out of the panel by 2.5% of the list's width, and the title input is the first
-    // thing in the row -- so the one save whose name a reader is most likely to be
-    // editing was the one whose name was clipped. Measured at 515px of panel: "Graph 3"
-    // rendered as "raph 3".
+test('the selected save is marked without changing its size', ()=>{
+    // It was `transform: scale(1.05)`, and a row as wide as its container cannot grow 2.5%
+    // at each end without one end leaving. Both ends were measured doing it: centred, the
+    // title input was cut on the left ("Graph 3" rendered as "raph 3"); anchored left, the
+    // X button sat 13px past the right edge of a 262px menu list.
     //
-    // Pinned because the symptom is silent: nothing throws, no test of behaviour
-    // changes, and the row still looks selected. Read from the rule itself, not the
-    // file, so a `transform-origin` on some other selector cannot satisfy it.
+    // Pinned because the symptom is silent -- nothing throws, and the row still reads as
+    // selected. Read from the rule itself, so a transform on some other selector neither
+    // satisfies nor breaks this.
     const i = css.indexOf('.selected-save {');
     assert.notEqual(i, -1, '.selected-save has no rule; this test reads nothing');
     const rule = css.slice(i, css.indexOf('}', i));
-    assert.match(rule, /transform:\s*scale\(/,
-        'the row no longer scales, so the origin below is pinning nothing -- delete it');
-    assert.match(rule, /transform-origin:\s*left/,
-        'the selected row scales from its centre again, which pushes its title input '
-        + 'past the left edge of the panel');
+    assert.doesNotMatch(rule, /transform:/,
+        'the selected row transforms again, so it renders wider than the list that holds '
+        + 'it and clips whichever end the origin points away from');
+    // Still visibly the selected one: colour and an inset bar, both of which cost no width.
+    assert.match(rule, /background-color:/, 'the selected row has no marking at all');
+    assert.match(rule, /box-shadow:\s*inset/,
+        'the accent bar is gone; an inset shadow is what marks the row without taking '
+        + 'space from it');
 });
 
 test('deleting a save asks first, and names the save it is asking about', ()=>{
@@ -78,13 +80,65 @@ test('deleting a save asks first, and names the save it is asking about', ()=>{
         'the confirmed branch no longer deletes anything');
 });
 
-test('the Saves panel no longer narrates autosave', ()=>{
+test('Save graph answers the click', ()=>{
+    // It read as a button that did nothing. It always worked -- the fork was in the list
+    // within the same tick -- but the menu does not close around a command, the list was
+    // two clicks away in a panel, and the row said the same word before and after. So the
+    // click had no answer anywhere on screen.
+    const clicked = savenet.match(/#onBtnSaveGraphClicked = \(e\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(clicked, '#onBtnSaveGraphClicked is gone or no longer a field at that indent');
+    assert.match(clicked[0], /\.then\(this\.#reportGraphSaved\)/,
+        'the click is silent again');
+
+    // Into the label span, never the button: writing to the button replaces the icon with
+    // the words. Same reason `Recorder.setRecordLabel` and `#updateDiskFileButton` do it.
+    const report = savenet.match(/#reportGraphSaved = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(report, '#reportGraphSaved is gone or no longer a field at that indent');
+    assert.match(report[0], /querySelector\('\.menu-row-label'\)/,
+        'the word is written somewhere other than the label span');
+
+    // And it has to put back exactly what the markup carries, or one click renames the row
+    // for the rest of the session -- the bug the Store View button already had.
+    const label = menu.match(/id="save-graph-button"[\s\S]*?<span class="menu-row-label">([^<]+)</);
+    assert.ok(label, 'the Save graph row is gone or has no label span');
+    const restore = savenet.match(/#restoreSaveGraphLabel = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(restore, '#restoreSaveGraphLabel is gone or no longer a field at that indent');
+    assert.ok(restore[0].includes('"' + label[1] + '"'),
+        'the row is restored to a different word than the markup carries: markup says "'
+        + label[1] + '"');
+});
+
+test('an imported graph cannot take a title the list already holds', ()=>{
+    // A `.neurite` file names itself after the graph it came from, so opening one twice --
+    // or opening a file this browser exported at all -- lands a second save under a title
+    // already in the list. Two identical rows is the visible half. The half that loses work
+    // is `CoreSaver.save`: it overwrites *every* save whose title matches, so one autosave
+    // tick later both rows hold the same graph.
+    const after = savenet.match(/#afterImport\(importer, file\)\{[\s\S]*?\n {4}\}/);
+    assert.ok(after, '#afterImport is gone or no longer a method at that indent');
+    assert.match(after[0], /this\.#freeTitle\(/,
+        'an imported file takes its title straight from the file name again');
+
+    const free = savenet.match(/#freeTitle\(title\)\{[\s\S]*?\n {4}\}/);
+    assert.ok(free, '#freeTitle is gone or no longer a method at that indent');
+    assert.match(free[0], /this\.#graphs\.some\(Object\.hasTitleThis, base\)/,
+        'the guard no longer asks the list whether the title is taken');
+    assert.match(free[0], /while \(/,
+        'the guard tries one alternative and gives up, so a third import collides again');
+
+    // `CoreSaver.save` is the reason any of this matters; if it ever stops overwriting by
+    // title, this whole test is describing a hazard that no longer exists.
+    assert.match(savenet, /\.filter\(Object\.hasTitleThis, this\.title\)\.length/,
+        'saves are no longer matched by title, so re-read whether #freeTitle is needed');
+});
+
+test('nothing narrates autosave', ()=>{
     // The negative control for this whole test: if stripping ever stops working, the
     // comment that explains the removal satisfies every assertion below.
-    assert.doesNotMatch(saves, /<!--/, 'comments survived the strip; the checks below are blind');
+    assert.doesNotMatch(menu, /<!--/, 'comments survived the strip; the checks below are blind');
 
-    assert.doesNotMatch(saves, /autosave-status/, 'the status span is back in the panel');
-    assert.doesNotMatch(saves, /Autosaving/, 'the panel says Autosaving again');
+    assert.doesNotMatch(menu, /autosave-status/, 'the status span is back in the menu');
+    assert.doesNotMatch(menu, /Autosaving/, 'the menu says Autosaving again');
     assert.doesNotMatch(css, /^\.autosave-status/m, 'the status still has a rule of its own');
     // The dot was `content: "\25CF"` on `::before`, and it was the part that read as a
     // live indicator while being a constant.
@@ -144,14 +198,14 @@ test('Save graph forks the graph rather than saving over it', ()=>{
 });
 
 test('Clear is a command row that asks through the modal', ()=>{
-    assert.doesNotMatch(saves, /clear-button/, 'Clear is back inside the panel');
-    assert.match(menu, /id="clear-button"/, 'Clear is not a row of the menu');
+    const clearRows = menu.match(/id="clear-button"/g) || [];
+    assert.equal(clearRows.length, 1, 'Clear is not a row of the menu exactly once');
 
     // The Yes/No pair and the label rewrite are what the modal replaced. Left behind,
     // they are three dead elements and a handler writing to a button that has an icon in
     // it -- `btn.text` is an `<a>` property and silently does nothing on a `<button>`.
     for (const id of ['clear-sure', 'clear-sure-button', 'clear-unsure-button']) {
-        assert.doesNotMatch(saves + menu, new RegExp('id="' + id + '"'),
+        assert.doesNotMatch(menu, new RegExp('id="' + id + '"'),
             id + ' is still in the markup');
         assert.doesNotMatch(savenet, new RegExp("byId\\('" + id + "'\\)"),
             id + ' is still bound in savenet.js');

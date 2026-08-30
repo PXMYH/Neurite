@@ -138,7 +138,7 @@
          open, and the two `classList.toggle`s in `dropdown.js` are the only writes to
          that state in the tree. -->
     <button type="button" class="menu-button" aria-label="Menu" aria-expanded="false"
-            data-tooltip="Menu: open, save, screenshot, record, and the AI, fractal and settings panels">
+            data-tooltip="Menu: open and save a graph to disk, the graphs in this browser, screenshot, record, and the AI, fractal, views and settings panels">
         <!-- A span, not the div it was: a `<button>` takes phrasing content, and the
              three bars are `position: absolute`, so the box is identical either way. -->
         <span class="menu-icon" id="menu-icon"></span>
@@ -233,6 +233,30 @@
 
                 <div class="menu-separator" role="separator"></div>
 
+                <!-- The graphs this browser is holding, in the menu rather than behind a row
+                     of it. They were a panel called Saves, which is two clicks to reach the
+                     one control anybody wants -- Load -- and a name that described where the
+                     rows were kept rather than what they are.
+
+                     "In this browser" is the whole point of the heading. The durable copy of
+                     a graph is the `.neurite` file that Save to… writes and Open… reads;
+                     everything in this list is in IndexedDB, which the browser may evict on
+                     its own terms and "clear browsing data" takes outright. So the two rows
+                     that cross to disk sit above, and this says what these do not.
+
+                     `savenet.js` binds `#saved-networks-container` by id and fills it with a
+                     row per graph, so moving the markup changes no wiring -- and it moves it
+                     *earlier*: this file is a `PageLoad.resources` entry, injected before any
+                     script runs, where a tab panel is fetched in parallel with the others.
+                     The scrolling cap is on the list, not the menu: a reader with thirty
+                     graphs still gets a menu the height of the screen. -->
+                <div class="menu-graphs">
+                    <div class="menu-graphs-heading">In this browser</div>
+                    <div id="saved-networks-container" class="scrollable-list"></div>
+                </div>
+
+                <div class="menu-separator" role="separator"></div>
+
                 <!-- Every row below here opens a panel, so every one carries a chevron.
                      `openTab` is unchanged: it shows the panel, and the panel view
                      is what `MainMenu.showDetail` switches to. The `tablink` class
@@ -299,13 +323,6 @@
                         title="Adjust how the fractal is drawn, and its colours.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>
                     <span class="menu-row-label">Fractal</span>
-                    <span class="visually-hidden"> panel</span>
-                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
-                </button>
-                <button type="button" class="menu-row tablink" onclick="openTab('tab6', this)"
-                        title="The saved graphs this browser is holding: load one, rename it, or delete it.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-icon"></use></svg>
-                    <span class="menu-row-label">Saves</span>
                     <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
@@ -385,9 +402,6 @@
                 </div>
                 <div id="tab2" class="tabcontent">
                     <!-- Tab 2 content will be loaded here -->
-                </div>
-                <div id="tab6" class="tabcontent">
-                    <!-- Tab 6 content will be loaded here -->
                 </div>
                 <div id="tab7" class="tabcontent">
                     <!-- Tab 7 content will be loaded here -->

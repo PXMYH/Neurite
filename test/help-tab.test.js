@@ -18,7 +18,6 @@ const root = new URL('../', import.meta.url);
 const read = (p)=> readFileSync(new URL(p, root), 'utf8');
 
 const HELP = 'resources/html/tabs/helptab.html';
-const SAVES = 'resources/html/tabs/networkstab.html';
 const MENU = 'resources/html/tabs/dropdown.html';
 const help = read(HELP);
 const menu = read(MENU);
@@ -153,7 +152,7 @@ test('the commands are rows of the menu, once each, with their labels intact', (
     // cannot see the move. Name the file.
     for (const id of ['open-file-button', 'disk-file-button', 'save-graph-button',
                       'clear-button', 'screenshotButton', 'recordButton']) {
-        const files = ['index.html', HELP, SAVES, MENU,
+        const files = ['index.html', HELP, MENU,
                        'resources/html/tabs/notestab.html',
                        'resources/html/tabs/aitab.html',
                        'resources/html/tabs/fractaltab.html',

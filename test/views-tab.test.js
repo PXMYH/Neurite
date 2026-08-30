@@ -23,11 +23,9 @@ const read = (p)=> readFileSync(new URL(p, root), 'utf8');
 
 const TABS = 'resources/html/tabs/';
 const VIEWS = TABS + 'viewstab.html';
-const SAVES = TABS + 'networkstab.html';
 const MENU = TABS + 'dropdown.html';
 
 const views = read(VIEWS);
-const saves = read(SAVES);
 const menu = read(MENU);
 const main = read('js/main.js');
 // Comments stripped: the explanation of what was removed names it, so an unstripped
@@ -88,7 +86,7 @@ test('the places are one wrapping row, not three sliced ones', ()=>{
     assert.equal(calls.length, 2, 'expected one definition and one call: ' + calls.length);
 
     for (const id of ['savedCoordinatesContainerTop', 'savedCoordinatesContainerBottom']) {
-        assert.doesNotMatch(coords + cssCode + views + saves, new RegExp(id),
+        assert.doesNotMatch(coords + cssCode + views + menu, new RegExp(id),
             id + ' is back in the markup, the stylesheet or the script');
     }
 
@@ -146,15 +144,23 @@ test('one name for the thing, and the code agrees with the button', ()=>{
         + label[1] + '"');
 });
 
-test('the Saves panel says what it is now that it holds only a list', ()=>{
-    // Its rows are built by `savenet.js`, so with the coordinates gone the file itself has
-    // no words in it. An empty bordered box reads as a panel that failed to load rather
-    // than as a reader who has saved nothing yet -- and `notes-tab-removed.test.js` reads
-    // this heading as the panel's visible text when it checks that the menu row describes
-    // the panel it opens.
-    assert.match(saves, /class="button-label settings-heading">Saved Graphs</,
-        'the Saves panel has no heading, so it is a wordless box');
-    assert.match(saves, /id="saved-networks-container"/, 'the list is gone from the Saves panel');
-    assert.doesNotMatch(saves.replace(/<!--[\s\S]*?-->/g, ''), /Coordinates/,
-        'a coordinate control is back in the Saves panel');
+test('the graphs this browser holds are listed in the menu, not behind a row of it', ()=>{
+    // The Saves panel is gone: two clicks to reach Load, under a name that described where
+    // the rows were kept rather than what they are. The list is a group of the menu now,
+    // and `savenet.js` fills it by id -- which also means the markup moved *earlier*, from
+    // a tab fetched in parallel to a `PageLoad.resources` entry injected before any script
+    // runs.
+    assert.match(menu, /id="saved-networks-container"/, 'the menu holds no list of graphs');
+    assert.doesNotMatch(menu, /openTab\('tab6'/, 'a menu row opens the Saves panel again');
+    assert.doesNotMatch(read('js/main.js'), /networkstab\.html/,
+        'the deleted panel is still in PageLoad.tabs, so the loader fetches a missing file');
+
+    // The heading is the one fact that separates this list from the two rows above it: a
+    // `.neurite` file survives anything, and everything in this list is in storage the
+    // browser may evict.
+    assert.match(menu, /class="menu-graphs-heading">In this browser</,
+        'the list no longer says that what is in it is not the durable copy');
+    const iList = menu.indexOf('id="saved-networks-container"');
+    assert.ok(menu.indexOf('id="disk-file-button"') < iList,
+        'Save to… is below the list, so the durable path reads as an afterthought');
 });

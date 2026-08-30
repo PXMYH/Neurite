@@ -508,7 +508,7 @@ View.Graphs = class {
     #afterImport(importer, file){
         const name = file.name;
         const index = name.lastIndexOf('.');
-        const title = (index > -1 ? name.slice(0, index) : name);
+        const title = this.#freeTitle(index > -1 ? name.slice(0, index) : name);
 
         if (!importer.data) {
             const reader = new FileReader();
@@ -518,6 +518,21 @@ View.Graphs = class {
 
         this.#loadAndSave(importer, title).then(this.#updateGraphs);
     }
+    // A file names itself after the graph it came from, so opening one twice -- or opening
+    // a file exported from this browser at all -- lands a second save under a title the
+    // list already holds. Two rows reading "Graph 2" is the visible half. The half that
+    // costs work is `CoreSaver.save`, which overwrites *every* save whose title matches:
+    // one autosave tick after that, both rows hold the same graph and the older one is
+    // gone. So an imported title is made free before it is used.
+    #freeTitle(title){
+        const base = (title || 'Graph').trim() || 'Graph';
+        if (!this.#graphs.some(Object.hasTitleThis, base)) return base;
+
+        let n = 2;
+        while (this.#graphs.some(Object.hasTitleThis, base + ' (' + n + ')')) n += 1;
+        return base + ' (' + n + ')';
+    }
+
     #loadAndSave(importer, title){
         const meta = this.#makeMetaForTitle(title);
         this.#graphs.push(meta);
@@ -528,6 +543,8 @@ View.Graphs = class {
         this.#setSelectedGraph(meta).#loadGraph(importer.data, importer);
         return this.#stored.saveMetaAndData(meta, importer.finalData);
     }
+    // The same guard on the older path: a `.txt` or a bundle this importer could not read
+    // still arrives with a name, and `addSave` does not check titles either.
     async #onFileLoaded(title, e) {
         const content = e.target.result;
 
@@ -555,7 +572,25 @@ View.Graphs = class {
     #onBtnSaveGraphClicked = (e)=>{
         const isSaved = Boolean(this.#selectedGraph);
         const prom = this.#autosave();
+        prom.then(this.#reportGraphSaved);
         if (isSaved) prom.then(this.#forkGraph);
+    }
+    // It read as a button that did nothing. It always worked -- the copy was in the list
+    // within the same tick -- but the menu does not close around a command, the list was
+    // two clicks away in a panel, and the row said the same word before and after. So the
+    // click had no answer anywhere on screen. The label is the answer, the way
+    // `Recorder.setRecordLabel` and `#updateDiskFileButton` already use it: a word for a
+    // second, then back. Writing to the span and not the button is what keeps the icon.
+    #reportGraphSaved = ()=>{
+        const label = this.#btnSaveGraph?.querySelector('.menu-row-label');
+        if (!label) return;
+
+        label.textContent = "Saved";
+        Promise.delay(1200).then(this.#restoreSaveGraphLabel);
+    }
+    #restoreSaveGraphLabel = ()=>{
+        const label = this.#btnSaveGraph?.querySelector('.menu-row-label');
+        if (label) label.textContent = "Save graph";
     }
     // `saveWithTitle` selects the new save and rebuilds the list on its own, and
     // the title is the same one autosave uses for a graph that has none: taken
