@@ -2110,10 +2110,6 @@ textarea#prompt {
     color: black;
 }
 
-#saved-networks-container .linkbuttons {
-    margin: 0;
-}
-
 .coordinate-field {
     display: flex;
     align-items: center; /* Aligns items vertically in the center */
@@ -2934,49 +2930,18 @@ td {
             
         }
 
-/* Sized for the panel it used to live in: a fixed 190px box with a hairline over it,
-   which held that much space whether it had one graph in it or none. In the menu it is
-   one group among several, so it takes the height it needs and caps rather than reserves.
-   The hairline is gone too -- the menu already separates its groups. */
+/* Two lists still use this -- the embedded documents and the chunked text in
+   `modals.html` -- so it keeps the sizing those were written against. The graph list that
+   shared it is gone: a graph's durable form is a file on disk, so there is no list of
+   graphs in the interface to style. */
 .scrollable-list {
-    max-height: 168px;
-    width: 100%;
+    height: 190px;
+    width: 95%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 2px 0;
-    box-sizing: border-box;
-}
-
-/* The group, so the heading and the list scroll and indent as one thing. */
-.menu-graphs {
-    padding: 2px 12px 6px;
-}
-
-/* Not a row: it opens nothing and takes no click. Sized and coloured like the panel
-   headings elsewhere, quieter than a `.menu-row-label`, and it carries the one fact that
-   distinguishes this list from the two rows above it. */
-.menu-graphs-heading {
-    padding: 2px 0 4px;
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    color: #8a8a8a;
-    cursor: default;
-}
-
-/* A row is [title][Load][X] and the title is the part worth reading, so it takes the
-   space the two buttons do not. In the panel the input was a fixed 100px against a
-   full-width row, which left a bar of empty background beside every save. */
-#saved-networks-container > div {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 4px;
-    border-radius: 4px;
-}
-
-#saved-networks-container input {
-    flex: 1 1 auto;
-    min-width: 0;
+    padding: 5px;
+    margin-top: 10px;
+    border-top: 2px solid #727272;
 }
 
             .scrollable-list::-webkit-scrollbar {
@@ -3012,23 +2977,6 @@ td {
 #LocalLLMselect {
     background-color: #222226;
     border: none;
-}
-
-#saved-networks-container button {
-    flex: 0 0 auto;
-}
-
-/* Marked by colour, not by size. It was `transform: scale(1.05)`, which grows the row
-   2.5% of its width past each end -- and the row is as wide as its container, so one end
-   always leaves. Centred, it cut the title input on the left; anchored left, it pushed the
-   X button 13px past the right edge of the menu, where the list is 262px wide and the
-   scaled row 275px. Compensating for a transform with padding is chasing it; a selected
-   row does not have to change size to look selected. The accent bar is what replaces the
-   size, and it is drawn inside the row so it costs no width. */
-.selected-save {
-    background-color: #3b484d;
-    box-shadow: inset 2px 0 0 var(--ui-accent);
-    transition: background-color 0.3s ease;
 }
 
 

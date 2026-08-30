@@ -409,14 +409,14 @@ test('switching menu view carries focus with it, rather than dropping it on the 
 test('every menu row describes what it does, and the heading is not overridden', ()=>{
     // The panel rows carried a `title` as chips and got nothing in exchange when
     // they became rows, leaving one or two words as the whole description of a panel --
-    // while the command rows directly above them kept theirs. So this reads all eleven: a
+    // while the command rows directly above them kept theirs. So this reads all ten: a
     // hover that works on half the rows is the shape the gap had.
     const iList = dropdownHtml.indexOf('class="menu-list"');
     const iDetail = dropdownHtml.indexOf('id="menuDetail"');
     assert.ok(iList > 0 && iDetail > iList, 'the list and the panel are no longer in that order');
     const rows = [...dropdownHtml.slice(iList, iDetail)
         .matchAll(/<button[^>]*class="menu-row[^"]*"[^>]*>/g)].map( (m)=> m[0] );
-    assert.equal(rows.length, 11, 'the menu no longer has eleven rows; check what this is reading');
+    assert.equal(rows.length, 10, 'the menu no longer has ten rows; check what this is reading');
 
     for (const row of rows) {
         // Save to… is the one exception, and it is written at runtime: what that row

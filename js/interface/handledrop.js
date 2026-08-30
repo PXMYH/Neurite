@@ -201,7 +201,21 @@ class DropHandler {
             return this.createLinkNode(plainText);
         }
 
+        const graphFile = [...(ev.dataTransfer.files || [])]
+            .find(DropHandler.isGraphFile);
+        if (graphFile) return App.viewGraphs.importFile(graphFile);
+
         this.handleOSFileDrop(ev);
+    }
+
+    // A `.neurite` file is a whole graph -- markup, every Pane's text, and each asset's
+    // bytes after a NUL -- so the handlers below would make a text Node out of it and show
+    // the reader a wall of JSON. It used to be dropped on the list of saves, which was
+    // inside a panel and unmarked; the canvas is where a file is dropped now, and this is
+    // what keeps that one extension out of the node builders. Read from the name, because
+    // the OS gives a custom extension no MIME type: `file.type` is empty here.
+    static isGraphFile(file){
+        return file && /\.neurite$/i.test(file.name)
     }
 
     async processCustomDrop(meta) {

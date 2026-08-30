@@ -1,6 +1,7 @@
-// The commands that keep, fork and drop a graph, and the list of the graphs this browser
-// holds. All of it is in the menu itself now -- there is no Saves panel and no row named
-// Saves -- and each piece below is easy to half-undo.
+// The commands that put a graph on disk, bring one back, and start an empty one. There is
+// no list of graphs in this interface at all: a graph's durable form is a `.neurite` file,
+// so Save to… and Open… are the whole of keeping and restoring one, and what is left in
+// the browser is a working copy that only autosave and a refresh ever touch.
 //
 // "Autosaving" was a status for a state that has no other value: `#startAutosave` runs
 // from `init` and nothing stops it. A label that can only ever read one way is not a
@@ -35,78 +36,8 @@ const menu = noHtmlComments(read(MENU));
 const css = noBlockComments(read(CSS));
 const savenet = noLineComments(read(SAVENET));
 
-test('the selected save is marked without changing its size', ()=>{
-    // It was `transform: scale(1.05)`, and a row as wide as its container cannot grow 2.5%
-    // at each end without one end leaving. Both ends were measured doing it: centred, the
-    // title input was cut on the left ("Graph 3" rendered as "raph 3"); anchored left, the
-    // X button sat 13px past the right edge of a 262px menu list.
-    //
-    // Pinned because the symptom is silent -- nothing throws, and the row still reads as
-    // selected. Read from the rule itself, so a transform on some other selector neither
-    // satisfies nor breaks this.
-    const i = css.indexOf('.selected-save {');
-    assert.notEqual(i, -1, '.selected-save has no rule; this test reads nothing');
-    const rule = css.slice(i, css.indexOf('}', i));
-    assert.doesNotMatch(rule, /transform:/,
-        'the selected row transforms again, so it renders wider than the list that holds '
-        + 'it and clips whichever end the origin points away from');
-    // Still visibly the selected one: colour and an inset bar, both of which cost no width.
-    assert.match(rule, /background-color:/, 'the selected row has no marking at all');
-    assert.match(rule, /box-shadow:\s*inset/,
-        'the accent bar is gone; an inset shadow is what marks the row without taking '
-        + 'space from it');
-});
 
-test('deleting a save asks first, and names the save it is asking about', ()=>{
-    // The one irreversible control in the panel. It used to drop the graph, its blobs and
-    // its meta on a single click, while Clear -- which deletes nothing -- asked Yes or No.
-    // Anchored on the handler's own definition: `#handleConfirmDelete` holds the deletion
-    // now, and a `window.confirm` anywhere else in the file would satisfy a whole-file
-    // search while this button still deleted on the first click.
-    const clicked = savenet.match(/#onBtnDeleteClicked = \(e\)=>\{[\s\S]*?\n {8}\}/);
-    assert.ok(clicked, '#onBtnDeleteClicked is gone or no longer a field at that indent');
-    assert.match(clicked[0], /window\.confirm\(msg\)\.then\(this\.#handleConfirmDelete\)/,
-        'X deletes a save without asking again');
-    // The title, because a list of saves is a list of near-identical rows and "are you
-    // sure" does not answer "which one".
-    assert.match(clicked[0], /this\.meta\.title/,
-        'the question no longer names the graph it is about');
 
-    const handler = savenet.match(/#handleConfirmDelete = \(confirmed\)=>\{[\s\S]*?\n {8}\}/);
-    assert.ok(handler, '#handleConfirmDelete is gone or no longer a field at that indent');
-    assert.match(handler[0], /if \(!confirmed\) return/,
-        'the save is deleted whatever the reader answers');
-    assert.match(handler[0], /deleteForMeta\(meta\)/,
-        'the confirmed branch no longer deletes anything');
-});
-
-test('Save graph answers the click', ()=>{
-    // It read as a button that did nothing. It always worked -- the fork was in the list
-    // within the same tick -- but the menu does not close around a command, the list was
-    // two clicks away in a panel, and the row said the same word before and after. So the
-    // click had no answer anywhere on screen.
-    const clicked = savenet.match(/#onBtnSaveGraphClicked = \(e\)=>\{[\s\S]*?\n {4}\}/);
-    assert.ok(clicked, '#onBtnSaveGraphClicked is gone or no longer a field at that indent');
-    assert.match(clicked[0], /\.then\(this\.#reportGraphSaved\)/,
-        'the click is silent again');
-
-    // Into the label span, never the button: writing to the button replaces the icon with
-    // the words. Same reason `Recorder.setRecordLabel` and `#updateDiskFileButton` do it.
-    const report = savenet.match(/#reportGraphSaved = \(\)=>\{[\s\S]*?\n {4}\}/);
-    assert.ok(report, '#reportGraphSaved is gone or no longer a field at that indent');
-    assert.match(report[0], /querySelector\('\.menu-row-label'\)/,
-        'the word is written somewhere other than the label span');
-
-    // And it has to put back exactly what the markup carries, or one click renames the row
-    // for the rest of the session -- the bug the Store View button already had.
-    const label = menu.match(/id="save-graph-button"[\s\S]*?<span class="menu-row-label">([^<]+)</);
-    assert.ok(label, 'the Save graph row is gone or has no label span');
-    const restore = savenet.match(/#restoreSaveGraphLabel = \(\)=>\{[\s\S]*?\n {4}\}/);
-    assert.ok(restore, '#restoreSaveGraphLabel is gone or no longer a field at that indent');
-    assert.ok(restore[0].includes('"' + label[1] + '"'),
-        'the row is restored to a different word than the markup carries: markup says "'
-        + label[1] + '"');
-});
 
 test('an imported graph cannot take a title the list already holds', ()=>{
     // A `.neurite` file names itself after the graph it came from, so opening one twice --
@@ -130,6 +61,58 @@ test('an imported graph cannot take a title the list already holds', ()=>{
     // title, this whole test is describing a hazard that no longer exists.
     assert.match(savenet, /\.filter\(Object\.hasTitleThis, this\.title\)\.length/,
         'saves are no longer matched by title, so re-read whether #freeTitle is needed');
+});
+
+test('Save to… asks what to call the file when the browser will not', ()=>{
+    // A picker asks for the name itself. A download does not: it drops the file wherever the
+    // browser puts downloads, under whatever name the page chose -- and the page chose
+    // "Graph 4". That was survivable while a list let a graph be renamed before saving;
+    // with the file the only copy there is, the name is the only thing telling two graphs
+    // apart. Brave is the case that matters here: measured, it exposes no
+    // `showSaveFilePicker` at all, so this is the path it always takes.
+    const download = savenet.match(/#downloadCopy\(\)\{[\s\S]*?\n {4}\}/);
+    assert.ok(download, '#downloadCopy is gone or no longer a method at that indent');
+    assert.match(download[0], /this\.#askNameThenDownload/,
+        'the download path no longer asks for a name');
+
+    const ask = savenet.match(/#askNameThenDownload = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(ask, '#askNameThenDownload is gone or no longer a field at that indent');
+    assert.match(ask[0], /window\.prompt\("Save this graph as:", this\.#fileNameForMeta\(meta\)\)/,
+        'the prompt no longer offers the name the graph already has, so keeping it is not '
+        + 'one keypress');
+
+    const then = savenet.match(/#downloadAs = \(name\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(then, '#downloadAs is gone or no longer a field at that indent');
+    assert.match(then[0], /if \(name === null\) return/,
+        'cancelling the prompt still writes a file');
+    // The answer sticks, or the next save offers "Graph 4" again and the reader renames
+    // the same graph every time.
+    assert.match(then[0], /meta\.title = /, 'the name typed is not kept as the graph title');
+    assert.match(then[0], /saveMeta\(meta\)/, 'the kept title is never written to the store');
+});
+
+test('a dropped .neurite file is a graph, not a node full of JSON', ()=>{
+    // Dropping one used to mean dropping it on the list, which was unmarked and is now
+    // gone. The canvas takes it -- but the canvas builds Nodes by MIME type, and a bundle
+    // has none: `file.type` is empty for a custom extension, so it would have gone to the
+    // text handler and shown the reader the JSON header of their own graph.
+    const drop = read('js/interface/handledrop.js');
+    assert.match(drop, /static isGraphFile\(file\)\{[\s\S]*?\.neurite\$\/i\.test\(file\.name\)/,
+        'nothing recognises a graph file by name any more');
+
+    // Ahead of `handleOSFileDrop`, which is what would make a Node of it.
+    const iRoute = drop.indexOf('App.viewGraphs.importFile(graphFile)');
+    const iNodes = drop.indexOf('this.handleOSFileDrop(ev)');
+    assert.ok(iRoute > 0, 'a dropped graph file no longer reaches the importer');
+    assert.ok(iRoute < iNodes,
+        'the node builders get the file first, so a dropped graph becomes a text node');
+
+    // And the importer's door is public, because the caller is in another file -- savenet.js
+    // is a module, so nothing in it is reachable except through `App.viewGraphs`.
+    assert.match(savenet, /\n    importFile\(file\)\{/,
+        'importFile is gone or private again, so handledrop.js cannot reach it');
+    assert.match(savenet, /importFile\(file\)\{[\s\S]*?this\.#autosave\(\)\.then/,
+        'the drop no longer banks the graph on screen before replacing it');
 });
 
 test('nothing narrates autosave', ()=>{
@@ -166,36 +149,6 @@ test('autosave has no switch', ()=>{
         'autosave now reads a setting, so it can be turned off');
 });
 
-test('Save graph forks the graph rather than saving over it', ()=>{
-    assert.match(menu, /id="save-graph-button"/, 'Save graph is not a row of the menu');
-    // Before it, the only way to keep a graph as it is and carry on was Save to… then
-    // Open… -- a round trip through the disk to copy something that never left the
-    // browser. `saveWithTitle` on a *new* title is what makes it a copy: on an existing
-    // title `CoreSaver.save` overwrites every save of that name instead.
-    const handler = savenet.match(/#onBtnSaveGraphClicked = \(e\)=>\{[\s\S]*?\n {4}\}/);
-    assert.ok(handler, '#onBtnSaveGraphClicked is gone or no longer a field at that indent');
-    assert.match(handler[0], /this\.#autosave\(\)/,
-        'the graph is not banked first, so the save left behind is up to eight seconds '
-        + 'older than the copy carried on in, and the two are a fork of nothing the '
-        + 'reader saw');
-    assert.match(handler[0], /this\.#selectedGraph/,
-        'nothing checks whether a save exists yet. With none selected `#autosave` opens '
-        + 'one of its own, so forking after it leaves two identical entries per click');
-
-    const fork = savenet.match(/#forkGraph = \(\)=>\{[\s\S]*?\n {4}\}/);
-    assert.ok(fork, '#forkGraph is gone or no longer a field at that indent');
-    assert.match(fork[0], /saveWithTitle\(this\.#titleForNewGraph\(\)\)/,
-        'the fork no longer takes a fresh title, so it overwrites the save it came from');
-
-    // The title has to be one no save holds, and `#maxGraphId` only climbing is the whole
-    // reason it is. A timestamp or a counter of its own would collide after a delete.
-    const title = savenet.match(/#titleForNewGraph\(\)\{[^\n]*\}/);
-    assert.ok(title, '#titleForNewGraph is gone or no longer a one-line method');
-    assert.match(title[0], /this\.#maxGraphId \+ 1/, 'the new title is no longer taken from #maxGraphId');
-    assert.doesNotMatch(savenet, /#maxGraphId -= |#maxGraphId = 0;(?!\n)/,
-        '#maxGraphId is reset or decremented somewhere, so a new title can name a save '
-        + 'that already exists and the fork silently overwrites it');
-});
 
 test('Clear is a command row that asks through the modal', ()=>{
     const clearRows = menu.match(/id="clear-button"/g) || [];

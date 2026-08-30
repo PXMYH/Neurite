@@ -144,23 +144,27 @@ test('one name for the thing, and the code agrees with the button', ()=>{
         + label[1] + '"');
 });
 
-test('the graphs this browser holds are listed in the menu, not behind a row of it', ()=>{
-    // The Saves panel is gone: two clicks to reach Load, under a name that described where
-    // the rows were kept rather than what they are. The list is a group of the menu now,
-    // and `savenet.js` fills it by id -- which also means the markup moved *earlier*, from
-    // a tab fetched in parallel to a `PageLoad.resources` entry injected before any script
-    // runs.
-    assert.match(menu, /id="saved-networks-container"/, 'the menu holds no list of graphs');
-    assert.doesNotMatch(menu, /openTab\('tab6'/, 'a menu row opens the Saves panel again');
+test('there is no list of graphs anywhere in the interface', ()=>{
+    // A graph is kept by writing a file and restored by reading one. The list of records
+    // inside the browser went with the panel that held it: it offered a Load that only
+    // reached this browser's storage, a rename that named nothing outside it, and a delete
+    // for a copy no reader had asked to keep.
+    for (const file of tabFiles) {
+        assert.doesNotMatch(read(TABS + file), /saved-networks-container/,
+            'a list of graphs is back in ' + file);
+    }
     assert.doesNotMatch(read('js/main.js'), /networkstab\.html/,
-        'the deleted panel is still in PageLoad.tabs, so the loader fetches a missing file');
+        'the deleted panel is back in PageLoad.tabs, so the loader fetches a missing file');
+    assert.doesNotMatch(menu, /save-graph-button/,
+        'Save graph is back, and with no list its copy is one nobody can see or reach');
 
-    // The heading is the one fact that separates this list from the two rows above it: a
-    // `.neurite` file survives anything, and everything in this list is in storage the
-    // browser may evict.
-    assert.match(menu, /class="menu-graphs-heading">In this browser</,
-        'the list no longer says that what is in it is not the durable copy');
-    const iList = menu.indexOf('id="saved-networks-container"');
-    assert.ok(menu.indexOf('id="disk-file-button"') < iList,
-        'Save to… is below the list, so the durable path reads as an afterthought');
+    // What has to survive the removal: the working copy. Autosave is still the only writer,
+    // and the load chain still reopens the last graph -- so a refresh or a crash costs
+    // nothing even though nothing is listed.
+    const savenet = read('js/interface/dropdown/savenet.js');
+    assert.match(savenet, /setInterval\(this\.#autosave, 8000\)/,
+        'autosave is gone, so an unsaved graph now dies with the tab');
+    assert.match(savenet, /\.then\(this\.#startAutosave\)/, 'autosave is never started');
+    assert.match(savenet, /class LocalStorageStateLoader|LocalStorageStateLoader = class/,
+        'the loader that reopens the last graph is gone');
 });

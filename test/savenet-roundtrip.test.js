@@ -210,18 +210,25 @@ test('the helpers this file calls by bare name exist', ()=>{
 });
 
 test('the download name keeps titles in any script and drops path characters', ()=>{
-    // `#fileNameForMeta` is private and its class reads the DOM as it is built, so
-    // the sanitiser is lifted out of the source instead. It is worth pinning: the
-    // ASCII-only `\w` that suggests itself here turns a Chinese title into
-    // underscores, and a title is the only thing naming the file.
-    const line = src.match(/^.*replace\(\/\[\^.*\.trim\(\);$/m)?.[0];
-    assert.ok(line, 'the sanitising line was not found in ' + PATH);
-    const nameFor = new Function('raw', line.replace('meta.title', 'raw')
-        + '\n return (title || "neurite-graph") + ".neurite";');
+    // `#fileNameForName` is private and its class reads the DOM as it is built, so the
+    // whole method body is lifted out of the source and run. It is worth pinning twice
+    // over now: the ASCII-only `\w` that suggests itself here turns a Chinese title into
+    // underscores, and with no list of graphs in the interface the file name is the only
+    // thing that tells two graphs apart. It also sanitises what a reader types into the
+    // save prompt, which can hold a slash exactly as a title could.
+    const body = src.match(/#fileNameForName\(name\)\{([\s\S]*?)\n {4}\}/)?.[1];
+    assert.ok(body, '#fileNameForName was not found in ' + PATH);
+    const nameFor = new Function('name', body);
 
     assert.equal(nameFor('Graph 1'), 'Graph 1.neurite');
     assert.equal(nameFor('分形笔记'), '分形笔记.neurite', 'CJK survives');
     assert.equal(nameFor('a/b:c\\d'), 'a_b_c_d.neurite', 'path characters do not');
-    assert.equal(nameFor('  '), 'neurite-graph.neurite', 'and a blank title still names a file');
-    assert.equal(nameFor(''), 'neurite-graph.neurite');
+    // Typing the extension in the prompt must not double it.
+    assert.equal(nameFor('Field notes.neurite'), 'Field notes.neurite',
+        'a name that already ends in .neurite gains a second one');
+    assert.equal(nameFor('  '), '', 'a blank name answers nothing');
+    assert.equal(nameFor(''), '');
+    // ...and the caller is what turns that nothing into a file name.
+    assert.match(src, /return this\.#fileNameForName\(meta\.title\) \|\| 'neurite-graph\.neurite'/,
+        'a graph with a blank title no longer falls back to a name');
 });

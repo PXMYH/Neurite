@@ -302,11 +302,7 @@ View.Graphs = class {
     #btnClear = Elem.byId('clear-button');
     #btnDiskFile = Elem.byId('disk-file-button');
     #btnOpenFile = Elem.byId('open-file-button');
-    #btnSaveGraph = Elem.byId('save-graph-button');
-    #dropArea = Elem.byId('saved-networks-container');
-    // A page cannot open a file dialog on its own either. Dropping a file on the
-    // list has always worked, but nothing on screen said so, and a gesture is no
-    // use to a keyboard or a phone: this is the same import behind a button.
+    // A page cannot open a file dialog on its own: the input is what Open… clicks.
     #inputOpenFile = Elem.byId('open-file-input');
 
     #blobs = {};
@@ -324,20 +320,23 @@ View.Graphs = class {
         return this;
     }
 
+    // Bookkeeping, with nothing on screen to update. A graph's durable form is a file
+    // on disk, so there is no list of graphs in the interface and this reads the store
+    // back into memory only: `#graphs` for the title checks, `#selectedGraph` re-pointed
+    // at the record the store just wrote, and `#blobs` because `BlobSaver` diffs against
+    // it to find the assets a save has stopped referencing.
     #updateGraphs = ()=>{
+        const stored = this.#stored;
         this.#blobs = {};
         this.#graphs = [];
         if (this.#selectedGraph) this.#selectedGraph.title = ''; // for autosave
-        this.#dropArea.innerHTML = '';
-        return this.#stored.forEachMetaAndGraphId(this.#appendMeta);
+        return stored.forEachMetaAndGraphId(this.#appendMeta)
+            .then(stored.forEachBlobMetaAndGraphId
+                    .bind(stored, this.#processBlobMeta));
     }
     #appendMeta = (meta, graphId)=>{
         this.#graphs.push(meta);
-        const isSelected = (graphId === this.#selectedGraph?.graphId);
-        if (isSelected) this.#selectedGraph = meta;
-        const viewMeta = new View.Graphs.MetaView(this, meta, isSelected);
-        this.#dropArea.appendChild(viewMeta.div);
-        viewMeta.updateForBlob();
+        if (graphId === this.#selectedGraph?.graphId) this.#selectedGraph = meta;
     }
 
     #makeMetaForBlobOfTitle(blob, title){
@@ -366,139 +365,19 @@ View.Graphs = class {
     }
     #hasGraphIdThis(obj){ return obj.graphId === this.valueOf() }
 
-    static MetaView = class {
-        constructor(mom, meta, isSelected){
-            this.meta = meta;
-            this.mom = mom;
-            this.div = this.#makeDiv(meta, isSelected);
-        }
+    // `MetaView` was here: a row per graph, with a title input, Load and X. It went with
+    // the list it filled. Load's job is Open…'s now, and it reads a file rather than an
+    // IndexedDB record; renaming a graph is naming the file the picker or the prompt asks
+    // about; and deleting one is deleting a file, which no page needs code for.
 
-        #makeDiv(meta, isSelected){
-            const inputTitle = this.#makeTitleInput(meta.title);
-            const btnLoad = this.#makeLinkButton("Load");
-            const btnDelete = this.#makeLinkButton("X");
-
-            On.change(inputTitle, this.#onTitleInputChanged);
-            On.click(btnLoad, this.#onBtnLoadClicked);
-            On.click(btnDelete, this.#onBtnDeleteClicked);
-
-            const div = Html.new.div();
-            if (isSelected) div.classList.add("selected-save");
-            div.append(inputTitle, btnLoad, btnDelete);
-            div.title = "added on: " + meta.added + "\n"
-                    + "revisions: " + meta.revisions + "\n"
-                    + "last: " + meta.lastUpdated + "\n"
-                    + "└ size: " + meta.size + " bytes";
-            return div;
-        }
-        #makeLinkButton(text){
-            return Html.make.button('linkbuttons', text)
-        }
-        #makeTitleInput(title){
-            const input = Html.new.input();
-            input.style.border = 'none';
-            input.style.width = '100px';
-            input.type = "text";
-            input.value = title;
-            return input;
-        }
-
-        #onTitleInputChanged = (e)=>{
-            this.meta.title = e.target.value;
-            this.mom.#stored.saveMeta(this.meta);
-        }
-        #onBtnLoadClicked = (e)=>{
-            if (this.meta.size > 0) return this.#proceedWithLoad();
-
-            const msg = "Are you sure you want an empty save?";
-            window.confirm(msg).then(this.#handleConfirmEmptySave);
-        }
-        #handleConfirmEmptySave = (confirmed)=>{
-            if (confirmed) this.#proceedWithLoad()
-        }
-        #proceedWithLoad(){
-            // Wait for the autosave to finish reading the screen. It scrapes the
-            // live DOM one microtask later, so loading straight away would hand
-            // the incoming graph to the outgoing graph's save.
-            return this.mom.#autosave().then(this.#loadSelf);
-        }
-        #loadSelf = ()=>{
-            return this.mom.#stored.dataForMeta(this.meta).then(this.#loadData)
-        }
-        #loadData = (data)=>{
-            this.mom.#setSelectedGraph(this.meta)
-                .#loadGraph(data)
-                .#updateGraphs()
-        }
-
-        // The only irreversible control in the panel, and until now the only one that
-        // asked nothing: it dropped the graph, its blobs and its meta on one click, while
-        // Clear -- which deletes nothing at all -- asked Yes or No first. The graph is
-        // named in the question, because a list of saves is a list of near-identical rows
-        // and "are you sure" is not an answer to "which one".
-        #onBtnDeleteClicked = (e)=>{
-            const title = this.meta.title || "this graph";
-            const msg = 'Delete "' + title + '"? This is the only copy in the browser, '
-                      + 'and it cannot be undone.';
-            window.confirm(msg).then(this.#handleConfirmDelete);
-        }
-        #handleConfirmDelete = (confirmed)=>{
-            if (!confirmed) return;
-
-            const meta = this.meta;
-            const mom = this.mom;
-            const graphIndex = mom.#graphs.findIndex(Object.isThis, meta);
-            mom.#graphs.splice(graphIndex, 1);
-            const isSelected = (meta === mom.#selectedGraph);
-            if (isSelected) mom.#state.delete('latest-selected');
-            mom.#stored.deleteForMeta(meta).then(mom.#updateGraphs);
-        }
-
-        updateForBlob(){
-            this.mom.#stored.blobMetaForGraphId(this.meta.graphId)
-                .then(this.#handleBlobMeta)
-        }
-        #handleBlobMeta = (dictMeta)=>{
-            if (!dictMeta) return;
-
-            this.mom.#blobs[this.meta.graphId] = dictMeta;
-            let counter = 0
-            let size = 0;
-            for (const blobId in dictMeta) {
-                counter += 1;
-                size += dictMeta[blobId].size;
-            }
-            this.div.title += "\nassets: " + counter + "\n"
-                            + "└ size: " + size + " bytes";
-        }
-    }
-
-    #addDragEvents(){
-        const dropArea = this.#dropArea;
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach( (eName)=>{
-            On[eName](dropArea, (e)=>{
-                e.preventDefault();
-                e.stopPropagation();
-            })
-        });
-
-        ['dragenter', 'dragover']
-            .forEach( (eName)=>On[eName](dropArea, this.#highlight) );
-
-        ['dragleave', 'drop']
-            .forEach( (eName)=>On[eName](dropArea, this.#unhighlight) );
-
-        On.drop(dropArea, this.#onSavedGraphsDrop);
-    }
-    #highlight(e){ e.currentTarget.classList.add('highlight') }
-    #unhighlight(e){ e.currentTarget.classList.remove('highlight') }
-
-    #onSavedGraphsDrop = (e)=>{
-        const file = e.dataTransfer.files[0];
+    // Dropping a `.neurite` file used to mean dropping it on the list, which was inside a
+    // panel, unmarked, and is now gone. The canvas takes it instead -- `handledrop.js`
+    // routes a file by that extension here rather than making a text Node out of a bundle
+    // -- so this is the one way in from a drag, and Open… is the one way in from a click.
+    importFile(file){
         if (!file) return Logger.info("Missing file");
 
-        this.#autosave().then(this.#import.bind(this, file));
+        return this.#autosave().then(this.#import.bind(this, file));
     }
     #import(file){
         const importer = new GraphImporter();
@@ -560,53 +439,23 @@ View.Graphs = class {
         }
     }
 
-    // Fork: keep the graph as it is now under a new title, and carry on in the
-    // copy. Banking first is what makes the two identical at the moment of the
-    // click -- without it the entry left behind is up to eight seconds older than
-    // the one carried on in, which is not a fork of anything the reader saw.
-    //
-    // Nothing selected is the one case this must not fork. `#autosave` opens a
-    // save of its own rather than dropping the work, so the bank below *is* the
-    // new save, and forking after it would leave two identical entries from one
-    // click.
-    #onBtnSaveGraphClicked = (e)=>{
-        const isSaved = Boolean(this.#selectedGraph);
-        const prom = this.#autosave();
-        prom.then(this.#reportGraphSaved);
-        if (isSaved) prom.then(this.#forkGraph);
-    }
-    // It read as a button that did nothing. It always worked -- the copy was in the list
-    // within the same tick -- but the menu does not close around a command, the list was
-    // two clicks away in a panel, and the row said the same word before and after. So the
-    // click had no answer anywhere on screen. The label is the answer, the way
-    // `Recorder.setRecordLabel` and `#updateDiskFileButton` already use it: a word for a
-    // second, then back. Writing to the span and not the button is what keeps the icon.
-    #reportGraphSaved = ()=>{
-        const label = this.#btnSaveGraph?.querySelector('.menu-row-label');
-        if (!label) return;
-
-        label.textContent = "Saved";
-        Promise.delay(1200).then(this.#restoreSaveGraphLabel);
-    }
-    #restoreSaveGraphLabel = ()=>{
-        const label = this.#btnSaveGraph?.querySelector('.menu-row-label');
-        if (label) label.textContent = "Save graph";
-    }
-    // `saveWithTitle` selects the new save and rebuilds the list on its own, and
-    // the title is the same one autosave uses for a graph that has none: taken
-    // from `#maxGraphId`, which only ever climbs, so it cannot name a save that
-    // is already in the list.
-    #forkGraph = ()=>{
-        return this.#saver.saveWithTitle(this.#titleForNewGraph())
-    }
+    // `Save graph` was here, and it forked the graph into a second record inside the
+    // browser. That was worth a row while a list showed the records; with the list gone it
+    // would make a copy nobody can see, reach or delete -- which is the shape of a button
+    // that does nothing. Two graphs kept apart is two files now: Save to… twice, under two
+    // names.
 
     // The question is asked through the app's modal rather than by growing a
     // Yes/No pair beside the row: as a row of the menu this has no room to put
     // one, and every other question this file asks -- an empty save, a file too
     // large to store -- is already a `window.confirm`.
     #onBtnClearClicked = (e)=>{
-        const msg = "Start an empty graph? This one is saved first, "
-                  + "so you can load it again from the Saves panel.";
+        // It says what is true now that there is no list: the graph is banked, so a
+        // refresh reopens it, but nothing in the interface reaches it after the next one.
+        // Save to… is what makes a graph you can come back to.
+        const msg = "Start an empty graph? Use Save to… first if you want to keep this "
+                  + "one -- a graph you have not saved to disk cannot be reopened once "
+                  + "you start another.";
         window.confirm(msg).then(this.#handleConfirmClear);
     }
     #handleConfirmClear = (confirmed)=>{
@@ -1054,14 +903,32 @@ View.Graphs = class {
     // The bundle is built from what is in the store, not from the screen, so the
     // graph has to be banked first or the copy is up to eight seconds stale.
     #downloadCopy(){
-        return this.#autosave().then(this.#downloadSelectedGraph)
+        return this.#autosave().then(this.#askNameThenDownload)
     }
-    #downloadSelectedGraph = ()=>{
+    // A picker asks for the name itself. A download does not: it drops the file in
+    // whichever folder the browser uses, under whatever name the page chose, and the page
+    // chose `Graph 4`. That was tolerable while a list let the reader rename a graph before
+    // saving it; with the file being the only copy there is, the name is the only thing
+    // that tells two graphs apart, so this asks. Prefilled, so keeping it is one keypress.
+    #askNameThenDownload = ()=>{
         const meta = this.#selectedGraph;
         if (!meta) return Logger.warn("No graph to save yet");
 
+        return window.prompt("Save this graph as:", this.#fileNameForMeta(meta))
+            .then(this.#downloadAs)
+    }
+    #downloadAs = (name)=>{
+        if (name === null) return Logger.info("Save cancelled");
+
+        // The name is also the graph's title from here on, so the next save offers what
+        // the reader typed rather than reverting to `Graph 4`.
+        const meta = this.#selectedGraph;
+        const filename = this.#fileNameForName(name) || this.#fileNameForMeta(meta);
+        meta.title = filename.replace(/\.neurite$/i, '');
+        this.#stored.saveMeta(meta);
+
         return (new GraphExporter(meta, this.#stored)).export()
-            .then(DiskMirror.download.bind(DiskMirror, this.#fileNameForMeta(meta)))
+            .then(DiskMirror.download.bind(DiskMirror, filename))
             .then(this.#afterDownload, this.#onDownloadFailed);
     }
     // A save's title is whatever the user typed in the list, so it reaches here
@@ -1069,8 +936,16 @@ View.Graphs = class {
     // an allowlist of letters and digits in any script rather than of `\w`, which
     // is ASCII: a graph titled in Chinese would otherwise download as `___`.
     #fileNameForMeta(meta){
-        const title = String(meta.title || '').replace(/[^\p{L}\p{N} .\-_]+/gu, '_').trim();
-        return (title || 'neurite-graph') + '.neurite';
+        return this.#fileNameForName(meta.title) || 'neurite-graph.neurite'
+    }
+    // Shared with the prompt, because a name a reader types is exactly as capable of
+    // holding a slash as a title they typed into the old list was.
+    #fileNameForName(name){
+        const clean = String(name || '')
+            .replace(/\.neurite$/i, '')
+            .replace(/[^\p{L}\p{N} .\-_]+/gu, '_')
+            .trim();
+        return (clean ? clean + '.neurite' : '');
     }
     #afterDownload = (filename)=>{ Logger.info("Downloaded", filename) }
     // Silence is the one thing this cannot do: the user clicked Save because they
@@ -1104,11 +979,8 @@ View.Graphs = class {
     }
 
     init(){
-        this.#addDragEvents();
-
         On.click(this.#btnClear, this.#onBtnClearClicked);
         On.click(this.#btnDiskFile, this.#onBtnDiskFileClicked);
-        On.click(this.#btnSaveGraph, this.#onBtnSaveGraphClicked);
         On.click(this.#btnOpenFile, this.#onBtnOpenFileClicked);
         On.change(this.#inputOpenFile, this.#onOpenFileInputChanged);
         On.click(Elem.byId('resetSettings'), this.#onBtnResetSettingsClicked);

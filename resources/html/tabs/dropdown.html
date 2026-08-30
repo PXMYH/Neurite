@@ -138,7 +138,7 @@
          open, and the two `classList.toggle`s in `dropdown.js` are the only writes to
          that state in the tree. -->
     <button type="button" class="menu-button" aria-label="Menu" aria-expanded="false"
-            data-tooltip="Menu: open and save a graph to disk, the graphs in this browser, screenshot, record, and the AI, fractal, views and settings panels">
+            data-tooltip="Menu: open and save a graph to disk, screenshot, record, and the AI, fractal, views and settings panels">
         <!-- A span, not the div it was: a `<button>` takes phrasing content, and the
              three bars are `position: absolute`, so the box is identical either way. -->
         <span class="menu-icon" id="menu-icon"></span>
@@ -171,12 +171,24 @@
                      finding it.
 
                      The first three are the whole life of a graph read left to right:
-                     bring one in, send one out, put this one away and start again. Four
-                     of the five cross the page's edge -- two move a `.neurite` file, two
-                     read the screen through `getDisplayMedia` -- and Clear is the one
-                     that does not, which is why it sits beside Save to… rather than
-                     among them: it is the row you want next after saving, and the row a
-                     reader should be least able to hit by accident on the way to a panel.
+                     bring one in, send one out, put this one away and start again. And
+                     those first two are the *only* way a graph is kept or restored: there
+                     is no list of graphs anywhere in this interface. A graph lives on the
+                     canvas, and its durable form is a `.neurite` file on disk -- which is
+                     the one copy no browser can evict, and the one a reader can move,
+                     back up and read the size of.
+
+                     Autosave still runs underneath, and it still reopens the last graph
+                     on a refresh, so a reload or a crash costs nothing. What it is not is
+                     a filing cabinet: it holds the graph you are in, and Save to… is what
+                     keeps a graph you want to come back to.
+
+                     Four of the five rows cross the page's edge -- two move a `.neurite`
+                     file, two read the screen through `getDisplayMedia` -- and Clear is
+                     the one that does not, which is why it sits beside Save to… rather
+                     than among them: it is the row you want next after saving, and the row
+                     a reader should be least able to hit by accident on the way to a
+                     panel.
 
                      `savenet.js`, `record.js` and `handledrop.js` bind by id, so moving
                      the markup changes no wiring. The label is its own span for the same
@@ -192,21 +204,6 @@
                 <button type="button" class="menu-row" id="disk-file-button">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#download-icon"></use></svg>
                     <span class="menu-row-label">Save to…</span>
-                </button>
-                <!-- The one command that keeps a graph without sending it anywhere. Autosave
-                     writes the graph you are in, over and over, and until this row there
-                     was no way to keep a graph *as it is now* and carry on from it: the
-                     only fork was Save to… followed by Open…, a round trip through the
-                     disk to copy something that never had to leave the browser.
-
-                     It banks the graph you are in first, so the entry you leave behind and
-                     the entry you carry on in are identical at the moment of the click and
-                     diverge only afterwards. The new one is selected, which is what makes
-                     the next autosave land in the copy rather than back in the original. -->
-                <button type="button" class="menu-row" id="save-graph-button"
-                        title="Keep this graph as a new save and carry on in the copy. The save you were in stays exactly as it is now.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#plus-icon"></use></svg>
-                    <span class="menu-row-label">Save graph</span>
                 </button>
                 <!-- Clear asks before it acts, and it asks through `window.confirm`, which
                      is the app's own modal. In the panel it asked with a Yes/No pair that
@@ -230,30 +227,6 @@
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-video-icon"></use></svg>
                     <span class="menu-row-label">Record</span>
                 </button>
-
-                <div class="menu-separator" role="separator"></div>
-
-                <!-- The graphs this browser is holding, in the menu rather than behind a row
-                     of it. They were a panel called Saves, which is two clicks to reach the
-                     one control anybody wants -- Load -- and a name that described where the
-                     rows were kept rather than what they are.
-
-                     "In this browser" is the whole point of the heading. The durable copy of
-                     a graph is the `.neurite` file that Save to… writes and Open… reads;
-                     everything in this list is in IndexedDB, which the browser may evict on
-                     its own terms and "clear browsing data" takes outright. So the two rows
-                     that cross to disk sit above, and this says what these do not.
-
-                     `savenet.js` binds `#saved-networks-container` by id and fills it with a
-                     row per graph, so moving the markup changes no wiring -- and it moves it
-                     *earlier*: this file is a `PageLoad.resources` entry, injected before any
-                     script runs, where a tab panel is fetched in parallel with the others.
-                     The scrolling cap is on the list, not the menu: a reader with thirty
-                     graphs still gets a menu the height of the screen. -->
-                <div class="menu-graphs">
-                    <div class="menu-graphs-heading">In this browser</div>
-                    <div id="saved-networks-container" class="scrollable-list"></div>
-                </div>
 
                 <div class="menu-separator" role="separator"></div>
 

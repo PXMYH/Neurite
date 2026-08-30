@@ -269,14 +269,14 @@ test('Escape leaves by the same two steps it came in', ()=>{
 
 test('every menu row is a button that says what it does', ()=>{
     const rows = htmlCode.match(/<button[^>]*class="[^"]*menu-row[^"]*"[^>]*>/g) || [];
-    assert.equal(rows.length, 11,
-        'the menu no longer holds eleven rows as <button> open tags; every count below '
+    assert.equal(rows.length, 10,
+        'the menu no longer holds ten rows as <button> open tags; every count below '
         + 'reads this list');
 
     for (const row of rows) {
         assert.match(row, /type="button"/,
             'a menu row has no type, so it is a submit button: harmless only while '
-            + '`closest(\'form\')` is null for all eleven, and `aitab.html` does contain a '
+            + '`closest(\'form\')` is null for all ten, and `aitab.html` does contain a '
             + '<form>. Row: ' + row.slice(0, 60));
     }
 
@@ -303,7 +303,7 @@ test('every menu row is a button that says what it does', ()=>{
     assert.equal(panelSpans.length, 5,
         'the five panel rows no longer carry the word that tells a reader they descend a '
         + 'level. The chevron that says so on screen is `aria-hidden`, so without this '
-        + 'they are indistinguishable from the six commands above the separator');
+        + 'they are indistinguishable from the five commands above the separator');
 
     // A sibling of the label, never a child: `MainMenu.showDetail` reads the panel
     // heading out of `label.textContent`, so nesting the span retitles the heading to
