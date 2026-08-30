@@ -60,6 +60,44 @@
        at 60% saturation and near the accent's lightness so it stays in the same
        family rather than competing with it. */
     --ui-card-outline: #d49454;
+
+    /* Chrome surfaces. Distinct from --ui-surface, which is a *card*: a card is
+       content and is warm on purpose, chrome is furniture and stays neutral. Both
+       the tool island and the menu panel had this value written out twice as
+       #1a1921f2 with a matching #8882 hairline, which is why changing the
+       chrome's material used to mean finding every literal first.
+
+       The values here are the ones already on screen, to the byte -- naming them
+       is a separate change from retuning them. */
+    --ui-chrome: #1a1921f2;
+    --ui-chrome-border: #8882;
+    /* The hairline inside an island: a divider between tool groups, not an edge. */
+    --ui-chrome-rule: #8883;
+    /* Hover on a chrome control. White at low alpha rather than a tint, so one
+       value works over both the panel and the island. */
+    --ui-chrome-hover: #ffffff14;
+    /* Chrome text, and the same at full strength for hover and focus. */
+    --ui-chrome-text: #ddd;
+    --ui-chrome-text-strong: #fff;
+    /* The blur behind an island. A variable because it is the one chrome property
+       with a cost -- a compositor layer over a canvas that repaints every frame --
+       so it wants to be findable in one place when that cost is questioned. */
+    --ui-chrome-blur: blur(6px);
+
+    /* One tool in the island, and the glyph inside it. Two names rather than one
+       because they do not scale together: the box is a touch target and the glyph
+       is an optical weight, and Excalidraw's own pair is 36/16 where Neurite's is
+       38/20 -- a comparison only possible once both are named. */
+    --ui-tool-size: 38px;
+    --ui-tool-icon-size: 20px;
+    /* A tool's glyph is dimmer at rest than menu text is: it sits on the island's
+       own surface rather than on the panel, and it is a symbol rather than a word. */
+    --ui-chrome-icon: #bbb;
+    --ui-chrome-icon-hover: #eee;
+    /* The island one step lighter, for a chrome control whose whole body is the
+       hover target rather than a fill inside it -- the menu button, which has no
+       inner surface to wash. */
+    --ui-chrome-raised: #2a2932f2;
 }
 
 html, body {
@@ -1227,9 +1265,9 @@ input[type="text"i].title-input {
     align-items: center;
     gap: 8px;
     padding: 6px;
-    background: #1a1921f2;
-    backdrop-filter: blur(6px);
-    border: 1px solid #8882;
+    background: var(--ui-chrome);
+    backdrop-filter: var(--ui-chrome-blur);
+    border: 1px solid var(--ui-chrome-border);
     /* Softer than --ui-radius: at 6px of padding around 38px tools, 8px leaves the
        corner reading as a clipped square rather than as a pill. */
     border-radius: 12px;
@@ -1261,7 +1299,7 @@ input[type="text"i].title-input {
         width: 1px;
         align-self: stretch;
         margin: 2px;
-        background-color: #8883;
+        background-color: var(--ui-chrome-rule);
     }
 
         /* Top-left, where a hamburger is looked for. It sat bottom-left on the
@@ -1288,9 +1326,9 @@ input[type="text"i].title-input {
                it name their own rule. */
             box-sizing: content-box;
             padding: 0;
-            background: #1a1921f2;
-            backdrop-filter: blur(6px);
-            border: 1px solid #8882;
+            background: var(--ui-chrome);
+            backdrop-filter: var(--ui-chrome-blur);
+            border: 1px solid var(--ui-chrome-border);
             border-radius: var(--ui-radius);
             box-shadow: var(--ui-shadow-raised);
             cursor: pointer;
@@ -1299,7 +1337,7 @@ input[type="text"i].title-input {
         }
 
             .menu-button:hover {
-                background-color: #2a2932f2;
+                background-color: var(--ui-chrome-raised);
             }
 
         .menu-icon {
@@ -1309,7 +1347,7 @@ input[type="text"i].title-input {
             transform: translate(-50%, -50%);
             width: 20px;
             height: 2px;
-            background-color: #bbb;
+            background-color: var(--ui-chrome-icon);
             transition: all 0.3s ease-in-out;
             z-index: 10; /* higher than dropdown-content */
         }
@@ -1329,7 +1367,7 @@ input[type="text"i].title-input {
                 left: 0;
                 width: 20px;
                 height: 2px;
-                background-color: #bbb;
+                background-color: var(--ui-chrome-icon);
                 transition: all 0.3s ease-in-out;
             }
 
@@ -1407,10 +1445,10 @@ input[type="text"i].title-input {
     /* Absorbs the few px the note pane hangs below its tab, which would otherwise
        show as a permanent vertical scrollbar on a panel that fits. */
     padding-bottom: 16px;
-    background: #1a1921f2;
-    backdrop-filter: blur(6px);
+    background: var(--ui-chrome);
+    backdrop-filter: var(--ui-chrome-blur);
     /* Floating clear of every edge now, so all four corners are free to round. */
-    border: 1px solid #8882;
+    border: 1px solid var(--ui-chrome-border);
     border-radius: var(--ui-radius);
     box-shadow: var(--ui-shadow-raised);
     /* One column for the one child. It asked for two equal ones, and `1fr`
@@ -1477,7 +1515,7 @@ input[type="text"i].title-input {
                     border: none;
                     border-radius: var(--ui-radius-inner);
                     background: none;
-                    color: #ddd;
+                    color: var(--ui-chrome-text);
                     font: inherit;
                     font-size: 14px;
                     text-align: left;
@@ -1487,8 +1525,8 @@ input[type="text"i].title-input {
                 }
 
                     .menu-row:hover {
-                        background-color: #ffffff14;
-                        color: #fff;
+                        background-color: var(--ui-chrome-hover);
+                        color: var(--ui-chrome-text-strong);
                     }
 
                     /* Keyboard users get the accent rather than the hover grey: a
@@ -1498,7 +1536,7 @@ input[type="text"i].title-input {
                         outline: none;
                         background-color: var(--ui-accent-dim);
                         box-shadow: inset 0 0 0 1px var(--ui-accent);
-                        color: #fff;
+                        color: var(--ui-chrome-text-strong);
                     }
 
                     .menu-row svg {
@@ -2991,10 +3029,6 @@ td {
     padding: 6px 0;
 }
 
-#disk-file-button {
-    font-size: 13px;
-}
-
 .coordinates-container {
     background-color: #222226; /* Replace with your desired background color */
     border-top: 2px solid #727272;
@@ -4207,10 +4241,10 @@ code.language-markdown {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
+    width: var(--ui-tool-size);
+    height: var(--ui-tool-size);
     padding: 0;
-    color: #bbb;
+    color: var(--ui-chrome-icon);
     /* The pill is the surface. One per tool as well made the group read as four
        buttons crammed into a box rather than as one control with four positions. */
     background-color: transparent;
@@ -4232,8 +4266,8 @@ code.language-markdown {
 
     .tool-bar .node-add-item svg,
     .tool-bar .tool-bar-action svg {
-        width: 20px;
-        height: 20px;
+        width: var(--ui-tool-icon-size);
+        height: var(--ui-tool-icon-size);
         flex-shrink: 0;
     }
 
@@ -4242,8 +4276,8 @@ code.language-markdown {
        pill's own surface is the same signal at the weight this context wants. */
     .tool-bar .node-add-item:hover,
     .tool-bar .tool-bar-action:hover {
-        color: #eee;
-        background-color: #ffffff14;
+        color: var(--ui-chrome-icon-hover);
+        background-color: var(--ui-chrome-hover);
     }
 
     /* Inset, because the tools sit 6px from the pill's edge and an outset ring
