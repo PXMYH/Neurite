@@ -77,9 +77,36 @@ test('Save to… asks what to call the file when the browser will not', ()=>{
 
     const ask = savenet.match(/#askNameThenDownload = \(\)=>\{[\s\S]*?\n {4}\}/);
     assert.ok(ask, '#askNameThenDownload is gone or no longer a field at that indent');
-    assert.match(ask[0], /window\.prompt\("Save this graph as:", this\.#fileNameForMeta\(meta\)\)/,
-        'the prompt no longer offers the name the graph already has, so keeping it is not '
-        + 'one keypress');
+    assert.match(ask[0], /window\.prompt\("Save this graph as:", this\.#suggestedSaveName\(meta\)\)/,
+        'the prompt no longer offers a name, so keeping one is not one keypress');
+
+    // What it offers for a graph nobody has named: `Graph.neurite`. The number in
+    // `Graph 4` is `#maxGraphId`'s, kept to tell records apart inside the browser -- it
+    // says nothing about the graph, and an import had already grown it into `Graph 2 (2)`,
+    // which the sanitiser then served as `Graph 2 _2_.neurite`. Measured in a browser: a
+    // freshly cleared graph offers `Graph.neurite`, and a graph saved as "Field notes"
+    // offers `Field notes.neurite` back.
+    const suggest = savenet.match(/#suggestedSaveName\(meta\)\{[\s\S]*?\n {4}\}/);
+    assert.ok(suggest, '#suggestedSaveName is gone or no longer a method at that indent');
+    assert.match(suggest[0], /'Graph\.neurite'/, 'the default name is not Graph.neurite');
+    assert.match(suggest[0], /isAutoTitle\(meta\.title\)/,
+        'nothing separates a title this file invented from one the reader typed');
+    assert.match(suggest[0], /this\.#fileNameForMeta\(meta\)/,
+        'a name the reader typed is no longer offered back, so saving twice starts over');
+
+    // The generated forms it has to recognise, run rather than read: every title this file
+    // makes without asking. Miss one and the reader is offered machinery as a file name;
+    // match too much and a graph they called "Graph 7 notes" loses its name on the second
+    // save.
+    const auto = savenet.match(/static isAutoTitle\(title\)\{([\s\S]*?)\n {4}\}/);
+    assert.ok(auto, 'isAutoTitle is gone or no longer a static at that indent');
+    const isAuto = new Function('title', auto[1]);
+    for (const generated of ['Graph 1', 'Graph 42', 'Graph 2 (2)', '', '   ']) {
+        assert.equal(isAuto(generated), true, JSON.stringify(generated) + ' is a title this file invented');
+    }
+    for (const chosen of ['Field notes', 'Graph theory', 'Graph 7 notes', '分形笔记', 'graph']) {
+        assert.equal(isAuto(chosen), false, JSON.stringify(chosen) + ' is a name the reader typed');
+    }
 
     const then = savenet.match(/#downloadAs = \(name\)=>\{[\s\S]*?\n {4}\}/);
     assert.ok(then, '#downloadAs is gone or no longer a field at that indent');

@@ -914,8 +914,27 @@ View.Graphs = class {
         const meta = this.#selectedGraph;
         if (!meta) return Logger.warn("No graph to save yet");
 
-        return window.prompt("Save this graph as:", this.#fileNameForMeta(meta))
+        return window.prompt("Save this graph as:", this.#suggestedSaveName(meta))
             .then(this.#downloadAs)
+    }
+    // `Graph.neurite`, not `Graph 4.neurite`. That number is `#maxGraphId`'s, and it exists
+    // to keep records apart inside the browser -- it tells a reader nothing about the graph
+    // and arrives in the prompt as text to delete before typing a real name. Worse after an
+    // import, where `#freeTitle` had already made it `Graph 2 (2)` and the sanitiser turned
+    // the brackets into `Graph 2 _2_`.
+    //
+    // A name the reader has typed comes back verbatim, which is the whole reason the title
+    // is kept: saving the same graph twice should offer what it is called, not start over.
+    #suggestedSaveName(meta){
+        return (View.Graphs.isAutoTitle(meta.title)
+                ? 'Graph.neurite'
+                : this.#fileNameForMeta(meta));
+    }
+    // Every title this file generates without asking: `#titleForNewGraph`'s `Graph <n>`,
+    // the `Graph <n> (<m>)` an import falls back to, and the blank `#updateGraphs` leaves
+    // on the selected record while it rebuilds.
+    static isAutoTitle(title){
+        return /^(?:Graph \d+(?: \(\d+\))?)?$/.test(String(title ?? '').trim())
     }
     #downloadAs = (name)=>{
         if (name === null) return Logger.info("Save cancelled");
@@ -936,7 +955,7 @@ View.Graphs = class {
     // an allowlist of letters and digits in any script rather than of `\w`, which
     // is ASCII: a graph titled in Chinese would otherwise download as `___`.
     #fileNameForMeta(meta){
-        return this.#fileNameForName(meta.title) || 'neurite-graph.neurite'
+        return this.#fileNameForName(meta.title) || 'Graph.neurite'
     }
     // Shared with the prompt, because a name a reader types is exactly as capable of
     // holding a slash as a title they typed into the old list was.

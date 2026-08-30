@@ -229,6 +229,6 @@ test('the download name keeps titles in any script and drops path characters', (
     assert.equal(nameFor('  '), '', 'a blank name answers nothing');
     assert.equal(nameFor(''), '');
     // ...and the caller is what turns that nothing into a file name.
-    assert.match(src, /return this\.#fileNameForName\(meta\.title\) \|\| 'neurite-graph\.neurite'/,
+    assert.match(src, /return this\.#fileNameForName\(meta\.title\) \|\| 'Graph\.neurite'/,
         'a graph with a blank title no longer falls back to a name');
 });
