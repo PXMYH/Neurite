@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-mode="current">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neurite chrome — the Excalidraw comparison</title>
+<style>
+/* ============================================================================
+   This page is a proposal, not a spec. Nothing here is implemented.
+
+   Every Neurite number is measured out of a running instance (Chromium, 1200x974,
+   commit e0e48c0); every Excalidraw number is read out of its source at
+   excalidraw/excalidraw@master. Neither set is recalled. The mock chrome below is
+   built from those literal values, so what it shows is what the two really look
+   like side by side -- switch the theme and the mode and read the difference off
+   the screen rather than out of the table.
+   ========================================================================= */
+
+/* --- the page's own shell. Kept apart from the mock's tokens on purpose: the
+       mock re-declares its own, and a shared name would leak between them. */
+:root {
+    --pg-bg: #16151a;
+    --pg-surface: #1f1e25;
+    --pg-line: #34323d;
+    --pg-text: #e6e4ee;
+    --pg-dim: #a09eae;
+    --pg-accent: #8b86f0;
+    --pg-good: #6fbf8b;
+    --pg-warn: #d9a84e;
+    --pg-bad: #d2726c;
+    --pg-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box }
+body {
+    margin: 0;
+    padding: 0 20px 120px;
+    background: var(--pg-bg);
+    color: var(--pg-text);
+    font: 15px/1.65 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+main { max-width: 1080px; margin: 0 auto }
+h1 { font-size: 27px; line-height: 1.25; margin: 44px 0 6px; letter-spacing: -0.01em }
+h2 {
+    font-size: 19px; margin: 52px 0 4px; padding-top: 22px;
+    border-top: 1px solid var(--pg-line); letter-spacing: -0.005em;
+}
+h3 { font-size: 15px; margin: 26px 0 6px; color: var(--pg-accent) }
+p { margin: 10px 0 }
+.lede { color: var(--pg-dim); font-size: 16px; margin-bottom: 8px }
+.sub { color: var(--pg-dim); font-size: 13.5px; margin-top: 2px }
+code {
+    font-family: var(--pg-mono); font-size: 0.87em;
+    background: #ffffff10; padding: 1px 5px; border-radius: 4px;
+}
+a { color: var(--pg-accent) }
+
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--pg-line); vertical-align: top }
+th { color: var(--pg-dim); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em }
+td.mono, th.mono { font-family: var(--pg-mono); font-size: 12.5px }
+tbody tr:hover { background: #ffffff07 }
+
+.tag { font-size: 11px; padding: 1px 7px; border-radius: 20px; white-space: nowrap; font-weight: 500 }
+.tag.same { background: #6fbf8b26; color: var(--pg-good) }
+.tag.near { background: #d9a84e26; color: var(--pg-warn) }
+.tag.diff { background: #d2726c26; color: var(--pg-bad) }
+
+.card { background: var(--pg-surface); border: 1px solid var(--pg-line); border-radius: 10px; padding: 16px 18px; margin: 14px 0 }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
+@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr } }
+
+.pill-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 16px 0 }
+.pill-row button {
+    font: inherit; font-size: 13px; padding: 6px 13px; border-radius: 7px;
+    border: 1px solid var(--pg-line); background: var(--pg-surface); color: var(--pg-text);
+    cursor: pointer; transition: background 140ms ease, border-color 140ms ease;
+}
+.pill-row button:hover { background: #ffffff12 }
+.pill-row button[aria-pressed="true"] { background: var(--pg-accent); border-color: var(--pg-accent); color: #14121f }
+.pill-row .label { color: var(--pg-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 2px }
+
+/* ============================================================================
+   THE MOCK. Two stages, one set of markup, four states (current|proposed x
+   dark|light). Rules keyed off [data-mode] and [data-theme] on <html>, so the
+   toggles at the top of the page drive both stages at once and nothing has to be
+   kept in sync by hand.
+   ========================================================================= */
+.stage {
+    position: relative; height: 250px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--pg-line);
+    /* Stands in for the fractal: an island has to be judged against something
+       busy, not against flat paper. A plain fill would flatter both designs. */
+    background-image:
+        radial-gradient(circle at 22% 30%, #ffffff0e 0 1px, transparent 1px),
+        radial-gradient(circle at 68% 72%, #ffffff0a 0 1.5px, transparent 1.5px);
+    background-size: 34px 34px, 47px 47px;
+}
+.stage .caption {
+    position: absolute; bottom: 8px; right: 10px; font-size: 11px;
+    letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.5;
+    font-family: var(--pg-mono);
+}
+
+/* -- canvas colour: black today, Excalidraw's #121212 / #fff proposed --------- */
+[data-mode="current"] .stage { background-color: #000 }
+[data-mode="current"] .stage .caption { color: #888 }
+[data-mode="proposed"][data-theme="dark"] .stage { background-color: #121212 }
+[data-mode="proposed"][data-theme="dark"] .stage .caption { color: #888 }
+[data-mode="proposed"][data-theme="light"] .stage { background-color: #fff }
+[data-mode="proposed"][data-theme="light"] .stage .caption { color: #767680 }
+[data-mode="proposed"][data-theme="light"] .stage {
+    background-image:
+        radial-gradient(circle at 22% 30%, #0000001a 0 1px, transparent 1px),
+        radial-gradient(circle at 68% 72%, #00000012 0 1.5px, transparent 1.5px);
+}
+
+/* -- the island. `.mk-*` so nothing collides with the real app's class names -- */
+.mk-island {
+    position: absolute; display: flex; align-items: center;
+    transition: background-color 200ms ease, box-shadow 200ms ease,
+                border-radius 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+.mk-menu-btn {
+    top: 16px; left: 16px; width: 42px; height: 42px;
+    justify-content: center; cursor: pointer;
+}
+.mk-tool-bar { top: 16px; left: 50%; transform: translateX(-50%); gap: 8px; padding: 6px }
+.mk-zoom { bottom: 16px; left: 16px; gap: 2px; padding: 4px }
+
+/* current: measured off the running app -------------------------------------- */
+[data-mode="current"] .mk-island {
+    background: #1a1921f2;
+    backdrop-filter: blur(6px);
+    border: 1px solid #8882;
+    box-shadow: 0 6px 20px rgba(12, 12, 20, 0.6);
+    color: #ddd;
+}
+[data-mode="current"] .mk-menu-btn { border-radius: 8px }
+[data-mode="current"] .mk-tool-bar { border-radius: 12px }
+[data-mode="current"] .mk-tool { width: 38px; height: 38px; border-radius: 5px }
+[data-mode="current"] .mk-tool svg { width: 20px; height: 20px }
+[data-mode="current"] .mk-tool:hover { background: #ffffff14; color: #fff }
+[data-mode="current"] .mk-divider { background: #8883 }
+/* Today there is no zoom island and no digit badge, so the mock has none. */
+[data-mode="current"] .mk-zoom,
+[data-mode="current"] .mk-kbd { display: none }
+
+/* proposed: Excalidraw's own token values ----------------------------------- */
+[data-mode="proposed"] .mk-island {
+    /* No border. `.Island` is background + shadow + radius and nothing else --
+       the 1px hairline is what makes today's islands read as cut-out panels
+       instead of as paper resting on the canvas. */
+    border: 1px solid transparent;
+    backdrop-filter: none;
+    border-radius: 8px;                      /* --border-radius-lg */
+    box-shadow: 0px 0px 1px 0px rgba(0, 0, 0, 0.17),
+                0px 0px 3px 0px rgba(0, 0, 0, 0.08),
+                0px 7px 14px 0px rgba(0, 0, 0, 0.05);
+}
+[data-mode="proposed"][data-theme="dark"] .mk-island {
+    background: #232329;                     /* --island-bg-color, dark */
+    color: #ced4da;
+    box-shadow: 0px 0px 1px 0px rgba(0, 0, 0, 0.17),
+                0px 0px 3px 0px rgba(0, 0, 0, 0.08),
+                0px 7px 14px 0px rgba(0, 0, 0, 0.05),
+                0 0 0 1px rgba(0, 0, 0, 0.15);   /* dark adds the outline */
+}
+[data-mode="proposed"][data-theme="light"] .mk-island {
+    background: #ffffff;                     /* --island-bg-color, light */
+    color: #1b1b1f;                          /* --color-on-surface */
+}
+[data-mode="proposed"] .mk-tool {
+    width: 32px; height: 32px;               /* --default-button-size */
+    border-radius: 6px;                      /* --border-radius-md */
+}
+[data-mode="proposed"] .mk-tool svg { width: 16px; height: 16px }  /* --default-icon-size */
+[data-mode="proposed"][data-theme="light"] .mk-tool:hover { background: #f1f0ff }
+[data-mode="proposed"][data-theme="dark"]  .mk-tool:hover { background: #363541 }
+[data-mode="proposed"][data-theme="light"] .mk-tool[aria-pressed="true"] { background: #e3e2fe; color: #5b57d1 }
+[data-mode="proposed"][data-theme="dark"]  .mk-tool[aria-pressed="true"] { background: #4f4d6f; color: #beb9ff }
+[data-mode="proposed"][data-theme="light"] .mk-divider { background: #c5c5d0 }
+[data-mode="proposed"][data-theme="dark"]  .mk-divider { background: #ffffff1f }
+
+.mk-tool {
+    display: flex; align-items: center; justify-content: center;
+    position: relative; cursor: pointer; color: inherit;
+    background: none; border: none; padding: 0;
+    transition: background-color 140ms ease, color 140ms ease, border-radius 200ms ease;
+}
+.mk-tool svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round }
+.mk-divider { width: 1px; align-self: stretch; margin: 2px }
+/* The digit in the corner. Excalidraw prints the shortcut on the button; today
+   Neurite hides the same digit inside the tooltip, where it cannot be learned
+   by looking. */
+.mk-kbd {
+    position: absolute; right: 2px; bottom: 0; font-size: 8px; line-height: 1;
+    opacity: 0.55; font-family: var(--pg-mono); pointer-events: none;
+}
+.mk-zoom-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border: none; background: none; color: inherit;
+    border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px;
+}
+.mk-zoom-btn.wide { width: 46px; font-size: 11px; font-variant-numeric: tabular-nums }
+[data-theme="light"][data-mode="proposed"] .mk-zoom-btn:hover { background: #f1f0ff }
+[data-theme="dark"][data-mode="proposed"] .mk-zoom-btn:hover { background: #363541 }
+
+/* -- the open menu panel, rendered as its own stage ------------------------- */
+.mk-panel {
+    position: absolute; top: 16px; left: 16px; width: 288px;
+    display: flex; flex-direction: column; padding: 8px;
+    transition: background-color 200ms ease, box-shadow 200ms ease, color 200ms ease;
+}
+[data-mode="current"] .mk-panel { gap: 0; padding: 8px 8px 16px }
+[data-mode="proposed"] .mk-panel { gap: 1px }
+.mk-row {
+    display: flex; align-items: center; width: 100%; cursor: pointer;
+    background: none; border: none; color: inherit; font: inherit; text-align: left;
+    transition: background-color 140ms ease, color 140ms ease, border-radius 200ms ease;
+}
+.mk-row svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round }
+.mk-row .name { flex: 1; min-width: 0 }
+.mk-row .hint { margin-inline-start: auto; opacity: 0.5; font-family: var(--pg-mono); font-size: 12px }
+.mk-row .chev { opacity: 0.45 }
+[data-mode="current"] .mk-row {
+    gap: 10px; padding: 8px 12px; border-radius: 5px; font-size: 14px;
+}
+[data-mode="current"] .mk-row:hover { background: #ffffff14; color: #fff }
+[data-mode="current"] .mk-row .hint { display: none }   /* no shortcut hints today */
+[data-mode="proposed"] .mk-row {
+    /* height 2rem, padding 0 .5rem, column-gap .625rem, font-size .875rem */
+    gap: 10px; height: 32px; padding: 0 8px; border-radius: 6px; font-size: 14px;
+}
+[data-mode="proposed"] .mk-row .chev { display: none }  /* the hint takes its slot */
+[data-mode="proposed"][data-theme="light"] .mk-row:hover { background: #f1f0ff }
+[data-mode="proposed"][data-theme="dark"]  .mk-row:hover { background: #363541 }
+.mk-sep { height: 1px; margin: 6px 4px; background: currentColor; opacity: 0.12 }
+
+/* -- the interaction demo (section 5) -------------------------------------- */
+.demo-stage {
+    position: relative; height: 210px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--pg-line); background: #0c0c10; cursor: crosshair;
+}
+.demo-stage.armed { cursor: copy }
+.demo-note {
+    position: absolute; width: 74px; height: 46px; border-radius: 6px;
+    background: #332e28; border: 1px solid #5a7ec0; transform: translate(-50%, -50%);
+    font-size: 10px; color: #ddd; padding: 5px 6px; overflow: hidden;
+    animation: pop 180ms ease;
+}
+@keyframes pop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.9) } }
+.demo-hint {
+    position: absolute; left: 12px; bottom: 10px; font-size: 12px;
+    font-family: var(--pg-mono); color: var(--pg-dim); pointer-events: none;
+}
+.demo-arm {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; padding: 5px; border-radius: 8px;
+    background: #232329; box-shadow: 0 7px 14px rgba(0,0,0,.4);
+}
+.demo-arm button {
+    width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer;
+    background: none; color: #ced4da; font: inherit; font-size: 13px;
+}
+.demo-arm button:hover { background: #363541 }
+.demo-arm button[aria-pressed="true"] { background: #4f4d6f; color: #beb9ff }
+
+ol.phases { padding-left: 0; list-style: none; counter-reset: ph; margin: 12px 0 }
+ol.phases > li {
+    counter-increment: ph; position: relative; padding: 14px 0 14px 46px;
+    border-bottom: 1px solid var(--pg-line);
+}
+ol.phases > li::before {
+    content: counter(ph); position: absolute; left: 0; top: 14px;
+    width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--pg-accent); color: #14121f; font-size: 13px; font-weight: 600;
+}
+ol.phases b { display: block; font-size: 15px; margin-bottom: 2px }
+ol.phases .meta { color: var(--pg-dim); font-size: 12.5px; font-family: var(--pg-mono); margin-top: 4px }
+
+.callout { border-left: 3px solid var(--pg-warn); padding: 2px 0 2px 14px; margin: 14px 0; color: var(--pg-dim) }
+.callout.stop { border-left-color: var(--pg-bad) }
+.callout strong { color: var(--pg-text) }
+footer { margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--pg-line); color: var(--pg-dim); font-size: 12.5px }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Neurite chrome, measured against Excalidraw</h1>
+<p class="lede">A proposal. Nothing here is implemented. Every Neurite number is measured out of a
+running instance at commit <code>e0e48c0</code>; every Excalidraw number is read out of
+<code>excalidraw/excalidraw@master</code>.</p>
+
+<h2>1. The verdict</h2>
+<p>Neurite's chrome is already the same <em>shape</em> as Excalidraw's: floating rounded islands over a
+full-bleed canvas, a hamburger at top-left, a tool pill centred at the top, 24&times;24 stroke-2
+Lucide icons, and instant custom tooltips. Several metrics match to the pixel — the menu row's
+<code>gap: 10px</code>, its <code>font-size: 14px</code>, its 16px icons, and the panel's 8px radius are
+all exactly Excalidraw's values already.</p>
+
+<p>So this is not a rebuild. Four things separate the two, and only one of them is a real
+decision:</p>
+
+<table>
+  <thead><tr><th>Gap</th><th>What it costs</th><th>Kind</th></tr></thead>
+  <tbody>
+    <tr><td>Islands read as cut-out panels: a 1px hairline, one heavy black shadow, and a
+        blur behind them</td><td>~20 lines of CSS</td><td><span class="tag same">cosmetic</span></td></tr>
+    <tr><td>Dark only. Excalidraw is light-first with a dark theme; Neurite has no light theme
+        and cannot get one — 486 colour literals are hardcoded</td><td>Chrome band only: ~350 lines.
+        Whole app: not worth it</td><td><span class="tag near">mechanical</span></td></tr>
+    <tr><td>No keyboard hints in the menu, no digit badges on the tools. The shortcuts exist —
+        they are hidden inside tooltip prose</td><td>~15 lines + markup</td><td><span class="tag same">cosmetic</span></td></tr>
+    <tr><td><b>The toolbar is not a mode picker.</b> Excalidraw's tools stay armed and show which is
+        active; Neurite's fire once on click</td><td>Real behaviour change</td><td><span class="tag diff">decision</span></td></tr>
+  </tbody>
+</table>
+
+<h2>2. See it</h2>
+<p class="sub">Both stages below are built from the literal measured values. Flip the toggles.</p>
+
+<div class="pill-row">
+  <span class="label">Mode</span>
+  <button data-set="mode" data-val="current" aria-pressed="true">Neurite today</button>
+  <button data-set="mode" data-val="proposed" aria-pressed="false">Excalidraw tokens</button>
+  <span class="label" style="margin-left:14px">Theme</span>
+  <button data-set="theme" data-val="dark" aria-pressed="true">Dark</button>
+  <button data-set="theme" data-val="light" aria-pressed="false">Light</button>
+</div>
+
+<h3>Resting chrome</h3>
+<div class="stage" id="stage-rest">
+  <div class="mk-island mk-menu-btn" title="menu">
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </div>
+  <div class="mk-island mk-tool-bar" role="toolbar" aria-label="mock">
+    <button class="mk-tool" aria-pressed="false" title="New note">
+      <svg viewBox="0 0 24 24"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5z"/><path d="M15 3v6h6"/></svg>
+      <span class="mk-kbd">1</span></button>
+    <button class="mk-tool" aria-pressed="false" title="Link node">
+      <svg viewBox="0 0 24 24"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 0 10h-2"/><path d="M8 12h8"/></svg>
+      <span class="mk-kbd">2</span></button>
+    <button class="mk-tool" aria-pressed="false" title="File tree">
+      <svg viewBox="0 0 24 24"><path d="M20 10a2 2 0 0 0-2-2h-4l-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2z"/></svg>
+      <span class="mk-kbd">3</span></button>
+    <button class="mk-tool" aria-pressed="false" title="AI note">
+      <svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 14h.01M15 14h.01"/></svg>
+      <span class="mk-kbd">4</span></button>
+    <span class="mk-divider"></span>
+    <button class="mk-tool" title="Search nodes">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.3-4.3"/></svg></button>
+  </div>
+  <div class="mk-island mk-zoom">
+    <button class="mk-zoom-btn" title="Zoom out">&minus;</button>
+    <button class="mk-zoom-btn wide">100%</button>
+    <button class="mk-zoom-btn" title="Zoom in">+</button>
+  </div>
+  <span class="caption" id="cap-rest"></span>
+</div>
+
+<h3>Menu open</h3>
+<div class="stage" style="height:300px" id="stage-menu">
+  <div class="mk-island mk-panel">
+    <button class="mk-row"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7L11 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg><span class="name">Open…</span><span class="hint">Ctrl+O</span></button>
+    <button class="mk-row"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg><span class="name">Save to…</span><span class="hint">Ctrl+S</span></button>
+    <button class="mk-row"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg><span class="name">Clear</span><span class="hint"></span></button>
+    <button class="mk-row"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span class="name">Screenshot</span><span class="hint"></span></button>
+    <span class="mk-sep"></span>
+    <button class="mk-row"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 14h.01M15 14h.01"/></svg><span class="name">Ai</span><span class="hint">pane</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+    <button class="mk-row"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18"/></svg><span class="name">Fractal</span><span class="hint">pane</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+    <button class="mk-row"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span class="name">Views</span><span class="hint">pane</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+    <button class="mk-row"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.8 1.17V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3 15H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9L4.54 9a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6V4.5a2 2 0 1 1 4 0"/></svg><span class="name">Settings</span><span class="hint">pane</span><svg class="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+  </div>
+  <span class="caption" id="cap-menu"></span>
+</div>
+
+<div class="callout"><strong>What the light theme exposes.</strong> Flip to Light and the mock changes,
+but the real app cannot: the canvas is <code>#000</code>, node cards are
+<code>--ui-note-surface: #332e28</code>, and 486 colour literals sit in
+<code>resources/styles/styles.css</code> outside any token. A light theme is a
+separate project from an Excalidraw-shaped chrome, and it is the expensive half.
+The chrome band alone is ~350 lines and is worth tokenising either way.</div>
+
+<h2>3. Token map</h2>
+<p class="sub">Excalidraw values from <code>packages/excalidraw/css/theme.scss</code> and
+<code>components/Island.scss</code>. Neurite values measured in the browser, or read from the
+<code>:root</code> at <code>resources/styles/styles.css:5</code>.</p>
+
+<table>
+  <thead><tr><th class="mono">Excalidraw</th><th class="mono">value</th><th class="mono">Neurite today</th><th></th></tr></thead>
+  <tbody>
+    <tr><td class="mono">--border-radius-lg</td><td class="mono">0.5rem = 8px</td><td class="mono">--ui-radius: 8px</td><td><span class="tag same">exact</span></td></tr>
+    <tr><td class="mono">--border-radius-md</td><td class="mono">0.375rem = 6px</td><td class="mono">--ui-radius-inner: 5px</td><td><span class="tag near">1px</span></td></tr>
+    <tr><td class="mono">--default-icon-size</td><td class="mono">1rem = 16px</td><td class="mono">menu 16px / toolbar 20px</td><td><span class="tag near">toolbar</span></td></tr>
+    <tr><td class="mono">--default-button-size</td><td class="mono">2rem = 32px</td><td class="mono">38px tool, 42px menu</td><td><span class="tag near">chunkier</span></td></tr>
+    <tr><td class="mono">menu item height</td><td class="mono">2rem = 32px</td><td class="mono">34px</td><td><span class="tag near">2px</span></td></tr>
+    <tr><td class="mono">menu item column-gap</td><td class="mono">0.625rem = 10px</td><td class="mono">10px</td><td><span class="tag same">exact</span></td></tr>
+    <tr><td class="mono">menu item font-size</td><td class="mono">0.875rem = 14px</td><td class="mono">14px</td><td><span class="tag same">exact</span></td></tr>
+    <tr><td class="mono">panel width</td><td class="mono">max 20rem = 320px</td><td class="mono">304px</td><td><span class="tag same">near</span></td></tr>
+    <tr><td class="mono">--island-bg-color <i>dark</i></td><td class="mono">#232329</td><td class="mono">#1a1921f2 + blur(6px)</td><td><span class="tag near">darker</span></td></tr>
+    <tr><td class="mono">--island-bg-color <i>light</i></td><td class="mono">#ffffff</td><td class="mono">—</td><td><span class="tag diff">absent</span></td></tr>
+    <tr><td class="mono">--default-bg-color <i>dark</i></td><td class="mono">#121212</td><td class="mono">#000</td><td><span class="tag near">blacker</span></td></tr>
+    <tr><td class="mono">--shadow-island</td><td class="mono">3 layers, max alpha 0.17</td><td class="mono">1 layer, alpha 0.6</td><td><span class="tag diff">heavy</span></td></tr>
+    <tr><td class="mono">island border</td><td class="mono"><i>none</i></td><td class="mono">1px solid #8882</td><td><span class="tag diff">hairline</span></td></tr>
+    <tr><td class="mono">--color-primary</td><td class="mono">#6965db / #a8a5ff</td><td class="mono">--ui-accent: #5a7ec0</td><td><span class="tag near">blue vs violet</span></td></tr>
+    <tr><td class="mono">--button-hover-bg</td><td class="mono">#f1f0ff / #363541</td><td class="mono">#ffffff14</td><td><span class="tag near">untinted</span></td></tr>
+    <tr><td class="mono">--keybinding-color</td><td class="mono">grey-40, opacity .5</td><td class="mono">—</td><td><span class="tag diff">absent</span></td></tr>
+    <tr><td class="mono">chrome font</td><td class="mono">Assistant (OFL)</td><td class="mono">Inter</td><td><span class="tag near">swap</span></td></tr>
+  </tbody>
+</table>
+
+<h3>The whole Island, verbatim</h3>
+<p>This is all of <code>components/Island.scss</code>. It is worth seeing how little there is —
+the look is three properties and a token set, not a component library.</p>
+<div class="card"><pre style="margin:0;font-family:var(--pg-mono);font-size:12.5px;line-height:1.6;overflow-x:auto">.Island {
+  --padding: 0;
+  box-sizing: border-box;
+  background-color: var(--island-bg-color);
+  box-shadow: var(--shadow-island);
+  border-radius: var(--border-radius-lg);
+  padding: calc(var(--padding) * var(--space-factor));
+  position: relative;
+}</pre></div>
+
+<h2>4. What cannot be lifted</h2>
+<div class="callout stop"><strong>The components.</strong> Excalidraw is React + TypeScript + SCSS
+compiled by Vite. Neurite has no bundler and no React: <code>index.html</code> loads
+<code>js/main.js</code>, which fetches ~83 files sequentially into one shared global scope.
+Nothing under <code>packages/excalidraw/components/</code> can be dropped in. What transfers is
+the <em>token set</em>, the <em>metrics</em>, and the <em>layout grammar</em> — all of which are
+plain CSS.</div>
+
+<div class="callout stop"><strong>Excalifont.</strong> The hand-drawn canvas font. The repository's
+root <code>LICENSE</code> is MIT, but the font binary's own copyright table reads
+<code>Copyright (c) 2024 by Excalidraw. All rights reserved.</code> and there is no
+per-font licence file beside it. Mixed signal, and it is out of scope anyway: it is
+canvas text, not toolbar. <b>Assistant</b>, the font the chrome actually uses, is a
+different matter — it is on Google Fonts under the OFL (verified), so it is safe to
+adopt.</div>
+
+<p><b>Attribution.</b> Excalidraw is MIT, <code>Copyright (c) 2020 Excalidraw</code>; Neurite is MIT
+too. Copying token values and metrics is compatible. If CSS is lifted rather than
+re-derived, the file should say where it came from.</p>
+
+<h2>5. The one real decision</h2>
+<p>Excalidraw's toolbar is a <b>mode picker</b>. You press <kbd>R</kbd>, the rectangle button stays
+lit, and every click on the canvas draws a rectangle until you switch. Neurite's toolbar is a
+<b>one-shot creator</b>: click the note icon and a note appears immediately, or drag the icon out
+to place one. Nothing stays armed and no button ever looks active.</p>
+
+<p>The Excalidraw look depends on that active state — the lit pill is the single most recognisable
+thing about the toolbar. Adopting the look without the behaviour means a toolbar with a
+highlight that never appears.</p>
+
+<div class="card">
+  <div class="pill-row" style="margin-top:0">
+    <span class="label">Try</span>
+    <button data-demo="oneshot" aria-pressed="true">One-shot (today)</button>
+    <button data-demo="modal" aria-pressed="false">Armed mode (Excalidraw)</button>
+  </div>
+  <div class="demo-stage" id="demo">
+    <div class="demo-arm">
+      <button data-tool="note" aria-pressed="false" title="note">N</button>
+      <button data-tool="link" aria-pressed="false" title="link">L</button>
+      <button data-tool="ai" aria-pressed="false" title="ai">A</button>
+    </div>
+    <span class="demo-hint" id="demo-hint"></span>
+  </div>
+  <p class="sub" id="demo-note" style="margin-top:8px"></p>
+</div>
+
+<h3>Three ways to answer it</h3>
+<table>
+  <thead><tr><th>Option</th><th>What happens</th><th>Cost</th></tr></thead>
+  <tbody>
+    <tr><td><b>A. Look only</b></td>
+        <td>Take the tokens, metrics, digit badges and shortcut hints. Tools keep firing on
+            click. The active state is used for <em>hover and focus</em> only.</td>
+        <td>CSS + markup. No JS behaviour touched.</td></tr>
+    <tr><td><b>B. Armed tools</b> <span class="tag near">recommended</span></td>
+        <td>Clicking a tool arms it; the next canvas click places one node there and disarms.
+            <kbd>1</kbd>–<kbd>4</kbd> arm, <kbd>Esc</kbd> disarms. Drag-out keeps working
+            untouched. The lit pill becomes real.</td>
+        <td>One armed-tool variable, one canvas click handler, one class toggle. The digits
+            already exist in the tooltips.</td></tr>
+    <tr><td><b>C. Full modal</b></td>
+        <td>The tool stays armed across many placements, like Excalidraw. Every canvas click
+            makes a node until you press <kbd>Esc</kbd>.</td>
+        <td>Fights Neurite's canvas: click-drag pans, and double-click already creates. A mode
+            that swallows clicks would need those renegotiated.</td></tr>
+  </tbody>
+</table>
+<p><b>B</b> because it buys the whole visual grammar for one variable and one handler, and because
+it is reversible. <b>C</b> collides with panning, which is the gesture the fractal depends on most.</p>
+
+<h2>6. Phases</h2>
+<p>Phases 1–3 are CSS only, and that is a measured claim rather than a hope: exactly four files
+under <code>js/</code> mention any chrome class name at all
+(<code>dropdown.js</code>, <code>savenet.js</code>, <code>handledrop.js</code>,
+<code>record/record.js</code>), and the only class any of them <em>writes</em> onto the chrome is
+<code>open</code>, toggled at <code>dropdown.js:183</code>. Nothing reads a colour, a radius or a
+size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
+<ol class="phases">
+  <li><b>Tokenise the chrome band, and nothing else</b>
+      <p>The chrome is a contiguous ~350 lines: <code>styles.css:1221–1530</code> (tool bar, menu
+      button, dropdown, menu rows), <code>4206–4260</code> (<code>.tool-bar-action</code>) and
+      <code>4651+</code> (<code>.panel-icon</code>). Replace the literals there with tokens — today
+      <code>.tool-bar</code> and <code>.dropdown-content</code> both hardcode
+      <code>#1a1921f2</code> and <code>1px solid #8882</code> while <code>--ui-surface</code> exists
+      and is read exactly once. Also fold the second <code>:root</code> at line 3178 in, and delete
+      <code>styles.css:2994</code> — a bare <code>#disk-file-button { font-size: 13px }</code>, sitting
+      1,500 lines away from the <code>.menu-row</code> rule it overrides, which is why
+      <em>Save to…</em> renders a pixel smaller than every row beside it.</p>
+      <p class="meta">no visual change · pure prerequisite · pins: computed styles unchanged before/after</p></li>
+
+  <li><b>Retune the island</b>
+      <p>Drop the 1px hairline. Swap the single heavy shadow for the 3-layer one. Lighten
+      <code>#1a1921f2</code> toward <code>#232329</code> and drop the backdrop blur, which is
+      doing nothing at 95% opacity but costs a compositor layer over an animating canvas.
+      Radii to 8/6.</p>
+      <p class="meta">visible · ~20 lines · the biggest look change per line spent</p></li>
+
+  <li><b>Menu row anatomy</b>
+      <p>Add the right-aligned shortcut hint at <code>opacity: .5</code>. The shortcuts already
+      exist in <code>data-tooltip</code> prose — surface them. Row height 34→32, radius 5→6, hover
+      fill tinted with the accent instead of flat white. Keep the chevron on panel rows: it is the
+      one thing that says "this opens something", which Excalidraw solves with a submenu arrow anyway.</p>
+      <p class="meta">visible · ~15 lines + markup per row</p></li>
+
+  <li><b>Digit badges and the armed state</b>
+      <p>Print 1–4 in the corner of each tool button. Then option <b>B</b> above: arm on click,
+      place on the next canvas click, <kbd>Esc</kbd> to cancel. This is the phase that needs a
+      decision before it starts.</p>
+      <p class="meta">behaviour · needs sign-off · browser-verify before writing the test</p></li>
+
+  <li><b>A bottom-left zoom island</b>
+      <p>Neurite has zoom and pan readouts inside the Views panel; Excalidraw keeps them on the
+      canvas at bottom-left, where they double as the reset control. This is the one region
+      Neurite has no equivalent of.</p>
+      <p class="meta">new region · optional · check it against the iPad work in ipad-spike.md first</p></li>
+</ol>
+
+<div class="callout"><strong>One idea worth stealing that is not visual.</strong> Excalidraw tags each
+island <code>data-viewport-ui</code> and measures them in <code>getViewportOffsets</code>, so the
+canvas knows which rectangles are covered. Neurite has nothing like it, which is why a
+"fit to view" can drop a node under the tool pill. Independent of the restyle, and cheap.</div>
+
+<div class="callout stop"><strong>What this proposal does not do.</strong> It does not tokenise the
+other ~4,900 lines of <code>styles.css</code>, and it does not deliver a light theme. The
+<code>:root</code> block's own comment already settled that direction — tokens are added as the
+rules that need them are touched, and a single-pass rewrite is explicitly not the goal. A light
+theme would reverse that decision, and it should be argued on its own merits, not smuggled in as
+part of a restyle.</div>
+
+<footer>
+Sources — Neurite: measured in Chromium at 1200&times;974 on commit <code>e0e48c0</code>;
+<code>resources/styles/styles.css</code> (5,295 lines, 486 colour literals, 66
+<code>var(--ui-*)</code> uses across 12 tokens); <code>resources/svg/icons.html</code>
+(34 symbols, Lucide Static v1.33.0).
+Excalidraw @ master: <code>packages/excalidraw/css/theme.scss</code>,
+<code>components/Island.scss</code>,
+<code>components/dropdownMenu/DropdownMenu.scss</code>,
+<code>fonts/</code>, root <code>LICENSE</code>.
+</footer>
+
+</main>
+<script>
+'use strict';
+
+// ---- the two page-level toggles -------------------------------------------
+// Both write a data-* attribute on <html>; every rule above keys off those, so
+// there is no per-element state to keep in step.
+const root = document.documentElement;
+const captions = {
+    rest: { current: 'measured · commit e0e48c0', proposed: 'excalidraw tokens' },
+    menu: { current: 'measured · commit e0e48c0', proposed: 'excalidraw tokens' }
+};
+function setAttr(name, val){
+    root.setAttribute('data-' + name, val);
+    document.querySelectorAll('[data-set="' + name + '"]').forEach( (b)=>
+        b.setAttribute('aria-pressed', String(b.dataset.val === val)) );
+    paintCaptions();
+}
+function paintCaptions(){
+    const mode = root.getAttribute('data-mode');
+    const theme = root.getAttribute('data-theme');
+    const suffix = (mode === 'proposed' ? ' · ' + theme : '');
+    document.getElementById('cap-rest').textContent = captions.rest[mode] + suffix;
+    document.getElementById('cap-menu').textContent = captions.menu[mode] + suffix;
+}
+document.querySelectorAll('[data-set]').forEach( (b)=>
+    b.addEventListener('click', ()=> setAttr(b.dataset.set, b.dataset.val)) );
+paintCaptions();
+
+// A tool in the mock toolbar only shows an active state in `proposed`, because
+// that state is exactly what today's chrome has no way to express.
+document.querySelectorAll('#stage-rest .mk-tool[aria-pressed]').forEach( (b)=>
+    b.addEventListener('click', ()=>{
+        const on = b.getAttribute('aria-pressed') === 'true';
+        document.querySelectorAll('#stage-rest .mk-tool[aria-pressed]')
+            .forEach( (o)=> o.setAttribute('aria-pressed', 'false') );
+        b.setAttribute('aria-pressed', String(!on));
+    }) );
+
+// ---- the interaction demo -------------------------------------------------
+// The point of this one is not decoration: it is the difference between the two
+// models, shown rather than described, because that is the difference the reader
+// has to sign off on.
+const demo = document.getElementById('demo');
+const demoHint = document.getElementById('demo-hint');
+const demoNote = document.getElementById('demo-note');
+let model = 'oneshot';
+let armed = null;
+
+const COPY = {
+    oneshot: 'Pressing a tool makes a note at once, wherever the view happens to be. '
+           + 'No button ever looks active, so the toolbar has no state to show — which is '
+           + 'why the Excalidraw highlight would sit unused.',
+    modal:   'Pressing a tool arms it and it stays lit. The next click on the canvas places '
+           + 'one note there and disarms. Esc cancels. This is what makes the lit pill mean '
+           + 'something.'
+};
+
+function paintDemo(){
+    demoHint.textContent = (model === 'oneshot')
+        ? 'press a tool'
+        : (armed ? 'armed: ' + armed + ' — click the canvas, or Esc' : 'press a tool to arm it');
+    demo.classList.toggle('armed', Boolean(armed));
+    demoNote.textContent = COPY[model];
+}
+function clearNotes(){ demo.querySelectorAll('.demo-note').forEach( (n)=> n.remove() ) }
+function place(x, y, tool){
+    const n = document.createElement('div');
+    n.className = 'demo-note';
+    n.style.left = x + 'px';
+    n.style.top = y + 'px';
+    n.textContent = tool + ' note';
+    demo.appendChild(n);
+    // Six is enough to read the pattern; past that the stage is just full.
+    const all = demo.querySelectorAll('.demo-note');
+    if (all.length > 6) all[0].remove();
+}
+function disarm(){
+    armed = null;
+    demo.querySelectorAll('.demo-arm button').forEach( (b)=> b.setAttribute('aria-pressed', 'false') );
+    paintDemo();
+}
+
+document.querySelectorAll('[data-demo]').forEach( (b)=>
+    b.addEventListener('click', ()=>{
+        model = b.dataset.demo;
+        document.querySelectorAll('[data-demo]').forEach( (o)=>
+            o.setAttribute('aria-pressed', String(o.dataset.demo === model)) );
+        clearNotes();
+        disarm();
+    }) );
+
+demo.querySelectorAll('.demo-arm button').forEach( (b)=>
+    b.addEventListener('click', (ev)=>{
+        ev.stopPropagation();           // the stage's own handler is the canvas
+        const tool = b.dataset.tool;
+        if (model === 'oneshot') {
+            // Today's behaviour: the note lands at the middle of the view, and the
+            // button goes straight back to rest.
+            place(demo.clientWidth / 2, demo.clientHeight / 2 + 20, tool);
+            return paintDemo();
+        }
+        const wasArmed = (armed === tool);
+        disarm();
+        if (!wasArmed) { armed = tool; b.setAttribute('aria-pressed', 'true') }
+        paintDemo();
+    }) );
+
+demo.addEventListener('click', (ev)=>{
+    if (model !== 'modal' || !armed) return;
+    const r = demo.getBoundingClientRect();
+    place(ev.clientX - r.left, ev.clientY - r.top, armed);
+    disarm();                            // option B: one placement, then rest
+});
+document.addEventListener('keydown', (ev)=>{ if (ev.key === 'Escape' && armed) disarm() });
+paintDemo();
+</script>
+</body>
+</html>

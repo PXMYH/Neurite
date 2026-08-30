@@ -12,6 +12,7 @@ how it is built.
 | this file | Same map as static text, for reading in a terminal or on GitHub. |
 | [`handoff.md`](handoff.md) | Start here when picking up development with no memory of the last session: what to read, how to run and verify, how issues are picked, what landed recently, and the working rules for this fork. |
 | [`ipad-spike.md`](ipad-spike.md) | Starting evidence for [#6](https://github.com/PXMYH/Neurite/issues/6): what the source already determines about the iPad (touch handler inventory, the two competing pinch paths, 153 fixed-px dimensions, CodeMirror's iOS input path, where the FPS readout is), plus the capture protocol for the parts that need the device. |
+| [`chrome-restyle.html`](chrome-restyle.html) | A proposal, not a spec: what separates Neurite's toolbar and menu from Excalidraw's, measured rather than recalled. Toggle between the two token sets and between light and dark to see the difference on screen. Names the one gap that is a behaviour decision rather than CSS — Excalidraw's toolbar is a mode picker and Neurite's fires on click — and phases the rest. Open it directly in a browser. |
 | [`adr/`](adr/) | Decisions that would otherwise get re-proposed. [`0001`](adr/0001-keep-the-hand-ordered-script-array.md) is why `PageLoad.scripts` stays a hand-ordered array; [`0002`](adr/0002-typescript-in-the-load-path.md) is why a file in it may be TypeScript without a bundler, a watch process, or a change to the array. |
 
 ## The one-paragraph version
