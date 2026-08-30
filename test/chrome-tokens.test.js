@@ -48,7 +48,7 @@ test('the chrome tokens exist and each one is read', ()=>{
     const TOKENS = [
         '--ui-chrome', '--ui-chrome-border', '--ui-chrome-rule', '--ui-chrome-hover',
         '--ui-chrome-text', '--ui-chrome-text-strong', '--ui-chrome-blur',
-        '--ui-chrome-icon', '--ui-chrome-icon-hover', '--ui-chrome-raised',
+        '--ui-chrome-icon', '--ui-chrome-icon-hover', '--ui-chrome-shadow',
         '--ui-tool-size', '--ui-tool-icon-size',
     ];
     for (const token of TOKENS) {
@@ -122,6 +122,44 @@ test('no chrome rule holds a colour literal any more', ()=>{
         'a colour literal is back on a chrome rule: ' + found.join(', ')
         + '. Add it to the :root block and read it with var() instead, or the four '
         + 'chrome surfaces drift apart one edit at a time');
+});
+
+test('the island is paper on the canvas, not a panel cut out of it', ()=>{
+    // What the retune actually decided, in the four values a future edit is most
+    // likely to reach for one at a time.
+    const root = code.slice(0, code.indexOf('html, body'));
+
+    assert.match(root, /--ui-chrome:\s*#232329\b/,
+        'the island surface moved off Excalidraw\'s measured #232329');
+    assert.match(root, /--ui-chrome-border:\s*transparent\b/,
+        'the 1px hairline is back. An Island is a background, a shadow and a radius -- '
+        + 'the edge comes from the shadow\'s last layer, under the island rather than around it');
+    assert.match(root, /--ui-chrome-blur:\s*none\b/,
+        'the backdrop blur is back. It composites a layer over a canvas that repaints '
+        + 'every frame, and over an opaque island it shows nothing');
+
+    // Three soft layers plus the dark theme's 1px ring. The ring is what replaced the
+    // border, so a shadow that loses it loses the island's edge too.
+    const shadow = root.match(/--ui-chrome-shadow:([^;]*);/);
+    assert.ok(shadow, '--ui-chrome-shadow is gone');
+    const layers = shadow[1].match(/rgba?\([^)]*\)/g) || [];
+    assert.equal(layers.length, 4,
+        'the island shadow is no longer four layers: three soft ones at 0.17 / 0.08 / '
+        + '0.05 and the 1px ring that stands in for the border');
+    assert.match(shadow[1], /0 0 0 1px rgba\(0, 0, 0, 0\.15\)/,
+        'the 1px ring is gone, so the island has no edge in the dark theme');
+});
+
+test('a selected card keeps its own shadow, not the island\'s', ()=>{
+    // The reason --ui-chrome-shadow exists at all rather than retuning
+    // --ui-shadow-raised in place: that token is also read by `.window.selected`, and a
+    // card is content. Retuning chrome should not quietly restyle a selected note.
+    const selected = rule('.window.selected');
+    assert.match(selected, /box-shadow:\s*var\(--ui-shadow-raised\)/,
+        'a selected card now reads the chrome shadow, so retuning the islands also '
+        + 'restyles notes -- which is the coupling --ui-chrome-shadow was added to avoid');
+    assert.match(code, /--ui-shadow-raised:\s*0 6px 20px/,
+        '--ui-shadow-raised was retuned, which moves every card that reads it');
 });
 
 test('Save to... is the same size as every row beside it', ()=>{

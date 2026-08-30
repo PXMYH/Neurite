@@ -67,22 +67,49 @@
        #1a1921f2 with a matching #8882 hairline, which is why changing the
        chrome's material used to mean finding every literal first.
 
-       The values here are the ones already on screen, to the byte -- naming them
-       is a separate change from retuning them. */
-    --ui-chrome: #1a1921f2;
-    --ui-chrome-border: #8882;
+       Excalidraw's own dark island, measured: #232329, and #121212 behind it. This
+       canvas is #000, which is darker than either, so the island reads with more
+       separation here than it does there -- and that is the point of the value
+       rather than a reason to darken it back. */
+    --ui-chrome: #232329;
+    /* No hairline. An island is paper resting on the canvas, and a 1px grey edge is
+       what made these read as panels cut out of it instead. Excalidraw's `.Island`
+       is a background, a shadow and a radius -- there is no border property in the
+       rule at all. What defines the edge in the dark theme is the last layer of the
+       shadow below, a 1px black ring, which sits under the island rather than
+       around it. Kept as a token set to `transparent` so the border declarations
+       do not have to be deleted from four rules to find out. */
+    --ui-chrome-border: transparent;
     /* The hairline inside an island: a divider between tool groups, not an edge. */
     --ui-chrome-rule: #8883;
-    /* Hover on a chrome control. White at low alpha rather than a tint, so one
-       value works over both the panel and the island. */
-    --ui-chrome-hover: #ffffff14;
+    /* Hover on a chrome control. Excalidraw's dark `--button-hover-bg`. Opaque now
+       rather than white-at-low-alpha: the island under it is opaque too, so the
+       wash had nothing left to let through, and a named colour is one fewer
+       composite for the compositor to resolve over an animating canvas. */
+    --ui-chrome-hover: #363541;
     /* Chrome text, and the same at full strength for hover and focus. */
     --ui-chrome-text: #ddd;
     --ui-chrome-text-strong: #fff;
-    /* The blur behind an island. A variable because it is the one chrome property
-       with a cost -- a compositor layer over a canvas that repaints every frame --
-       so it wants to be findable in one place when that cost is questioned. */
-    --ui-chrome-blur: blur(6px);
+    /* No blur. It was the one chrome property with a real cost -- a compositor layer
+       over a canvas that repaints every frame -- and at 95% opacity it was buying
+       almost nothing; now that the island is fully opaque it is buying exactly
+       nothing. Excalidraw uses no backdrop-filter anywhere, measured across the
+       whole rendered page. Kept as a token so the cost stays named and reversible
+       rather than deleted from three rules and forgotten. */
+    --ui-chrome-blur: none;
+
+    /* The island's elevation, and its edge. Excalidraw's `--shadow-island`, three
+       layers whose strongest alpha is 0.17 -- against the single `0 6px 20px
+       rgba(12,12,20,0.6)` that used to be here, which was one heavy drop rather
+       than a soft rise. The fourth layer is the dark theme's own addition: a 1px
+       black ring that replaces the grey hairline the islands used to draw.
+       Deliberately not --ui-shadow-raised, which `.window.selected` also reads --
+       a selected card is content and keeps the heavier shadow. */
+    --ui-chrome-shadow:
+        0px 0px 1px 0px rgba(0, 0, 0, 0.17),
+        0px 0px 3px 0px rgba(0, 0, 0, 0.08),
+        0px 7px 14px 0px rgba(0, 0, 0, 0.05),
+        0 0 0 1px rgba(0, 0, 0, 0.15);
 
     /* One tool in the island, and the glyph inside it. Two names rather than one
        because they do not scale together: the box is a touch target and the glyph
@@ -94,10 +121,6 @@
        own surface rather than on the panel, and it is a symbol rather than a word. */
     --ui-chrome-icon: #bbb;
     --ui-chrome-icon-hover: #eee;
-    /* The island one step lighter, for a chrome control whose whole body is the
-       hover target rather than a fill inside it -- the menu button, which has no
-       inner surface to wash. */
-    --ui-chrome-raised: #2a2932f2;
 }
 
 html, body {
@@ -1268,10 +1291,13 @@ input[type="text"i].title-input {
     background: var(--ui-chrome);
     backdrop-filter: var(--ui-chrome-blur);
     border: 1px solid var(--ui-chrome-border);
-    /* Softer than --ui-radius: at 6px of padding around 38px tools, 8px leaves the
-       corner reading as a clipped square rather than as a pill. */
-    border-radius: 12px;
-    box-shadow: var(--ui-shadow-raised);
+    /* 12px here was reasoned from the padding: at 6px around a 38px tool, 8px was
+       said to leave the corner reading as a clipped square rather than a pill. The
+       measurement disagrees -- the whole of excalidraw.com uses exactly two radii,
+       4px three times and 8px forty-two, and its tool island is one of the 8s. One
+       radius for every island is worth more than a per-island judgement. */
+    border-radius: var(--ui-radius);
+    box-shadow: var(--ui-chrome-shadow);
 }
 
     .tool-bar .node-panel {
@@ -1330,14 +1356,19 @@ input[type="text"i].title-input {
             backdrop-filter: var(--ui-chrome-blur);
             border: 1px solid var(--ui-chrome-border);
             border-radius: var(--ui-radius);
-            box-shadow: var(--ui-shadow-raised);
+            box-shadow: var(--ui-chrome-shadow);
             cursor: pointer;
             transition: background-color var(--ui-transition);
             z-index: 2;
         }
 
+            /* The same value the menu rows and the tools use. It was a second,
+               slightly-lighter surface on the reasoning that this button has no
+               inner fill to wash -- but with an opaque island and an opaque hover
+               there is no difference between washing a fill and replacing one, so
+               the two tokens collapsed into the one that is already everywhere. */
             .menu-button:hover {
-                background-color: var(--ui-chrome-raised);
+                background-color: var(--ui-chrome-hover);
             }
 
         .menu-icon {
@@ -1450,7 +1481,7 @@ input[type="text"i].title-input {
     /* Floating clear of every edge now, so all four corners are free to round. */
     border: 1px solid var(--ui-chrome-border);
     border-radius: var(--ui-radius);
-    box-shadow: var(--ui-shadow-raised);
+    box-shadow: var(--ui-chrome-shadow);
     /* One column for the one child. It asked for two equal ones, and `1fr`
        equalises them, so the panel measured 650px to hold 325px of tabs and
        325px of nothing. */
