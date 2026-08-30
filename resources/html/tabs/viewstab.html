@@ -1,9 +1,12 @@
 <div class="submenu">
 
-    <!-- Places on the Plane, kept so the reader can come back to them. Every one of
-         these moves the *view* and nothing else: `returnToSavedView` reads a stored pan
-         and zoom and hands them to `Animation.goToCoords`, so no Node moves and the
-         Fractal's equation does not change.
+    <!-- Saved Views: places on the Plane kept under a name, so the reader can go back to
+         them. `CONTEXT.md` holds the term, and the words on screen here are the reason it
+         had to: this panel said "Places", the row that opens it says "Views", and the code
+         under both says `savedViews`. Every one of them moves the view and nothing else --
+         `returnToSavedView` reads a stored pan and zoom and hands them to
+         `Animation.goToCoords`, so no Node moves and the Fractal's equation does not
+         change.
 
          They were the lower two-thirds of the Saves panel, under the list of Saved
          Graphs, which put two unrelated jobs behind one row: one about what is stored in
@@ -18,18 +21,20 @@
          make sense under any of them. That listener is in `displaysavedcoords.js`, not
          here. -->
 
-    <div class="button-label settings-heading">Places</div>
+    <div class="button-label settings-heading">Saved Views</div>
     <div id="savedCoordinatesContainer" class="saved-coordinates-container"></div>
 
     <!-- Store reads the current pan and zoom and asks for a name; Delete removes the one
-         last clicked, which is the only thing that marks a place as selected. -->
+         last clicked, which is the only thing that marks a Saved View as selected. The two
+         ids still say Coordinates: they are what `displaysavedcoords.js` binds by, and
+         renaming an id changes no word a reader ever sees. -->
     <div class="view-buttons">
-        <a id="saveCoordinatesBtn">Store Coordinates</a>
-        <a id="deleteCoordinatesBtn">Delete Coordinates</a>
+        <a id="saveCoordinatesBtn">Store View</a>
+        <a id="deleteCoordinatesBtn">Delete View</a>
     </div>
 
-    <!-- Not a readout: both boxes are inputs, and typing in one moves the view. That is
-         the same journey a place above makes, written as numbers -- which is the only way
+    <!-- Not a readout: both boxes are inputs, and typing in one moves the view. That is the
+         same journey a Saved View above makes, written as numbers -- which is the only way
          to reach a point nobody has named. `interface.js` parses what is typed and sets
          `App.interface.coordsLive = false` while it does, so the live position stops
          overwriting the digits mid-word. -->

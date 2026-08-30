@@ -101,6 +101,36 @@ test('the places are one wrapping row, not three sliced ones', ()=>{
         + 'places and clips when it has many');
 });
 
+test('one name for the thing, and the code agrees with the button', ()=>{
+    // Three names were in play for one object: the panel said "Places", the row that opens
+    // it says "Views", and the code says `savedViews`. `CONTEXT.md` is what settles that,
+    // so the term has to be in it -- and the words on screen have to be the term.
+    assert.match(read('CONTEXT.md'), /^\*\*Saved View\*\*:$/m,
+        'the glossary has no entry for a Saved View, so the panel and the code are free to '
+        + 'drift apart again');
+    // "coordinate" and "place" are in that entry's own Avoid list, so the panel may not
+    // show them. Visible text only, and that is the whole distinction: the three ids here
+    // still read `saveCoordinatesBtn` and `savedCoordinatesContainer`, because an id is
+    // what `displaysavedcoords.js` binds by and no reader ever sees one. Tags go, so
+    // attributes go with them; comments go, because this file explains that very split.
+    const shown = views
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<[a-zA-Z\/!][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>/g, ' ');
+    for (const word of [/Coordinates/, /Places/]) {
+        assert.doesNotMatch(shown, word, 'the Views panel shows ' + word + ' again');
+    }
+
+    // The label the button carries and the label the code writes back after "Saved!" have
+    // to be the same string. They were not: the markup said "Store Coordinates" and
+    // `saveCurrentView` restored "Save Coordinates", so one click renamed the button for
+    // the rest of the session -- a rename nothing would catch, since no handler reads it.
+    const label = views.match(/<a id="saveCoordinatesBtn">([^<]+)<\/a>/);
+    assert.ok(label, 'the Store button is gone or no longer an <a>');
+    assert.ok(coords.includes('saveButton.textContent = "' + label[1] + '"'),
+        'the code puts back a different label than the markup carries: markup says "'
+        + label[1] + '"');
+});
+
 test('the Saves panel says what it is now that it holds only a list', ()=>{
     // Its rows are built by `savenet.js`, so with the coordinates gone the file itself has
     // no words in it. An empty bordered box reads as a panel that failed to load rather

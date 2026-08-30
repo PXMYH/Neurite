@@ -27,6 +27,13 @@ The Mandelbrot set drawn under the Graph. It is the terrain, not a backdrop:
 its shape pulls Nodes toward the set's boundary as they move.
 _Avoid_: background, backdrop, wallpaper, texture
 
+**Saved View**:
+A place on the Plane kept under a name — one pan and one zoom — so the reader
+can go back to it. It says where to look and nothing about what is there, so
+returning to one moves no Node and changes no Fractal. Which Saved Views are
+offered depends on the Fractal being drawn.
+_Avoid_: coordinate, coordinates, place, bookmark, location, camera, viewport
+
 ### Nodes and edges
 
 **Node**:

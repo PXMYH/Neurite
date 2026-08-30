@@ -449,8 +449,8 @@ test('every menu row describes what it does, and the heading is not overridden',
     const PANELS = {
         tab4: ['aitab.html', 'API'],
         tab2: ['fractaltab.html', 'drawn'],
-        tab6: ['networkstab.html', 'saved'],
-        tab7: ['viewstab.html', 'coordinates'],
+        tab6: ['networkstab.html', 'graphs'],
+        tab7: ['viewstab.html', 'views'],
         tab5: ['settingstab.html', 'placement'],
         tab3: ['helptab.html', 'mouse'],
     };

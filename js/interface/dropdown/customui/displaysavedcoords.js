@@ -269,7 +269,7 @@ async function saveCurrentView() {
     // Update button text temporarily
     const saveButton = Elem.byId('saveCoordinatesBtn');
     saveButton.textContent = "Saved!";
-    const cb = ()=>{ saveButton.textContent = "Save Coordinates" } ;
+    const cb = ()=>{ saveButton.textContent = "Store View" } ;
     Promise.delay(500).then(cb);
 }
 
