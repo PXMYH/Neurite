@@ -156,8 +156,8 @@
     <div class="dropdown-content">
         <div class="menu-panel">
             <nav class="menu-list" id="menuList" aria-label="Menu">
-                <!-- The four commands, above the panels and separated from them, because
-                     they are the only rows that do something rather than go somewhere:
+                <!-- The commands, above the panels and separated from them, because they
+                     are the only rows that do something rather than go somewhere:
                      no chevron, because there is no level to descend to. The menu does
                      not close around them either -- the only writes to the `open` class
                      in the tree are the two toggles in the hamburger's own handler, so
@@ -165,14 +165,18 @@
                      starts the same way. That was equally true when both lived inside the
                      Saves panel, so it is not new here; it is left as it was rather than
                      described as something it is not.
-                     They were two rows deep -- Open and Save to… at the top of the
+                     They were two rows deep -- Open, Save to… and Clear inside the
                      Saves panel, Screenshot and Record below them -- and reaching a save
                      of the graph took opening the menu, choosing a panel, and only then
                      finding it.
 
-                     All four cross the page's edge: two move a `.neurite` file, two read
-                     the screen through `getDisplayMedia`. Nothing else in the menu leaves
-                     the browser, which is what makes them one group.
+                     The first three are the whole life of a graph read left to right:
+                     bring one in, send one out, put this one away and start again. Four
+                     of the five cross the page's edge -- two move a `.neurite` file, two
+                     read the screen through `getDisplayMedia` -- and Clear is the one
+                     that does not, which is why it sits beside Save to… rather than
+                     among them: it is the row you want next after saving, and the row a
+                     reader should be least able to hit by accident on the way to a panel.
 
                      `savenet.js`, `record.js` and `handledrop.js` bind by id, so moving
                      the markup changes no wiring. The label is its own span for the same
@@ -188,6 +192,18 @@
                 <button type="button" class="menu-row" id="disk-file-button">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#download-icon"></use></svg>
                     <span class="menu-row-label">Save to…</span>
+                </button>
+                <!-- Clear asks before it acts, and it asks through `window.confirm`, which
+                     is the app's own modal. In the panel it asked with a Yes/No pair that
+                     appeared beside it and a label that rewrote itself to "Are you sure?"
+                     -- three elements and two handlers to ask one question. A row of a
+                     menu cannot grow a second row underneath it without moving every row
+                     below, and `window.confirm` is what Load already uses for the same
+                     kind of question. -->
+                <button type="button" class="menu-row" id="clear-button"
+                        title="Put this graph away and start an empty one. The current graph is saved first, so nothing is lost and no save is deleted.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-plus-icon"></use></svg>
+                    <span class="menu-row-label">Clear</span>
                 </button>
                 <button type="button" class="menu-row" id="screenshotButton"
                         title="Capture the screen and drop it on the canvas as an image node.">

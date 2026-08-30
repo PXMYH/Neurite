@@ -1,10 +1,15 @@
 <div class="submenu">
 
-    <!-- Open…, Save to…, Screenshot and Record used to head this panel. They are rows
-         of the menu itself now (`dropdown.html`): they are commands, and a command that
-         needs a panel opened first is a command two clicks deep. The hidden file input
-         behind Open went with them, because it has to stay rendered and this panel does
-         not.
+    <!-- Open…, Save to…, Clear, Screenshot and Record used to head this panel. They are
+         rows of the menu itself now (`dropdown.html`): they are commands, and a command
+         that needs a panel opened first is a command two clicks deep. The hidden file
+         input behind Open went with them, because it has to stay rendered and this panel
+         does not.
+
+         The "Autosaving" status went with nothing -- it was deleted. It described a
+         behaviour that has no switch: `#startAutosave` runs on a timer from `init` and
+         nothing turns it off, so the line spent a row of the panel restating a state
+         that is never anything else. A status that cannot change is not a status.
 
          What is left is everything that operates on storage the browser evicts on its
          own terms -- the saves themselves, and the coordinates. -->
@@ -13,14 +18,6 @@
 
 
     <div class="top-section">
-        <div class="buttons-left">
-            <span class="autosave-status" title="Every change is saved on its own, every 8 seconds and whenever this tab is hidden. There is no manual save.">Autosaving</span>
-            <a id="clear-button">Clear</a>
-            <div id="clear-sure" style="display:none">
-                <a id="clear-sure-button">Yes</a>
-                <a id="clear-unsure-button">No</a>
-            </div>
-        </div>
         <div id="savedCoordinatesContainerTop" class="saved-coordinates-container"></div>
     </div>
 

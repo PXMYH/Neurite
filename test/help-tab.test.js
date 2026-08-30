@@ -144,14 +144,15 @@ test('the keys the reference does not repeat are the ones the reader can rebind'
     }
 });
 
-test('the four commands are rows of the menu, once each, with their labels intact', ()=>{
-    // Screenshot and Record came from this tab; Open and Save to… came from the Saves
-    // panel, which is one level further in. All four are commands, so they are rows of
-    // the menu itself rather than contents of a panel.
+test('the commands are rows of the menu, once each, with their labels intact', ()=>{
+    // Screenshot and Record came from this tab; Open, Save to… and Clear came from the
+    // Saves panel, which is one level further in. All five are commands, so they are rows
+    // of the menu itself rather than contents of a panel.
     //
     // "The id is somewhere in the page" was true before the move and after it, so it
     // cannot see the move. Name the file.
-    for (const id of ['open-file-button', 'disk-file-button', 'screenshotButton', 'recordButton']) {
+    for (const id of ['open-file-button', 'disk-file-button', 'clear-button',
+                      'screenshotButton', 'recordButton']) {
         const files = ['index.html', HELP, SAVES, MENU,
                        'resources/html/tabs/notestab.html',
                        'resources/html/tabs/aitab.html',
@@ -164,7 +165,8 @@ test('the four commands are rows of the menu, once each, with their labels intac
     // The label span is not cosmetic: `Recorder.setRecordLabel` and savenet's
     // `#updateDiskFileButton` write into it, and writing to the button instead would
     // replace the icon along with the words.
-    for (const id of ['open-file-button', 'disk-file-button', 'screenshotButton', 'recordButton']) {
+    for (const id of ['open-file-button', 'disk-file-button', 'clear-button',
+                      'screenshotButton', 'recordButton']) {
         const button = menu.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
         assert.ok(button, id + ' is no longer a button');
         assert.match(button[0], /class="menu-row"/, id + ' does not use the row pattern');
@@ -175,9 +177,11 @@ test('the four commands are rows of the menu, once each, with their labels intac
         assert.doesNotMatch(button[0], /menu-row-chevron/, id + ' promises a panel it does not open');
     }
     // Screenshot and Record are the two whose title text is the only place the reader
-    // learns what they capture. Open's is the same kind of promise; Save to…'s is
+    // learns what they capture. Open's and Clear's are the same kind of promise -- and
+    // Clear's is the only place the row says it saves first and deletes nothing, which is
+    // the whole difference between it and the delete a reader fears it is. Save to…'s is
     // written by `savenet.js`, which is why it is not asserted here.
-    for (const id of ['open-file-button', 'screenshotButton', 'recordButton']) {
+    for (const id of ['open-file-button', 'clear-button', 'screenshotButton', 'recordButton']) {
         const button = menu.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
         assert.match(button[0], /title="[^"]{20,}"/, id + ' says nothing on hover');
     }

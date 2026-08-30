@@ -291,11 +291,8 @@ class GraphImporter {
 
 View.Graphs = class {
     #btnClear = Elem.byId('clear-button');
-    #btnClearSure = Elem.byId('clear-sure-button');
-    #btnClearUnsure = Elem.byId('clear-unsure-button');
     #btnDiskFile = Elem.byId('disk-file-button');
     #btnOpenFile = Elem.byId('open-file-button');
-    #divClearSure = Elem.byId('clear-sure');
     #dropArea = Elem.byId('saved-networks-container');
     // A page cannot open a file dialog on its own either. Dropping a file on the
     // list has always worked, but nothing on screen said so, and a gesture is no
@@ -523,18 +520,18 @@ View.Graphs = class {
         }
     }
 
+    // The question is asked through the app's modal rather than by growing a
+    // Yes/No pair beside the row: as a row of the menu this has no room to put
+    // one, and every other question this file asks -- an empty save, a file too
+    // large to store -- is already a `window.confirm`.
     #onBtnClearClicked = (e)=>{
-        this.#divClearSure.setAttribute('style', "display:block");
-        this.#btnClear.text = "Are you sure?";
+        const msg = "Start an empty graph? This one is saved first, "
+                  + "so you can load it again from the Saves panel.";
+        window.confirm(msg).then(this.#handleConfirmClear);
     }
-    #onBtnClearUnsureClicked = (e)=>{
-        Elem.hide(this.#divClearSure);
-        this.#btnClear.text = "Clear";
-    }
+    #handleConfirmClear = (confirmed)=>{
+        if (!confirmed) return;
 
-    #onBtnClearSureClicked = (e)=>{
-        Elem.hide(this.#divClearSure);
-        this.#btnClear.text = "Clear";
         // Bank what is on screen before wiping it, then leave nothing selected:
         // the next autosave tick opens a fresh save rather than overwriting the
         // one just banked.
@@ -1022,8 +1019,6 @@ View.Graphs = class {
         this.#addDragEvents();
 
         On.click(this.#btnClear, this.#onBtnClearClicked);
-        On.click(this.#btnClearSure, this.#onBtnClearSureClicked);
-        On.click(this.#btnClearUnsure, this.#onBtnClearUnsureClicked);
         On.click(this.#btnDiskFile, this.#onBtnDiskFileClicked);
         On.click(this.#btnOpenFile, this.#onBtnOpenFileClicked);
         On.change(this.#inputOpenFile, this.#onOpenFileInputChanged);

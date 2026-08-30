@@ -2992,11 +2992,6 @@ td {
     justify-content: flex-start;
 }
 
-.buttons-left, .buttons-right {
-    display: flex;
-    flex-direction: column; /* Stack buttons vertically */
-}
-
 .buttons-right {
     display: flex;
     flex-direction: column; /* Stack buttons vertically */
@@ -3007,34 +3002,6 @@ td {
 .top-section {
     display: flex;
     flex-direction: row; /* Align children in a row */
-}
-
-.buttons-left {
-    display: flex;
-    flex-direction: column; /* Stack buttons vertically */
-    width: 100px; /* Fixed width */
-    background-color: #222226;
-    border-left: 2px solid #727272;
-    border-bottom: 2px solid #727272;
-    position: fixed;
-}
-
-/* Reads as a state, not a control: saving is not something to switch off. */
-.autosave-status {
-    display: block;
-    padding: 5px;
-    font-size: 13px;
-    letter-spacing: 0.04em;
-    color: #8a8a8a;
-    cursor: default;
-}
-
-.autosave-status::before {
-    content: "\25CF"; /* a filled dot -- this is on right now */
-    color: var(--ui-accent);
-    margin-right: 5px;
-    font-size: 11px;
-    vertical-align: 1px;
 }
 
 #disk-file-button {
@@ -3072,7 +3039,9 @@ td {
     align-items: center;
     height: 90px;
     justify-content: flex-end;
-    margin-left: 100px; /* Same as the width of .buttons-left */
+    /* The 100px indent here was the width of `.buttons-left`, which was
+       `position: fixed` and so sat over this row rather than beside it. Both are
+       gone with Clear, and the indent had no other reason to exist. */
 }
 
 #savedCoordinatesContainerBottom {
