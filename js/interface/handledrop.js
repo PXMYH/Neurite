@@ -29,6 +29,59 @@ Mouse.onDraggingFinish = function (e) {
     Mouse.isDragging = false;
 }
 
+// Which tool is lit, and when it goes out.
+//
+// The behaviour was already Excalidraw's: press a tool and the Node it makes follows
+// the mouse until a click puts it down. What was missing was any sign of it -- the tool
+// went back to looking idle the instant it was pressed, so the one thing the pill could
+// usefully say, "this is what your next click will place", it never said.
+//
+// The release has to be deferred by a tick, and that is the whole trick. A Node lands on
+// a document `mouseup` (window.js:300), and the same `mouseup` is what confirms the
+// modal that the link, file-tree and AI tools open before their Node exists at all.
+// Checked *during* mouseup, those two cases are indistinguishable -- nothing is in
+// flight in either -- and the light would go out before three of the four tools had
+// produced anything. Checked on the next tick, after every handler for that mouseup has
+// run, the question answers itself: a Node in flight means the tool is still working.
+const ToolArm = {
+    el: null,
+
+    engage(iconDiv){
+        ToolArm.release();
+        ToolArm.el = iconDiv;
+        iconDiv.setAttribute('aria-pressed', 'true');
+    },
+
+    release(){
+        if (!ToolArm.el) return;
+
+        ToolArm.el.removeAttribute('aria-pressed');
+        ToolArm.el = null;
+    },
+
+    // Truthful rather than remembered: the light follows what the graph is actually
+    // doing, so a Node that lands some other way -- or never arrives, because a modal
+    // was cancelled -- cannot leave a tool lit with nothing behind it.
+    anyNodeInFlight(){
+        for (const key in Graph.nodes) {
+            if (Graph.nodes[key]?.followingMouse) return true;
+        }
+        return false;
+    },
+
+    releaseIfNothingInFlight: ()=>{
+        if (!ToolArm.el || ToolArm.anyNodeInFlight()) return;
+
+        ToolArm.release();
+    },
+
+    onMouseUp: ()=>{
+        if (ToolArm.el) setTimeout(ToolArm.releaseIfNothingInFlight, 0);
+    }
+};
+
+On.mouseup(document, ToolArm.onMouseUp);
+
 function makeIconDraggable(iconDiv) {
     iconDiv.setAttribute('draggable', 'true');
 
@@ -51,10 +104,20 @@ function makeIconDraggable(iconDiv) {
             iconName: iconDiv.classList[1]
         };
         e.dataTransfer.setData('text/plain', JSON.stringify(draggableData));
+        // The drag path ends in a Node following the mouse exactly as the click path
+        // does, so it lights the same tool. `classList[1]` above still reads the icon's
+        // own name: nothing was added to the class list to carry this state, which is an
+        // `aria-pressed` attribute instead.
+        ToolArm.engage(iconDiv);
     });
 
     On.click(iconDiv, (e) => {
         if (!Mouse.isDragging) {
+            // Lit before the action runs, so the three tools that open a modal first are
+            // lit while it is open -- the tool is engaged from the press, whatever it is
+            // still waiting on.
+            ToolArm.engage(iconDiv);
+
             // A note needs no input to exist, so a click makes one rather than
             // asking for anything — the same call the drop path makes below.
             // The other three icons open a modal because a link needs a URL and

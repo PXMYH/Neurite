@@ -67,9 +67,27 @@ test('every tool in the pill is named on hover and to a screen reader', ()=>{
 
         // A label left in one tool is worse than five: the pill goes ragged and the
         // odd one out reads as the only control that does something different.
-        const text = inner.replace(/<[^>]*>/g, '').trim();
+        //
+        // The shortcut badge is not a label and is excluded by name rather than by
+        // loosening the rule. It is `position: absolute`, so it cannot widen the pill,
+        // which is the failure this guards -- 577px of caption strip. It is also
+        // `aria-hidden`, so it adds nothing to the accessible name the two assertions
+        // above just agreed on. Anything else with text in it is still a caption.
+        const withoutBadge = inner.replace(/<span class="tool-key"[^>]*>\d<\/span>/g, '');
+        const text = withoutBadge.replace(/<[^>]*>/g, '').trim();
         assert.equal(text, '', 'a tool still renders label text: ' + JSON.stringify(text));
     }
+});
+
+test('the shortcut badge cannot widen the pill', ()=>{
+    // The reason the labels came out in the first place. A badge that took part in
+    // layout would put the captions back one glyph at a time.
+    const css = read('resources/styles/styles.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = css.match(/\.tool-bar \.tool-key \{([^}]*)\}/);
+    assert.ok(rule, 'the .tool-key rule is gone, so the badges are in flow');
+    assert.match(rule[1], /position:\s*absolute/,
+        'the shortcut badge takes part in layout, so each one widens its tool and the '
+        + 'pill grows a caption strip again');
 });
 
 test('the digit shortcuts match the digits the tooltips promise', ()=>{

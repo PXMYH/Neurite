@@ -121,6 +121,16 @@
        own surface rather than on the panel, and it is a symbol rather than a word. */
     --ui-chrome-icon: #bbb;
     --ui-chrome-icon-hover: #eee;
+    /* The shortcut digit in a tool's corner. Excalidraw's --keybinding-color, dark
+       theme: a solid grey rather than an opacity, so it dims without also fading the
+       glyph it sits beside. */
+    --ui-chrome-keybinding: #7a7a7a;
+    /* The lit tool, and what sits on it. Excalidraw's
+       --color-surface-primary-container and --color-on-primary-container in the dark
+       theme -- deliberately not --ui-accent, which owns selection and focus. An armed
+       tool is a mode, not a selection, and the two have to stay tellable apart. */
+    --ui-chrome-active: #403e6a;
+    --ui-chrome-on-active: #e0dfff;
 }
 
 html, body {
@@ -4279,6 +4289,8 @@ code.language-markdown {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* The digit badge is positioned against this box. */
+    position: relative;
     width: var(--ui-tool-size);
     height: var(--ui-tool-size);
     padding: 0;
@@ -4324,6 +4336,52 @@ code.language-markdown {
     .tool-bar .tool-bar-action:focus-visible {
         outline: 2px solid var(--ui-accent);
         outline-offset: -2px;
+    }
+
+    /* The digit the tool's tooltip already names, printed where the tool is instead of
+       only inside prose the reader has to hover to find. Keys 1-4 have been bound and
+       working at dropdown.js:320 all along; nothing on screen said so.
+       `bottom`/`right` at 4px and 10px are Excalidraw's own numbers -- its
+       `.ToolIcon__keybinding` states 2px/3px and is then overridden to 4px/4px by the
+       mixin that every toolbar button includes. */
+    .tool-bar .tool-key {
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        font-size: 10px;
+        line-height: 1;
+        color: var(--ui-chrome-keybinding);
+        /* A label, never a target: a click here has to reach the tool underneath. */
+        pointer-events: none;
+        user-select: none;
+        transition: color var(--ui-transition);
+    }
+
+    /* The lit pill. This is the state the whole toolbar reads by -- and the state
+       Neurite had no way to show, because a tool fired and immediately looked idle
+       again even though the node it made was still following the mouse waiting to be
+       placed. The behaviour was already "arm, then click to place"; only the signal
+       was missing. */
+    .tool-bar .node-add-item[aria-pressed="true"] {
+        background-color: var(--ui-chrome-active);
+        color: var(--ui-chrome-on-active);
+    }
+
+        /* Not dimmed on the lit pill: Excalidraw re-points --keybinding-color at
+           --color-on-primary-container here, so the digit goes to full contrast rather
+           than staying grey against a surface that just got lighter. */
+        .tool-bar .node-add-item[aria-pressed="true"] .tool-key {
+            color: var(--ui-chrome-on-active);
+        }
+
+    /* The one place Excalidraw hides the digit is its mobile toolbar. Same reasoning
+       here, at the width where the pill already drops to its own row: at that size the
+       tools are what has to stay legible, and a 10px glyph in the corner of each is
+       the first thing worth spending. */
+    @media (max-width: 440px) {
+        .tool-bar .tool-key {
+            display: none;
+        }
     }
 
 /* The chrome's tooltip, from hovertooltip.js: what the tool labels turned into.
