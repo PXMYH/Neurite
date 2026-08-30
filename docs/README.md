@@ -16,7 +16,7 @@ how it is built.
 
 ## The one-paragraph version
 
-`index.html` loads a single script, `js/main.js`. Everything else — 81 more files — is fetched
+`index.html` loads a single script, `js/main.js`. Everything else — 83 more files — is fetched
 sequentially at runtime by `PageLoad.scripts` into one shared global scope, so **load order is the
 dependency graph and a file missing from that array never runs**. Once loaded, the app is a handful of
 globals: `Graph` holds every node and edge plus the view transform, `Fractal` supplies the complex-plane
@@ -127,8 +127,9 @@ flowchart LR
 - **Never hardcode `##` or `[[`.** They are `Tag.node` / `Tag.ref` and the user can change them.
 - **Geometry goes through `vec2`** (`cmult`, `cadd`, `rot`), not plain x/y math.
 - **No linter, one typechecker.** `npm run typecheck` (`tsc --noEmit`) checks the `.ts` files under
-  `js/`; the `.js` files only supply their globals. There are 56 tests under `test/`, run with
-  `node --test test/*.test.js`
+  `js/`; the `.js` files only supply their globals. There are 173 tests in 26 files under `test/`, run
+  with `npm test` or `node --test test/*.test.js` (a bare `node --test test/` fails — the directory arg
+  is read as a module path)
   — nothing under `js/` exports, so they read source as text or slice a class into a `node:vm` context
   (a `.ts` file goes through `ts.transpileModule` first — `test/zetsplit.test.js`).
   Everything else is verified in the browser at `http://localhost:8999`, or through

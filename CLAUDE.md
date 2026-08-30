@@ -42,11 +42,20 @@ Each sub-server gets `npm install` run for it automatically on first start, exce
 and every request path is taken as relative to it, so `/` in the file tree is that folder rather
 than the disk's root (`localhost_servers/direct-access/file-access.js`).
 
-There is no linter. There is a typechecker (`npm run typecheck`) and it only checks the `.ts` files;
-the test suite is deliberately thin — `node --test` with
-no runner dependency. Most verification is still manual in the browser (or via the automation
-server's `GET localhost:8081/screenshot`, which returns a base64 PNG of a Playwright-driven
-instance). `git remote` points at the fork `PXMYH/Neurite`.
+There is no linter. There is a typechecker (`npm run typecheck`) and it only checks the `.ts` files.
+The test suite carries no runner dependency — `node --test` and nothing else — but it is no longer
+thin: 173 tests across 26 files under `test/`, and it is the regression net for anything that can be
+read out of the source or sliced into a `node:vm`. What it cannot see is layout, paint and input, so a
+real browser pass is still part of the work (or the automation server's `GET localhost:8081/screenshot`,
+which returns a base64 PNG of a Playwright-driven instance). `git remote` points at the fork
+`PXMYH/Neurite`.
+
+A scratch port costs more than the port. `http://localhost:8999` is hardcoded twice on the backend
+side — the CORS allowlist in `localhost_servers/start_servers.js` and `defaultNeuriteUrl` in
+`localhost_servers/automation/automation.js`. Serve the app on 9123 and every proxied AI call fails as
+a CORS error that names no port, while `GET /screenshot` photographs whatever is on 8999 instead of
+your copy. Add your port to the allowlist for the length of the task, or pass the URL to the
+automation server as its first argument (`node automation.js http://localhost:9123/`).
 
 ## Working in this repo
 
@@ -155,9 +164,14 @@ loop: autopilot → SVG viewbox → mouse orbit path → FPS → nodes → edges
 CodeMirror instance plus its own `ZettelkastenParser`, `ZettelkastenUI`, and `ZettelkastenProcessor`.
 All four are held together in **one** array of records, `window.zetPaneList`, whose entries are
 `{paneId, cm, parser, ui, processor}` (`ZetPanes.createPane` in
-`js/interface/dropdown/tabs/notestab.js:208`). `window.currentActiveZettelkastenMirror` is the CodeMirror
+`js/interface/dropdown/tabs/notestab.js`). `window.currentActiveZettelkastenMirror` is the CodeMirror
 of the pane on screen, and it is the handle most code reaches for. There are no parallel arrays keyed by
 index — reach a pane's parser or processor through its `zetPaneList` record.
+
+The Notes **tab** is gone from the menu; the pane machinery is not. `#tab1` still exists and still
+loads `notestab.html`, because `App.init` builds `ZetPanes` from `#zetPaneContainer` and `openTab`
+refreshes `currentActiveZettelkastenMirror` on every tab switch — delete that div and boot throws.
+Half-removing this in either direction is the trap `test/notes-tab-removed.test.js` pins.
 
 - Text → graph: `processInput` (on CodeMirror `change`) walks lines, `Tag.node` (default `##`) opens a
   node section, `Tag.ref` (default `[[`) declares edges, `LLM_TAG` (`AI:`) makes an AI node.
@@ -186,8 +200,21 @@ and re-hydration replays `content.dataset.node_extras` through `Node.Extensions`
 `textareaId`, `checkboxId`, `sliderId`). New stateful widgets on a node need a `push_extra_cb` entry, or
 they will silently not survive save/load. `toJSON` explicitly drops non-serializable fields.
 
-Saved graphs live in IndexedDB via localforage (`Stored` in `globals.js`); `savenet.js` holds
+A Saved Graph is *the markup itself*: `Elem.byId('nodes').innerHTML`, taken verbatim
+(`savenet.js:735`). So every attribute a node's DOM carried at save time comes back with it, forever —
+which makes the builder the wrong place to set anything the source should stay in charge of. A
+placeholder written in `TextNode.create` restores under its old wording however the source reads
+afterwards; the same line in `TextNode.init` agrees with a new node, because `init` is the one function
+both paths run (`savenet.js:896`, `if (node.isTextNode) TextNode.init(node)`). Pinned by
+`test/card-placeholder-on-restore.test.js`.
+
+Saved Graphs live in IndexedDB via localforage (`Stored` in `globals.js`); `savenet.js` holds
 `GraphsKeeper`/`GraphExporter`/`GraphImporter` and stores blobs (images, media) separately from graph JSON.
+`DiskMirror` in the same file is the second copy: one real click on `showSaveFilePicker` and every
+autosave lands in that file, so the feature is gated on `DiskMirror.isSupported` before its button is
+drawn rather than failing at the click — Safari and every iOS browser have no picker, and there the
+download fallback gives a copy taken now instead of a file that keeps itself current
+(`test/savenet-disk-mirror.test.js`).
 
 ### AI layer
 
@@ -259,3 +286,19 @@ Single-context: `CONTEXT.md` at the repo root is the domain glossary — read it
 `docs/adr/` holds the decisions that are settled: `0001` on keeping the hand-ordered script array,
 `0002` on TypeScript in the load path. Both are linked from the architecture section above.
 See `docs/agents/domain.md`.
+
+`docs/` holds more than the ADRs, and none of it needs re-deriving:
+
+- [`docs/handoff.md`](docs/handoff.md) — where to start with no memory of the last session: what to
+  read, how issues are picked, what landed recently.
+- [`docs/README.md`](docs/README.md) — the component map as a Mermaid graph, a suggested reading order
+  for the seven files that explain the rest, and the same traps this file lists.
+- [`docs/architecture.html`](docs/architecture.html) — the interactive version: click a component for
+  its files and neighbours, or pick a flow (boot, notes⇄nodes, AI request, save/load, search, render
+  tick) to trace one path. Opens straight from disk.
+- [`docs/icons.md`](docs/icons.md) — every icon is Lucide Static v1.33.0 geometry inlined into
+  `resources/svg/icons.html`, and the existing ids are the interface: markup and scripts refer to the
+  id, so replacing an icon means swapping the geometry under the id it already has. No runtime icon
+  dependency, ever (`test/icon-sprite.test.js` pins this).
+- Feature-level behaviour, if the change is user-visible: `controls.md`, `features.md`,
+  `zettelkasten.md`, `fractalgpt.md`, `multi-agent.md`, `neural-api.md`, `desktop.md`.
