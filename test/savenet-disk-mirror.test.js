@@ -111,6 +111,49 @@ test('once a file is picked, every save is mirrored to it whole', async ()=>{
     assert.ok((await handle.writes[1].text()).includes('edited'));
 });
 
+test('the picker opens on the name the graph already has', async ()=>{
+    // The picker is where the folder and the name are chosen, so the name it opens with
+    // is the one most readers keep. Both paths of Save to… have to agree on it: the
+    // download fallback writes `#fileNameForMeta`, and a hardcoded `suggestedName` here
+    // meant the browser that lets you choose was the one that offered no title.
+    const options = [];
+    const handle = makeFileHandle();
+    const { GraphsKeeper } = load({
+        showSaveFilePicker: (opts)=>{ options.push(opts); return Promise.resolve(handle) }
+    });
+    const keeper = new GraphsKeeper();
+
+    assert.equal(await keeper.disk.pick('Field notes.neurite'), true);
+    assert.equal(options[0].suggestedName, 'Field notes.neurite',
+        'the name passed in is not what the picker opens with');
+
+    // The default is what a graph with no save yet gets, and it still has to name the
+    // format: an extensionless suggestion is a file no drop-to-import will accept.
+    await keeper.disk.pick();
+    assert.match(options[1].suggestedName, /\.neurite$/,
+        'the fallback name no longer carries the extension');
+
+    // And the button has to be the thing that passes it. The two assertions above are
+    // satisfied by a `pick` nobody calls with a name -- which is exactly the state this
+    // replaces -- so the caller is read from the source: `View.Graphs` needs the whole
+    // page to construct, and this is the same text route the rest of test/ takes.
+    // Comments stripped, because the ones just added name both methods.
+    const code = src.replace(/^[ \t]*\/\/[^\n]*$/gm, '');
+    const clicked = code.match(/#onBtnDiskFileClicked = \(e\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(clicked, '#onBtnDiskFileClicked is gone or no longer a field at that indent');
+    assert.match(clicked[0], /\.pick\(this\.#suggestedFileName\(\)\)/,
+        'Save to… opens the picker with no name again, so every graph is offered the '
+        + 'same default however it is titled');
+
+    const suggested = code.match(/#suggestedFileName\(\)\{[\s\S]*?\n {4}\}/);
+    assert.ok(suggested, '#suggestedFileName is gone or no longer a method at that indent');
+    assert.match(suggested[0], /#fileNameForMeta\(meta\)/,
+        'the picker name is no longer the one the download writes, so the two halves of '
+        + 'Save to… disagree about what the file is called');
+    assert.match(suggested[0], /neurite-graph\.neurite/,
+        'a graph with nothing selected now has no name to offer at all');
+});
+
 test('the picked file is remembered, and reclaimed only while permission holds', async ()=>{
     for (const permission of ['granted', 'prompt']) {
         const handle = makeFileHandle({permission});

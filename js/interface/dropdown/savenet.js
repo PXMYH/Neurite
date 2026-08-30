@@ -67,9 +67,14 @@ class DiskMirror {
         return false;
     }
 
-    pick(){ // only from within a user gesture
+    // The picker is where the reader chooses the folder and the name, so the name it
+    // opens with is the one they are most likely to keep. It used to be
+    // 'neurite-graph.neurite' for every graph, while the download fallback beside it
+    // named the file after the graph -- so the same command produced a titled file in
+    // one browser and an untitled one in the browser that lets you choose.
+    pick(suggestedName = 'neurite-graph.neurite'){ // only from within a user gesture
         return window.showSaveFilePicker({
-            suggestedName: 'neurite-graph.neurite',
+            suggestedName,
             types: [{
                 description: "Neurite graph",
                 accept: {'application/octet-stream': ['.neurite', '.txt']}
@@ -984,7 +989,15 @@ View.Graphs = class {
     #onBtnDiskFileClicked = (e)=>{
         if (!DiskMirror.isSupported) return this.#downloadCopy();
 
-        this.#stored.disk.pick().then(this.#afterDiskFilePicked);
+        this.#stored.disk.pick(this.#suggestedFileName())
+            .then(this.#afterDiskFilePicked);
+    }
+    // The same name the download fallback writes, so the two paths agree. A graph with
+    // nothing selected has no title yet, and `#fileNameForMeta` would answer for a save
+    // that does not exist.
+    #suggestedFileName(){
+        const meta = this.#selectedGraph;
+        return (meta ? this.#fileNameForMeta(meta) : 'neurite-graph.neurite');
     }
     // The bundle is built from what is in the store, not from the screen, so the
     // graph has to be banked first or the copy is up to eight seconds stale.
