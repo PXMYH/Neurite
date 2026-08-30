@@ -177,8 +177,11 @@ tbody tr:hover { background: #ffffff07 }
 [data-mode="proposed"] .mk-tool svg { width: 16px; height: 16px }  /* --default-icon-size */
 [data-mode="proposed"][data-theme="light"] .mk-tool:hover { background: #f1f0ff }
 [data-mode="proposed"][data-theme="dark"]  .mk-tool:hover { background: #363541 }
-[data-mode="proposed"][data-theme="light"] .mk-tool[aria-pressed="true"] { background: #e3e2fe; color: #5b57d1 }
-[data-mode="proposed"][data-theme="dark"]  .mk-tool[aria-pressed="true"] { background: #4f4d6f; color: #beb9ff }
+/* The lit pill: `--color-surface-primary-container` with the icon in
+   `--color-on-primary-container`, not the `--color-primary-light` a menu row's
+   selected state uses. Two different tokens for two different jobs. */
+[data-mode="proposed"][data-theme="light"] .mk-tool[aria-pressed="true"] { background: #e0dfff; color: #030064 }
+[data-mode="proposed"][data-theme="dark"]  .mk-tool[aria-pressed="true"] { background: #403e6a; color: #e0dfff }
 [data-mode="proposed"][data-theme="light"] .mk-divider { background: #c5c5d0 }
 [data-mode="proposed"][data-theme="dark"]  .mk-divider { background: #ffffff1f }
 
@@ -190,17 +193,32 @@ tbody tr:hover { background: #ffffff07 }
 }
 .mk-tool svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round }
 .mk-divider { width: 1px; align-self: stretch; margin: 2px }
-/* The digit in the corner, at Excalidraw's own numbers rather than at numbers
-   that merely look right: `.ToolIcon__keybinding` is `bottom: 2px; right: 3px`
-   at `0.625rem`, coloured with `--keybinding-color` -- a solid grey, not an
-   opacity, and never hidden at any width or on touch. Neurite hides the same
-   digit inside tooltip prose, where it cannot be learned by looking. */
+/* The digit in the corner, at the numbers a *toolbar* button really uses, which
+   are not the ones the badge's own rule states. `.excalidraw .ToolIcon__keybinding`
+   (ToolIcon.scss:155) says `bottom: 2px; right: 3px` at specificity (0,2,0), but
+   the `toolbarButtonColorStates` mixin is included into `.ToolIcon` and emits
+   `.excalidraw .ToolIcon .ToolIcon__keybinding { bottom: 4px; right: 4px }` at
+   (0,3,0) -- and that block sits at the mixin's own level, a sibling of the
+   `--checked` rule rather than inside it, so it applies to every tool
+   unconditionally. 4px/4px wins. 2px/3px is the value for a badge outside a
+   `.ToolIcon`.
+
+   Solid grey, never an opacity. It IS hidden in one place -- the mobile toolbar,
+   `.App-toolbar--mobile .ToolIcon__keybinding { display: none }`
+   (styles.scss:819) -- but at no desktop width. Neurite hides the same digit
+   inside tooltip prose, where it cannot be learned by looking. */
 .mk-kbd {
-    position: absolute; right: 3px; bottom: 2px; font-size: 10px; line-height: 1;
+    position: absolute; right: 4px; bottom: 4px; font-size: 10px; line-height: 1;
     font-family: var(--pg-mono); pointer-events: none;
+    transition: color 140ms ease;
 }
 [data-theme="light"] .mk-kbd { color: #b8b8b8 }   /* --color-gray-40 */
 [data-theme="dark"]  .mk-kbd { color: #7a7a7a }   /* --color-gray-60 */
+/* On the lit pill the badge is not dimmed at all: the mixin re-points
+   `--keybinding-color` at `--color-on-primary-container`, so the digit goes to
+   full contrast rather than staying grey. */
+[data-theme="light"] .mk-tool[aria-pressed="true"] .mk-kbd { color: #030064 }
+[data-theme="dark"]  .mk-tool[aria-pressed="true"] .mk-kbd { color: #e0dfff }
 .mk-zoom-btn {
     display: flex; align-items: center; justify-content: center;
     width: 28px; height: 28px; border: none; background: none; color: inherit;
@@ -410,7 +428,8 @@ The chrome band alone is ~350 lines and is worth tokenising either way.</div>
     <tr><td class="mono">island border</td><td class="mono"><i>none</i></td><td class="mono">1px solid #8882</td><td><span class="tag diff">hairline</span></td></tr>
     <tr><td class="mono">--color-primary</td><td class="mono">#6965db / #a8a5ff</td><td class="mono">--ui-accent: #5a7ec0</td><td><span class="tag near">blue vs violet</span></td></tr>
     <tr><td class="mono">--button-hover-bg</td><td class="mono">#f1f0ff / #363541</td><td class="mono">#ffffff14</td><td><span class="tag near">untinted</span></td></tr>
-    <tr><td class="mono">tool digit badge</td><td class="mono">bottom 2px, right 3px, 10px,<br><code>--keybinding-color</code> #b8b8b8 / #7a7a7a</td><td class="mono">— <i>digit is in the tooltip</i></td><td><span class="tag diff">absent</span></td></tr>
+    <tr><td class="mono">tool digit badge</td><td class="mono">bottom 4px, right 4px, 10px,<br><code>--keybinding-color</code> #b8b8b8 / #7a7a7a;<br>when lit → #030064 / #e0dfff</td><td class="mono">— <i>digit is in the tooltip</i></td><td><span class="tag diff">absent</span></td></tr>
+    <tr><td class="mono">lit tool pill</td><td class="mono"><code>--color-surface-primary-container</code><br>#e0dfff / #403e6a</td><td class="mono">— <i>no tool is ever active</i></td><td><span class="tag diff">absent</span></td></tr>
     <tr><td class="mono">menu shortcut hint</td><td class="mono">margin-inline-start: auto,<br>opacity .5</td><td class="mono">— <i>chevron holds the slot</i></td><td><span class="tag diff">absent</span></td></tr>
     <tr><td class="mono">chrome font</td><td class="mono">Assistant (OFL)</td><td class="mono">Inter</td><td><span class="tag near">swap</span></td></tr>
   </tbody>
@@ -542,9 +561,24 @@ size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
       <p class="meta">visible · ~15 lines + markup per row</p></li>
 
   <li><b>Digit badges and the armed state</b>
-      <p>Print 1–4 in the corner of each tool button. Then option <b>B</b> above: arm on click,
-      place on the next canvas click, <kbd>Esc</kbd> to cancel. This is the phase that needs a
-      decision before it starts.</p>
+      <p>Print 1–4 in the bottom-right corner of each tool button at 10px. Then option <b>B</b>
+      above: arm on click, place on the next canvas click, <kbd>Esc</kbd> to cancel. This is the
+      phase that needs a decision before it starts.</p>
+      <p><b>Two things the badge's own CSS does not tell you.</b> Excalidraw states
+      <code>bottom: 2px; right: 3px</code> on <code>.ToolIcon__keybinding</code>
+      (<code>ToolIcon.scss:155</code>) and then overrides itself: the
+      <code>toolbarButtonColorStates</code> mixin is included into <code>.ToolIcon</code> and emits
+      the same selector one level deeper with <code>bottom: 4px; right: 4px</code>, which wins on
+      specificity — and sits at the mixin's own level rather than inside the
+      <code>--checked</code> rule, so it applies to every tool always. <b>4px/4px is the toolbar
+      value.</b> Second, the badge is <em>not</em> dimmed on the lit pill: the mixin re-points
+      <code>--keybinding-color</code> at <code>--color-on-primary-container</code>, so the digit
+      goes to full contrast (#030064 light, #e0dfff dark) rather than staying grey. Copy the grey
+      alone and the lit state looks half-finished.</p>
+      <p>It is also the one thing Excalidraw hides on a small screen —
+      <code>.App-toolbar--mobile .ToolIcon__keybinding { display: none }</code>
+      (<code>styles.scss:819</code>) — though at no desktop width. Worth matching, since Neurite's
+      pill already takes a second row under 440px.</p>
       <p class="meta">behaviour · needs sign-off · browser-verify before writing the test</p></li>
 
   <li><b>A bottom-left zoom island</b>
@@ -567,32 +601,45 @@ size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
       <p class="meta">new region · optional · check it against the iPad work in ipad-spike.md first</p></li>
 </ol>
 
-<h3>The two regions with no Neurite counterpart</h3>
-<p>Five surfaces a reader can point at; Neurite has three of them. That grouping is this page's,
-not Excalidraw's — its own taxonomy is coarser, three docks
-(<code>"top" | "bottom" | "side"</code>) and two measured panels
-(<code>"sidebar" | "stylesPanel"</code>, <code>types.ts:1426,1506</code>), with the top-left menu
-and the top-centre tools both living in one <code>App-menu_top</code> row
-(<code>LayerUI.tsx:309,347</code>). The missing pair is worth naming so neither gets mistaken for
-something this proposal covers:</p>
+<h3>The full region map</h3>
+<p><b>Four surfaces are always on; three more appear on a condition.</b> Excalidraw's own taxonomy
+is coarser still — three docks (<code>"top" | "bottom" | "side"</code>) and two measured panels
+(<code>"sidebar" | "stylesPanel"</code>, <code>types.ts:1426,1506</code>) — with the top-left menu
+and the top-centre tools both living in one <code>App-menu_top</code> grid row
+(<code>LayerUI.tsx:309,347</code>). The rows below are the surfaces a reader can point at, which is
+the useful granularity for a design comparison.</p>
 <table>
   <thead><tr><th>Excalidraw region</th><th>Neurite</th><th>In scope?</th></tr></thead>
   <tbody>
     <tr><td>Main menu, top-left</td><td><code>.menu-button</code> + <code>.dropdown-content</code></td><td>yes — phases 1&ndash;3</td></tr>
-    <tr><td>Tool island, top-centre</td><td><code>.tool-bar</code></td><td>yes — phases 1&ndash;4</td></tr>
-    <tr><td>Zoom + undo, bottom-left</td><td>readouts are inside panels</td><td>phase 5, optional</td></tr>
-    <tr><td><b>Properties island, left</b> — <code>stylesPanel</code> in Excalidraw's own source:
-        stroke, background, fill, width, opacity, layers, whenever a shape is selected</td>
+    <tr><td>Tool island, top-centre — <code>App-toolbar</code>, <code>Toolbar.tsx:228</code></td><td><code>.tool-bar</code></td><td>yes — phases 1&ndash;4</td></tr>
+    <tr><td>Zoom + undo, bottom-left — <code>Footer.tsx:50,54</code>. Neither child is an
+        <code>Island</code>; the island look comes from <code>Actions.scss</code></td>
+        <td>the <code>#pan</code>/<code>#zoom</code> inputs are inside a panel</td><td>phase 5, optional</td></tr>
+    <tr><td>Help, bottom-right — <code>Footer.tsx:79</code>, pushed out by
+        <code>justify-content: space-between</code> on the same bottom strip</td>
+        <td>Help is a menu row, not a canvas button</td><td><span class="tag near">deliberate</span></td></tr>
+    <tr><td><b>Properties island</b> — <code>stylesPanel</code>: stroke, background, fill, width,
+        opacity, layers, on selection. Not a separate left dock — it stacks in the <em>same
+        top-left column, under the main menu</em> (<code>LayerUI.tsx:315</code>,
+        <code>width: 12.5rem</code> at <code>styles.scss:497</code>)</td>
         <td><b>none.</b> Nothing under <code>js/</code> shows or hides a chrome surface on node
         selection; per-node configuration lives entirely inside each node's own window chrome</td>
         <td><span class="tag diff">no</span></td></tr>
-    <tr><td>Library, top-right</td><td>none</td><td><span class="tag diff">no</span></td></tr>
+    <tr><td><b>Library sidebar</b> — <b>right edge, full height</b>, not top-right:
+        <code>position: absolute; top: 0; bottom: 0; right: 0</code> with a
+        <code>border-left</code> (<code>Sidebar.scss:7–25</code>). What sits top-right is only its
+        trigger, which hides itself once docked (<code>LayerUI.tsx:419</code>)</td>
+        <td>none</td><td><span class="tag diff">no</span></td></tr>
+    <tr><td>Top-right cluster — collaborator avatars, the sidebar trigger, and the stats panel
+        (<code>LayerUI.tsx:405,420,423</code>)</td>
+        <td>none; Neurite is single-player</td><td><span class="tag diff">no</span></td></tr>
   </tbody>
 </table>
 <p>The properties island is the surface Excalidraw users touch most, and its absence is the
 largest structural difference between the two apps — but it is neither the toolbar nor the menu,
-and Neurite's equivalent decisions already live on the node. Raising it here only so it is not
-discovered later and read as an omission.</p>
+and Neurite's equivalent decisions already live on the node. Raising it, and the sidebar, only so
+neither is discovered later and read as an omission.</p>
 
 <div class="callout"><strong>z-index reads as ad hoc and mostly is not.</strong> Sixteen distinct
 values across <code>styles.css</code> — <code>-1, 0, 1, 2, 4, 10, 20, 30, 100, 150, 500, 900,
@@ -607,8 +654,19 @@ within it. So there is no global ordering to reason about, and a new island need
 
 <div class="callout"><strong>One idea worth stealing that is not visual.</strong> Excalidraw tags each
 island <code>data-viewport-ui</code> and measures them in <code>getViewportOffsets</code>, so the
-canvas knows which rectangles are covered. Neurite has nothing like it, which is why a
-"fit to view" can drop a node under the tool pill. Independent of the restyle, and cheap.</div>
+canvas knows which rectangles are covered. It acts on that: when the sidebar is docked and there is
+room, the whole chrome layer is <em>narrowed</em> rather than overlapped —
+<code>width: calc(100% - var(--right-sidebar-width))</code> on <code>layer-ui__wrapper</code>
+(<code>LayerUI.tsx:634</code>). Neurite has nothing like it, which is why a "fit to view" can drop a
+node under the tool pill. Independent of the restyle, and cheap.</div>
+
+<div class="callout"><strong>The badge is a shortcut label, not a counter.</strong> Worth knowing
+before phase 4 hardcodes digits: Excalidraw prefers the numeric key and <em>falls back to a
+letter</em> (<code>Tools.tsx:286–290</code>), so overflow tools show <code>F</code>, <code>K</code>,
+<code>B</code> in the same corner. One button opts out entirely —
+<code>&lt;HandToolButton hideKeyBinding /&gt;</code> at <code>Toolbar.tsx:271</code>. Neurite's four
+tools fit in 1–4, so digits are enough today; the slot should still hold a string rather than a
+number.</div>
 
 <div class="callout stop"><strong>What this proposal does not do.</strong> It does not tokenise the
 other ~4,900 lines of <code>styles.css</code>, and it does not deliver a light theme. The
