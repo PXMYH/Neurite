@@ -1542,7 +1542,14 @@ input[type="text"i].title-input {
                     align-items: center;
                     gap: 10px;
                     width: 100%;
-                    padding: 8px 12px;
+                    /* 32px, which is Excalidraw's `.dropdown-menu-item` height, rather
+                       than the 34 that 8px of vertical padding around a 14px line came
+                       out at. Stated as a height with the padding left horizontal, so
+                       the row measures the same whatever the label's line-height does.
+                       The other three metrics needed no change: the 10px gap, the 14px
+                       type and the 16px icon were already its values exactly. */
+                    height: 32px;
+                    padding: 0 12px;
                     border: none;
                     border-radius: var(--ui-radius-inner);
                     background: none;

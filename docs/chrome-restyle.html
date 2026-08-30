@@ -596,11 +596,23 @@ size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
       <p class="meta">visible · ~20 lines · the biggest look change per line spent</p></li>
 
   <li><b>Menu row anatomy</b>
-      <p>Add the right-aligned shortcut hint at <code>opacity: .5</code>. The shortcuts already
-      exist in <code>data-tooltip</code> prose — surface them. Row height 34→32, radius 5→6, hover
-      fill tinted with the accent instead of flat white. Keep the chevron on panel rows: it is the
-      one thing that says "this opens something", which Excalidraw solves with a submenu arrow anyway.</p>
-      <p class="meta">visible · ~15 lines + markup per row</p></li>
+      <p><b>Mostly already done, and one part of it should not be done at all.</b> Three of the
+      four metrics were already Excalidraw's exactly — the 10px gap, the 14px type and the 16px
+      icon. Only the height differed, 34 against <code>.dropdown-menu-item</code>'s 32, and it is
+      now 32 stated as a height with the padding left horizontal.</p>
+      <p><b>The shortcut hints are not buildable yet.</b> An earlier draft of this phase said the
+      shortcuts "already exist in <code>data-tooltip</code> prose — surface them". That conflated
+      two different things. The <em>tools</em> do have keys, 1–4, bound and working at
+      <code>dropdown.js:320</code>. The <em>menu commands</em> have none: every row was checked, and
+      not one names a key in a tooltip or a title, because no <code>Ctrl+O</code> or
+      <code>Ctrl+S</code> binding exists to name. A hint column would have to invent them, and a
+      hint for a key that does nothing is worse than no hint. So the slot stays empty until the
+      bindings are real — which is a separate change, and <code>Ctrl+S</code> in particular has a
+      browser default to argue with first.</p>
+      <p>Also skipped: the 5px→6px inner radius. <code>--ui-radius-inner</code> is shared with
+      <code>.node-textarea</code>, so moving it moves a card's body too, and the alternative is a
+      whole new token for one pixel nobody can see.</p>
+      <p class="meta">2px per row · the hint column is blocked on real bindings, not on styling</p></li>
 
   <li><b>Digit badges and the armed state</b>
       <p>Print 1–4 in the bottom-right corner of each tool button at 10px. Then option <b>B</b>
