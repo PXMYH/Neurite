@@ -277,29 +277,37 @@ On.change(Elem.byId('fractal-select'), displaySavedCoordinates);
 On.click(Elem.byId('saveCoordinatesBtn'), saveCurrentView);
 
 On.click(Elem.byId('deleteCoordinatesBtn'), (e) => {
-    if (Coordinate.selectedIndex !== null) {
-        deleteSavedView(Coordinate.selectedIndex);
+    if (Coordinate.selectedView) {
+        deleteSavedView(Coordinate.selectedView);
     } else {
-        alert('No coordinate selected for deletion.');
+        alert('No saved view is selected.');
     }
 });
 
-function deleteSavedView(index) {
-    const currentFractalType = Elem.byId('fractal-select').value;
-    const fractalViews = savedViews[currentFractalType];
+// Which list actually holds it. `savedViews` is keyed by fractal, plus an `all` for the
+// views that make sense under any of them, and the strip on screen is two of those lists
+// end to end -- so the only reliable answer is to look.
+function listHoldingView(view) {
+    for (const fractalType in savedViews) {
+        const views = savedViews[fractalType];
+        if (Array.isArray(views) && views.includes(view)) return views;
+    }
+    return null;
+}
 
-    if (index === null || !fractalViews || index >= fractalViews.length) {
-        Logger.err("No coordinate at index for deletion:", index);
+function deleteSavedView(view) {
+    const views = listHoldingView(view);
+    if (!views) {
+        Logger.err("No saved view to delete:", view);
         return;
     }
 
-    // Remove the selected view from the array
-    fractalViews.splice(index, 1);
+    views.splice(views.indexOf(view), 1);
 
     updateSavedViewsCache();
     displaySavedCoordinates();
 
-    Logger.info("View deleted at index:", index);
+    Logger.info("View deleted:", view.title);
 
     Coordinate.resetSelected();
 }
@@ -336,9 +344,14 @@ function listSavedViews() {
 
 
 
+// The selection is the view object, not its position. Position was the bug: the strip
+// on screen is the current fractal's views followed by `savedViews.all`, so an index
+// into what the reader sees is an index into neither array -- and `deleteSavedView`
+// spliced the per-fractal one with it. Selecting `// Reset View`, which lives in `all`,
+// deleted whatever mandelbrot view happened to sit at that position.
 const Coordinate = {
     selectedDiv: null,
-    selectedIndex: null
+    selectedView: null
 }
 Coordinate.deselect = function () {
     if (!this.selectedDiv) return;
@@ -348,15 +361,14 @@ Coordinate.deselect = function () {
 }
 Coordinate.resetSelected = function () {
     this.selectedDiv = null;
-    this.selectedIndex = null;
+    this.selectedView = null;
 }
 
 function appendViewsToContainer(views, containerId) {
     const container = Elem.byId(containerId);
     container.innerHTML = '';
 
-    views.forEach((view, index) => {
-        const globalIndex = index;
+    views.forEach((view) => {
         const coordElement = Html.make.div('saved-coordinate-item');
         coordElement.textContent = view.title;
 
@@ -372,7 +384,7 @@ function appendViewsToContainer(views, containerId) {
             coordElement.classList.add('selected-coordinate');
             coordElement.style.transform = 'scale(0.95)'; // Scale down for selected
             Coordinate.selectedDiv = coordElement;
-            Coordinate.selectedIndex = globalIndex;
+            Coordinate.selectedView = view;
         });
 
         // Reset the scale when mouse leaves the selected item
@@ -387,7 +399,11 @@ function appendViewsToContainer(views, containerId) {
 }
 
 function displaySavedCoordinates() {
-    const savedViews = getSavedViewsFromCache();
+    // The module's own `savedViews`, not a fresh parse of the cache. It used to shadow the
+    // name with `getSavedViewsFromCache()`, which returns new objects every call -- so a
+    // rendered element held a copy that no list in memory contained, and deleting by
+    // identity could not find it. `localStorage` is the mirror here, written by
+    // `updateSavedViewsCache` and read once at load; nothing else writes the key.
     const currentFractalType = Elem.byId('fractal-select').value;
     const currentFractalViews = savedViews[currentFractalType] || [];
     const allViews = savedViews.all || [];
