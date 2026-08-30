@@ -41,10 +41,6 @@ class NeuralTelemetry {
         });
     }
 
-    // Method to get the list of currently saved views
-    getListOfSavedViews() {
-        return listSavedViews();
-    }
 }
 
 function testGetLastFunctionCalls(n) {
@@ -69,14 +65,11 @@ Prompt.forTelemetry = function(telemetry, vision = false){
         }
     }
 
-    // Append the list of saved views with their coordinates
-    //const savedViewsList = telemetry.getListOfSavedViews();
-    //if (savedViewsList.length > 0) {
-    //    const formattedViews = savedViewsList.map(view => {
-    //        return `{Title: "${view.title}", Coordinates: Zoom ${view.coordinates.zoom}, Pan ${view.coordinates.pan}}`;
-    //    });
-    //    prompt.push(", ", "Saved Views", ": ", formattedViews.join(" | "));
-    //}
+    // A commented-out block here appended every Saved View to the prompt through
+    // `telemetry.getListOfSavedViews()`. Both are gone: the method called
+    // `listSavedViews()`, which read the object as an array and threw, so uncommenting
+    // these five lines would have broken every telemetry prompt rather than enriching it.
+    // Worth writing again from `savedViews` directly if the model should know the places.
 
     // Append the history of function calls
     const historyCount = 3;

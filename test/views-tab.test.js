@@ -101,6 +101,21 @@ test('the places are one wrapping row, not three sliced ones', ()=>{
         + 'places and clips when it has many');
 });
 
+test('savedViews is read as the object it is', ()=>{
+    // It is keyed by Fractal -- `mandelbrot`, `julia`, `all` -- so every array method on it
+    // is a bug that cannot show up until the line runs. Four functions here were deleted
+    // for exactly this: `savedViews.length` was always undefined, so one returned `[]`
+    // forever, and `savedViews.map` was a TypeError waiting for whoever uncommented the
+    // single call site in `neuraltelemetryprompt.js`. This is the invariant they broke,
+    // pinned instead of their names.
+    assert.doesNotMatch(coords, /savedViews\.(length|map|filter|forEach|slice|find|includes)\b/,
+        'savedViews is being read as an array again');
+    // The per-Fractal lists are the arrays. Reaching one by key is what a reader of this
+    // file should be doing, and `listHoldingView` is the only thing that walks all of them.
+    assert.match(coords, /savedViews\[currentFractalType\]/,
+        "the current fractal's list is no longer reached by key");
+});
+
 test('one name for the thing, and the code agrees with the button', ()=>{
     // Three names were in play for one object: the panel said "Places", the row that opens
     // it says "Views", and the code says `savedViews`. `CONTEXT.md` is what settles that,

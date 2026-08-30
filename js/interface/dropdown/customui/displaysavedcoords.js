@@ -175,37 +175,12 @@ const defaultSavedViews = {
     ]
 };
 
-function getSavedView(query) {
-    const viewsList = listSavedViews();
-    let foundView = viewsList.find(view => view.title.toLowerCase() === query.toLowerCase());
-
-    // If no exact match, try a more sophisticated search approach
-    if (!foundView) {
-        foundView = viewsList.find(view => view.title.toLowerCase().includes(query.toLowerCase()));
-        // Further search strategies can be implemented here if necessary
-    }
-
-    // If a view is found, return an object with coordinates and function call format
-    if (foundView) {
-        return {
-            coordinates: foundView.coordinates,
-            functionCall: foundView.functionCall // Assuming this is available in your data structure
-        };
-    } else {
-        Logger.warn(`No saved view found for query: "${query}"`);
-        return null;
-    }
-}
-
-function getSavedViews() {
-    // Check if the savedViews is defined and has elements
-    if (savedViews && savedViews.length > 0) {
-        return savedViews;
-    } else {
-        Logger.warn("No saved views are currently available.");
-        return [];  // Or return null, depending on how you want to handle this case.
-    }
-}
+// Four readers of `savedViews` were deleted here: `getSavedView(query)`,
+// `getSavedViews()`, `generateCopyPasteSavedViews()` and `listSavedViews()`. None had a
+// live caller, and three of the four could not have worked if they had: `savedViews` is an
+// object keyed by Fractal, so `savedViews.length` was always undefined and
+// `savedViews.map` was a TypeError waiting for whoever uncommented the one call site.
+// Write them again against the real shape if a caller ever needs them.
 
 function receiveCurrentView() {
     return window.prompt("Enter a title for the current location:")
@@ -216,10 +191,6 @@ function receiveCurrentView() {
                         })
         )
         .catch(Logger.err.bind(Logger, "Failed to get prompt input:"))
-}
-
-function generateCopyPasteSavedViews() {
-    return JSON.stringify(savedViews, null, 2);
 }
 
 let savedViews;
@@ -331,15 +302,6 @@ function returnToSavedView(savedView, animate = true, speed = 0.0001) {
         animate,
         speed
     );
-}
-
-function listSavedViews() {
-    return savedViews.map(view => {
-        return {
-            title: view.title,
-            coordinates: view.standardCoords
-        };
-    });
 }
 
 
