@@ -536,11 +536,40 @@ size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
       <p class="meta">behaviour · needs sign-off · browser-verify before writing the test</p></li>
 
   <li><b>A bottom-left zoom island</b>
-      <p>Neurite has zoom and pan readouts inside the Views panel; Excalidraw keeps them on the
-      canvas at bottom-left, where they double as the reset control. This is the one region
-      Neurite has no equivalent of.</p>
+      <p>Neurite's zoom and pan readouts live inside the Views panel
+      (<code>viewstab.html:41–48</code>) and the FPS counter inside the Fractal panel
+      (<code>fractaltab.html:49</code>) — nothing reports the view on the canvas itself.
+      Excalidraw keeps zoom at bottom-left, where it doubles as the reset control.</p>
       <p class="meta">new region · optional · check it against the iPad work in ipad-spike.md first</p></li>
 </ol>
+
+<h3>The two regions with no Neurite counterpart</h3>
+<p>Excalidraw docks five surfaces; Neurite has three of them. The missing pair is worth naming
+so neither gets mistaken for something this proposal covers:</p>
+<table>
+  <thead><tr><th>Excalidraw region</th><th>Neurite</th><th>In scope?</th></tr></thead>
+  <tbody>
+    <tr><td>Main menu, top-left</td><td><code>.menu-button</code> + <code>.dropdown-content</code></td><td>yes — phases 1&ndash;3</td></tr>
+    <tr><td>Tool island, top-centre</td><td><code>.tool-bar</code></td><td>yes — phases 1&ndash;4</td></tr>
+    <tr><td>Zoom + undo, bottom-left</td><td>readouts are inside panels</td><td>phase 5, optional</td></tr>
+    <tr><td><b>Properties island, left</b> — stroke, background, fill, width, opacity, layers,
+        whenever a shape is selected</td>
+        <td><b>none.</b> Nothing under <code>js/</code> shows or hides a chrome surface on node
+        selection; per-node configuration lives entirely inside each node's own window chrome</td>
+        <td><span class="tag diff">no</span></td></tr>
+    <tr><td>Library, top-right</td><td>none</td><td><span class="tag diff">no</span></td></tr>
+  </tbody>
+</table>
+<p>The properties island is the surface Excalidraw users touch most, and its absence is the
+largest structural difference between the two apps — but it is neither the toolbar nor the menu,
+and Neurite's equivalent decisions already live on the node. Raising it here only so it is not
+discovered later and read as an omission.</p>
+
+<div class="callout"><strong>z-index has no scale.</strong> Sixteen distinct values across
+<code>styles.css</code> — <code>-1, 0, 1, 2, 4, 10, 20, 30, 100, 150, 500, 900, 1000, 1001,
+2000, 9999</code> — assigned ad hoc. The chrome itself sits low: the menu button at 2 and the
+panel at 1, both nested inside <code>#dropdowndiv</code> at 100. A new bottom-left island has no
+obvious band to join, so phase 5 should settle on one rather than pick the next free number.</div>
 
 <div class="callout"><strong>One idea worth stealing that is not visual.</strong> Excalidraw tags each
 island <code>data-viewport-ui</code> and measures them in <code>getViewportOffsets</code>, so the
