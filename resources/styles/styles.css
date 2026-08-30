@@ -2982,6 +2982,11 @@ td {
 .selected-save {
     background-color: #3b484d;
     transform: scale(1.05); /* Slightly enlarge the selected save */
+    /* From the left edge, not the centre. A centred scale grows the row 2.5% of its
+       width in each direction, and the row is as wide as the list, so the left end
+       leaves the panel: the title input is first in the row and it is the title that
+       gets cut. The save being edited was the one whose name could not be read. */
+    transform-origin: left center;
     transition: transform 0.3s ease;
 }
 

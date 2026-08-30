@@ -35,6 +35,26 @@ const menu = noHtmlComments(read(MENU));
 const css = noBlockComments(read(CSS));
 const savenet = noLineComments(read(SAVENET));
 
+test('the selected save grows without cutting off its own title', ()=>{
+    // `transform: scale(1.05)` with the default centre origin moves the row's left edge
+    // out of the panel by 2.5% of the list's width, and the title input is the first
+    // thing in the row -- so the one save whose name a reader is most likely to be
+    // editing was the one whose name was clipped. Measured at 515px of panel: "Graph 3"
+    // rendered as "raph 3".
+    //
+    // Pinned because the symptom is silent: nothing throws, no test of behaviour
+    // changes, and the row still looks selected. Read from the rule itself, not the
+    // file, so a `transform-origin` on some other selector cannot satisfy it.
+    const i = css.indexOf('.selected-save {');
+    assert.notEqual(i, -1, '.selected-save has no rule; this test reads nothing');
+    const rule = css.slice(i, css.indexOf('}', i));
+    assert.match(rule, /transform:\s*scale\(/,
+        'the row no longer scales, so the origin below is pinning nothing -- delete it');
+    assert.match(rule, /transform-origin:\s*left/,
+        'the selected row scales from its centre again, which pushes its title input '
+        + 'past the left edge of the panel');
+});
+
 test('the Saves panel no longer narrates autosave', ()=>{
     // The negative control for this whole test: if stripping ever stops working, the
     // comment that explains the removal satisfies every assertion below.
