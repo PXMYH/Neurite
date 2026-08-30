@@ -190,13 +190,17 @@ tbody tr:hover { background: #ffffff07 }
 }
 .mk-tool svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round }
 .mk-divider { width: 1px; align-self: stretch; margin: 2px }
-/* The digit in the corner. Excalidraw prints the shortcut on the button; today
-   Neurite hides the same digit inside the tooltip, where it cannot be learned
-   by looking. */
+/* The digit in the corner, at Excalidraw's own numbers rather than at numbers
+   that merely look right: `.ToolIcon__keybinding` is `bottom: 2px; right: 3px`
+   at `0.625rem`, coloured with `--keybinding-color` -- a solid grey, not an
+   opacity, and never hidden at any width or on touch. Neurite hides the same
+   digit inside tooltip prose, where it cannot be learned by looking. */
 .mk-kbd {
-    position: absolute; right: 2px; bottom: 0; font-size: 8px; line-height: 1;
-    opacity: 0.55; font-family: var(--pg-mono); pointer-events: none;
+    position: absolute; right: 3px; bottom: 2px; font-size: 10px; line-height: 1;
+    font-family: var(--pg-mono); pointer-events: none;
 }
+[data-theme="light"] .mk-kbd { color: #b8b8b8 }   /* --color-gray-40 */
+[data-theme="dark"]  .mk-kbd { color: #7a7a7a }   /* --color-gray-60 */
 .mk-zoom-btn {
     display: flex; align-items: center; justify-content: center;
     width: 28px; height: 28px; border: none; background: none; color: inherit;
@@ -406,7 +410,8 @@ The chrome band alone is ~350 lines and is worth tokenising either way.</div>
     <tr><td class="mono">island border</td><td class="mono"><i>none</i></td><td class="mono">1px solid #8882</td><td><span class="tag diff">hairline</span></td></tr>
     <tr><td class="mono">--color-primary</td><td class="mono">#6965db / #a8a5ff</td><td class="mono">--ui-accent: #5a7ec0</td><td><span class="tag near">blue vs violet</span></td></tr>
     <tr><td class="mono">--button-hover-bg</td><td class="mono">#f1f0ff / #363541</td><td class="mono">#ffffff14</td><td><span class="tag near">untinted</span></td></tr>
-    <tr><td class="mono">--keybinding-color</td><td class="mono">grey-40, opacity .5</td><td class="mono">—</td><td><span class="tag diff">absent</span></td></tr>
+    <tr><td class="mono">tool digit badge</td><td class="mono">bottom 2px, right 3px, 10px,<br><code>--keybinding-color</code> #b8b8b8 / #7a7a7a</td><td class="mono">— <i>digit is in the tooltip</i></td><td><span class="tag diff">absent</span></td></tr>
+    <tr><td class="mono">menu shortcut hint</td><td class="mono">margin-inline-start: auto,<br>opacity .5</td><td class="mono">— <i>chevron holds the slot</i></td><td><span class="tag diff">absent</span></td></tr>
     <tr><td class="mono">chrome font</td><td class="mono">Assistant (OFL)</td><td class="mono">Inter</td><td><span class="tag near">swap</span></td></tr>
   </tbody>
 </table>
@@ -563,16 +568,21 @@ size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
 </ol>
 
 <h3>The two regions with no Neurite counterpart</h3>
-<p>Excalidraw docks five surfaces; Neurite has three of them. The missing pair is worth naming
-so neither gets mistaken for something this proposal covers:</p>
+<p>Five surfaces a reader can point at; Neurite has three of them. That grouping is this page's,
+not Excalidraw's — its own taxonomy is coarser, three docks
+(<code>"top" | "bottom" | "side"</code>) and two measured panels
+(<code>"sidebar" | "stylesPanel"</code>, <code>types.ts:1426,1506</code>), with the top-left menu
+and the top-centre tools both living in one <code>App-menu_top</code> row
+(<code>LayerUI.tsx:309,347</code>). The missing pair is worth naming so neither gets mistaken for
+something this proposal covers:</p>
 <table>
   <thead><tr><th>Excalidraw region</th><th>Neurite</th><th>In scope?</th></tr></thead>
   <tbody>
     <tr><td>Main menu, top-left</td><td><code>.menu-button</code> + <code>.dropdown-content</code></td><td>yes — phases 1&ndash;3</td></tr>
     <tr><td>Tool island, top-centre</td><td><code>.tool-bar</code></td><td>yes — phases 1&ndash;4</td></tr>
     <tr><td>Zoom + undo, bottom-left</td><td>readouts are inside panels</td><td>phase 5, optional</td></tr>
-    <tr><td><b>Properties island, left</b> — stroke, background, fill, width, opacity, layers,
-        whenever a shape is selected</td>
+    <tr><td><b>Properties island, left</b> — <code>stylesPanel</code> in Excalidraw's own source:
+        stroke, background, fill, width, opacity, layers, whenever a shape is selected</td>
         <td><b>none.</b> Nothing under <code>js/</code> shows or hides a chrome surface on node
         selection; per-node configuration lives entirely inside each node's own window chrome</td>
         <td><span class="tag diff">no</span></td></tr>
