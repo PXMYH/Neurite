@@ -307,6 +307,17 @@ View.Graphs = class {
 
     #blobs = {};
     #graphs = [];
+    // One tab per record. Two tabs of the same origin share one IndexedDB and each runs
+    // its own eight-second timer, so both were writing to whichever record
+    // `latest-selected` named -- and a tab whose canvas was empty wrote *empty* over the
+    // work of the tab that had notes in it. Measured: a graph of two notes stored at
+    // 15,985 bytes, replaced by 6,744 bytes of settings with no `data-node_json` in it,
+    // which is the shape of the file this was found through.
+    //
+    // The lock is held for the tab's lifetime rather than per write: a write is not the
+    // unit of ownership, the session is. A tab that cannot get it still shows the graph
+    // and still saves -- it just saves to a record of its own.
+    #isWriter = true;
     #maxBlobId = 0;
     #maxGraphId = 0;
     #saver = new View.Graphs.Saver(this);
@@ -858,6 +869,17 @@ View.Graphs = class {
     // in the list, and it stays readable in the way a timestamp would not.
     #titleForNewGraph(){ return "Graph " + (this.#maxGraphId + 1) }
 
+    // The graph is on screen either way -- a second tab showing an empty canvas would read
+    // as lost work -- but the record it came from belongs to the tab that holds the lock.
+    // Dropping the selection is what makes this tab's first tick open its own record
+    // instead of writing over that one.
+    #forkIfNotWriter = ()=>{
+        if (this.#isWriter) return;
+
+        Logger.info("Another tab is saving this graph; this tab will keep its own copy.");
+        this.#setSelectedGraph(null);
+    }
+
     #startAutosave = ()=>{
         setInterval(this.#autosave, 8000);
         // Eight seconds is a long time to lose when a tab closes or an iPad
@@ -1023,6 +1045,28 @@ View.Graphs = class {
         return this.#autosave();
     }
 
+    // Held, never released. Releasing it would hand the record to a second tab while
+    // this one is still writing. `ifAvailable` is what makes the answer immediate: without
+    // it the request queues and a second tab waits forever instead of forking.
+    #claimWriterLock(){
+        const locks = navigator.locks;
+        if (!locks?.request) return Promise.resolve();
+
+        return new Promise( (decided)=>{
+            locks.request('neurite-autosave', {ifAvailable: true}, (lock)=>{
+                this.#isWriter = Boolean(lock);
+                decided();
+                return (lock ? new Promise(Function.nop) : undefined);
+            }).catch(this.#onLockUnavailable.bind(this, decided));
+        });
+    }
+    // A lock that cannot be asked for is not a reason to stop saving: fall back to the
+    // old behaviour, which is one writer by assumption rather than by proof.
+    #onLockUnavailable = (decided, err)=>{
+        Logger.warn("Could not claim the autosave lock:", err);
+        decided();
+    }
+
     init(){
         On.click(this.#btnClear, this.#onBtnClearClicked);
         On.click(this.#btnDiskFile, this.#onBtnDiskFileClicked);
@@ -1041,7 +1085,8 @@ View.Graphs = class {
         }
 
         const stored = this.#stored;
-        return stored.forEachMetaAndGraphId(this.#processMeta)
+        return this.#claimWriterLock()
+            .then(stored.forEachMetaAndGraphId.bind(stored, this.#processMeta))
             .then(stored.forEachBlobMetaAndGraphId
                     .bind(stored, this.#processBlobMeta))
             .then(this.#loadState.bind(this));
@@ -1076,6 +1121,7 @@ View.Graphs = class {
         // or the first tick would open a new save before the old one loads.
         return (new classLoader(this)).load(stateFromURL)
             .then(this.#updateGraphs)
+            .then(this.#forkIfNotWriter)
             .then(this.#startAutosave);
     }
 

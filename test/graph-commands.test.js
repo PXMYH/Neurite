@@ -154,6 +154,43 @@ test('a file is never written without the nodes that are on screen', ()=>{
         'the guard no longer asks the graph what is on screen');
 });
 
+test('a second tab cannot write over the first tab\'s graph', ()=>{
+    // How the empty file was really made. Two tabs of one origin share one IndexedDB and
+    // each runs its own eight-second timer, and both wrote to whichever record
+    // `latest-selected` named -- so a tab whose canvas was empty wrote *empty* over the
+    // work of the tab that had notes in it. Measured before the fix: two notes stored at
+    // 15,985 bytes, replaced by 6,744 bytes of settings with no `data-node_json`, which is
+    // the shape and size of the file that started this.
+    assert.match(savenet, /locks\.request\('neurite-autosave', \{ifAvailable: true\}/,
+        'nothing claims the writer lock, so two tabs share one record again');
+
+    // `ifAvailable` is the whole mechanism: without it the request queues, and a second
+    // tab waits for a lock the first tab never releases instead of forking.
+    const claim = savenet.match(/#claimWriterLock\(\)\{[\s\S]*?\n {4}\}/);
+    assert.ok(claim, '#claimWriterLock is gone or no longer a method at that indent');
+    assert.match(claim[0], /if \(!locks\?\.request\) return Promise\.resolve\(\)/,
+        'a browser without Web Locks now fails to save at all rather than falling back');
+    // Held for the tab's lifetime. Releasing it hands the record over while this tab is
+    // still writing to it, which is the bug with extra steps.
+    assert.match(claim[0], /new Promise\(Function\.nop\)/,
+        'the lock is released, so a second tab can take the record mid-session');
+
+    // The tab that loses shows the graph anyway -- an empty canvas would read as lost
+    // work -- and saves it to a record of its own.
+    const fork = savenet.match(/#forkIfNotWriter = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(fork, '#forkIfNotWriter is gone or no longer a field at that indent');
+    assert.match(fork[0], /if \(this\.#isWriter\) return/, 'the writing tab forks too');
+    assert.match(fork[0], /this\.#setSelectedGraph\(null\)/,
+        'a second tab keeps the first tab\'s record selected, so its first tick overwrites it');
+
+    // Order: the lock has to be decided before the state is loaded, or the fork happens
+    // against a selection that was already adopted.
+    const iClaim = savenet.indexOf('this.#claimWriterLock()');
+    const iLoad = savenet.indexOf('this.#loadState.bind(this)');
+    assert.ok(iClaim > 0 && iClaim < iLoad,
+        'the writer lock is claimed after the graph is loaded, which is too late to fork');
+});
+
 test('autosave cannot decline to save', ()=>{
     // It had a second exit for a window `#updateGraphs` opened: that function blanked the
     // selected record's title while it rebuilt the list of saves, and `#autosave` treated a

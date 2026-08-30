@@ -198,12 +198,19 @@ test('the helpers this file calls by bare name exist', ()=>{
     const isLocal = (name)=> new RegExp(
         `(?:function|const|let|var|class)\\s+${name}\\b|\\b${name}\\s*[:=]|\\b${name}\\s*\\(.*\\)\\s*{`
     ).test(src);
+    // A parameter is as much a local binding as a `const` is, and reading only declarations
+    // missed them: `new Promise( (decided)=>{ ... decided() ... } )` reported `decided` as a
+    // name defined nowhere in the app. The check above cannot be widened to cover this
+    // without matching every call site, so it is asked separately.
+    const isParam = (name)=> new RegExp(
+        `\\((?:[^()]*,)?\\s*${name}\\s*(?:,[^()]*)?\\)\\s*(?:=>|\\{)`
+    ).test(src);
     // Names the page supplies and node does not. Listed rather than assumed, so
     // adding one is a decision someone makes on purpose.
     const PAGE_GLOBALS = new Set(['alert']);
     const isGlobal = (name)=> name in globalThis || PAGE_GLOBALS.has(name);
     const missing = [...called].filter( (name)=>
-        !isLocal(name) && !isGlobal(name)
+        !isLocal(name) && !isParam(name) && !isGlobal(name)
         && !new RegExp(`(?:function|const|let|var|class)\\s+${name}\\b|\\b${name}\\s*[:=]\\s*(?:function|\\()`).test(app)
     );
     assert.deepEqual(missing, []);
