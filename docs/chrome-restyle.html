@@ -171,10 +171,16 @@ tbody tr:hover { background: #ffffff07 }
     color: #1b1b1f;                          /* --color-on-surface */
 }
 [data-mode="proposed"] .mk-tool {
-    width: 32px; height: 32px;               /* --default-button-size */
+    /* --lg-button-size, not --default-button-size: the toolbar is the one place that
+       takes the large size (`.App-toolbar-container .ToolIcon__icon`,
+       ToolIcon.scss:175). Confirmed against the live DOM, whose toolbar measures
+       `grid-template-columns: 36px 5px 36px ... 5px 36px; gap: 4px`. */
+    width: 36px; height: 36px;
     border-radius: 6px;                      /* --border-radius-md */
 }
-[data-mode="proposed"] .mk-tool svg { width: 16px; height: 16px }  /* --default-icon-size */
+[data-mode="proposed"] .mk-tool svg { width: 16px; height: 16px }  /* --lg-icon-size */
+[data-mode="proposed"] .mk-tool-bar { gap: 4px }
+[data-mode="proposed"] .mk-divider { width: 5px; background: none }
 [data-mode="proposed"][data-theme="light"] .mk-tool:hover { background: #f1f0ff }
 [data-mode="proposed"][data-theme="dark"]  .mk-tool:hover { background: #363541 }
 /* The lit pill: `--color-surface-primary-container` with the icon in
@@ -415,8 +421,9 @@ The chrome band alone is ~350 lines and is worth tokenising either way.</div>
   <tbody>
     <tr><td class="mono">--border-radius-lg</td><td class="mono">0.5rem = 8px</td><td class="mono">--ui-radius: 8px</td><td><span class="tag same">exact</span></td></tr>
     <tr><td class="mono">--border-radius-md</td><td class="mono">0.375rem = 6px</td><td class="mono">--ui-radius-inner: 5px</td><td><span class="tag near">1px</span></td></tr>
-    <tr><td class="mono">--default-icon-size</td><td class="mono">1rem = 16px</td><td class="mono">menu 16px / toolbar 20px</td><td><span class="tag near">toolbar</span></td></tr>
-    <tr><td class="mono">--default-button-size</td><td class="mono">2rem = 32px</td><td class="mono">38px tool, 42px menu</td><td><span class="tag near">chunkier</span></td></tr>
+    <tr><td class="mono">--lg-icon-size <i>(toolbar)</i></td><td class="mono">1rem = 16px</td><td class="mono">menu 16px / toolbar 20px</td><td><span class="tag near">toolbar</span></td></tr>
+    <tr><td class="mono">--lg-button-size <i>(toolbar)</i></td><td class="mono">2.25rem = 36px</td><td class="mono">38px tool, 42px menu</td><td><span class="tag same">2px</span></td></tr>
+    <tr><td class="mono">toolbar gap / divider</td><td class="mono">4px / 5px</td><td class="mono">8px / 1px rule</td><td><span class="tag near">tighter</span></td></tr>
     <tr><td class="mono">menu item height</td><td class="mono">2rem = 32px</td><td class="mono">34px</td><td><span class="tag near">2px</span></td></tr>
     <tr><td class="mono">menu item column-gap</td><td class="mono">0.625rem = 10px</td><td class="mono">10px</td><td><span class="tag same">exact</span></td></tr>
     <tr><td class="mono">menu item font-size</td><td class="mono">0.875rem = 14px</td><td class="mono">14px</td><td><span class="tag same">exact</span></td></tr>
@@ -434,6 +441,41 @@ The chrome band alone is ~350 lines and is worth tokenising either way.</div>
     <tr><td class="mono">chrome font</td><td class="mono">Assistant (OFL)</td><td class="mono">Inter</td><td><span class="tag near">swap</span></td></tr>
   </tbody>
 </table>
+
+<h3>Cross-checked against the live site</h3>
+<p>Everything above was read out of Excalidraw's source. The rendered site was then measured
+independently — 324 elements at <code>excalidraw.com</code> — and the two agree, which is the
+useful outcome: a token declared in SCSS is not proof it survives to the screen.</p>
+<table>
+  <thead><tr><th>Measured on the live DOM</th><th>vs the source read</th></tr></thead>
+  <tbody>
+    <tr><td>The 3-layer <code>--shadow-island</code>, byte for byte</td><td><span class="tag same">agrees</span></td></tr>
+    <tr><td>Exactly <b>two</b> radii in the whole page: 4px (3 uses) and <b>8px (42 uses)</b></td><td><span class="tag same">agrees</span></td></tr>
+    <tr><td><code>#6965db</code> primary · <code>#e0dfff</code> as a background, <b>1 use</b> — the lit pill
+        · <code>#b8b8b8</code> 84 uses — the badge · <code>#030064</code> 14 uses — the lit badge</td><td><span class="tag same">agrees</span></td></tr>
+    <tr><td><b>10px</b> appears in the type scale on exactly <code>kbd, span</code></td><td><span class="tag same">agrees</span></td></tr>
+    <tr><td><code>backdrop-filter in use: <b>no</b></code> · gradients: <b>0</b> · max radius 8px</td><td><span class="tag same">agrees</span></td></tr>
+    <tr><td>Assistant, self-hosted, weights 400/500/600/700; Excalifont only on body</td><td><span class="tag same">agrees</span></td></tr>
+    <tr><td>Toolbar grid: <code>36px 5px 36px … 5px 36px</code>, <code>gap: 4px</code></td><td><span class="tag diff">corrects</span> — I had written 32px</td></tr>
+    <tr><td>Spacing base <b>4px</b>; WCAG <b>100%</b>, zero failing pairs</td><td>new</td></tr>
+  </tbody>
+</table>
+
+<div class="callout"><strong>Excalidraw's z-index is a named scale, and that is the part worth
+copying.</strong> Nineteen tokens, layered by role rather than by number:
+<code>--zIndex-canvas: 1</code>, <code>--zIndex-layerUI: 4</code>,
+<code>--zIndex-ui-bottom: 60</code>, <code>--zIndex-ui-top: 100</code>,
+<code>--zIndex-ui-main-menu: 110</code>, <code>--zIndex-ui-library: 120</code>,
+<code>--zIndex-modal: 1000</code>, <code>--zIndex-popup: 1001</code>,
+<code>--zIndex-toast: 999999</code>. Neurite's sixteen values are mostly local to stacking
+contexts and mostly work, so this is not urgent — but it is the shape to grow toward, and it costs
+nothing to name the band the chrome already occupies.</div>
+
+<div class="callout stop"><strong>What the measurement says <em>not</em> to copy.</strong> Excalidraw
+scores 86/100 overall, and its one weak category is typography at <b>50/100</b>: four font families
+on one page (Assistant, Times, Arial, Excalifont). It also carries 90 <code>!important</code> rules
+and 83% unused CSS. Neurite is on one family, so the restyle should stay there — take the palette,
+the metrics and the material, and leave the type sprawl.</div>
 
 <h3>The whole Island, verbatim</h3>
 <p>This is all of <code>components/Island.scss</code>. It is worth seeing how little there is —
