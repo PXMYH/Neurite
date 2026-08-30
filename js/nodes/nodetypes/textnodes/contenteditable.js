@@ -3,15 +3,8 @@ function createSyntaxTextarea() {
 
     const className = 'editable-div custom-scrollbar textarea-override';
     const textarea = Html.make.textarea(className);
-    // An empty note used to be a blank rectangle with nothing to say it was typeable,
-    // so it says that much. It no longer teaches the reference tag: the link strip
-    // above lists this note's links and its + control is titled "Link this note to
-    // another", so a card that also spelled out `[[Title]]` put the mechanism into
-    // the space meant for the writing. The syntax is still taught in the ? tab, for
-    // the notes pane where a tag is actually typed. `.editable-div::placeholder`
-    // gives this a colour of its own — the textarea's own text colour is
-    // near-invisible by design.
-    textarea.placeholder = 'Write here.';
+    // The placeholder is not set here. `TextNode.init` sets it, because that is the one
+    // function both a new node and a restored one go through -- see `TextNode.PLACEHOLDER`.
 
     // Create the overlay div for syntax highlighting
     const displayDiv = Html.make.div('syntax-display-div custom-scrollbar');
