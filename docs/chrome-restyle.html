@@ -513,6 +513,13 @@ size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
       <code>styles.css:2994</code> — a bare <code>#disk-file-button { font-size: 13px }</code>, sitting
       1,500 lines away from the <code>.menu-row</code> rule it overrides, which is why
       <em>Save to…</em> renders a pixel smaller than every row beside it.</p>
+      <p><b>One trap.</b> Do not reach for <code>* { box-sizing: border-box }</code> while tidying
+      this band. <code>test/menu-keyboard.test.js</code> asserts no universal block declares
+      <code>box-sizing</code>, because <code>.menu-button</code> carries an explicit
+      <code>content-box</code> to undo the UA's <code>border-box</code> on a
+      <code>&lt;button&gt;</code> and keep its 42&times;42. A universal reset changes what that
+      rule is compensating for and fails the suite. The <code>* {}</code> block already exists at
+      <code>styles.css:77</code>, which makes it an easy place to add one by habit.</p>
       <p class="meta">no visual change · pure prerequisite · pins: computed styles unchanged before/after</p></li>
 
   <li><b>Retune the island</b>
@@ -536,10 +543,22 @@ size out of the DOM. Phase 4 is the only one that touches behaviour.</p>
       <p class="meta">behaviour · needs sign-off · browser-verify before writing the test</p></li>
 
   <li><b>A bottom-left zoom island</b>
-      <p>Neurite's zoom and pan readouts live inside the Views panel
-      (<code>viewstab.html:41–48</code>) and the FPS counter inside the Fractal panel
-      (<code>fractaltab.html:49</code>) — nothing reports the view on the canvas itself.
-      Excalidraw keeps zoom at bottom-left, where it doubles as the reset control.</p>
+      <p>Nothing reports the view on the canvas itself. The <code>#pan</code> and
+      <code>#zoom</code> boxes are <em>inputs</em> rather than readouts — typing in one moves the
+      view — and they are inside the Views panel (<code>viewstab.html:44,48</code>); the FPS
+      counter is inside the Fractal panel (<code>fractaltab.html:49</code>). Excalidraw keeps
+      zoom at bottom-left, where it doubles as the reset control.</p>
+      <p>Cheaper than it looks, and only if the island is built as a child of
+      <code>.dropdown</code> (<code>dropdown.html:13</code>). That root is already
+      <code>100vw × 100dvh</code>, <code>pointer-events: none</code>, at
+      <code>z-index: 100</code> — its own comment at <code>styles.css:1195</code> says it is sized
+      in viewport units precisely because <code>inset: 0</code> put "every bottom-anchored island
+      above the top edge of the screen". So a child gets three things free: the band over canvas
+      and cards, <code>pointer-events: auto</code> from <code>.dropdown > *</code>
+      (<code>styles.css:1214</code>), and the guard at <code>dropdown.js:296</code> that stops
+      <code>mousedown</code>, <code>wheel</code> and <code>dblclick</code> over chrome from
+      panning and zooming the graph. Built anywhere else, all three have to be re-solved by hand.
+      The change is <code>bottom</code> and <code>left</code> on one element.</p>
       <p class="meta">new region · optional · check it against the iPad work in ipad-spike.md first</p></li>
 </ol>
 
@@ -565,11 +584,16 @@ largest structural difference between the two apps — but it is neither the too
 and Neurite's equivalent decisions already live on the node. Raising it here only so it is not
 discovered later and read as an omission.</p>
 
-<div class="callout"><strong>z-index has no scale.</strong> Sixteen distinct values across
-<code>styles.css</code> — <code>-1, 0, 1, 2, 4, 10, 20, 30, 100, 150, 500, 900, 1000, 1001,
-2000, 9999</code> — assigned ad hoc. The chrome itself sits low: the menu button at 2 and the
-panel at 1, both nested inside <code>#dropdowndiv</code> at 100. A new bottom-left island has no
-obvious band to join, so phase 5 should settle on one rather than pick the next free number.</div>
+<div class="callout"><strong>z-index reads as ad hoc and mostly is not.</strong> Sixteen distinct
+values across <code>styles.css</code> — <code>-1, 0, 1, 2, 4, 10, 20, 30, 100, 150, 500, 900,
+1000, 1001, 2000, 9999</code> — but the large numbers are <em>local</em>. <code>.dropdown</code>
+is <code>position: fixed</code> with <code>z-index: 100</code> (<code>styles.css:1195</code>),
+which makes it a stacking context, so <code>.dropdown-content</code> at 1,
+<code>.menu-button</code> at 2 and <code>.menu-icon</code> at 10 only ever compete with each
+other. The same trick hides inside <code>.window</code>, which stacks at 2 while
+<code>.ainode-settings-container</code> sits at 100 and <code>.title-input-wrapper</code> at 150
+within it. So there is no global ordering to reason about, and a new island needs
+<b>no new z-index value at all</b> — see phase 5.</div>
 
 <div class="callout"><strong>One idea worth stealing that is not visual.</strong> Excalidraw tags each
 island <code>data-viewport-ui</code> and measures them in <code>getViewportOffsets</code>, so the
