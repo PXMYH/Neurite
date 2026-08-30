@@ -5138,7 +5138,48 @@ body.ai-disabled .node-add-item.ai-icon {
     .modal-cancel:hover {
         background-color: #603030;
     }
-    
+
+/* A confirm modal asks one question, so its two answers belong on one row. Stacked,
+   Yes sat directly above No and read as a list rather than as a choice -- and the
+   destructive answer was the one the pointer was already resting on. The container is
+   shared with the alert and prompt modals, which do want a column, so only the wrap
+   is changed here and the message claims a full row of its own. */
+.confirm-modal-content {
+    flex-flow: row wrap;
+    gap: 8px;
+}
+
+    .confirm-modal-content .confirm-message {
+        flex: 0 0 100%;
+        margin: 0;
+    }
+
+    /* Equal halves, so neither answer is the bigger target. */
+    .confirm-modal-content .modal-ok,
+    .confirm-modal-content .modal-cancel {
+        flex: 1;
+    }
+
+        /* Yes is the destructive answer and now says so. Scoped to this modal: the
+           same `.modal-ok` class is the OK of the alert and prompt modals, which
+           destroy nothing. `#950e0e` is the red the account-delete button uses. */
+        .confirm-modal-content .modal-ok {
+            background-color: #7a1c1c;
+            color: #eee;
+        }
+
+        .confirm-modal-content .modal-ok:hover {
+            background-color: #950e0e;
+            color: #fff;
+        }
+
+        /* No keeps its own hover out of the danger colour, which it shares by default
+           -- beside a red Yes, a red No is the wrong signal on the safe answer. */
+        .confirm-modal-content .modal-cancel:hover {
+            background-color: #33333a;
+        }
+
+
 .modal-prompt-textarea {
     flex-grow: 1;
     background-color: #222226;
