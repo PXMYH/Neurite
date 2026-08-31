@@ -1,4 +1,13 @@
-function post(type, res){ self.postMessage({ type, res }) }
+// Every reply carries the id of the request that asked for it. Without one there is
+// nothing to match a reply to a caller, and the page had no choice but to guess: it
+// attached one listener per request to this single Worker, so the first result was
+// delivered to every waiting caller and results two onward were dropped with no
+// listener left to hear them. Measured before the fix -- four distinct vectors sent
+// back, one vector cached against all three Nodes.
+//
+// `id` is last and optional so `post('ready', …)` and an error raised before any
+// request exists still work; those are broadcasts and belong to no caller.
+function post(type, res, id){ self.postMessage({ type, res, id }) }
 post.error = post.bind(self, 'error');
 
 class Model {
@@ -37,27 +46,31 @@ class Model {
         return Promise.reject(err);
     }
 
-    generate(text){
+    // `id` is carried the whole way down to the reply rather than held in a field: every
+    // request chains onto the one before it (see `#promExtractor` below), so several are
+    // in flight at once and a single "current id" would be overwritten by the next
+    // message long before this one finished extracting.
+    generate(text, id){
         if (typeof text !== 'string') {
-            post.error("Input must be a string");
+            post.error("Input must be a string", id);
             return Promise.resolve();
         }
 
-        const onExtractor = this.#passTextToExtractor.bind(this, text);
+        const onExtractor = this.#passTextToExtractor.bind(this, text, id);
         return this.#promExtractor = (this.#promExtractor || this.initialize())
-            .then(onExtractor, this.#postError);
+            .then(onExtractor, this.#postError.bind(this, id));
     }
-    #passTextToExtractor(text, extractor){
+    #passTextToExtractor(text, id, extractor){
         const options = {
             pooling: 'mean',
             normalize: true,
         };
         return extractor(text, options)
-            .then(this.#postResult)
+            .then(this.#postResult.bind(this, id))
             .then( ()=>extractor );
     }
-    #postResult(output){ post('result', Array.from(output.data)) }
-    #postError = (err)=>{ post.error(err.message) }
+    #postResult(id, output){ post('result', Array.from(output.data), id) }
+    #postError = (id, err)=>{ post.error(err.message, id) }
 }
 
 const models = {
@@ -66,14 +79,17 @@ const models = {
 }
 
 self.onmessage = function(e){
-    const { verb, modelName, input } = e.data;
+    const { verb, modelName, input, id } = e.data;
 
     const model = models[modelName];
-    if (!model) return post.error("Unknown model: " + modelName);
-    if (!model[verb]) return post.error("Unknown message type: " + type);
+    if (!model) return post.error("Unknown model: " + modelName, id);
+    // `type` was undefined here and threw a ReferenceError instead of reporting the bad
+    // verb -- and because the throw escaped before any reply was posted, the caller's
+    // promise never settled either way.
+    if (!model[verb]) return post.error("Unknown message type: " + verb, id);
 
-    model[verb](input).catch( (err)=>{
+    model[verb](input, id).catch( (err)=>{
         console.error('Worker: Error processing message:', err);
-        post.error(err.message);
+        post.error(err.message, id);
     });
 }

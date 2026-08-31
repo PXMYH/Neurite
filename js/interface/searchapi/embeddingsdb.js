@@ -12,10 +12,29 @@ const Embeddings = {
     selectModel: null,
     worker: null,
 
+    // One listener for the Worker's whole lifetime, dispatching by request id, instead of
+    // one listener per request.
+    //
+    // The old shape attached a fresh `message` listener inside every `fetchLocal` and let
+    // each one resolve on whatever arrived next. `Embeddings.search` fires 1 + N requests
+    // in a single synchronous burst, so all 1 + N listeners were attached before the
+    // Worker's first reply could be delivered -- a Worker message arrives as its own task,
+    // and the burst finishes inside the current one. That first reply then dispatched to
+    // every listener, each removed only itself, and each resolved with the same vector.
+    // Replies two onward arrived with no listener left and were dropped.
+    //
+    // Measured before the fix: four distinct vectors posted back for four distinct
+    // inputs, and one of them -- the search term's -- cached against all three Nodes. So
+    // every Node scored an identical cosine and semantic ranking did nothing.
+    // Plain properties, not `#private`: `Embeddings` is an object literal, and a class
+    // field is a syntax error here.
+    pending: new Map(),
+    nextId: 0,
+
     init(){
         this.selectModel = Elem.byId('embeddingsModelSelect');
         this.worker = new Worker('/embeddings.js', { type: 'module' });
-        this.listenToWorker = this.listenToWorker.bind(this);
+        On.message(this.worker, this.onWorkerMessage);
 
         /*
         // Initialize both models
@@ -23,8 +42,27 @@ const Embeddings = {
         this.post('initialize', 'local-embeddings-all-MiniLM-L6-v2');
         */
     },
-    post(verb, modelName, input){
-        this.worker.postMessage({ verb, modelName, input })
+    post(verb, modelName, input, id){
+        this.worker.postMessage({ verb, modelName, input, id })
+    },
+
+    // Routes each reply to the one caller that asked for it. A reply with no `id` is a
+    // broadcast -- the Worker's `ready`, or an error raised before any request existed --
+    // and belongs to nobody, so it is logged rather than resolved into a random caller.
+    onWorkerMessage: (e)=>{
+        const { type, res, id } = e.data;
+        if (id === undefined) {
+            if (type === 'error') Logger.err("Embeddings Worker:", res);
+            return;
+        }
+
+        const pending = Embeddings.pending.get(id);
+        if (!pending) return Logger.warn("Embeddings reply for an unknown request:", id);
+
+        Embeddings.pending.delete(id);
+        if (type === 'error') return pending.reject(new Error(res));
+
+        pending.resolve(res);
     },
 
     fetch(text, source){
@@ -43,22 +81,11 @@ const Embeddings = {
     },
 
     fetchLocal(modelName, text){
-        const prom = new Promise(this.listenToWorker);
-        this.post('generate', modelName, text);
+        const id = this.nextId++;
+        const prom = new Promise( (resolve, reject)=>
+            this.pending.set(id, {resolve, reject}) );
+        this.post('generate', modelName, text, id);
         return prom;
-    },
-    listenToWorker(resolve, reject){
-        const onMessage = (e)=>{
-            const data = e.data;
-            if (data.type === 'result') {
-                Off.message(this.worker, onMessage);
-                resolve(data.res);
-            } else if (data.type === 'error') {
-                Off.message(this.worker, onMessage);
-                reject(new Error(data.res));
-            }
-        }
-        On.message(this.worker, onMessage);
     },
 
     async fetchOllama(modelName, text){
