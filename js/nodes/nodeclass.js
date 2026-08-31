@@ -330,7 +330,13 @@ class Node {
     onWheel = (e)=>{
         if (!App.nodeMode) return;
 
-        const amount = Math.exp(e.wheelDelta * -settings.zoomSpeed);
+        // The same expression the fractal's own zoom uses (interface.js), and for the same
+        // reason: `deltaY` is negative when the wheel goes up, so the exponent is negated
+        // for up to mean in. This read `e.wheelDelta`, which is the legacy property and
+        // carries the *opposite* sign -- +120 for a scroll up where `deltaY` is -120 -- so
+        // Shift plus a scroll up shrank a card while the same gesture on the canvas zoomed
+        // into the fractal. One card and one plane, two directions.
+        const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
 
         if (Autopilot.isMoving() && this.uuid === Autopilot.referenceFrame.uuid) {
             Autopilot.targetZoom_scaleBy(1 / amount);

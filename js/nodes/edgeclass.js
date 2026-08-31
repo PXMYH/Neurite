@@ -393,7 +393,10 @@ class EdgeView {
     onWheel = (e)=>{
         if (!App.nodeMode) return;
 
-        const amount = Math.exp(e.wheelDelta * -settings.zoomSpeed);
+        // Same convention as the fractal's zoom and a card's, so an edge lengthens on a
+        // scroll up rather than shortening. `wheelDelta` is the legacy property and its
+        // sign is the opposite of `deltaY`'s, which is what had all three disagreeing.
+        const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
 
         // Determine if this edge should be scaled based on both nodes being selected
         const selectedNodes = App.selectedNodes;
