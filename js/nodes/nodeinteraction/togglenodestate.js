@@ -21,12 +21,12 @@ NodeView.prototype.centerTitleInput = function(){
     style.pointerEvents = 'none'; // Disable interactions during collapse
     style.zIndex = '5'; // Just in case
 
-    const inputStyle = this.titleInput.style;
-    inputStyle.border = 'none';
-    inputStyle.textAlign = 'center';
-    inputStyle.fontSize = '25px';
-    inputStyle.width = 'fit-content';
-    inputStyle.background = 'transparent'; // optional: cleaner appearance
+    // The input steps aside while collapsed and `.collapsed-title` takes its place. It
+    // used to stay and carry the title itself with `width: fit-content`, which an
+    // `<input>` does not honour -- an input sizes from a character count, so a long
+    // title was clipped at whatever that came to and the rest was simply gone. A div
+    // both wraps and measures its own text.
+    this.showCollapsedTitle();
 }
 NodeView.prototype.resetTitleInput = function(){
     const wrapperStyle = this.titleInputWrapper.style;
@@ -37,12 +37,27 @@ NodeView.prototype.resetTitleInput = function(){
     wrapperStyle.pointerEvents = '';
     wrapperStyle.zIndex = '';
 
-    const inputStyle = this.titleInput.style;
-    inputStyle.border = '';
-    inputStyle.textAlign = '';
-    inputStyle.fontSize = '';
-    inputStyle.width = '';
-    inputStyle.background = '';
+    this.hideCollapsedTitle();
+}
+
+// Written from the input every time it is shown rather than kept in step by a listener.
+// The input is the one source of truth for the title -- the Zettelkasten text can rename
+// a card while it is collapsed -- and a card is only collapsed or expanded a handful of
+// times, so reading the value at that moment is both cheaper and impossible to get out
+// of date.
+NodeView.prototype.showCollapsedTitle = function(){
+    const el = this.collapsedTitle || this.ensureCollapsedTitle();
+    if (!el) return;
+
+    el.textContent = this.titleInput.value;
+    el.classList.add('collapsed-title-visible');
+    this.titleInput.classList.add('title-input-stowed');
+}
+NodeView.prototype.hideCollapsedTitle = function(){
+    const el = this.collapsedTitle;
+    if (el) el.classList.remove('collapsed-title-visible');
+
+    this.titleInput.classList.remove('title-input-stowed');
 }
 
 NodeView.prototype.hideButHeaderAndTitle = function(child){

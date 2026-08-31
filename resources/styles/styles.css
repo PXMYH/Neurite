@@ -647,6 +647,17 @@ body {
     border-bottom-color: transparent;
 }
 
+    /* Copy is a title-editing affordance and a collapsed card is not editable -- the
+       wrapper carries `pointer-events: none`, so this button could not be pressed here
+       even while it was drawn. It survived `hideButHeaderAndTitle` because it lives
+       inside the title wrapper rather than beside it, and it is the faint mark that
+       used to sit at the end of a collapsed title looking like an ellipsis. The input
+       reserved 30px of padding for it; the wrapping title does not, so left drawn it
+       overlaps the last word instead of following it. */
+    .window.collapsed .copy-button {
+        display: none;
+    }
+
 /* A card's links, between the header and the note body (see linkstrip.js). It
    needs no rule or tint of its own: the header above it ends in a divider and the
    note body below it is a darker fill, so this band is bounded by two edges that
@@ -801,12 +812,55 @@ input[type="text"i].title-input {
     display: none;
 }
 
+/* Stowed, not removed: the input keeps the title's value, every listener bound to it and
+   its place in the tab order, and hands only the drawing of the text to
+   `.collapsed-title` for as long as the card is a circle. */
+input[type="text"i].title-input.title-input-stowed {
+    display: none;
+}
+
+/* The title a collapsed card shows. Not the `<input>` that shows it when the card is
+   open: an input is a single-line control, so it cannot wrap at any width, and it sizes
+   from a character count rather than from its text -- `width: fit-content` on it
+   resolved to 302px around 405px of title and threw the rest away. A div does both.
+
+   Present in the markup whenever a card is, and shown only while collapsed, so there is
+   no element to create at the moment of collapsing and nothing to go wrong if a Saved
+   Graph restores a card mid-collapse. */
 .collapsed-title {
+    display: none;
     background: transparent;
     border: none;
     pointer-events: none; /* Makes it un-clickable */
     text-align: center; /* Centers the text */
 }
+
+    .collapsed-title.collapsed-title-visible {
+        display: block;
+        /* The size the input was given inline while it held this job. */
+        font-size: 25px;
+        line-height: 1.15;
+        color: var(--ui-chrome-text);
+        /* Wrapping is the whole point, and these two are what an input could not do:
+           break between words, and keep every one of them. `pre-wrap` rather than
+           `normal` so a title that was typed with runs of spaces still reads as it was
+           written. */
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
+        /* Measured rather than picked. "Agent = Model + Harness + Evals" ran to 405px on
+           one line; at 9ch and 11ch it broke into four cramped lines, and 14ch was the
+           first cap that gave two. 16ch is that with headroom -- 222px, a little over
+           half the sprawl, and still two lines rather than three if the title grows a
+           word. A short title is unaffected either way: `width: max-content` below keeps
+           "Notes" at 65px and one line at every cap tried.
+
+           `ch` rather than px so the cap holds its shape against the 25px above instead
+           of against a guess about it. */
+        max-width: 16ch;
+        /* Content-sized up to that cap: a two-word title should not be padded out to the
+           full width just because the cap allows it. */
+        width: max-content;
+    }
 
 .copy-button {
     position: absolute;

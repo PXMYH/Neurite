@@ -119,10 +119,43 @@ class NodeView {
         this.headerContainer = div?.querySelector('.header-container') || null;
         this.titleInputWrapper = this.headerContainer?.querySelector('.title-input-wrapper') || null;
         this.titleInput = this.titleInputWrapper?.querySelector('.title-input') || null;
+        this.collapsedTitle = this.ensureCollapsedTitle();
         this.copyBtn = this.titleInputWrapper?.querySelector('.copy-button') || null;
         this.innerContent = div?.querySelector('.content') || null;
         this.resizeHandle = div?.querySelector('.resize-handle') || null;
         this.buttons = this.headerContainer?.querySelector('.button-container') || null;
+    }
+
+    // The title a collapsed card shows, created here rather than in the builder because
+    // this is the one function both paths run. A Saved Graph is the markup itself, so
+    // every card saved before this existed comes back without the element -- built in
+    // the builder alone, collapsing one of those would find nothing to write the title
+    // into and silently show an empty circle.
+    //
+    // It exists at all because an `<input>` cannot do this job. A text input is a
+    // single-line control, so `white-space` has no effect on it, and its intrinsic width
+    // comes from a character count rather than from its content: `width: fit-content`
+    // resolved to 302px around 405px of title, which is how the last third of
+    // "Agent = Model + Harness + Evals" became unreachable with nothing on screen to say
+    // it was there.
+    //
+    // A sibling rather than a replacement. `titleInput.value` is read in 21 places and
+    // editing a title is what an input is good at; this element only ever displays, so
+    // it is hidden from the accessibility tree -- the input beside it is already the
+    // accessible name.
+    ensureCollapsedTitle(){
+        const wrapper = this.titleInputWrapper;
+        if (!wrapper) return null;
+
+        const existing = wrapper.querySelector('.collapsed-title');
+        if (existing) return existing;
+
+        const el = Html.make.div('collapsed-title');
+        el.setAttribute('aria-hidden', 'true');
+        // Before the copy button, which is absolutely positioned and so does not care,
+        // but keeps the reading order of the markup matching the visual one.
+        wrapper.insertBefore(el, wrapper.querySelector('.copy-button'));
+        return el;
     }
 
     static onHeaderContainerMouseDown(e){
