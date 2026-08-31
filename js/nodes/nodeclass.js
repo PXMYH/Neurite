@@ -473,6 +473,18 @@ Node.Extensions = {
         view.resizeHandle = odiv.querySelector('.resize-handle');
         view.titleInput = odiv.querySelector('.title-input');
         view.div = odiv.querySelector('.window');
+
+        // A card with no `.window` in its saved markup cannot be windowified: everything
+        // `rewindowify` goes on to do reads this div, starting with
+        // `initCollapsed`, which asked for `this.div.classList` and threw. That throw
+        // travelled all the way out of `new Node` and aborted the whole load, so one
+        // malformed card cost every card after it rather than costing itself. Say so and
+        // leave this one flat instead.
+        if (!view.div) {
+            return Logger.warn("Card", node.uuid, "was saved without its window markup; "
+                             + "leaving it unwindowified rather than failing the load");
+        }
+
         view.rewindowify();
     },
     "textarea": (node, o) => {

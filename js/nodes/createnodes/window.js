@@ -42,9 +42,13 @@ class NodeView {
 
         const inputWrapper = Html.make.div('title-input-wrapper');
 
-        const titleInput = Html.make.input('title-input');
-        titleInput.setAttribute('type', 'text');
-        titleInput.setAttribute('value', title);
+        // A textarea, not an `<input type="text">`. The two are interchangeable for
+        // everything this title does -- `.value`, `.select()`, `selectionStart` and the
+        // paste handler are the same API on both -- and only one of them can wrap. An
+        // input is a single-line control, so a title longer than the header simply
+        // scrolled out of a box with no scrollbar: 271px of text inside 198px, with the
+        // end unreachable and nothing to say it was there.
+        const titleInput = NodeView.makeTitleInput(title);
 
         const copyBtn = Html.make.div('copy-button');
         copyBtn.setAttribute('title', 'Copy title');
@@ -119,11 +123,64 @@ class NodeView {
         this.headerContainer = div?.querySelector('.header-container') || null;
         this.titleInputWrapper = this.headerContainer?.querySelector('.title-input-wrapper') || null;
         this.titleInput = this.titleInputWrapper?.querySelector('.title-input') || null;
+        this.titleInput = this.upgradeTitleInputElement();
         this.collapsedTitle = this.ensureCollapsedTitle();
         this.copyBtn = this.titleInputWrapper?.querySelector('.copy-button') || null;
         this.innerContent = div?.querySelector('.content') || null;
         this.resizeHandle = div?.querySelector('.resize-handle') || null;
         this.buttons = this.headerContainer?.querySelector('.button-container') || null;
+    }
+
+    // One row to begin with; `fitTitleHeight` grows it from there. `rows` rather than a
+    // CSS height so the box is one line tall before any script has run on it.
+    static makeTitleInput(value){
+        const el = Html.make.textarea('title-input');
+        el.setAttribute('rows', '1');
+        // A title is one line of prose, not a paragraph: browsers offer to spell-check a
+        // textarea and would underline every node name.
+        el.setAttribute('spellcheck', 'false');
+        // A textarea's value is its text content, not a `value` attribute -- and a Saved
+        // Graph is `innerHTML`, which serialises content and not properties. Set as text
+        // so the title is in the markup; `.value` then reads it back.
+        el.textContent = value ?? '';
+        return el;
+    }
+
+    // Every card saved before the title became a textarea comes back with an `<input>`,
+    // because a Saved Graph is the markup itself. Swapped here, in the one function both
+    // paths run, so an older card gains the wrap rather than keeping the truncation
+    // forever. The value moves across; nothing else on the element is load-bearing.
+    upgradeTitleInputElement(){
+        const old = this.titleInput;
+        if (!old || old.tagName !== 'INPUT') return old;
+
+        const el = NodeView.makeTitleInput(old.value ?? old.getAttribute('value') ?? '');
+        old.replaceWith(el);
+        return el;
+    }
+
+    // A textarea does not size to its content, so the height is set from it. Called on
+    // bind and on every edit; `auto` first because `scrollHeight` never shrinks below the
+    // height already set on the element.
+    fitTitleHeight = ()=>{
+        const el = this.titleInput;
+        if (!el) return;
+
+        el.style.height = 'auto';
+        const wanted = el.scrollHeight;
+
+        // A card is built before it is placed, so on the first pass the element is not
+        // laid out yet and `scrollHeight` is 0. Writing that pins the title shut -- the
+        // box measures nothing and the text is clipped to it, which is the bug this whole
+        // change is about, reintroduced by the fix for it. Leave the height that `rows="1"`
+        // gives and ask again once the browser has measured something.
+        if (wanted < 1) {
+            el.style.height = '';
+            requestAnimationFrame(this.fitTitleHeight);
+            return;
+        }
+
+        el.style.height = wanted + 'px';
     }
 
     // The title a collapsed card shows, created here rather than in the builder because
@@ -270,6 +327,29 @@ class NodeView {
         });
 
         On.mouseleave(titleInput, (e)=>{ isDragging = false } );
+
+        // A textarea does not grow with its text, so the height follows the content on
+        // every edit. Also once now: a restored card arrives with its title already long.
+        On.input(titleInput, this.fitTitleHeight);
+        this.fitTitleHeight();
+
+        // A textarea keeps its saved value in its text content, and editing changes only
+        // the property -- so without this an edited title reverts to whatever it was when
+        // the card was built the next time the graph is written out as `innerHTML`. Kept
+        // in step on `change` rather than on `input`: writing text content while the
+        // reader is typing in it would move the caret to the end on every keystroke.
+        On.change(titleInput, ()=>{ titleInput.textContent = titleInput.value });
+
+        // Enter would insert a newline, which an input could not do and a title has no use
+        // for -- the header would grow a blank second line and the Zettelkasten tag that
+        // mirrors this title would gain a line break in the middle of a name. Treat it as
+        // "done" instead, which is what it meant while this was an input.
+        On.keydown(titleInput, (e)=>{
+            if (e.key !== 'Enter' || e.shiftKey) return;
+
+            e.preventDefault();
+            titleInput.blur();
+        });
     }
 
     rewindowify() {

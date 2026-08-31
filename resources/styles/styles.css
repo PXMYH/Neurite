@@ -788,8 +788,14 @@ body {
     z-index: 150;
 }
 
-/* stripped down, now just handles look */
-input[type="text"i].title-input {
+/* stripped down, now just handles look.
+
+   Matches both elements on purpose. The title is a `<textarea>` so that it can wrap --
+   an `<input>` is a single-line control and a long title scrolled out of it unreachably --
+   but every card saved before that change comes back as an `<input>`, and it has to look
+   identical for however long it takes `upgradeTitleInputElement` to be reached. */
+input[type="text"i].title-input,
+textarea.title-input {
     background: none !important;
     /* No border at all. It carried the header's divider for a while, but an input
        that flex-grows can only draw a rule as long as the space the buttons leave,
@@ -801,7 +807,39 @@ input[type="text"i].title-input {
     padding-right: 30px;
 }
 
-    input[type="text"i].title-input:focus {
+    /* What the textarea needs and the input did not have to be told. */
+    textarea.title-input {
+        /* Inherited, so the title cannot drift away from the card's own type the way a
+           second copy of the family and size would. */
+        font: inherit;
+        /* Not inherited. `color: inherit` resolved to the global `*` grey and made the
+           title a shade darker than the input had been -- measured, #9d9d9d against the
+           #bbb it used to compute to. Restated at the value `.node-textarea` uses, so a
+           card's title and its body are the same colour. */
+        color: #bbb;
+        /* The input was border-box; a textarea's UA default is content-box, which took
+           30px off the usable width once the copy button's padding was added to it. */
+        box-sizing: border-box;
+        /* The wrap itself, and no scrollbar: `fitTitleHeight` keeps the box as tall as its
+           text, so there is never anything to scroll to. `overflow: hidden` also removes
+           the gutter a textarea otherwise reserves, which is what would have made the
+           title sit a few px left of where the input put it. */
+        overflow: hidden;
+        /* A textarea is resizable by default, and a drag handle on a card title is both
+           meaningless and in the way of dragging the card. */
+        resize: none;
+        /* The input's own padding, restated because a textarea's UA default differs. */
+        padding-top: 1px;
+        padding-bottom: 1px;
+        padding-left: 2px;
+        /* One line until the content says otherwise. */
+        min-height: 0;
+        display: block;
+        width: 100%;
+    }
+
+    input[type="text"i].title-input:focus,
+    textarea.title-input:focus {
         color: lightgrey;
         outline: none;
         /* Remove the default outline; `.header-container:focus-within` draws the
@@ -815,7 +853,8 @@ input[type="text"i].title-input {
 /* Stowed, not removed: the input keeps the title's value, every listener bound to it and
    its place in the tab order, and hands only the drawing of the text to
    `.collapsed-title` for as long as the card is a circle. */
-input[type="text"i].title-input.title-input-stowed {
+input[type="text"i].title-input.title-input-stowed,
+textarea.title-input.title-input-stowed {
     display: none;
 }
 

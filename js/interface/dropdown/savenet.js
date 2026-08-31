@@ -791,20 +791,42 @@ View.Graphs = class {
 
         this.#saver.restoreAdditionalSaveObjects(div);
 
+        // One bad card costs itself, not the graph. Both loops used to run unguarded, so
+        // anything that threw for a single card -- markup saved without its `.window`
+        // was the case that found this -- came out of the loop and abandoned every card
+        // after it. A graph is the reader's work, and losing the rest of it to one
+        // unreadable note is the worst available outcome. Counted rather than swallowed:
+        // a quieter graph than the one that was saved has to say so.
+        const skipped = [];
         const newNodes = [];
         for (const child of div.children) {
-            const node = new Node(child);
-            newNodes.push(node);
-            Graph.addNode(node);
+            try {
+                const node = new Node(child);
+                newNodes.push(node);
+                Graph.addNode(node);
+            } catch (err) {
+                skipped.push(child.dataset?.viewId || '(unidentified)');
+                Logger.err("Could not rebuild a saved card; skipping it:", err);
+            }
         }
 
         Elem.forEachChild(div, this.#populateDirectionalityMap, this);
 
         for (const node of newNodes) {
-            Graph.appendNode(node);
-            node.init();
-            this.#reconstructSavedNode(node, importer);
-            node.sensor = new NodeSensor(node, 3);
+            try {
+                Graph.appendNode(node);
+                node.init();
+                this.#reconstructSavedNode(node, importer);
+                node.sensor = new NodeSensor(node, 3);
+            } catch (err) {
+                skipped.push(node.uuid);
+                Logger.err("Could not finish restoring card", node.uuid, "-", err);
+            }
+        }
+
+        if (skipped.length > 0) {
+            Logger.warn(skipped.length, "of", div.children.length,
+                        "cards could not be restored:", skipped.join(', '));
         }
 
         if (zettelSaveElem) {
