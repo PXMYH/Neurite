@@ -1,5 +1,9 @@
 // vite.config.js
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const checkoutRoot = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
     base: './',
@@ -34,7 +38,25 @@ export default defineConfig({
         // a secure context, without which navigator.storage is simply absent.
         // Deliberately narrow: neither suffix resolves from public DNS, so this keeps
         // the DNS-rebinding protection that a blanket allow-all would throw away.
-        allowedHosts: ['.local', '.ts.net']
+        allowedHosts: ['.local', '.ts.net'],
+        watch: {
+            // `.claude/worktrees/` holds every other session's checkout, and the
+            // watcher does not know they are not this project. A file written in any
+            // of them reloads the page being read from this server -- and a
+            // `tsconfig.json` in one of them does worse: Vite logs "Clearing cache and
+            // forcing full-reload". A full reload discards whatever is being typed, so
+            // the symptom is a Node title that empties itself while a second session
+            // is merely working somewhere else.
+            //
+            // Anchored to this checkout, NOT written as `**/.claude/**`. A worktree
+            // lives *at* `<primary>/.claude/worktrees/<name>`, so the floating glob
+            // matches every file inside a worktree too -- and a session serving from
+            // its own worktree, which is the documented way to work here, would get a
+            // watcher that ignores all of its own source and an HMR socket that never
+            // fires. Absolute and rooted, it means "the worktrees below me" from the
+            // primary and "nothing" from inside a worktree, which is right both ways.
+            ignored: [resolve(checkoutRoot, '.claude/**'), '**/node_modules/**', '**/.git/**']
+        }
     },
     worker: {
         format: 'es'
