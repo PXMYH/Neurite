@@ -78,7 +78,16 @@ class TextNode {
         const divDisplay = content.querySelector('.syntax-display-div');
         node.displayDiv = divDisplay;
 
-        const textarea = content.querySelector('textarea');
+        // By class, never by tag. A card holds three textareas -- the title, the body,
+        // and the `.editable-div` the reader types into -- and the title comes first in
+        // the markup, so `querySelector('textarea')` returns *it*. That was right only
+        // while the title was an `<input>`: `upgradeTitleInputElement` made it a textarea
+        // so a long title could wrap, and from that commit on `node.textarea` was the
+        // title element. Every write meant for the body landed in the title bar, the real
+        // body textarea stayed empty, and the card was then blanked from that empty copy
+        // on the next pass -- one root cause behind "the title only keeps one character",
+        // "body text becomes a `##` heading" and "the second note wipes the first".
+        const textarea = content.querySelector('.node-textarea');
         node.textarea = textarea;
 
         node.htmlView = content.querySelector('#html-iframe');

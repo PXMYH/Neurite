@@ -37,7 +37,9 @@ function makeNode(placeholder){
     const parts = {
         '.editable-div': editable,
         '.syntax-display-div': {},
-        'textarea': {value: ''},
+        // The body is found by class, not by tag: a card's title is also a textarea and
+        // comes first in the markup. See `card-body-textarea-not-title.test.js`.
+        '.node-textarea': {value: ''},
         '#html-iframe': {},
         '#python-frame': {},
         '#text-syntax-wrapper': {}
