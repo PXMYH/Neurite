@@ -51,6 +51,14 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
     <td><code>Double Click</code></td>
     <td>Anchor a node</td>
   </tr>
+  <tr>
+    <td><code>Ctrl + Shift + M</code></td>
+    <td>Collapse a node to its circle. Acts on the selected nodes, or on the node under the pointer when nothing is selected.</td>
+  </tr>
+  <tr>
+    <td><code>Ctrl + Shift + F</code></td>
+    <td>Expand a collapsed node. Same target rule as above.</td>
+  </tr>
     <tr>
     <td><code>Right Click</code></td>
     <td>List and run node methods. (delete, connect, extractText, zoomTo, and more.)</td>

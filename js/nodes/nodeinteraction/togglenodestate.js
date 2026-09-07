@@ -198,6 +198,85 @@ NodeView.prototype.expand = function () {
 }
 
 
+// Collapse and expand from the keyboard: Ctrl+Shift+M shrinks a card to its circle,
+// Ctrl+Shift+F opens it again. Two keys rather than one toggle, because the point of a
+// shortcut here is tidying a whole selection at once and a toggle would flip a mixed
+// selection into a different mix rather than settling it.
+//
+// Each direction is guarded on the state it expects, and neither guard is decoration:
+//   - `expand` reads `dataset.originalSizes` through `JSON.parse`, which is `undefined`
+//     on a card that has never been collapsed, and `JSON.parse(undefined)` throws.
+//   - `collapse` *writes* `originalSizes` from the computed style. Run it on a card that
+//     is already collapsed and it records the 60px circle as the original, so the next
+//     expand restores a 60px card and the real size is gone for good.
+// So a no-op is the correct response to a card already in the asked-for state.
+NodeView.prototype.collapseIfExpanded = function(){
+    if (this.div.classList.contains('collapsed')) return false;
+    if (!this.model.content) return false;
+
+    this.collapse();
+    return true;
+}
+NodeView.prototype.expandIfCollapsed = function(){
+    if (!this.div.classList.contains('collapsed')) return false;
+    if (!this.model.content) return false;
+
+    this.expand();
+    return true;
+}
+
+// The pointer is tracked here rather than read off `Graph.mousePos`, which holds plane
+// coordinates -- `elementFromPoint` wants screen ones, and converting back to ask the DOM
+// a question the DOM already answered is the long way round.
+NodeView.lastPointer = {x: 0, y: 0};
+On.mousemove(window, (e)=>{
+    NodeView.lastPointer.x = e.clientX;
+    NodeView.lastPointer.y = e.clientY;
+});
+
+// A selection is the explicit target and wins. With nothing selected the card under the
+// pointer is what the reader means -- reaching for a shortcut after a drag-box selection
+// is one workflow, and hovering one card is the other.
+NodeView.viewsForShortcut = function(){
+    const selected = [];
+    App.selectedNodes.forEachView(Array.prototype.push, selected);
+    if (selected.length) return selected;
+
+    const p = NodeView.lastPointer;
+    const div = document.elementFromPoint(p.x, p.y)?.closest('.window');
+    if (!div) return [];
+
+    let hit = null;
+    Graph.forEachNode((node)=>{ if (node.view?.div === div) hit = node.view });
+    return hit ? [hit] : [];
+}
+
+NodeView.runShortcut = function(method){
+    const views = NodeView.viewsForShortcut();
+    let changed = 0;
+    for (const view of views) { if (view[method]()) changed += 1 }
+    return changed;
+}
+
+On.keydown(window, (e)=>{
+    if (!e.getModifierState(controls.controlKey.value)) return;
+    if (!e.getModifierState(controls.shiftKey.value)) return;
+
+    // `e.key` carries the shifted spelling, and on some layouts a Control chord reports
+    // the unshifted one, so both cases are accepted rather than guessing which arrives.
+    const key = e.key.toLowerCase();
+    const method = (key === 'm') ? 'collapseIfExpanded'
+                 : (key === 'f') ? 'expandIfCollapsed'
+                 : null;
+    if (!method) return;
+
+    // Claimed before the count is known: the chord is ours either way, and letting it
+    // through on a no-op would hand Ctrl+Shift+F to the browser's own find bar.
+    e.preventDefault();
+    e.stopPropagation();
+    NodeView.runShortcut(method);
+});
+
 
 //Drag Box Selection
 
