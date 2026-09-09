@@ -9,6 +9,7 @@
     "prestart:host": "node scripts/ensure-worktree-node-modules.js",
     "start:host": "vite --host",
     "test": "node --test",
+    "test:e2e": "node test-e2e/run.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "build": "vite build",
     "postbuild": "shx cp -r js dist/js && shx cp -r resources dist/resources && shx cp -r wiki dist/wiki && tsc -p tsconfig.build.json && shx rm -f 'dist/js/**/*.ts'"
@@ -19,7 +20,8 @@
   "devDependencies": {
     "vite": "^6.1.1",
     "shx": "^0.3.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "playwright": "^1.42.1"
   },
   "dependencies": {
   },
