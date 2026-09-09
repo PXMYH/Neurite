@@ -1,6 +1,7 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote, nodeDiv } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, addAiNote, nodeDiv,
+         paneText, deleteViaCard, deleteViaMenu } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -105,4 +106,40 @@ test('removing a node takes its window and its edge, and spares the neighbour', 
     assert.equal(state.edgesLeft, 0, 'the edge went with it');
     assert.equal(state.bInGraph, true, 'the neighbour survives in the model');
     assert.equal(state.survivorInDom, true, 'the neighbour keeps its window');
+});
+
+// The pane is the source of truth, so a delete that drops the node and leaves its
+// section behind leaves the note in the reader's notes -- and the next full pass can
+// build the node back from it. Both delete paths are covered because they are
+// reached differently, and an AI note is used for both: its section opens with
+// LLM_TAG rather than Tag.node, which is the case that used to be missed.
+test('deleting an AI note through the card button takes its notes text', async () => {
+    const uuid = await addAiNote(page, 'Ai Card');
+    assert.ok((await paneText(page)).includes('Ai Card'), 'pane holds the section first');
+
+    await deleteViaCard(page, uuid);
+    assert.ok(!(await paneText(page)).includes('Ai Card'), 'its section left the pane');
+});
+
+test('deleting an AI note through the context menu takes its notes text', async () => {
+    const uuid = await addAiNote(page, 'Ai Menu');
+    assert.ok((await paneText(page)).includes('Ai Menu'), 'pane holds the section first');
+
+    await deleteViaMenu(page, uuid);
+    assert.ok(!(await paneText(page)).includes('Ai Menu'), 'its section left the pane');
+});
+
+// A section ends where the next one starts, and an AI section starts one just as a
+// Tag.node section does. Deleting the note above one used to swallow it, because the
+// scan for the end of the section only ever stopped at Tag.node.
+test('deleting a note leaves the AI note below it alone', async () => {
+    const doomed = await addNote(page, 'Above', 'body of above');
+    const spared = await addAiNote(page, 'Below');
+
+    await deleteViaMenu(page, doomed);
+
+    const text = await paneText(page);
+    assert.ok(!text.includes('Above'), 'the deleted note left the pane');
+    assert.ok(text.includes('Below'), `the AI section below survived -- pane is now ${JSON.stringify(text)}`);
+    assert.equal(await page.evaluate((id) => id in Graph.nodes, spared), true, 'and its node survived');
 });

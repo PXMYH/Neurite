@@ -614,7 +614,9 @@ class ZettelkastenProcessor {
     handleLLM(line, i, currentNodeTitle){
         const wrapPerLine = this.wrapPerLine;
         const wrapPerTitle = this.wrapPerTitle;
-        const nodeTitle = line.substr("LLM:".length).trim() || "Untitled";
+        // LLM_TAG, not a literal: the tag was "LLM:" once and the length stayed
+        // behind, so `AI:Title` written without a space lost its first character.
+        const nodeTitle = line.substr(LLM_TAG.length).trim() || "Untitled";
         currentNodeTitle = nodeTitle;
 
         let wrap = wrapPerTitle[nodeTitle];

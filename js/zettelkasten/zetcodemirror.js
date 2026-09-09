@@ -132,27 +132,41 @@ class ZettelkastenParser {
             if (mapTitle.toLowerCase() === lowerCaseTitle) return mapLineNo
         }
     }
+    // A section starts at a Tag.node line OR an LLM_TAG line and runs until the next
+    // one of either -- that is how processLine reads the pane, so it is what a delete
+    // has to cut. Both halves used to know only about Tag.node: an AI section could
+    // not be found at all (the title map holds Tag.node lines only, so an AI note's
+    // text outlived its node), and the scan for the end of a section ran straight
+    // through the next AI section and took it along.
+    //
+    // Returns whether this pane held the section, so a caller can stop looking.
     deleteNodeByTitle(title) {
-        const startLineNo = this.nodeTitleToLineMap.get(title);
-
-        if (typeof startLineNo !== 'undefined') {
-            let endLineNo = startLineNo;
-            for (let i = startLineNo + 1; i < this.cm.lineCount(); i++) {
-                const lineText = this.cm.getLine(i);
-                if (lineText.startsWith(Tag.node)) {
-                    endLineNo = i - 1;
-                    break;
-                }
-                endLineNo = i;
-            }
-
-            this.cm.replaceRange('', { line: startLineNo, ch: 0 }, { line: endLineNo + 1, ch: 0 });
-
-            if (this.cm.getValue().trim() === '') {
-                this.cm.setValue('');
-            }
-            this.cm.refresh();
+        let startLineNo = this.nodeTitleToLineMap.get(title);
+        if (startLineNo === undefined) {
+            this.cm.eachLine( (line)=>{
+                if (startLineNo !== undefined || !line.text.startsWith(LLM_TAG)) return;
+                if (line.text.slice(LLM_TAG.length).trim() === title) startLineNo = line.lineNo();
+            });
+            if (startLineNo === undefined) return false;
         }
+
+        let endLineNo = startLineNo;
+        for (let i = startLineNo + 1; i < this.cm.lineCount(); i++) {
+            const lineText = this.cm.getLine(i);
+            if (lineText.startsWith(Tag.node) || lineText.startsWith(LLM_TAG)) {
+                endLineNo = i - 1;
+                break;
+            }
+            endLineNo = i;
+        }
+
+        this.cm.replaceRange('', { line: startLineNo, ch: 0 }, { line: endLineNo + 1, ch: 0 });
+
+        if (this.cm.getValue().trim() === '') {
+            this.cm.setValue('');
+        }
+        this.cm.refresh();
+        return true;
     }
     updateMode() {
         this.cm.setOption("mode", { name: "custom", node: Tag.node, ref: Tag.ref });
@@ -465,6 +479,26 @@ function getZetNodeCMInstance(nodeOrTitle) {
         };
     }
     return null;
+}
+
+// Deleting a node takes the pane section it was built from with it. The pane is the
+// source of truth: text left behind is still a note in the reader's notes, and the
+// next full pass can raise the node from it. Every delete path used to carry its own
+// half of this -- the card button removed the node and cleaned up only if it was a
+// text node, one action class cleaned up the text and left the node to the sync, and
+// every other node type cleaned up nothing at all.
+//
+// getZetNodeCMInstance cannot be used to find the pane: it looks the title up in the
+// Tag.node title map, so it answers null for an AI note. deleteNodeByTitle reports
+// whether the section was in that pane, which is what picks the pane here.
+function deleteNodeAndItsZetText(node){
+    const title = node.getTitle?.();
+    node.remove();
+    if (!title) return;
+
+    for (const pane of window.zetPaneList) {
+        if (pane.parser.deleteNodeByTitle(title)) return;
+    }
 }
 
 function escapeRegExp(str) {

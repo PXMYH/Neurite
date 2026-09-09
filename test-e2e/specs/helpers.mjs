@@ -55,6 +55,51 @@ export async function addNote(page, title, body = '') {
     return uuid;
 }
 
+// Create an AI note by appending an `<LLM_TAG> title` line to the pane, which is
+// how a reader makes one -- there is no neural-API call for it. The write declares
+// a rewrite pass, exactly as createNote's does, so the sync engine reads it as
+// code-authored rather than typed, and the node arrives one pass later.
+export async function addAiNote(page, title) {
+    await page.evaluate((t) => {
+        const cm = window.currentActiveZettelkastenMirror;
+        const pane = window.zetPaneList.find(p => p.cm === cm) ?? window.zetPaneList[0];
+        const last = cm.lastLine();
+        pane.processor.writeAs(ZettelkastenProcessor.Pass.rewrite, () => cm.replaceRange(
+            `\n\n${LLM_TAG} ${t}\n`, { line: last, ch: cm.getLine(last).length }));
+    }, title);
+    await page.waitForFunction(
+        (t) => Object.values(Graph.nodes).some(n => n.getTitle() === t && n.isLLM),
+        title,
+        { timeout: 5000 }
+    );
+    return page.evaluate((t) => Object.keys(Graph.nodes).find(k => Graph.nodes[k].getTitle() === t), title);
+}
+
+export function paneText(page) {
+    return page.evaluate(() => window.currentActiveZettelkastenMirror.getValue());
+}
+
+// Delete through the card's own header button, with a real click: the header
+// buttons are bound through applySvgButtonUI, and a synthetic MouseEvent does not
+// drive them. window.confirm is the app's own modal (customdialog.js) resolving to
+// a boolean, so it is answered here rather than clicked through.
+export async function deleteViaCard(page, uuid) {
+    await page.evaluate(() => { window.confirm = async () => true; });
+    const div = await nodeDiv(page, uuid);
+    const btn = await div.$('#button-delete');
+    if (!btn) throw new Error(`no delete button on node ${uuid}`);
+    await btn.click();
+    await page.waitForFunction((id) => !(id in Graph.nodes), uuid, { timeout: 5000 });
+}
+
+// Delete through the context menu's Delete entry, via the same NodeActions
+// instance the menu builds. The class is chosen per node type, which is the point
+// of covering this path separately from the card button.
+export async function deleteViaMenu(page, uuid) {
+    await page.evaluate((id) => { NodeActions.forNode(Graph.nodes[id]).delete(); }, uuid);
+    await page.waitForFunction((id) => !(id in Graph.nodes), uuid, { timeout: 5000 });
+}
+
 // Wait until a node's hidden body textarea holds `text`.
 export function waitForBody(page, uuid, text) {
     return page.waitForFunction(

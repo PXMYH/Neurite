@@ -131,7 +131,7 @@ NodeActions.base = class BaseNodeActions {
     }
     toggleAutomata(){ App.cellularAutomata.toggle() }
     delete() {
-        this.applyActionToSelectedNodes(Node.remove);
+        this.applyActionToSelectedNodes(deleteNodeAndItsZetText);
         App.menuContext.hide();
     }
     spawnNode(){ spawnZettelkastenNode(this.node) }
@@ -155,15 +155,10 @@ NodeActions.text = class TextNodeActions extends NodeActions.base {
 
     toggleCode() { handleCodeExecution(this.node) }
     testNodeText() { testNodeText(this.node.getTitle()) }
-    delete() {
-        this.applyActionToSelectedNodes( (node)=>{
-            const nodeTitle = node.getTitle();
-            const parser = getZetNodeCMInstance(nodeTitle)?.parser;
-            if (parser) parser.deleteNodeByTitle(nodeTitle);
-        });
-
-        App.menuContext.hide();
-    }
+    // No delete() override: the base one deletes the node and its pane section
+    // together for every node type. This class used to delete the text only and
+    // leave the node to the next sync pass, which did nothing at all when the title
+    // was not in the pane's map.
 }
 
 NodeActions.llm = class LLMNodeActions extends NodeActions.base {
