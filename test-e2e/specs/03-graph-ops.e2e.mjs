@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, nodeDiv } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -10,14 +10,27 @@ afterEach(async () => { await context?.close(); });
 
 const nodeCount = (page) => page.evaluate(() => Object.keys(Graph.nodes).length);
 
-test('creates a note through the neural API', async () => {
+// createNote is the text -> graph half of the Zettelkasten sync: it appends a
+// `<Tag.node> title` section to the notes pane and the sync engine builds the node
+// from that text. So this checks both ends agree -- the node carries the title and
+// body, and the pane holds the section it was built from. Tag.node is read from
+// the app, never hardcoded as '##', because the reader can reconfigure it.
+test('creates a note through the neural API and the notes pane agrees', async () => {
     const before = await nodeCount(page);
     const uuid = await addNote(page, 'API Note', 'made via createNote');
     assert.ok(uuid, 'returned a uuid');
     assert.equal(await nodeCount(page), before + 1, 'one node added');
 
-    const title = await page.evaluate((id) => Graph.nodes[id].view.titleInput.value, uuid);
-    assert.equal(title, 'API Note');
+    const state = await page.evaluate((id) => ({
+        title: Graph.nodes[id].view.titleInput.value,
+        body: Graph.nodes[id].textarea.value,
+        paneText: window.currentActiveZettelkastenMirror.getValue(),
+        heading: `${Tag.node} API Note`,
+    }), uuid);
+    assert.equal(state.title, 'API Note');
+    assert.equal(state.body, 'made via createNote', 'body reached the node');
+    assert.ok(state.paneText.includes(state.heading), `pane holds "${state.heading}"`);
+    assert.ok(state.paneText.includes('made via createNote'), 'pane holds the body line');
 });
 
 test('creates a note with Shift + double-click on the canvas', async () => {
@@ -36,9 +49,12 @@ test('creates a note with Shift + double-click on the canvas', async () => {
     assert.equal(await nodeCount(page), before + 1, 'one node added by the gesture');
 });
 
+// Bodies are left empty on purpose: this test is about edges, and a note created
+// with a body makes addNote wait for the body sync, which would redden this test
+// for a body-sync regression that has nothing to do with connecting nodes.
 test('connectNodes writes an edge between two notes', async () => {
-    const a = await addNote(page, 'A', 'alpha');
-    const b = await addNote(page, 'B', 'beta');
+    const a = await addNote(page, 'A');
+    const b = await addNote(page, 'B');
     await page.evaluate(([ua, ub]) => { connectNodes(Graph.nodes[ua], Graph.nodes[ub]); }, [a, b]);
 
     // The edge key is the two endpoint uuids sorted and joined with '-'.
@@ -55,4 +71,38 @@ test('connectNodes writes an edge between two notes', async () => {
         wantKey
     );
     assert.ok(connected, `an edge joins the two notes (key ${wantKey})`);
+});
+
+// Deleting has to take the node, its window, and its edges together, and it has to
+// leave the neighbour alone. All four are asserted in one test because the failure
+// this guards against is partial: a delete that finds its targets by identity goes
+// wrong when it is handed copies, and then the model drops the node while the DOM
+// keeps the card, or the edge outlives an endpoint.
+test('removing a node takes its window and its edge, and spares the neighbour', async () => {
+    const a = await addNote(page, 'Doomed', '');
+    const b = await addNote(page, 'Survivor', '');
+    await page.evaluate(([ua, ub]) => { connectNodes(Graph.nodes[ua], Graph.nodes[ub]); }, [a, b]);
+    await page.waitForFunction(() => Object.keys(Graph.edges).length > 0, undefined, { timeout: 5000 });
+
+    // Hold the DOM node itself: after the delete its uuid is gone from the model,
+    // so the card could only be found again through the handle taken here.
+    const doomedCard = await nodeDiv(page, a);
+    const survivorCard = await nodeDiv(page, b);
+
+    await page.evaluate((id) => { Graph.nodes[id].remove(); }, a);
+    await page.waitForFunction((id) => !(id in Graph.nodes), a, { timeout: 5000 });
+
+    const state = await page.evaluate(([ua, ub, doomed, survivor]) => ({
+        aInGraph: ua in Graph.nodes,
+        bInGraph: ub in Graph.nodes,
+        doomedInDom: doomed.isConnected,
+        survivorInDom: survivor.isConnected,
+        edgesLeft: Object.keys(Graph.edges).length,
+    }), [a, b, doomedCard, survivorCard]);
+
+    assert.equal(state.aInGraph, false, 'deleted node left Graph.nodes');
+    assert.equal(state.doomedInDom, false, 'its window left the DOM');
+    assert.equal(state.edgesLeft, 0, 'the edge went with it');
+    assert.equal(state.bInGraph, true, 'the neighbour survives in the model');
+    assert.equal(state.survivorInDom, true, 'the neighbour keeps its window');
 });

@@ -12,10 +12,18 @@
 // auto-discovers `**/*.test.js`) never launches a browser. They run only through
 // here, one at a time -- headless Chromium is heavy and serial is the reliable
 // default for an eval you want to trust.
+//
+// The scratch port has one consequence worth knowing before adding a spec that
+// needs the backend: `http://localhost:8999` is hardcoded in the CORS allowlist
+// (`localhost_servers/start_servers.js`) and as `defaultNeuriteUrl` in the
+// automation server. A proxied AI call from port 9123 therefore fails as a CORS
+// error that names no port. A spec that needs the gateway has to add its port to
+// that allowlist; the specs here stay off the network instead.
 import { spawn } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { chromium } from 'playwright';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = dirname(here);                       // the worktree/checkout root
@@ -32,6 +40,16 @@ const specs = readdirSync(specDir)
 
 if (specs.length === 0) {
     console.error('No specs found in test-e2e/specs/*.e2e.mjs');
+    process.exit(1);
+}
+
+// `npm install` brings the playwright package but not the browser it drives, and
+// the browser lives outside the checkout (~/Library/Caches/ms-playwright), so a
+// fresh machine has the package and no Chromium. Checked once here: without this
+// every spec file fails separately on its own launch, and the reason scrolls away
+// above the last failure.
+if (!existsSync(chromium.executablePath())) {
+    console.error('[e2e] Chromium is missing. Install the browser once:\n\n    npx playwright install chromium\n');
     process.exit(1);
 }
 
