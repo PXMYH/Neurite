@@ -213,3 +213,136 @@ test('an arrowhead is a mark, not a shape competing with the notes', async () =>
     assert.ok(ratio.percent < 8,
         `and not dominant: ${ratio.percent.toFixed(1)}% of a card (${ratio.median.toFixed(1)}px of ${ratio.cardW.toFixed(0)}px)`);
 });
+
+// The reviewer's blocker: twelve notes typed into the pane arrived with 9 of 66 card pairs
+// overlapping, the worst by 41% of a card, because the pane's placement puts cards in three
+// x-columns narrower than a card is wide -- so per-arrival separation, which is bracketed by
+// a clamp that keeps the newcomer in view, could never win. The parse now settles the whole
+// graph once, without the clamp: a map is allowed to be bigger than the screen.
+test('a graph typed into the pane arrives without overlapping cards', async () => {
+    await page.evaluate(() => {
+        const notes = [
+            ['Encoding', 'Turning experience into a trace.'],
+            ['Retrieval', 'Finding it again. [[Encoding]]'],
+            ['Consolidation', 'Sleep makes it durable. [[Encoding]] [[Retrieval]]'],
+            ['Forgetting', 'Traces decay. [[Encoding]] [[Retrieval]] [[Consolidation]]'],
+            ['Interference', 'Old competes with new. [[Forgetting]] [[Retrieval]]'],
+            ['Working Memory', 'A small live buffer. [[Encoding]]'],
+            ['Spacing', 'Gaps beat cramming. [[Consolidation]] [[Forgetting]]'],
+            ['Cues', 'A cue finds a trace. [[Retrieval]] [[Encoding]] [[Spacing]]'],
+            ['Schema', 'Old knowledge shapes new. [[Encoding]]'],
+            ['Sleep', 'Where consolidation happens. [[Consolidation]]'],
+            ['Chunking', 'Grouping beats listing. [[Working Memory]] [[Schema]]'],
+            ['Testing Effect', 'Recall beats review. [[Retrieval]] [[Spacing]] [[Cues]]'],
+        ];
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.setValue(notes.map(([t, b]) => `${Tag.node} ${t}\n${b}\n`).join('\n'));
+        cm.refresh();
+    });
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length >= 12, undefined, { timeout: 25000 });
+    // Past ZettelkastenProcessor.relaxDelayMs, which debounces the settle so that typing a
+    // note does not separate the graph once per keystroke.
+    await page.waitForTimeout(1400);
+
+    const state = await page.evaluate(() => {
+        const ns = Object.values(Graph.nodes).filter(n => !n.removed);
+        let worst = Infinity, overlapping = 0, total = 0;
+        for (let i = 0; i < ns.length; i++) {
+            for (let j = i + 1; j < ns.length; j++) {
+                const a = Graph.planeHalfExtent(ns[i]), b = Graph.planeHalfExtent(ns[j]);
+                if (!a || !b) continue;
+                total += 1;
+                const dx = Math.abs(ns[i].pos.x - ns[j].pos.x), dy = Math.abs(ns[i].pos.y - ns[j].pos.y);
+                const r = Math.max(dx / (a.hw + b.hw), dy / (a.hh + b.hh));
+                if (r < 1) overlapping += 1;
+                worst = Math.min(worst, r);
+            }
+        }
+        return { count: ns.length, overlapping, total, worst };
+    });
+    assert.ok(state.count >= 12, `twelve notes exist, got ${state.count}`);
+    assert.equal(state.overlapping, 0,
+        `no pair overlaps on arrival; ${state.overlapping} of ${state.total} did, worst ${state.worst.toFixed(4)}`);
+});
+
+// Fit has to leave nothing behind an opaque island, not merely inside the viewport. Two of
+// my own arithmetic errors showed up here: a corner island was charged as a full-width band
+// (so Fit over-reserved and wasted two thirds of the width), and then the axis reduction
+// used `min` where both axes have to be satisfied, which under-reserved and put cards back
+// under the toolbar.
+test('Fit leaves no card off screen and none behind the chrome', async () => {
+    for (const t of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']) await addNote(page, t, `Body of ${t}.`);
+    await page.waitForTimeout(900);
+
+    for (const size of [{ width: 1600, height: 1000 }, { width: 1280, height: 800 }, { width: 1024, height: 700 }]) {
+        await page.setViewportSize(size);
+        await page.waitForTimeout(250);
+        await page.click('.hud-btn[data-act="fit"]');
+        await page.waitForTimeout(500);
+
+        const state = await page.evaluate(() => {
+            const chrome = [...document.querySelectorAll('.tool-bar, .menu-button, .hud-panel')]
+                .map(e => e.getBoundingClientRect()).filter(b => b.width);
+            const hits = (a, b) => !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+            const boxes = Object.values(Graph.nodes).filter(n => !n.removed)
+                .map(n => n.view.div.getBoundingClientRect()).filter(b => b.width);
+            return {
+                cards: boxes.length,
+                offscreen: boxes.filter(b => b.left < 0 || b.top < 0 || b.right > window.innerWidth || b.bottom > window.innerHeight).length,
+                behindChrome: boxes.filter(b => chrome.some(c => hits(b, c))).length,
+            };
+        });
+        assert.equal(state.offscreen, 0, `nothing off screen at ${size.width}x${size.height}`);
+        assert.equal(state.behindChrome, 0, `nothing behind chrome at ${size.width}x${size.height}`);
+    }
+    await page.setViewportSize({ width: 1600, height: 1000 });
+});
+
+// A control that describes something the app does not do. `#button-fullscreen` announced
+// itself as "fullscreen" beside a maximize glyph, and its handler moves the camera to the
+// card -- it has never resized it, and `style.width` is unchanged after pressing it.
+test('the card buttons say what they do', async () => {
+    const uuid = await addNote(page, 'Labelled', 'body');
+    await page.waitForTimeout(500);
+
+    const labels = await page.evaluate((id) => {
+        const div = Graph.nodes[id].view.div;
+        return ['button-collapse', 'button-fullscreen', 'button-delete'].map(bid => {
+            const b = div.querySelector('#' + bid);
+            return { bid, label: b?.getAttribute('aria-label'), tooltip: b?.getAttribute('data-tooltip') };
+        });
+    }, uuid);
+
+    for (const l of labels) {
+        assert.ok(l.label && l.label.length > 4, `${l.bid} has a real name, got "${l.label}"`);
+        assert.ok(l.tooltip && l.tooltip.length > 10, `${l.bid} has a tooltip, got "${l.tooltip}"`);
+    }
+    const fs = labels.find(l => l.bid === 'button-fullscreen');
+    assert.doesNotMatch(fs.label, /fullscreen/i, 'it no longer claims to make the card fullscreen');
+    assert.match(fs.tooltip, /view/i, 'and says it moves the view');
+
+    // And the behaviour it now describes is what happens: the camera moves, the card does not.
+    const before = await page.evaluate((id) => ({
+        width: Graph.nodes[id].view.div.style.width, zoom: Graph.zoom.mag(),
+    }), uuid);
+    const btn = await page.evaluateHandle((id) => Graph.nodes[id].view.div.querySelector('#button-fullscreen'), uuid);
+    await btn.asElement().click();
+    await page.waitForTimeout(900);
+    const after = await page.evaluate((id) => ({
+        width: Graph.nodes[id].view.div.style.width, zoom: Graph.zoom.mag(),
+    }), uuid);
+    assert.equal(after.width, before.width, 'the card was not resized');
+    assert.notEqual(after.zoom, before.zoom, 'the view moved');
+});
+
+// Escape closes a modal. Nothing did: the close control is a non-focusable span, and the
+// menu's Escape handler yields to an open modal on the assumption the modal takes the key.
+test('Escape closes a modal', async () => {
+    await page.click('#nodeSearchButton');
+    await page.waitForFunction(() => !!Modal.current, undefined, { timeout: 5000 });
+
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !Modal.current, undefined, { timeout: 5000 });
+    const shown = await page.evaluate(() => getComputedStyle(Modal.div).display);
+    assert.equal(shown, 'none', 'the modal is hidden');
+});

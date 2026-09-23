@@ -66,6 +66,15 @@ function loadProcessor(extra = {}){
         // overwritten on the next pass. An empty object is the right double: nothing has
         // been recorded, which is the case these tests are about.
         Graph: {edgeDirectionalities: {}},
+        // Timers, because `processInput` ends by scheduling a debounced graph-wide overlap
+        // relaxation and the sandbox has no globals of its own. Deliberately inert rather
+        // than real: these tests are about what one parse does to nodes and edges, and a
+        // relaxation that fired inside them would move positions they do not assert and
+        // would need a `Graph.relaxOverlaps` double to be written as well. The scheduling
+        // being called at all is what matters here; that it does the right thing is covered
+        // in test-e2e/specs/09-gestures.e2e.mjs against a real graph.
+        setTimeout: ()=>0,
+        clearTimeout: ()=>{},
         Logger: {debug(){}, info(){}, warn(){}, err(){}},
         // `update` as well as the `ofNode` the slice defines for itself. The real one
         // (globals.js:652) assigns `.value` and then dispatches `change`, which is how

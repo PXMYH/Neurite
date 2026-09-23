@@ -153,6 +153,29 @@ Modal.close = function () {
 
 On.click(Modal.btnClose, Modal.close);
 
+// Escape closes a modal, and the nested explanation overlay first.
+//
+// Nothing did. The close control is a `<span class="close">` with no tabindex, no role and
+// `&times;` as its whole accessible name, so it cannot be reached by keyboard -- and the
+// menu's own Escape handler yields to an open modal (`dropdown.js:246`, `if (Modal.current)
+// return`) on the assumption that the modal would take the key. Neither of them did, so
+// with a modal open Escape did nothing at all and the only way out was a mouse click on a
+// non-focusable span. Both adversarial reviews found it independently.
+//
+// The overlay goes first because it is the inner layer: a reader who opened an explanation
+// on top of a modal means the explanation when they press Escape once.
+On.keydown(window, (e)=>{
+    if (e.key !== 'Escape') return;
+    if (Modal.overlay?.style.display === 'block') {
+        Modal.closeOverlay();
+        e.stopPropagation();
+        return;
+    }
+    if (!Modal.current) return;
+    Modal.close();
+    e.stopPropagation();
+});
+
 Modal.openOverlay = function (explanationId) {
     const explanationContent = Elem.byId(explanationId);
     if (!explanationContent) {

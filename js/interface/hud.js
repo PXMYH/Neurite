@@ -246,6 +246,7 @@ class Hud {
 
         Autopilot.stop();
         Graph.pan_set(new vec2((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2));
+        Hud.centreOnUsableRect();
 
         // |zoom| is the half-width of the view, and the viewport is square in plane
         // terms, so the half-span of the larger axis is what has to fit.
@@ -259,6 +260,38 @@ class Hud {
         Hud.setZoomMag(Math.max(half * Hud.chromeMargin(), 1e-12));
     }
 
+    // Offset the pan so the graph is centred in the space the chrome leaves, rather than in
+    // the viewport.
+    //
+    // Opening the view up by the chrome's share is only half of fitting: the chrome is not
+    // symmetric -- a tool island at the top centre, a menu button top left, an overview
+    // bottom left -- so a graph centred in the viewport still sits partly under the top
+    // island while empty space goes unused at the bottom. Called after the zoom is set,
+    // because the conversion from screen pixels to plane units depends on it.
+    static centreOnUsableRect(){
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const rect = Hud.usableRect();
+        if (!rect) return;
+
+        // The usable rect's centre, in screen pixels, against the viewport's.
+        const dxPx = (rect.left + rect.right) / 2 - vw / 2;
+        const dyPx = (rect.top + rect.bottom) / 2 - vh / 2;
+        if (!dxPx && !dyPx) return;
+
+        // Screen pixels to plane units at the current zoom. The graph has to move the
+        // opposite way from the space, so the pan moves with it.
+        const perPx = 2 * Graph.zoom.mag() / Svg.windowScale();
+        Graph.pan_set(new vec2(Graph.pan.x - dxPx * perPx, Graph.pan.y - dyPx * perPx));
+    }
+
+    // The part of the viewport no island is sitting on, in screen pixels.
+    static usableRect(){
+        const vw = window.innerWidth, vh = window.innerHeight;
+        if (!vw || !vh) return null;
+        const {top, bottom, left, right} = Hud.chromeInsets();
+        return {top, left, right: vw - right, bottom: vh - bottom};
+    }
+
     // How much bigger the view has to be for the chrome not to cover the edges of it.
     // Measured from the islands themselves rather than assumed, so moving one or adding
     // another keeps Fit honest.
@@ -266,21 +299,54 @@ class Hud {
         const vw = window.innerWidth, vh = window.innerHeight;
         if (!vw || !vh) return 1.1;
 
+        const {top, bottom, left, right} = Hud.chromeInsets();
+        const usableH = Math.max(vh - top - bottom, vh * 0.3);
+        const usableW = Math.max(vw - left - right, vw * 0.3);
+
+        // max, not min. Both axes have to be satisfied, so the binding one is whichever
+        // needs the *most* room -- taking the minimum reserved enough for the easier axis
+        // and left cards behind the chrome on the other. It passed before only because the
+        // over-charging this replaced inflated both ratios past the point where the
+        // difference showed.
+        return Math.max(vh / usableH, vw / usableW) * 1.06;
+    }
+
+    // How many screen pixels each edge of the viewport is covered by chrome.
+    static chromeInsets(){
+        const vw = window.innerWidth, vh = window.innerHeight;
         let top = 0, bottom = 0, left = 0, right = 0;
         for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel')) {
             const b = el.getBoundingClientRect();
             if (!b.width || !b.height) continue;
-            // Only the edge each island is anchored to matters; an island in the middle
-            // of the viewport is not something Fit can zoom around.
-            if (b.top < vh / 2) top = Math.max(top, b.bottom);
-            else bottom = Math.max(bottom, vh - b.top);
-            if (b.left < vw / 2) left = Math.max(left, b.right);
-            else right = Math.max(right, vw - b.left);
+
+            // An island only costs an edge the space it actually spans. This used to add
+            // every island to both a horizontal and a vertical band, so the 194x196 HUD in
+            // the bottom-left corner was charged as a full-width bottom band AND a
+            // full-height left band -- margin 1.7418, and at 1024x700 the graph was given
+            // 36.5% of the width with 650px unused. A corner island blocks a corner.
+            const spansWidth = b.width / vw;
+            const spansHeight = b.height / vh;
+            if (spansWidth >= 0.5) {
+                if (b.top < vh / 2) top = Math.max(top, b.bottom);
+                else bottom = Math.max(bottom, vh - b.top);
+            }
+            if (spansHeight >= 0.5) {
+                if (b.left < vw / 2) left = Math.max(left, b.right);
+                else right = Math.max(right, vw - b.left);
+            }
+            // Neither: a corner or edge island. Charge it to whichever edge it is nearer,
+            // which is the one a card would actually be hidden behind.
+            if (spansWidth < 0.5 && spansHeight < 0.5) {
+                const fromTop = b.top, fromBottom = vh - b.bottom;
+                const fromLeft = b.left, fromRight = vw - b.right;
+                const nearest = Math.min(fromTop, fromBottom, fromLeft, fromRight);
+                if (nearest === fromTop) top = Math.max(top, b.bottom);
+                else if (nearest === fromBottom) bottom = Math.max(bottom, vh - b.top);
+                else if (nearest === fromLeft) left = Math.max(left, b.right);
+                else right = Math.max(right, vw - b.left);
+            }
         }
-        const usableH = Math.max(vh - top - bottom, vh * 0.3);
-        const usableW = Math.max(vw - left - right, vw * 0.3);
-        // The smaller axis is the binding one, plus a little air.
-        return Math.min(vh / usableH, vw / usableW) * 1.06;
+        return {top, bottom, left, right};
     }
 
     static home(){
@@ -297,9 +363,13 @@ class Hud {
     // state where a note cannot be read at all. Both halves of a pair move equally here
     // because no card is the newcomer.
     static tidy(){
-        const moves = Graph.relaxOverlaps({bias: 0.5});
-        Logger.info('Tidy resolved', moves, 'overlaps');
-        return moves;
+        // `relaxOverlaps` returns passes, not pairs -- it resolves the deepest pair each
+        // pass and re-measures, so one overlapping pair can take many passes. The log said
+        // "Tidy resolved 384 overlaps" for nine, which is a number a reader would have had
+        // to be wrong about on purpose.
+        const passes = Graph.relaxOverlaps({bias: 0.5});
+        Logger.info('Tidy settled the graph in', passes, 'passes');
+        return passes;
     }
 
     // Rescale without touching rotation. `zoom` is one complex number carrying both,

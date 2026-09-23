@@ -22,6 +22,24 @@ class NodeView {
         };
     }
 
+    // What each card button is called, and what it does, in the words a reader needs.
+    //
+    // The name used to be derived from the id, which made `#button-fullscreen` announce
+    // itself as "fullscreen" next to a Lucide `maximize` glyph -- and its handler is
+    // `Autopilot.zoomToFitFrame(node)` plus a jump to the note in the pane. It moves the
+    // camera to the card; it has never resized the card, and `style.width` is unchanged
+    // after pressing it. So the control was describing something the app does not do, and
+    // pressing it a second time appeared to do nothing because the camera was already
+    // there.
+    //
+    // The glyph stays -- "fit this to the view" is what a maximize mark means in a canvas
+    // tool -- and the words now match the behaviour.
+    static buttonNames = {
+        'button-collapse': {label: 'Collapse note', tooltip: 'Collapse this note to a circle'},
+        'button-fullscreen': {label: 'Zoom to note', tooltip: 'Move the view to this note, and show it in the notes pane'},
+        'button-delete': {label: 'Delete note', tooltip: 'Delete this note and its text'},
+    };
+
     static windowify(title, content, node, nscale_mult = 1, intrinsicScale = 1){
         const odiv = node.content;
         const div = Html.make.div('window');
@@ -560,8 +578,16 @@ class NodeView {
         // so `addSvgButton` callers are covered without touching their signature.
         btn.setAttribute('tabindex', '0');
         btn.setAttribute('role', 'button');
+        const named = NodeView.buttonNames[btn.id];
         if (!btn.hasAttribute('aria-label')) {
-            btn.setAttribute('aria-label', btn.id.replace(/^button-/, '').replace(/-/g, ' '));
+            btn.setAttribute('aria-label',
+                named?.label ?? btn.id.replace(/^button-/, '').replace(/-/g, ' '));
+        }
+        // Every other control in the app has a hover tooltip; these three had only an
+        // aria-label, so what they do was available to a screen reader and not to a
+        // reader looking at them.
+        if (named?.tooltip && !btn.hasAttribute('data-tooltip')) {
+            btn.setAttribute('data-tooltip', named.tooltip);
         }
 
         const onMouseLeave = () => {

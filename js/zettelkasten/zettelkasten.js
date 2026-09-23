@@ -59,6 +59,11 @@ TextArea.ofNode = function(node){
 }
 
 class ZettelkastenProcessor {
+    // How long after the last parse to separate the graph. Long enough that typing a
+    // note does not trigger one per keystroke, short enough that a reader who pastes a
+    // page of notes sees them settle rather than wondering whether it finished.
+    static relaxDelayMs = 400;
+
     // What a pass over the editor's text should do. `full` reparses every node's
     // body instead of only the node whose line changed; `restoring` binds a title
     // to the node that already carries it instead of spawning a new one.
@@ -166,6 +171,30 @@ class ZettelkastenProcessor {
 
         this.prevNoteInputLines = this.noteInputLines;
         this.noteInputLines = [];
+
+        this.scheduleRelax();
+    }
+
+    // Separate the whole graph once a pass has stopped arriving.
+    //
+    // Per-arrival separation cannot win against the placement here. A pane parse puts
+    // cards in three x-columns -- measured at x = -0.595, -0.5 and +0.595 -- while a card
+    // is 0.696 plane units wide, so neighbouring columns overlap by nearly a full card and
+    // only the y-gaps keep them apart. Twelve notes typed into the pane arrived with 9 of
+    // 66 pairs overlapping, the worst by 41% of a card, which is the first thing a reader
+    // sees of their own graph.
+    //
+    // Deliberately without `keepInView`. That clamp is right for one note a reader just
+    // made -- it has to be visible -- and wrong for a whole graph: twelve cards cannot
+    // both fit the viewport and stay clear of each other, so the clamp wins and the pile
+    // survives. A map is allowed to be larger than the screen. That is what Fit, the
+    // overview and the scale readout are for.
+    //
+    // Debounced, because a parse runs on every CodeMirror change: typing a note fires this
+    // once per keystroke, and separating the graph on each one would fight the caret.
+    scheduleRelax(){
+        clearTimeout(this.relaxTimer);
+        this.relaxTimer = setTimeout(()=>{ Graph.relaxOverlaps() }, ZettelkastenProcessor.relaxDelayMs);
     }
 
     processLine(line, index, currentNodeTitle){
