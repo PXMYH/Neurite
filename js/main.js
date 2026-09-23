@@ -163,6 +163,7 @@ class App {
         this.viewGraphs.init();
         this.zetPanes.init();
         ZetPath.init();
+        Hud.init();
         loadControls();
         updateSettingsFromControls();
         updateSavedViewsCache();
@@ -218,6 +219,10 @@ class PageLoad {
         'js/mandelbrot/mandelbrot.js',
         'js/mandelbrot/updatefractal.js',
         'js/interface/interface.js',
+        // After interface.js, which defines Autopilot -- the Hud stops it before
+        // moving the camera, so a click on the overview is not fought by a chase
+        // already in progress.
+        'js/interface/hud.js',
         'js/interface/handledrop.js',
         'js/interface/dropdown/customui/record/record.js',
         'js/interface/dropdown/customui/rightclick/customcontextmenu.js',

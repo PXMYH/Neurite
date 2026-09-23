@@ -76,8 +76,29 @@ class vec2 {
     crecip(){
         // 1/(a+bi) = (a-bi)/mag2
 //        return this.cconj().unscale(this.mag2());
-        const mag2 = this.mag2();
-        return new vec2(this.x / mag2, -this.y / mag2);
+        //
+        // Scaled by the larger component instead of divided by mag2, which throws
+        // away half the exponent range: x*x + y*y underflows to 0 while x and y are
+        // still perfectly representable, and then this returns Infinity and every
+        // cdiv downstream returns NaN. Measured, the old form died at
+        // |z| = 1.57e-162 -- at which point fromZtoUV goes NaN, so every card hides
+        // and every edge stops drawing. Doubles reach 5e-324, and Smith's method
+        // gets most of that back for two extra divides.
+        //
+        // This is on the deep-zoom path: cdiv is how fromZtoUV and xyToZ divide by
+        // Graph.zoom, so it is the hard floor on how far the canvas can zoom before
+        // the graph disappears rather than merely losing precision.
+        const ax = Math.abs(this.x), ay = Math.abs(this.y);
+        if (ax === 0 && ay === 0) return new vec2(Infinity, Infinity);
+
+        if (ax >= ay) {
+            const r = this.y / this.x;              // |r| <= 1, so r*r cannot overflow
+            const d = this.x + this.y * r;          // == mag2 / x, without forming mag2
+            return new vec2(1 / d, -r / d);
+        }
+        const r = this.x / this.y;
+        const d = this.x * r + this.y;
+        return new vec2(r / d, -1 / d);
     }
     cdiv(o){ return this.cmult(o.crecip()) }
     cpow(o){

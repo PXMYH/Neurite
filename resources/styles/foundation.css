@@ -224,6 +224,88 @@ textarea.title-input {
     color: rgba(255, 255, 255, 0.70);
 }
 
+/* The orientation panel.
+
+   Same material as the tool island, because it is the same kind of thing: chrome
+   resting on the canvas. It sits inside `.dropdown`, whose children are the only
+   ones with canvas gestures stop-propagated for them, and `.dropdown` is
+   `pointer-events: none` with each island opting back in. */
+.hud-panel {
+    /* absolute, not fixed. `body` is transformed (styles.css:140), so a fixed
+       element resolves against that transform rather than the viewport and lands off
+       screen -- which is the same trap the comment on `.dropdown` records, and why
+       that layer sizes itself 100vw x 100dvh instead of using `inset: 0`. Being
+       absolute inside that layer is what puts this where the reader can see it. */
+    position: absolute;
+    bottom: var(--space-4);
+    left: var(--space-4);
+    z-index: var(--z-hud);
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    background: var(--ui-chrome);
+    border: 1px solid var(--ui-chrome-border);
+    border-radius: var(--ui-radius);
+    box-shadow: var(--ui-chrome-shadow);
+}
+
+.hud-map {
+    display: block;
+    border-radius: var(--radius-sm);
+    /* Darker than the island so the overview reads as a window onto the canvas
+       rather than another panel surface. */
+    background: #14141a;
+    cursor: crosshair;
+}
+
+.hud-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.hud-scale {
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    color: var(--ui-chrome-text-strong);
+}
+
+.hud-count {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.hud-actions {
+    gap: var(--space-1);
+}
+
+.hud-btn {
+    flex: 1;
+    min-height: var(--hit-min);
+    padding: 0 var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--ui-chrome-text);
+    background: transparent;
+    border: 1px solid var(--ui-chrome-rule);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color var(--ui-transition), color var(--ui-transition);
+}
+
+.hud-btn:hover {
+    background: var(--ui-chrome-hover);
+    color: var(--ui-chrome-text-strong);
+}
+
+.hud-btn:focus-visible {
+    outline: 2px solid var(--ui-accent);
+    outline-offset: -2px;
+}
+
 /* A light-theme leftover that was forced into the dark editor with !important at
    z-index 1000: a white block with a #ccc border and black line numbers, sitting
    inside the note body. */

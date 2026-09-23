@@ -269,8 +269,17 @@ class Graph {
     }
     applyRotationDelta(angle) {
         const delta = new vec2(Math.cos(angle), Math.sin(angle));
-        this.rotation = this.rotation.cmult(delta);
-        return delta;
+
+        // Renormalised, because the caller multiplies `zoom` by this and `zoom`
+        // carries the zoom level in its magnitude. cos^2 + sin^2 is 1 only to
+        // rounding, so every rotation frame nudged the magnitude by about an ulp --
+        // meaning holding Alt and turning the canvas slowly changed how far in it
+        // was zoomed, drifting in whichever direction the rounding went.
+        const mag = delta.mag();
+        const unit = (mag > 0) ? delta.unscale(mag) : new vec2(1, 0);
+
+        this.rotation = this.rotation.cmult(unit);
+        return unit;
     }
     vecToZ(c = this.mousePos){
 //        Svg.updateScaleAndOffset();
