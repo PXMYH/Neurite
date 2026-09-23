@@ -156,20 +156,31 @@ ZetPath.options = {
     default: {
         // Shared Defaults
         pathLength: 64, // Default for "Number of Nodes" slider
-        scale: 0.8, // Default for "Node Size" slider
+        scale: 1, // Default for "Node Size" slider; see the per-style note below
         nodeSpacing: 1,
 
+        // `scale` is the factor each generation is multiplied by, so anything under 1
+        // compounds: Radial's 0.8 made the twentieth note 0.8^19 of the first. A floor in
+        // NodePlacementStrategy stops that reaching a quarter of a pixel, but a floor still
+        // leaves a size gradient -- measured at up to 1.8x between the largest and smallest
+        // note in one graph, which reads as some notes mattering more than others when all
+        // that differs is the order they were written in.
+        //
+        // 1 by default, so notes typed into the pane come out the same size and a graph can
+        // be scanned. The decay is still there for anyone who wants it: this is the "Node
+        // Size" slider's default position, not a removed capability, and Spiral has always
+        // been 1.
         Branching: {
             factor: 4,
             pathDistance: 1,
             pathLength: 64,
-            scale: 0.98
+            scale: 1
         },
         Radial: {
             depth: 8,
             pathDistance: 5,
             pathLength: 64,
-            scale: 0.8
+            scale: 1
         },
         Spiral: {
             curl: 0.2,
