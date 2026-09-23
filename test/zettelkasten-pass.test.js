@@ -61,6 +61,11 @@ function loadProcessor(extra = {}){
         Tag: {node: '##', ref: '[['},
         LLM_TAG: 'AI:',
         Node: {byTitle: ()=>null},
+        // `handleRefTags` reads `Graph.edgeDirectionalities` before giving a ref's edge a
+        // direction, so that a direction a reader set or deliberately cleared is not
+        // overwritten on the next pass. An empty object is the right double: nothing has
+        // been recorded, which is the case these tests are about.
+        Graph: {edgeDirectionalities: {}},
         Logger: {debug(){}, info(){}, warn(){}, err(){}},
         // `update` as well as the `ofNode` the slice defines for itself. The real one
         // (globals.js:652) assigns `.value` and then dispatches `change`, which is how

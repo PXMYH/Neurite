@@ -543,7 +543,31 @@ class ZettelkastenProcessor {
             }
             if (currentEdges.has(refUUID)) return;
 
-            currentEdges.set(refUUID, connectDistance(thisNode, wrapPerTitle[reference].node));
+            const target = wrapPerTitle[reference].node;
+            const edge = connectDistance(thisNode, target);
+            currentEdges.set(refUUID, edge);
+
+            // A reference has a direction, so the edge it makes should show one.
+            //
+            // `[[X]]` written inside a note means this note points at X; that is the
+            // whole relation a Zettelkasten is built out of. Every edge the sync made was
+            // undirected, and EdgeView.draw hides the arrowhead outright when
+            // `directionality.start && directionality.end` is false (edgeclass.js:191) --
+            // measured with 15 edges live: 15 arrow elements, 0 displayed. A directed
+            // graph was drawing no direction at all, and the arrowhead's colour was
+            // being adjusted on an element with `display: none`.
+            //
+            // Only when the edge has no direction recorded yet. `Graph.edgeDirectionalities`
+            // is keyed by edge and persists, and clicking an edge cycles it through
+            // A-to-B, B-to-A and none (edgeclass.js:66), so a reader who has set or
+            // cleared a direction keeps it -- including deliberately clearing it.
+            // Guarded on the field, not just on the edge: connectDistance can hand back an
+            // edge that already existed, or nothing at all when the two notes cannot be
+            // joined, and neither is a reason to throw inside a parse pass.
+            if (edge?.directionality && !Graph.edgeDirectionalities[edge.edgeKey]) {
+                edge.directionality.start = thisNode;
+                edge.directionality.end = target;
+            }
         });
         if (unresolved) this.deferRefTags(references, currentNodeTitle);
     }

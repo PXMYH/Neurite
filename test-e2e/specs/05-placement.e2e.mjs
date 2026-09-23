@@ -38,8 +38,14 @@ test('a new AI note lands inside the viewport', async () => {
     assert.ok(v > 0 && v < 1, `vertically in view, got v=${v.toFixed(3)}`);
 });
 
+// Ten, not five. Five notes can be separated by moving only the newest one; ten cannot
+// -- a card arriving into a cluster of three has no free direction and settles on top of
+// one of them, which is how a real graph ended up with several cards more than half
+// occluded. The relaxation moves whatever pair is worst, so this is the count that tells
+// the difference.
 test('notes created in a row do not land on top of each other', async () => {
-    for (const t of ['One', 'Two', 'Three', 'Four', 'Five']) {
+    for (const t of ['One', 'Two', 'Three', 'Four', 'Five',
+                     'Six', 'Seven', 'Eight', 'Nine', 'Ten']) {
         await addNote(page, t, `Body of ${t}.`);
     }
     // Placement settles twice: once on the frame the card appears, and again after
@@ -65,7 +71,7 @@ test('notes created in a row do not land on top of each other', async () => {
         }
         return { ratio, pair, count: ns.length };
     });
-    assert.equal(worst.count, 5, 'five notes exist');
+    assert.equal(worst.count, 10, 'ten notes exist');
     assert.ok(worst.ratio >= 1,
         `no pair overlaps; tightest was ${worst.pair?.join(' / ')} at ${worst.ratio.toFixed(3)}`);
 });

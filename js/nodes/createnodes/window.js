@@ -134,7 +134,12 @@ class NodeView {
         const settle = ()=>{
             if (Graph.nodes[node.uuid] !== node) return;
             for (let round = 0; round < 3; round++) {
-                Graph.separateOnArrival(node);
+                // Graph-wide, biased towards moving the newcomer. Moving only the new
+                // card cannot clear a pile -- with three cards already on one spot there
+                // is no free direction for it to take, so it lands on top of one of them.
+                // At 0.85 a new note absorbs most of each correction and an arrangement a
+                // reader made is barely touched.
+                Graph.relaxOverlaps({bias: 0.85, favour: node});
                 Graph.keepInView(node);
             }
         };

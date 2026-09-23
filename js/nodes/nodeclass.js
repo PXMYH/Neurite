@@ -328,7 +328,28 @@ class Node {
         }
     }
     onWheel = (e)=>{
-        if (!App.nodeMode) return;
+        // Without Shift, the wheel is the canvas's gesture, not the card's.
+        //
+        // This returned and nothing else happened: the canvas's own wheel listener is
+        // bound to `#svg_bg` (interface.js:124) and a card is not inside it, so the
+        // primary navigation gesture in the app silently did nothing whenever the
+        // pointer was over a note. Measured: ten wheel notches over a card left
+        // `Graph.zoom.mag()` at 0.301194, unchanged. And cards are drawn at full scale
+        // now, so they cover far more of the viewport than they did -- the fraction of
+        // the screen where zooming failed went up with the thing that made them legible.
+        //
+        // A note whose body has more text than fits still scrolls, because that is what
+        // the wheel means inside a scrollable box; the canvas only takes the gesture when
+        // there is nothing to scroll.
+        if (!App.nodeMode) {
+            if (Node.wheelScrollsContent(e)) return;
+            Autopilot.stop();
+            const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
+            performZoom(amount, Graph.vecToZ());
+            regenAmount += Math.abs(e.deltaY);
+            e.preventDefault();
+            return;
+        }
 
         // The same expression the fractal's own zoom uses (interface.js), and for the same
         // reason: `deltaY` is negative when the wheel goes up, so the exponent is negated
@@ -456,6 +477,25 @@ class Node {
         }
         return 'base';
     }
+    // Whether this wheel event belongs to something scrollable under the pointer, in
+    // the direction it is going. A body with more text than fits keeps the wheel; one
+    // already at its end hands it to the canvas, so a short note does not trap the
+    // gesture at all and a long one stops trapping it once it is read to the bottom.
+    static wheelScrollsContent(e){
+        for (let el = e.target; el && el !== document.body; el = el.parentElement) {
+            const canScroll = el.scrollHeight - el.clientHeight > 1;
+            if (!canScroll) continue;
+            const style = getComputedStyle(el);
+            if (!/auto|scroll/.test(style.overflowY)) continue;
+
+            const atTop = el.scrollTop <= 0;
+            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+            if (e.deltaY < 0 && !atTop) return true;
+            if (e.deltaY > 0 && !atBottom) return true;
+        }
+        return false;
+    }
+
     static remove(node){ node.remove() }
     static removeThisEdge(node){
         const index = node.edges.indexOf(this);

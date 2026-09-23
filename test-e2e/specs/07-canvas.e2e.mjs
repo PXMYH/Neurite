@@ -64,6 +64,11 @@ test('complex division reaches the limit of a double, not the square of one', as
 
 test('the screen-to-plane map still resolves at extreme depth', async () => {
     const results = await page.evaluate(() => {
+        // Autopilot writes pan and zoom every frame while it is chasing something
+        // (nodestep.js:40), and a frame can land between setting the zoom and reading the
+        // result -- which is a flaky test rather than a real failure. Stopped first, so
+        // this measures the arithmetic and nothing else.
+        Autopilot.stop();
         const out = [];
         for (const mag of [1e-100, 1e-200, 1e-300]) {
             Graph.pan = new vec2(0, 0);

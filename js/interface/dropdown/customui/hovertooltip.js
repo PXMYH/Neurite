@@ -63,7 +63,30 @@ class HoverTooltip {
         let top = rect.bottom + gap;
         if (top + box.height > window.innerHeight) top = rect.top - box.height - gap;
 
-        elem.style.left = Math.round(left) + 'px';
+        // And then out of the way of whatever the control opened.
+        //
+        // The menu button's own tooltip landed on the menu: below-by-default puts it at
+        // y=64, and the panel's first two rows are Open... at y=81 and Save to... at
+        // y=115, so the two file commands -- the only way in or out of a graph -- were
+        // covered by the hint describing them. At z-index 500 over a panel at `auto`,
+        // hovering the button to find out what it does hid what it does.
+        //
+        // Nudged to the right of the open panel rather than moved above the button: the
+        // button is at the top of the screen, so there is nothing above it, and the
+        // canvas to the panel's right is empty by definition while the panel is open.
+        let adjustedLeft = left;
+        const panel = document.querySelector('.dropdown-content');
+        if (panel) {
+            const p = panel.getBoundingClientRect();
+            const overlaps = p.width > 0
+                && adjustedLeft < p.right && adjustedLeft + box.width > p.left
+                && top < p.bottom && top + box.height > p.top;
+            if (overlaps) {
+                adjustedLeft = Math.min(p.right + gap, window.innerWidth - box.width - gap);
+            }
+        }
+
+        elem.style.left = Math.round(adjustedLeft) + 'px';
         elem.style.top = Math.round(top) + 'px';
     }
 

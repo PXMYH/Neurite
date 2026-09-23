@@ -120,6 +120,80 @@ class Graph {
         }
     }
 
+    // Relax overlaps across the whole graph, not just for one arriving card.
+    //
+    // separateOnArrival moves the new card and nothing else, which cannot resolve a
+    // pile: three cards on one spot leave the newcomer no free direction, so it settles
+    // on top of one of them. Measured with eleven notes -- several more than half
+    // occluded, and because a card surface is 75% alpha, the text of the card behind
+    // reads through the card in front. That is the app's default view once a reader has
+    // a real graph in it, and it was its worst defect.
+    //
+    // `favour` names a card that should absorb most of each correction it is part of --
+    // the arriving note -- and `bias` is how much. Every pair is still examined either
+    // way: restricting the comparison to pairs involving the newcomer left the overlaps
+    // the placement had already created between existing notes untouched, which measured
+    // 0.75 of clear on a ten-note graph however many passes ran. A new note arriving is
+    // the moment to fix the pile it is arriving into.
+    // `passes` is high because each pass resolves exactly one pair -- the deepest -- and
+    // separating one pair inside a cluster creates new overlaps, so a pile of ten needs
+    // far more passes than it has pairs. Measured: 120 passes took a ten-card pile from
+    // 0.01 to 0.68 of clear, and stopped short. It is cheap to raise: the card extents
+    // are measured once up front, so a pass is arithmetic over cached numbers with no
+    // layout read in it.
+    relaxOverlaps({passes = 4000, bias = 0.5, favour = null} = {}){
+        const nodes = Object.values(this.nodes).filter( (n)=>!n.removed );
+        if (nodes.length < 2) return 0;
+
+        const extents = new Map();
+        for (const node of nodes) {
+            const half = this.planeHalfExtent(node);
+            if (half) extents.set(node, half);
+        }
+
+        const margin = 0.06, epsilon = 1e-6;
+        let moves = 0;
+        for (let pass = 0; pass < passes; pass++) {
+            let worst = null;
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const a = nodes[i], b = nodes[j];
+                    const ea = extents.get(a), eb = extents.get(b);
+                    if (!ea || !eb) continue;
+
+                    const dx = a.pos.x - b.pos.x, dy = a.pos.y - b.pos.y;
+                    const overX = (ea.hw + eb.hw) * (1 + margin) - Math.abs(dx);
+                    const overY = (ea.hh + eb.hh) * (1 + margin) - Math.abs(dy);
+                    if (overX <= 0 || overY <= 0) continue;
+
+                    const depth = Math.min(overX, overY);
+                    if (!worst || depth > worst.depth) worst = {a, b, dx, dy, overX, overY, depth};
+                }
+            }
+            if (!worst) return moves;
+
+            const {a, b, dx, dy, overX, overY} = worst;
+            // The card that has to move most is the one the caller named, if any.
+            const aShare = (favour === a) ? bias : (favour === b) ? 1 - bias : 0.5;
+            const along = (overX < overY) ? 'x' : 'y';
+            const push = (along === 'x' ? overX : overY) + epsilon;
+            const sign = Math.sign((along === 'x' ? dx : dy) || 1);
+
+            const shift = (node, amount)=>{
+                node.pos = (along === 'x')
+                    ? new vec2(node.pos.x + amount, node.pos.y)
+                    : new vec2(node.pos.x, node.pos.y + amount);
+                // An anchored card is held to `anchor` by a spring every frame, so moving
+                // `pos` without moving the anchor snaps it straight back.
+                if (node.anchorForce) node.anchor = node.pos;
+            };
+            shift(a, sign * push * aShare);
+            shift(b, -sign * push * (1 - aShare));
+            moves += 1;
+        }
+        return moves;
+    }
+
     // Pull a card back on screen if it arrived, or got pushed, off the edge.
     //
     // A note you just made has to be a note you can see. Two things put one out of

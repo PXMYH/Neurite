@@ -37,6 +37,8 @@ class Hud {
             <div class="hud-row hud-actions">
                 <button type="button" class="hud-btn" data-act="fit"
                         data-tooltip="Fit every note on screen (0)">Fit</button>
+                <button type="button" class="hud-btn" data-act="tidy"
+                        data-tooltip="Push overlapping notes apart, without rearranging the map (T)">Tidy</button>
                 <button type="button" class="hud-btn" data-act="home"
                         data-tooltip="Back to the start: pan 0, zoom 1 (Home)">Home</button>
             </div>`;
@@ -49,6 +51,7 @@ class Hud {
         this.elemCount = panel.querySelector('.hud-count');
 
         On.click(panel.querySelector('[data-act="fit"]'), ()=>Hud.fitAll());
+        On.click(panel.querySelector('[data-act="tidy"]'), ()=>Hud.tidy());
         On.click(panel.querySelector('[data-act="home"]'), ()=>Hud.home());
         this.bindMapDragging();
         this.bindKeys();
@@ -72,9 +75,20 @@ class Hud {
         const hint = Html.make.div('canvas-hint');
         hint.innerHTML = `
             <p class="canvas-hint-lead">Double-click anywhere to write a note</p>
+            <!-- What the app actually does, checked against the handlers rather than
+                 written from memory. This said "Shift + drag a note onto another to link
+                 them", which is not a gesture Neurite has: Shift and mousedown on the
+                 first note arms a link (nodeclass.js:276) and the next mousedown on any
+                 note completes it -- dragging one card onto another moves it and makes no
+                 edge at all. An instruction on an empty canvas is the one piece of text a
+                 reader has no way to check, so it has to be the true one.
+
+                 Typing the link is the better thing to teach anyway: it is the same act
+                 as writing the note, it survives being wrong, and it is what makes this a
+                 Zettelkasten rather than a diagram. -->
             <p class="canvas-hint-keys">
-                <span><kbd>Shift</kbd> + drag a note onto another to link them</span>
-                <span><kbd>0</kbd> fit &middot; <kbd>Home</kbd> reset &middot; scroll to zoom</span>
+                <span>Write <kbd>[[</kbd>another note's title<kbd>]]</kbd> in a note to link them</span>
+                <span><kbd>0</kbd> fit &middot; <kbd>T</kbd> tidy &middot; <kbd>Home</kbd> reset &middot; scroll to zoom</span>
             </p>`;
         root.appendChild(hint);
         this.hint = hint;
@@ -144,8 +158,11 @@ class Hud {
     // the range they can reason about, and an exponent once they are not.
     static formatMag(mag){
         if (mag < 0.01) return mag.toExponential(1);
-        if (mag < 10) return mag.toFixed(mag < 1 ? 2 : 1);
-        if (mag < 1e5) return Math.round(mag).toLocaleString();
+        // One decimal from here to five figures, with no change of form at 1. It used
+        // to switch to two decimals below 1, so crossing the most-used zoom in the app
+        // reflowed the readout -- x0.97, x1.00, x1.0, x2.1. tabular-nums fixes the width
+        // of a digit, not how many of them there are.
+        if (mag < 1e5) return mag.toFixed(1);
         const exp = Math.floor(Math.log10(mag));
         return (mag / 10 ** exp).toFixed(1) + 'e' + exp;
     }
@@ -159,15 +176,19 @@ class Hud {
         const toMapX = (x)=> (x - frame.cx) * scale + w / 2;
         const toMapY = (y)=> (y - frame.cy) * scale + h / 2;
 
-        // The viewport, drawn first so notes sit on top of it.
+        // The viewport. Its tint goes down first so notes sit on top of it, and its
+        // outline goes on last so the notes cannot bury the one mark that says where the
+        // reader is -- at a zoom where the view is smaller than the cluster, drawing the
+        // outline first meant cards painted straight over it.
         const v = Hud.viewBounds();
         const vx = toMapX(v.minX), vy = toMapY(v.minY);
-        const vw = (v.maxX - v.minX) * scale, vh = (v.maxY - v.minY) * scale;
+        // Floored at 6px. Zoomed in far enough, the view is a fraction of a pixel of the
+        // overview and `Math.round` took it to 0 -- measured at x14, the rectangle was
+        // not drawn at all, so the deeper a reader went the less the overview told them.
+        const vw = Math.max((v.maxX - v.minX) * scale, 6);
+        const vh = Math.max((v.maxY - v.minY) * scale, 6);
         ctx.fillStyle = 'rgba(115, 150, 212, 0.16)';
         ctx.fillRect(vx, vy, vw, vh);
-        ctx.strokeStyle = 'rgba(115, 150, 212, 0.85)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(Math.round(vx) + 0.5, Math.round(vy) + 0.5, Math.round(vw), Math.round(vh));
 
         // One mark per note. Cards are drawn as rectangles where they are big
         // enough to be a shape, and as a dot when they are not -- a graph zoomed
@@ -186,6 +207,11 @@ class Hud {
                 ctx.fill();
             }
         }
+
+        // Last, so it is never painted over.
+        ctx.strokeStyle = 'rgba(160, 190, 240, 0.95)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(Math.round(vx) + 0.5, Math.round(vy) + 0.5, Math.round(vw), Math.round(vh));
     }
 
     // Click or drag anywhere on the overview to go there. Dragging rather than only
@@ -222,16 +248,58 @@ class Hud {
         Graph.pan_set(new vec2((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2));
 
         // |zoom| is the half-width of the view, and the viewport is square in plane
-        // terms, so the half-span of the larger axis is what has to fit. The 1.1
-        // leaves a margin so the outermost cards are not flush with the edge.
+        // terms, so the half-span of the larger axis is what has to fit.
+        //
+        // The margin is what the chrome takes, not a round number. Fit used to leave 10%
+        // and still put cards under the tool island at the top and this panel at the
+        // bottom left -- a card can be inside the viewport and behind something opaque,
+        // which to a reader is the same as not fitting. So the fraction of the viewport
+        // the chrome actually covers is measured and the view is opened up by it.
         const half = Math.max(box.maxX - box.minX, box.maxY - box.minY) / 2;
-        Hud.setZoomMag(Math.max(half * 1.1, 1e-12));
+        Hud.setZoomMag(Math.max(half * Hud.chromeMargin(), 1e-12));
+    }
+
+    // How much bigger the view has to be for the chrome not to cover the edges of it.
+    // Measured from the islands themselves rather than assumed, so moving one or adding
+    // another keeps Fit honest.
+    static chromeMargin(){
+        const vw = window.innerWidth, vh = window.innerHeight;
+        if (!vw || !vh) return 1.1;
+
+        let top = 0, bottom = 0, left = 0, right = 0;
+        for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel')) {
+            const b = el.getBoundingClientRect();
+            if (!b.width || !b.height) continue;
+            // Only the edge each island is anchored to matters; an island in the middle
+            // of the viewport is not something Fit can zoom around.
+            if (b.top < vh / 2) top = Math.max(top, b.bottom);
+            else bottom = Math.max(bottom, vh - b.top);
+            if (b.left < vw / 2) left = Math.max(left, b.right);
+            else right = Math.max(right, vw - b.left);
+        }
+        const usableH = Math.max(vh - top - bottom, vh * 0.3);
+        const usableW = Math.max(vw - left - right, vw * 0.3);
+        // The smaller axis is the binding one, plus a little air.
+        return Math.min(vh / usableH, vw / usableW) * 1.06;
     }
 
     static home(){
         Autopilot.stop();
         Graph.pan_set(new vec2(0, 0));
         Hud.setZoomMag(1);
+    }
+
+    // Push overlapping notes apart, and nothing else.
+    //
+    // Deliberately not a layout: it does not re-arrange the map, choose a shape, or
+    // move anything that was not on top of something. A reader's arrangement is theirs;
+    // the only thing being corrected is cards sitting on each other, which is the one
+    // state where a note cannot be read at all. Both halves of a pair move equally here
+    // because no card is the newcomer.
+    static tidy(){
+        const moves = Graph.relaxOverlaps({bias: 0.5});
+        Logger.info('Tidy resolved', moves, 'overlaps');
+        return moves;
     }
 
     // Rescale without touching rotation. `zoom` is one complex number carrying both,
@@ -262,6 +330,7 @@ class Hud {
 
             switch (e.key) {
                 case '0':    Hud.fitAll(); break;
+                case 't': case 'T': Hud.tidy(); break;
                 case 'Home': Hud.home(); break;
                 case '+': case '=': Hud.zoomBy(1.6); break;
                 case '-': case '_': Hud.zoomBy(1 / 1.6); break;

@@ -179,6 +179,24 @@ textarea.title-input {
     min-height: 72px;
 }
 
+/* A card has one width.
+
+   Measured across fifteen notes of the same type: 330, 344, 377, 384, 404, 423, 483
+   and 702px, with up to 362px of bare card surface down the right of the prose. The
+   `max-width: 340px` above caps the body, and `.window` is `width: fit-content`, so
+   whatever else in the card is widest decides how wide the card is -- and that is the
+   link strip. It is `flex-wrap: wrap` at `width: 100%` (styles.css:666), and a flex
+   line only wraps when something constrains it, so its max-content width -- every chip
+   on one line -- became the card's preferred width. A note with eight links was twice
+   the width of the same note with one.
+
+   So the cap goes on the card, and then the strip wraps inside it. Scoped with :has()
+   to cards that actually hold prose: an image or video card is `fit-content` for a good
+   reason and is left alone. 344px is the 340px column plus the card's own border. */
+.window:has(.editor-wrapper) {
+    max-width: 344px;
+}
+
 /* The card responds to the pointer.
 
    .window declared transitions for box-shadow, background-color and border-color
@@ -197,6 +215,32 @@ textarea.title-input {
     border-color: var(--ui-accent);
 }
 
+/* One ring, not two.
+
+   `.window.selected` adds a `::before` ring in the accent (styles.css:341) on top of the
+   card's own warm border, so a selected card wore a 4px orange-and-blue double edge --
+   and the two measure 1.16:1 against each other, a hue change with no luminance change.
+   Up close it is garish, and at a glance it is not a change at all.
+
+   The card's own border goes transparent while selected, so the accent ring is the whole
+   edge and its contrast is against the canvas (5.2:1) rather than against another
+   border. */
+.window.selected {
+    border-color: transparent;
+}
+
+/* `display: relative` at styles.css:200 is not a value `display` accepts, so it was
+   dropped and the rule did nothing -- it was meant to be `position`. The collapsed disc
+   needs it: its title is absolutely positioned against it, which is why an expanded
+   title at high zoom escaped the disc and crossed the toolbar. */
+.collapsed-circle {
+    position: relative;
+    /* And an edge, at 3:1 against the canvas. The disc was rgb(50 51 62 / 50%) with a
+       transparent border, measuring 1.21:1 -- an invisible target that is the only thing
+       representing a whole note. */
+    border: 1px solid #6f7488;
+}
+
 /* The card header buttons are NOT fixed here, and the reason belongs in the file
    rather than in a commit: each one is a <g> inside a single <svg>
    (resources/svg/icons.html:303), and a <g> has no CSS box model -- min-width,
@@ -210,6 +254,15 @@ textarea.title-input {
 .link-chip {
     background-color: rgba(255, 255, 255, 0.10);
     font-size: var(--text-xs);
+}
+
+/* The label itself, which the comment above named and then did not change -- it was
+   still `paleturquoise`, measured rgb(175, 238, 238). That is a fifth blue in an app
+   that already had four, and it is the text on the one control that says what a note is
+   connected to. The accent's lighter step instead, so a chip belongs to the same family
+   as the edge it stands for. */
+.link-chip-label {
+    color: #b9cdf0;
 }
 
 .link-chip-cut {
@@ -239,7 +292,11 @@ textarea.title-input {
     position: absolute;
     bottom: var(--space-4);
     left: var(--space-4);
-    z-index: var(--z-hud);
+    /* Below the menu, not above it. At 950 against the menu panel's `z-index: auto`
+       this covered two of its rows at 900x600 -- measured, the panel runs to y=486 and
+       this starts at y=394, leaving bare chevrons where Settings and Help should be.
+       An overview of the canvas has no business painting over an open menu. */
+    z-index: var(--z-canvas);
     pointer-events: auto;
     display: flex;
     flex-direction: column;
