@@ -299,9 +299,18 @@ The complete notices and the id-to-icon mapping are in docs/icons.md.
 
 <!-- The base Node-control row keeps the 16-unit optical sizing that the Link
      Node controls use. Each icon paints a 12-unit box, and each group keeps a
-     transparent final rectangle as its pointer target. -->
+     transparent final rectangle as its pointer target.
+
+     Height is 20pt, not the 16pt it was. These are <g> elements, so their size is
+     geometry and no CSS box model reaches them: at 16pt the viewBox's 2.125 units
+     rendered at 10.04 px/unit, making each group's 16-unit target 2 units wide,
+     which is ~20 px -- under the 24 px floor, and shrinking further with the
+     card's own zoom transform. 20pt puts it at ~25 px. The glyph grows with it
+     rather than being re-centred in a bigger box, because the group is one scaled
+     transform and splitting the target from the mark would mean three new
+     elements per card in a save format that is live DOM. -->
 <div id="elements" class="windowbuttons" style="display:none; visibility:hidden;">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 2.125" height="16pt">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 2.125" height="20pt">
         <g id="button-collapse" data-lucide="minimize-2" transform="scale(0.125 0.125) translate(1 1)"
            fill="none" stroke="RGB(170,170,170)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="0" y="0" width="16" height="16" fill="RGB(100,100,100)" stroke="none" />

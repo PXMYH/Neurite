@@ -75,7 +75,66 @@ class NodeView {
         const view = node.view = new NodeView(node);
         view.div = div;
         view.rewindowify();
+
+        // New cards only. A restored graph comes back through `rewindowify`
+        // directly (nodeclass.js:494), never through here, so reopening a saved
+        // map cannot move the positions it was saved with.
+        //
+        // Deferred by one frame because the separation measures the rendered box,
+        // and the card has only just been put in the document -- reading it now
+        // returns a zero-width rect. Guarded on still being in the graph, since a
+        // note typed and deleted inside one frame is a real sequence.
+        Promise.delay(0).then(()=>{
+            if (Graph.nodes[node.uuid] !== node) return;
+
+            NodeView.settlePlacement(node);
+        });
         return view;
+    }
+
+    // Separation and the view clamp, alternated and then repeated once the card has
+    // stopped changing size.
+    //
+    // Alternated because the two can disagree: separation can push a card out of the
+    // viewport and the clamp can pull it back onto a neighbour, so each needs a
+    // chance to answer the other. The clamp goes last on purpose -- if both cannot
+    // hold, a card that slightly overlaps is better than one the reader cannot see.
+    //
+    // Repeated because a card is not its final size on the frame it appears. A note
+    // created with a body gets that body one sync pass later, and the card grows a
+    // line-height per line when it arrives, so a placement computed on the first
+    // frame was measured against a card shorter than the one the reader ends up
+    // looking at -- measured, two notes settled clear and ended up 3% overlapped
+    // after their bodies landed. The second pass is what makes the number true.
+    static settlePlacement(node){
+        const settle = ()=>{
+            if (Graph.nodes[node.uuid] !== node) return;
+            for (let round = 0; round < 3; round++) {
+                Graph.separateOnArrival(node);
+                Graph.keepInView(node);
+            }
+        };
+        settle();
+        Promise.delay(300).then(settle);
+
+        // And then it stays where it was put.
+        //
+        // An unanchored card is carried by the fractal's own gradient --
+        // `applyMandelbrotForce` (nodeclass.js:167) pulls every node along
+        // `Fractal.grad` every frame. Measured on a new note: 19 px of travel per
+        // 250 ms, and it kept going until the card had left the viewport. That is a
+        // fine thing for a map meant to look alive and a bad default for one a
+        // reader is arranging on purpose: you place six notes and come back to find
+        // them somewhere else. It was also masking the placement bugs above -- a
+        // card created off screen drifted into view and looked deliberate.
+        //
+        // So a note arrives pinned, and drift becomes something you ask for:
+        // double-clicking a card still toggles it exactly as before (window.js:279),
+        // which now releases a note to the gradient on the first double-click
+        // instead of stopping it.
+        node.anchor = node.pos;
+        node.anchorForce = 1;
+        node.toggleWindowAnchored(true);
     }
 
     init(){
@@ -593,10 +652,24 @@ class NodeView {
         return g;
     }
 
-    static addAtNaturalScale(node, title, content, window_it = true){
+    // `nscale` is a parameter rather than the constant 0.5 it used to be, because
+    // 0.5 is right for some node types and was making one type unreadable.
+    //
+    // Every card in the app was drawn through a `transform: scale(0.5)`, so a 15px
+    // title rendered at 7.5px. For a note -- which is nothing but prose -- that put
+    // the text below legible at the default view, and it was the stylesheet that
+    // looked at fault rather than the transform. For an Ai node it was doing real
+    // work: that card carries a prompt box, a send button and a settings row, and
+    // at scale 1 it measures 506x611 px, which is a third of the viewport.
+    //
+    // So the default stays 0.5 and the callers that are purely text ask for 1.
+    // `scale` is per-node and round-trips through `toJSON`, so this changes what
+    // new cards get and leaves every already-saved graph at the size it was saved
+    // at. Shift+wheel over a card still overrides it per card, as it always did.
+    static addAtNaturalScale(node, title, content, window_it = true, nscale = 0.5){
         if (window_it) {
             if (!Array.isArray(content)) content = [content];
-            NodeView.windowify(title, content, node, 0.5);
+            NodeView.windowify(title, content, node, nscale);
         } else {
             node.content.appendChild(content);
         }

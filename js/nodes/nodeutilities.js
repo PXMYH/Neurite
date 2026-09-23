@@ -40,6 +40,124 @@ class Graph {
     }
     appendNode(node){ this.htmlNodes.append(node.content) }
 
+    // A card's footprint in plane units. Measured from the rendered box rather
+    // than from `node.scale`, because the width a card ends up with comes from its
+    // content (`.editor-wrapper` is 284px, `.node-textarea` 259px) and not from
+    // any single number the placement code could consult.
+    // An instance method, not a static: the global `Graph` is an instance
+    // (`Graph = new Graph()`, main.js:309), so a static here would be reachable
+    // only through the shadowed class name.
+    planeHalfExtent(node){
+        const box = node.view?.div?.getBoundingClientRect();
+        if (!box || !box.width) return null;
+
+        // Two plane units span min(viewportW, viewportH) screen px at |zoom| = 1,
+        // and `pos` is compared at whatever the live zoom is, so the conversion
+        // has to carry it.
+        const perPx = 2 * this.zoom.mag() / Svg.windowScale();
+        return {hw: box.width * perPx / 2, hh: box.height * perPx / 2};
+    }
+
+    // Push a freshly placed card off any card it landed on.
+    //
+    // Placement is a path walk (ZetPath, four styles, twelve sliders) whose step
+    // length is independent of how big a card actually renders, so the two can
+    // disagree -- measured, four notes created in a row sat 0.745 card-widths
+    // apart, and the node physics does not separate them: the same overlap was
+    // still there after seven seconds.
+    //
+    // This resolves it after the fact instead of adding a second opinion about
+    // where a note belongs, so it holds for every placement style and stays true
+    // if card sizes change again. Separation is along the axis of least
+    // penetration, which is what keeps a row of notes a row instead of scattering
+    // it. Bounded, so a dense graph cannot spin here.
+    separateOnArrival(node, maxPasses = 24){
+        const me = this.planeHalfExtent(node);
+        if (!me) return;
+
+        const margin = 0.08;  // a visible gutter, in fractions of a card
+        const epsilon = 1e-6; // so a resolved pair is strictly clear, not touching
+
+        for (let pass = 0; pass < maxPasses; pass++) {
+            // The single deepest overlap, not every overlap in turn.
+            //
+            // Pushing clear of each neighbour in sequence ping-pongs: clearing A
+            // moves the card into B, clearing B moves it back into A, and with an
+            // even pass count it lands exactly where it started -- measured, two
+            // notes came out of 24 passes at the same coordinates to four decimals
+            // and read as "separation did nothing". Resolving one pair per pass and
+            // re-measuring means every pass strictly reduces the worst overlap.
+            let worst = null;
+            for (const other of Object.values(this.nodes)) {
+                if (other === node || other.removed) continue;
+                const it = this.planeHalfExtent(other);
+                if (!it) continue;
+
+                const dx = node.pos.x - other.pos.x;
+                const dy = node.pos.y - other.pos.y;
+                const needX = (me.hw + it.hw) * (1 + margin);
+                const needY = (me.hh + it.hh) * (1 + margin);
+                const overX = needX - Math.abs(dx);
+                const overY = needY - Math.abs(dy);
+                if (overX <= 0 || overY <= 0) continue;  // clear on one axis already
+
+                // Depth is the smaller of the two, because that is the distance
+                // that actually has to be travelled to separate the pair.
+                const depth = Math.min(overX, overY);
+                if (!worst || depth > worst.depth) worst = {dx, dy, overX, overY, depth, needX};
+            }
+            if (!worst) return;
+
+            const {dx, dy, overX, overY, needX} = worst;
+            if (dx === 0 && dy === 0) {
+                // Exactly coincident: no direction to push along, so pick one.
+                node.pos = new vec2(node.pos.x + needX, node.pos.y);
+            } else if (overX < overY) {
+                node.pos = new vec2(node.pos.x + Math.sign(dx || 1) * (overX + epsilon), node.pos.y);
+            } else {
+                node.pos = new vec2(node.pos.x, node.pos.y + Math.sign(dy || 1) * (overY + epsilon));
+            }
+        }
+    }
+
+    // Pull a card back on screen if it arrived, or got pushed, off the edge.
+    //
+    // A note you just made has to be a note you can see. Two things put one out of
+    // sight: an Ai node's spawn point is a random draw over a range wider than the
+    // viewport (`(random - 0.5) * 1.8` per axis, zettelkasten.js:630), and the
+    // separation above can push a card past the edge while resolving an overlap --
+    // measured at UV -0.3, which is off the left side.
+    //
+    // This used to be hidden rather than absent: an unanchored card drifted along
+    // the fractal gradient, so one created off screen wandered into view on its
+    // own within a second or two. Cards are pinned on arrival now, so the
+    // placement has to be right rather than eventually right.
+    //
+    // Visible beats non-overlapping when the two disagree: an overlap is something
+    // a reader can see and drag apart, and a card outside the viewport is not.
+    keepInView(node, margin = 0.04){
+        const half = this.planeHalfExtent(node);
+        if (!half) return;
+
+        // Work in UV, where the viewport is 0..1 on both axes regardless of zoom,
+        // then convert the correction back through the same transform the renderer
+        // uses rather than a second copy of the algebra.
+        const uv = fromZtoUV(node.pos);
+        const perUvX = 2 * this.zoom.mag();  // plane units per full UV span
+        const halfUvX = half.hw / perUvX;
+        const halfUvY = half.hh / perUvX;
+
+        const lo = margin, hi = 1 - margin;
+        const clamp = (v, h)=> Math.min(Math.max(v, lo + h), Math.max(hi - h, lo + h));
+        const targetU = clamp(uv.x, halfUvX);
+        const targetV = clamp(uv.y, halfUvY);
+        if (targetU === uv.x && targetV === uv.y) return;
+
+        // uv -> z is the inverse of fromZtoUV: ((uv - 0.5) * 2) * zoom + pan.
+        const t = new vec2((targetU - 0.5) * 2, (targetV - 0.5) * 2);
+        node.pos = t.cmult(this.zoom).cadd(this.pan);
+    }
+
     clear(){
         App.selectedNodes.clear();
         this.forEachEdge(this.deleteEdge, this);

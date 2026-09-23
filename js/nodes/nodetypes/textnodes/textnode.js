@@ -24,7 +24,9 @@ class TextNode {
         pythonView.id = 'python-frame';
 
         const node = new Node();
-        const divView = NodeView.addAtNaturalScale(node, name, [textarea]).div;
+        // 1, not the 0.5 default: a note is prose and nothing else, so a half-scale
+        // transform put its 15px type on screen at 7.5px. See addAtNaturalScale.
+        const divView = NodeView.addAtNaturalScale(node, name, [textarea], true, 1).div;
         divView.append(htmlView, pythonView, editorWrapper);
         divView.style.minWidth = '100px';
         divView.style.minHeight = '100px';

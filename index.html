@@ -75,6 +75,14 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>-->
+
+    <!-- Last, on purpose. This is the layer that decides what the app looks like:
+         the typeface, the type and spacing scales, the named layers, and the
+         values that had to move to pass contrast. It supersedes styles.css by
+         source order rather than by editing 5518 lines of recorded reasoning, and
+         it comes after the CodeMirror and Prism themes above so it can also
+         correct the light-theme defaults those ship. -->
+    <link rel="stylesheet" type="text/css" href="./resources/styles/foundation.css">
 </head>
 
 <body id="body">

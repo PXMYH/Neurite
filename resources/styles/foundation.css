@@ -1,0 +1,246 @@
+/* Foundation: the layer that decides what the app looks like.
+
+   This file is loaded after styles.css and only ever adds or supersedes. The
+   token block at the top of styles.css keeps its 130 lines of recorded
+   reasoning; where a value here replaces one there, the reason is written next
+   to it rather than in a commit message.
+
+   Three things it fixes that were measured rather than felt:
+
+   1. The app had no typeface. styles.css:149 asks for "Inter" on the universal
+      selector, and there is no @font-face, no font file in the repository and no
+      font link in index.html -- so every glyph was the platform default and the
+      type identity differed per machine by accident.
+   2. There was no type scale, no spacing scale and no layer scale. 17 ad-hoc
+      font sizes, 48 padding values, 16 raw z-index values.
+   3. --ui-accent measured 3.85:1 on --ui-chrome. The colour that carries focus,
+      selection and hover failed AA on the surface it is used on. */
+
+:root {
+    /* A system-first stack, chosen rather than inherited. Inter stays first so a
+       reader who has it installed still gets the intended face, but the stack no
+       longer depends on a font nobody shipped: ui-sans-serif resolves to SF Pro
+       on macOS and iOS, Segoe UI Variable on Windows 11, and the platform UI
+       face elsewhere. This is deliberately not a webfont -- the app runs from
+       disk and off a localhost server, and a network round trip for the first
+       paint of a canvas tool is a worse trade than a face that varies. */
+    --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+                 Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* ui-monospace gets SF Mono on Apple platforms. The bare `monospace` that
+       .editor-wrapper used resolves to Courier on some systems, which is how a
+       note body could render in a serif slab. */
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                 "Liberation Mono", monospace;
+
+    /* Type scale. Seven steps, ~1.15-1.2 between neighbours, which is the range
+       that reads as one family at UI sizes -- the old set ran 1.09 to 1.45, so
+       some neighbours were indistinguishable and others jumped. */
+    --text-2xs: 10px;   /* a shortcut digit in a tool corner, nothing else */
+    --text-xs:  11px;   /* chips, captions, metadata */
+    --text-sm:  12px;   /* dense controls */
+    --text-base: 13px;  /* the app's default UI size */
+    --text-md:  15px;   /* card body, note prose */
+    --text-lg:  17px;   /* section and card headings */
+    --text-xl:  20px;   /* modal titles */
+    --text-2xl: 25px;   /* a collapsed card's title */
+
+    /* Four weights, because hierarchy was carried entirely by colour before:
+       5518 lines of CSS contained four font-weight declarations. */
+    --weight-normal: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+
+    --leading-tight: 1.25;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.65;
+
+    /* Spacing, 4px base. */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    /* Radii, alongside the existing --ui-radius (8px) and --ui-radius-inner (5px). */
+    --radius-sm: 4px;
+    --radius-pill: 999px;
+
+    /* Named layers. The raw z-index values already in styles.css are left alone;
+       these exist so new work stops inventing numbers. The one constraint worth
+       recording: #invert-filter sits at 2000 with a backdrop-filter, so anything
+       below it is affected by the inversion slider, which is why the tooltip
+       layer is the only thing above it. */
+    --z-canvas: 0;
+    --z-node: 2;
+    --z-chrome: 900;
+    --z-hud: 950;
+    --z-modal: 1000;
+    --z-palette: 1500;
+    --z-tooltip: 2100;
+
+    /* The smallest a pointer target is allowed to be. Measured offenders before
+       this: card header buttons ~20px, slider thumb 10x20, pane resize handles
+       6px, search icon 17px. */
+    --hit-min: 24px;
+
+    /* Accent, raised to pass. #5a7ec0 measured 3.85:1 on --ui-chrome #232329 --
+       below AA for text and below the 3:1 a 1px indicator needs. This value is
+       5.24:1 there and 3.55:1 against the card surface, so it clears AA as
+       chrome text and clears the non-text threshold as a selection ring. It is
+       the same hue; only lightness moved. */
+    --ui-accent: #7396d4;
+    --ui-accent-dim: rgba(115, 150, 212, 0.18);
+    /* A stronger fill for the one place the accent is a surface rather than a
+       line, so text can sit on it. */
+    --ui-accent-solid: #3c5a8f;
+
+    /* Danger, raised the same way. #c0605a measured 2.56:1 on the card surface,
+       so the delete affordance was dimmer than the AA floor for a glyph. */
+    --ui-danger: #e08b84;
+
+    /* Text roles, named. #bbb was hardcoded 48 times as the real body colour
+       while the universal selector claimed #9d9d9d, which then had to be
+       overridden 48 times. */
+    --text-primary: #e8e8ea;
+    --text-secondary: #bbb;
+    --text-muted: #8a8a90;
+    --text-faint: #6c6c76;
+}
+
+/* The typeface, and the end of the 16px-on-everything default.
+
+   This overrides styles.css:148-152 by source order at equal specificity rather
+   than by deleting it, so the original rule and its history stay readable. Only
+   the font is set universally; `color` and `font-size` are deliberately not
+   reset here, because 500-odd rules below that point already depend on the
+   inherited value and changing it globally would be a redesign of every panel
+   at once rather than a foundation. */
+* {
+    font-family: var(--font-sans);
+}
+
+code, pre, kbd, samp, .editor-wrapper, .CodeMirror, .cm-s-default {
+    font-family: var(--font-mono);
+}
+
+/* Type hierarchy on a card. A title and its body were both 16-18px at weight
+   400, so a card had two blocks of text and no heading.
+
+   Both selectors, and both element-qualified, because that is how styles.css:797
+   targets them and the title is a <textarea> whose `font: inherit` shorthand
+   would otherwise win by source order. Cards saved before the textarea change
+   come back as an <input>, so the two have to stay identical. */
+input[type="text"i].title-input,
+textarea.title-input {
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-tight);
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.editable-div, .syntax-display-div {
+    font-size: var(--text-md);
+    line-height: var(--leading-relaxed);
+    /* Positive tracking on body copy was working against legibility; tracking
+       should go to zero or negative as size rises, not up. Both layers are set
+       together because the highlighted overlay has to stay glyph-for-glyph on
+       top of the textarea underneath it. */
+    letter-spacing: 0;
+}
+
+/* The note body spans the card, and stops reserving space it does not need.
+
+   Two independent magic numbers decided a card's shape: `.editor-wrapper` was
+   284px and `.node-textarea` 259px, while the card itself is `width: fit-content`
+   and ends up as wide as its header. The body panel was therefore narrower than
+   the card it sits in, leaving a visible strip of card surface down the right-hand
+   side of every note.
+
+   `align-self: stretch` makes the body span whatever the card turns out to be --
+   .window is a flex column with `align-items: flex-start`, so a child has to opt
+   in. `min-width` keeps the old 284px as the card's intrinsic floor, so nothing
+   collapses to the width of the three header buttons when a title is short.
+
+   min-height was 180px, which gave a one-line note a tall empty box under it. A
+   card now fits its note and grows to the same 320px ceiling as before, which is
+   also what makes the resize handle feel like it is doing something.
+
+   max-width is the other half of dropping the fixed width: with `width: auto` and
+   nothing to stop it, one long unwrapped sentence stretched a card to 1042px --
+   measured. 340px at 15px type is a 45-50 character line, which is inside the
+   range prose is comfortable to read at. */
+.editor-wrapper {
+    align-self: stretch;
+    width: auto;
+    min-width: 284px;
+    max-width: 340px;
+    min-height: 72px;
+}
+
+/* The card responds to the pointer.
+
+   .window declared transitions for box-shadow, background-color and border-color
+   and then had no :hover rule anywhere in 5518 lines, so the app's primary
+   object gave no feedback at all until it was selected. Kept quiet: a card is
+   content, so this lifts the shadow and warms the outline rather than tinting
+   the surface, which is what .selected does. */
+.window:hover:not(.collapsed) {
+    box-shadow: var(--ui-shadow-raised);
+    border-color: #e3aa70;
+}
+
+/* Selection still outranks hover: a hovered selected card keeps its ring and its
+   tint, and only the shadow is shared. */
+.window.selected:hover {
+    border-color: var(--ui-accent);
+}
+
+/* The card header buttons are NOT fixed here, and the reason belongs in the file
+   rather than in a commit: each one is a <g> inside a single <svg>
+   (resources/svg/icons.html:303), and a <g> has no CSS box model -- min-width,
+   padding, border-radius and background-color on it are all no-ops. Their size
+   is SVG geometry, so the fix is in the markup, and their hover colour is
+   repainted from js/globals.js:219-231 onto an inner <rect> rather than coming
+   from CSS at all. */
+
+/* Link chips, made readable. The label was paleturquoise on a 1.20:1 pill, the
+   cut control 2.77:1 and the add control 3.12:1 -- all three below the floor. */
+.link-chip {
+    background-color: rgba(255, 255, 255, 0.10);
+    font-size: var(--text-xs);
+}
+
+.link-chip-cut {
+    color: rgba(255, 255, 255, 0.62);
+}
+
+.link-chip-cut:hover {
+    color: var(--ui-danger);
+}
+
+.link-add {
+    color: rgba(255, 255, 255, 0.70);
+}
+
+/* A light-theme leftover that was forced into the dark editor with !important at
+   z-index 1000: a white block with a #ccc border and black line numbers, sitting
+   inside the note body. */
+.CodeMirror-gutter-wrapper {
+    background: transparent !important;
+    border: none !important;
+}
+
+.CodeMirror-linenumbers,
+.CodeMirror-linenumbers div {
+    color: var(--text-faint) !important;
+}
+
+/* styles.css:3847 reads rgba(0.2, 0.2, 0.2, 0.3) with a comment describing a
+   "transparent blurred dark greyscale". Legacy rgba() takes 0-255 integers, so
+   0.2 rounds to 0 and it renders pure black at 30% alpha. This is the colour the
+   comment was describing. */
+.modal-overlay-content {
+    background-color: rgba(51, 51, 51, 0.3);
+}
