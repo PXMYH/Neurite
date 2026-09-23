@@ -92,6 +92,30 @@ class NodeView {
         return view;
     }
 
+    // Put the caret in a note's body so a reader can start typing.
+    //
+    // Deferred, and retried, because a note created from the notes pane does not
+    // exist yet when the gesture returns: the text is written into CodeMirror and the
+    // sync engine builds the card from it a pass later. So this waits for the card
+    // rather than assuming it, and gives up quietly if the note never arrives.
+    //
+    // The real input is `.editable-div` -- the visible text is a highlighted overlay
+    // above it with `pointer-events: none`, so focusing the overlay would put the
+    // caret nowhere.
+    static focusBodyOf(node, attemptsLeft = 20){
+        if (!node) return;
+        const target = node.contentEditableDiv;
+        if (target) {
+            target.focus();
+            if (typeof target.setSelectionRange === 'function') {
+                const end = target.value?.length ?? 0;
+                target.setSelectionRange(end, end);
+            }
+            return;
+        }
+        if (attemptsLeft > 0) Promise.delay(50).then(()=>NodeView.focusBodyOf(node, attemptsLeft - 1));
+    }
+
     // Separation and the view clamp, alternated and then repeated once the card has
     // stopped changing size.
     //

@@ -1,12 +1,18 @@
-// The Notes tab is gone from the menu, but the markup it loaded is not: `#tab1` still
-// exists and still loads `notestab.html`, because `App.init` builds `ZetPanes` from
-// `#zetPaneContainer` and `openTab` refreshes `currentActiveZettelkastenMirror` on every
-// tab switch. Deleting the div would throw at boot and on every tab click.
+// The Notes tab has a way in again, and this file is what it has to keep true.
 //
-// That makes this removal easy to get half-right in two opposite directions: delete the
-// div and break boot, or delete the tablink and leave the main AI prompt stranded in a
-// tab nobody can open. Both halves are pinned here, together with the reason the div
-// stays -- so that when the reason goes, this test says the div can go with it.
+// It used to assert the opposite. `#tab1` held the notes editor -- the CodeMirror every
+// node is built from -- and had no tablink, so the editor was loaded and unreachable: a
+// reader could edit a note inside its card and never learn the map has a text form at
+// all, which is the idea the app is built on. The comment beside `#tab1` recorded that as
+// an open choice rather than a decision: issue #65 "holds the choice between giving the
+// editor a designed home and deleting it outright". This takes the first branch.
+//
+// What has not changed is why the div cannot simply be deleted, and that is still pinned
+// below: `App.init` builds `ZetPanes` from `#zetPaneContainer`, `openTab` refreshes
+// `currentActiveZettelkastenMirror` on every tab switch, and an AI answer with no target
+// node is streamed into that editor for the sync pass to turn into nodes. The other half
+// of the original change also stands -- the main AI prompt belongs in the Ai tab, not
+// here -- and the test for it is unchanged.
 //
 // Read as text, like settings-tab.test.js: nothing under js/ exports, and the questions
 // here are about which file holds which element and what `dropdown.js` opens.
@@ -62,9 +68,11 @@ const assertViewsFound = ()=> assert.ok(iShowList > 0 && iShowDetail > iShowList
 const tablinks = [...dropdownHtml.matchAll(/onclick="openTab\('(\w+)', this\)"[\s\S]*?class="menu-row-label">([^<]+)</g)]
     .map( (m)=> [m[1], m[2].trim()] );
 
-test('no menu row opens the Notes tab, and the ones left are in a known order', ()=>{
+test('a menu row opens the Notes tab, and the rows are in a known order', ()=>{
+    // Notes first: it is the graph itself, and the rows under it are tools for it.
     assert.deepEqual(tablinks, [
         ['tab4', 'Ai'],
+        ['tab1', 'Notes'],
         ['tab2', 'Fractal'],
         ['tab7', 'Views'],
         ['tab5', 'Settings'],
@@ -82,8 +90,10 @@ test('no menu row opens the Notes tab, and the ones left are in a known order', 
 });
 
 test('the Notes markup still loads, and the reason it has to is still in the source', ()=>{
-    // Invisible, not deleted. If this pair ever stops being true, the div and the
-    // `PageLoad.tabs` entry can go -- that is what this test is for.
+    // The div is load-bearing independently of whether anything opens it, which is why
+    // it survived having no tablink and why it still cannot be deleted now that it has
+    // one. If this pair ever stops being true, the div and the `PageLoad.tabs` entry
+    // could go -- that is what this test is for.
     assert.match(dropdownHtml, /<div id="tab1" class="tabcontent">/,
         'the Notes div is gone; boot reads what loads into it');
     assert.match(read('js/main.js'), /'tab1': 'notestab\.html'/,
@@ -95,9 +105,12 @@ test('the Notes markup still loads, and the reason it has to is still in the sou
         'openTab no longer refreshes the editor, so #tab1 can be deleted outright');
     assert.match(read(NOTES), /<div id="zetPaneContainer"/, 'the editor host is gone');
 
-    // A reader who finds a tab with no way in needs the reason next to it.
-    assert.match(dropdownHtml.slice(0, dropdownHtml.indexOf('<div id="tab1"')),
-        /#65/, 'nothing near #tab1 says why it has no tablink');
+    // The div's own comment has to keep saying why it cannot be deleted, because that
+    // is no longer obvious from the menu: the row above makes it look like an ordinary
+    // panel, and an ordinary panel's div would be safe to remove with its row.
+    const beforeDiv = dropdownHtml.slice(0, dropdownHtml.indexOf('<div id="tab1"'));
+    assert.match(beforeDiv, /zetPaneContainer/,
+        'nothing near #tab1 says that App.init reads what loads into it');
 });
 
 test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>{
@@ -409,14 +422,14 @@ test('switching menu view carries focus with it, rather than dropping it on the 
 test('every menu row describes what it does, and the heading is not overridden', ()=>{
     // The panel rows carried a `title` as chips and got nothing in exchange when
     // they became rows, leaving one or two words as the whole description of a panel --
-    // while the command rows directly above them kept theirs. So this reads all ten: a
+    // while the command rows directly above them kept theirs. So this reads all eleven: a
     // hover that works on half the rows is the shape the gap had.
     const iList = dropdownHtml.indexOf('class="menu-list"');
     const iDetail = dropdownHtml.indexOf('id="menuDetail"');
     assert.ok(iList > 0 && iDetail > iList, 'the list and the panel are no longer in that order');
     const rows = [...dropdownHtml.slice(iList, iDetail)
         .matchAll(/<button[^>]*class="menu-row[^"]*"[^>]*>/g)].map( (m)=> m[0] );
-    assert.equal(rows.length, 10, 'the menu no longer has ten rows; check what this is reading');
+    assert.equal(rows.length, 11, 'the menu no longer has eleven rows; check what this is reading');
 
     for (const row of rows) {
         // Save to… is the one exception, and it is written at runtime: what that row

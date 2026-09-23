@@ -296,6 +296,26 @@
                     <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
+                <!-- First, because it is the graph itself.
+
+                     `tab1` had no tablink at all, so the notes pane -- the CodeMirror
+                     where the whole map exists as text, and the thing every node is
+                     built from -- could not be opened from the interface. It was
+                     still loaded, because App.init needs it, so the editor was
+                     present and unreachable (issue #65). A reader could edit a note
+                     inside its card and never learn that the map has a text form,
+                     which is the idea the app is built on.
+
+                     Above Ai and Fractal because a note is content and those are
+                     tools, and a file-text glyph because this is where the prose
+                     lives. -->
+                <button type="button" class="menu-row tablink" onclick="openTab('tab1', this)"
+                        title="The notes pane: every note as text, and the [[links]] between them. Editing here edits the map.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-text-icon"></use></svg>
+                    <span class="menu-row-label">Notes</span>
+                    <span class="visually-hidden"> panel</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
                 <button type="button" class="menu-row tablink" onclick="openTab('tab2', this)"
                         title="Adjust how the fractal is drawn, and its colours.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>

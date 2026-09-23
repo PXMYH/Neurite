@@ -20,6 +20,19 @@
     } else if (App.nodeMode && !Node.prev) {
         // Shift + double click => Create regular node
         createNodeFromWindow();
+    } else if (!Node.prev) {
+        // Double click on the canvas => a note, ready to type in.
+        //
+        // This gesture was free: the only other dblclick on a card is the anchor
+        // toggle, and the three modified forms above own Alt, Control and Shift. It
+        // was also the single biggest piece of friction in the app -- making a note,
+        // the thing a reader does more than anything else, required knowing that
+        // Shift had to be held first, and nothing on screen said so.
+        //
+        // Shift + double click still does exactly what it did. This is the unmodified
+        // case that used to do nothing at all.
+        e.preventDefault();
+        NodeView.focusBodyOf(createNodeFromWindow());
     }
 });
 
