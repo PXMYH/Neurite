@@ -185,3 +185,31 @@ test('a note with a link armed from it is marked', async () => {
     });
     assert.equal(cleared, 0, 'clearing the armed link clears the mark');
 });
+
+// An arrowhead says which way a relation runs. It should not be the largest mark between
+// two notes. At scale factor 1.5 it measured 11.8% of a card's width, and an intermediate
+// 0.85 barely moved the ratio because `wscale` also carries the edge's stress -- the two
+// partly cancelled. Asserted against the rendered box, since reasoning about the product
+// of five factors is what got it wrong twice.
+test('an arrowhead is a mark, not a shape competing with the notes', async () => {
+    await addNote(page, 'Encoding', 'Turning experience into a trace.');
+    await addNote(page, 'Retrieval', 'Finding it again. [[Encoding]]');
+    await page.waitForFunction(
+        () => [...document.querySelectorAll('.edge-arrow')].some(a => getComputedStyle(a).display !== 'none'),
+        undefined, { timeout: 10000 });
+
+    const ratio = await page.evaluate(() => {
+        const arrows = [...document.querySelectorAll('.edge-arrow')]
+            .filter(a => getComputedStyle(a).display !== 'none');
+        const cardW = Object.values(Graph.nodes)[0].view.div.getBoundingClientRect().width;
+        const sizes = arrows
+            .map(a => { const b = a.getBoundingClientRect(); return Math.max(b.width, b.height); })
+            .sort((x, y) => x - y);
+        const median = sizes[Math.floor(sizes.length / 2)] || 0;
+        return { percent: median / cardW * 100, median, cardW };
+    });
+    assert.ok(ratio.percent > 1.5,
+        `still visible: ${ratio.percent.toFixed(1)}% of a card (${ratio.median.toFixed(1)}px)`);
+    assert.ok(ratio.percent < 8,
+        `and not dominant: ${ratio.percent.toFixed(1)}% of a card (${ratio.median.toFixed(1)}px of ${ratio.cardW.toFixed(0)}px)`);
+});
