@@ -86,8 +86,19 @@ Ranked by what it would cost a reader building a real graph.
 4. **The armed-link state has no indicator.** Shift and mousedown on a note arms a link
    that the next mousedown anywhere completes, with nothing on screen saying so, and it
    persists indefinitely. Cheap to fix and worth doing.
-5. **Wheel-pan is half cursor speed** and pan is left-button only; middle-drag does
+5. **A card's footprint in plane units depends on the viewport**, so shrinking the window
+   re-introduces overlaps that Tidy had resolved. Measured with positions byte-identical
+   throughout: 0 overlapping pairs at 1440x900, 11 at 900x600, 0 again on the way back.
+   Cards are sized in CSS pixels while positions are in plane units, and the conversion
+   runs through `min(viewportW, viewportH)` -- so `Graph.planeHalfExtent` honestly returns
+   a different answer at a different window size, and every separation routine measures
+   through it. Fixing it means deciding whether a card scales with the window, which is a
+   question about what this canvas is rather than a defect to patch. Tidy is the
+   workaround and it is one keystroke.
+6. **Wheel-pan is half cursor speed** and pan is left-button only; middle-drag does
    nothing by default.
+7. **The empty-state hint paints through an open modal**, since it is only hidden on note
+   count.
 
 Also recorded: the CDN `<script>` tags in index.html carry no Subresource Integrity, so
 a compromised CDN would execute in the page. Out of scope for this work and not a thing
