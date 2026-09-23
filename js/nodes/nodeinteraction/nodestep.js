@@ -50,6 +50,11 @@ Autopilot.update = function(time){
 }
 
 class NodeSimulation {
+    // Milliseconds of a frame the fractal may spend drawing hairs. 6 leaves room
+    // inside a 16.7 ms budget for the node and edge passes that run before it, and
+    // at ~0.94 ms per hair it still allows a burst of six in one frame.
+    static hairBudgetMs = 6;
+
     framesLeftToSkip = 0;
     mousePath = [];
     mousePathPos = new vec2(0, 0);
@@ -134,12 +139,33 @@ class NodeSimulation {
         return this;
     }
 
+    // How much of the fractal gets drawn this frame.
+    //
+    // This was `lerp(factor, regenAmount, min(1, nodeMode_v**5 * 1.01))`, and
+    // lerp(a, b, 0) is a: nodeMode_v is 0 unless Shift is held, so `regenAmount`
+    // -- which every pan, zoom, wheel and pinch handler accumulates into -- was
+    // discarded in normal use. Measured: 100 hard drag-pans produced 111 hair calls
+    // in 111 frames, exactly the same one-per-frame as sitting still. The background
+    // could not respond to being moved through, which is most of why it read as a
+    // static scattering of lines rather than a fractal.
+    //
+    // Both terms count now. Idle is unchanged at `factor` per frame; moving adds the
+    // travel on top, so the view fills in as you navigate.
     updateRegen() {
         const lerp = Math.lerp;
         const random = Math.random;
-        regenDebt = Math.min(16, regenDebt + lerp(settings.regenDebtAdjustmentFactor, regenAmount, Math.min(1, (nodeMode_v ** 5) * 1.01)));
-        for (; regenDebt > 0; regenDebt--) {
+        regenDebt = Math.min(16, regenDebt + settings.regenDebtAdjustmentFactor + regenAmount);
+
+        // A frame budget, because there was none. One hair costs ~0.94 ms of
+        // main-thread maths, so a full debt of 16 was a 15 ms frame on its own -- and
+        // this loop runs after the node and edge passes have already spent their
+        // share. Unspent debt stays owed and is drawn on later frames, so a burst
+        // still arrives; it just arrives without dropping one.
+        const deadline = performance.now() + NodeSimulation.hairBudgetMs;
+        while (regenDebt > 0) {
             Fractal.render_hair(random() * settings.renderSteps);
+            regenDebt -= 1;
+            if (performance.now() > deadline) break;
         }
         regenAmount = 0;
         nodeMode_v = lerp(nodeMode_v, App.nodeMode, 0.125);

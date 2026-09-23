@@ -19,8 +19,40 @@ class EditTab {
         this.setRenderLength(settings.renderLength);
         this.setRenderQuality(settings.renderQuality);
         this.updateFilters();
-        this.setFlashlightStrength(settings.flashlight_fraction);
-        this.setFlashlightRadius(settings.flashlight_stdev);
+        // No setFlashlight* calls here. Settings.default already holds these as the
+        // 0-1 fractions the renderer wants, and the setters exist to convert the
+        // slider's 0-100 -- so calling them at boot divided the defaults by 100 and
+        // turned the flashlight off. The sliders are shown the x100 form in
+        // #initControls instead.
+        this.#repairFlashlightSettings();
+    }
+
+    // Correcting the code is not enough to correct the app.
+    //
+    // Settings persist to IndexedDB, and the boot path above had been writing the
+    // divided-by-100 value into that store on every load. So a reader who has opened
+    // Neurite before has 0.0073 saved, and the restore puts it back over the fixed
+    // default -- the fix would reach new installs only.
+    //
+    // The two sliders are step="1" over 0-100, so the only values a reader can
+    // actually choose are 0 and the multiples of 0.01. A value strictly between them
+    // could not have been set deliberately and is the artefact, so it is replaced;
+    // anything a reader really picked is left alone.
+    #repairFlashlightSettings(){
+        const smallestChoosable = 0.01;
+        const defaults = Settings.default;
+        for (const name of ['flashlight_fraction', 'flashlight_stdev']) {
+            const val = settings[name];
+            if (val > 0 && val < smallestChoosable) {
+                Logger.info('Repairing', name, 'from', val, 'to', defaults[name]);
+                settings[name] = defaults[name];
+            }
+        }
+        // Whatever the values ended up as, the sliders have to agree with them.
+        Elem.byId('flashlightStrength').value = settings.flashlight_fraction * 100;
+        Elem.byId('flashlightStrength_value').value = settings.flashlight_fraction * 100;
+        Elem.byId('flashlightRadius').value = settings.flashlight_stdev * 100;
+        Elem.byId('flashlightRadius_value').value = settings.flashlight_stdev * 100;
     }
 
     #initControls(){
@@ -47,11 +79,15 @@ class EditTab {
         Elem.byId('zoomSpeedSlider').value = settings.zoomSpeedMultiplier;
         Elem.byId('zoom_speed_value').value = settings.zoomSpeedMultiplier;
 
-        Elem.byId('flashlightStrength').value = settings.flashlight_fraction;
-        Elem.byId('flashlightStrength_value').value = settings.flashlight_fraction;
+        // x100, because both of these sliders are step="1" over 0-100 and the
+        // settings are 0-1 fractions. Writing the fraction straight in meant the
+        // slider rounded 0.73 to 1 and showed a reader "1" for a setting that was
+        // really 73 -- the display half of the same off-by-100 the setters had.
+        Elem.byId('flashlightStrength').value = settings.flashlight_fraction * 100;
+        Elem.byId('flashlightStrength_value').value = settings.flashlight_fraction * 100;
 
-        Elem.byId('flashlightRadius').value = settings.flashlight_stdev;
-        Elem.byId('flashlightRadius_value').value = settings.flashlight_stdev;
+        Elem.byId('flashlightRadius').value = settings.flashlight_stdev * 100;
+        Elem.byId('flashlightRadius_value').value = settings.flashlight_stdev * 100;
     }
 
     #initEventListeners(){
@@ -273,12 +309,17 @@ class EditTab {
         }
     }
 
-    setFlashlightStrength(val){
-        settings.flashlight_fraction = val;
-        settings._flashlight_fraction = val / 100;
-    }
-    setFlashlightRadius(val){
-        settings.flashlight_stdev = val;
-        settings._flashlight_stdev = val / 100;
-    }
+    // `val` is what the slider reads: 0-100. The setting is a 0-1 fraction, so the
+    // conversion happens once, here.
+    //
+    // It used to happen twice. Each of these assigned the raw value through the
+    // property -- whose setter already writes the `_name` backing field the getter
+    // returns -- and then wrote `_name` again at val/100, clobbering the first line.
+    // Harmless on its own, but EditTab.init called both with the already-normalised
+    // default, so boot divided 0.73 by 100 and the cursor flashlight ran at 0.0073:
+    // effectively off. 73% of the fractal's samples are supposed to be drawn near
+    // the pointer, which is what makes the background respond to where you are
+    // looking, and none of them were.
+    setFlashlightStrength(val){ settings.flashlight_fraction = val / 100 }
+    setFlashlightRadius(val){ settings.flashlight_stdev = val / 100 }
 }
