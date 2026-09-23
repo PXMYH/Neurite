@@ -61,8 +61,37 @@ Each phase ends green in the browser and in one commit.
 - [x] **4. Editor gestures, and the editor.** Plain double-click makes a note with
       the caret already in it. And the notes pane -- the CodeMirror the whole map is
       built from -- has a menu row for the first time; it was loaded and unreachable.
-- [ ] **5. Adversarial review.** Two reviewers, one on aesthetics and one trying to
-      build a real graph by hand. Loop until they have nothing left.
+- [x] **5. Adversarial review.** Two reviewers, one on aesthetics and one building a
+      real graph by hand. Both found real things, including three comments of mine that
+      described fixes which had not landed: the arrowhead recolouring was applied to a
+      `display: none` element, the chip label was still paleturquoise, and a `max-width`
+      reintroduced the bare-strip defect it was written to fix. Acted on; see the commit.
+
+## What is left, and why it is left rather than half-done
+
+Ranked by what it would cost a reader building a real graph.
+
+1. **No undo.** Verified absent -- `window.js:462` says so outright and a grep of `js/`
+   finds no implementation. An accidental link or delete is permanent. This is the
+   largest single gap in the app and it is a real project: the save format is live DOM
+   (`#nodes`' innerHTML), so an undo stack has to be built against the graph model
+   rather than against the document, and the text pane is a second source of truth that
+   would have to be kept in step with it.
+2. **A note's title defaults to a millisecond timestamp**, and `[[Title]]` is the link
+   address, so typing naturally produces a graph addressed by `26-09-23 ~ 00:34:20.090`.
+   Fixing it means deciding what an untitled note is called and what happens to links
+   when a title changes, which is a design question and not a defect to patch.
+3. **Auto-layout.** `relaxOverlaps` separates cards; it does not arrange them. A radial
+   or hierarchical layout over a selection is the next real utility win.
+4. **The armed-link state has no indicator.** Shift and mousedown on a note arms a link
+   that the next mousedown anywhere completes, with nothing on screen saying so, and it
+   persists indefinitely. Cheap to fix and worth doing.
+5. **Wheel-pan is half cursor speed** and pan is left-button only; middle-drag does
+   nothing by default.
+
+Also recorded: the CDN `<script>` tags in index.html carry no Subresource Integrity, so
+a compromised CDN would execute in the page. Out of scope for this work and not a thing
+to leave unsaid.
 
 Deliberately not attempted, and why:
 
