@@ -62,7 +62,18 @@ function loadProcessor(extra = {}){
         LLM_TAG: 'AI:',
         Node: {byTitle: ()=>null},
         Logger: {debug(){}, info(){}, warn(){}, err(){}},
-        TextArea: {},
+        // `update` as well as the `ofNode` the slice defines for itself. The real one
+        // (globals.js:652) assigns `.value` and then dispatches `change`, which is how
+        // a card's visible body -- a highlighted overlay above the textarea -- stays in
+        // step. An empty object here passed while the reference path assigned `.value`
+        // directly, and would have gone on passing after that became a real bug, so
+        // the double models both halves: the write, and the notification.
+        TextArea: {
+            update(text){
+                this.value = text;
+                this.dispatchEvent?.(new (globalThis.Event || Object)('change'));
+            }
+        },
         ...extra
     };
     vm.runInNewContext(

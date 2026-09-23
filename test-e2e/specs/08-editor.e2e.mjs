@@ -68,6 +68,35 @@ test('double-clicking a card does not make a note', async () => {
     assert.equal(await nodeCount(page), before, 'no extra note was created');
 });
 
+// A card's visible body is a highlighted overlay above the real textarea, kept in step
+// by the change event TextArea.update dispatches. The reference path assigned `.value`
+// directly and dispatched nothing, so a line of prose carrying a link reached the model
+// and not the reader: the card showed its placeholder while node.textarea.value held
+// the text. In a knowledge graph most body lines carry a link.
+test('a note whose body contains a link shows that body', async () => {
+    await addNote(page, 'Encoding', 'Turning an experience into a trace.');
+    await addNote(page, 'Retrieval', 'Finding the trace. [[Encoding]]');
+    await page.waitForTimeout(900);
+
+    const state = await page.evaluate(() => Object.values(Graph.nodes).map(n => ({
+        title: n.getTitle(),
+        model: n.textarea?.value ?? '',
+        visible: n.contentEditableDiv?.value ?? '',
+    })));
+
+    const linked = state.find(s => s.title === 'Retrieval');
+    assert.ok(linked, 'the linked note exists');
+    assert.match(linked.model, /Finding the trace\./, 'the model has the text');
+    assert.match(linked.visible, /Finding the trace\./,
+        `the reader can see it too; visible layer held ${JSON.stringify(linked.visible)}`);
+    assert.match(linked.visible, /\[\[Encoding\]\]/, 'including the link itself');
+
+    // And exactly once: accumulating the line in both the reference path and the plain
+    // path is the obvious wrong fix, and it duplicates the body.
+    const occurrences = (linked.visible.match(/Finding the trace\./g) || []).length;
+    assert.equal(occurrences, 1, `the line appears once, saw ${occurrences}`);
+});
+
 test('the notes pane can be opened from the menu', async () => {
     // tab1 had no tablink, so the CodeMirror every node is built from was loaded and
     // unreachable: a reader could edit a note in its card and never learn the map has

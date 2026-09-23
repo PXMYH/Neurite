@@ -45,11 +45,22 @@ function connectNodes(node1, node2) {
     }
 }
 
+// An edge is a filled ribbon, not a stroked line: `stroke: none` and the width is
+// geometry (`stroke-width` here is only what the width calculation scales from).
+//
+// The fill was `lightcyan` at 0.5 opacity, which composites over the black canvas to
+// roughly #707f7f -- measured 4.3:1 against the canvas but only 1.5:1 against a card,
+// and an edge's most important stretch is the part that meets the cards it joins. The
+// relationship between two notes is the thing a knowledge graph is for, and it was
+// the faintest mark on screen.
+//
+// Raised to full opacity at a cooler, brighter value in the accent's family, so an
+// edge reads as a connection at rest rather than only when hovered.
 function connectDistance(na, nb, linkStrength = 0.1, linkStyle = {
     stroke: "none",
     "stroke-width": "0.005",
-    fill: "lightcyan",
-    opacity: "0.5"
+    fill: "#8fb4e8",
+    opacity: "0.92"
 }) {
     Logger.debug("Connecting:", na.uuid, "to", nb.uuid);
 

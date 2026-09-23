@@ -443,7 +443,21 @@ class ZettelkastenProcessor {
             // By accessor, not by child index: the card's children are not fixed --
             // the link strip added one, which silently made this walk land on a chip
             // and write a node's body onto a span.
-            TextArea.ofNode(wrap.node).value = wrap.plainText;
+            //
+            // And through TextArea.update rather than a bare `.value =`, which is the
+            // difference between the model having the text and the reader seeing it.
+            // A card's visible body is a highlighted overlay kept in step by the
+            // change event that update dispatches; assigning `.value` fills the
+            // textarea underneath and dispatches nothing, so the overlay stayed empty.
+            //
+            // Measured: a note created with the body "Finding the trace. [[Encoding]]"
+            // came up showing its "Write here." placeholder while
+            // `node.textarea.value` held the text. Nothing was lost, which made it
+            // worse rather than better -- the note filled itself in a pass or two
+            // later, after the reader had already concluded it had not saved and typed
+            // it again. Every line of prose that carries a link took this path, which
+            // in a knowledge graph is most of them.
+            TextArea.update.call(TextArea.ofNode(wrap.node), wrap.plainText);
         }
     }
 

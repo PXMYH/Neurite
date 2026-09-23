@@ -306,6 +306,29 @@ textarea.title-input {
     outline-offset: -2px;
 }
 
+/* Edges, which are the graph.
+
+   An edge is a filled ribbon rather than a stroked line -- its width is geometry,
+   set from JS (connect.js:48) -- so these rules control colour only.
+
+   The arrowhead was `rgba(51, 51, 51, 0.9)`: a near-black mark on a black canvas,
+   measuring 1.28:1 against it. The one thing that tells a reader which way a claim
+   runs was invisible, and its hover rule was a no-op because `.edge-arrow-hover` and
+   `.edge-border-hover` are the same value. The arrow is the accent now, and the
+   border behind it stays the cooler blue, so direction reads at rest and brightens
+   on hover instead of changing to the colour it already was. */
+.edge-arrow {
+    fill: var(--ui-accent);
+}
+
+.edge-arrow-hover {
+    fill: #b9cdf0;
+}
+
+.edge-border-hover {
+    fill: #b9cdf0;
+}
+
 /* A light-theme leftover that was forced into the dark editor with !important at
    z-index 1000: a white block with a #ccc border and black line numbers, sitting
    inside the note body. */
