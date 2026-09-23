@@ -346,3 +346,61 @@ test('Escape closes a modal', async () => {
     const shown = await page.evaluate(() => getComputedStyle(Modal.div).display);
     assert.equal(shown, 'none', 'the modal is hidden');
 });
+
+// A card whose rendered box cannot be read must not vanish from the things that operate on
+// the graph. `planeHalfExtent` returned null for one, and every caller skips a null: Fit left
+// it out of the bounding box it covers and Tidy left it out of the separation, while the HUD
+// still counted it. So it was a note the reader was told they had, which two controls quietly
+// did not act on. A review saw 3 of 12 cards in that state after a session of repeated
+// resizes and could not reproduce it; the defence is cheap enough not to need a repro.
+test('a card that cannot be measured is still counted, fitted and separated', async () => {
+    for (const t of ['A', 'B', 'C', 'D']) await addNote(page, t, `Body of ${t}.`);
+    await page.waitForTimeout(800);
+
+    const state = await page.evaluate(() => {
+        const ns = Object.values(Graph.nodes);
+        const hidden = ns[0], other = ns[1];
+
+        // The reported state: in the graph, display set, box 0x0.
+        hidden.view.div.style.display = 'none';
+        const half = Graph.planeHalfExtent(hidden);
+
+        // Counted.
+        const bounds = Hud.contentBounds();
+        const counted = bounds?.count === Object.keys(Graph.nodes).length;
+
+        // Covered by what Fit covers, even placed far outside the view.
+        hidden.pos = new vec2(6, 6);
+        const covered = Hud.contentBounds();
+
+        // And moved by the separation when it is exactly on top of another card.
+        hidden.pos = new vec2(other.pos.x, other.pos.y);
+        hidden.anchor = hidden.pos;
+        Graph.relaxOverlaps({bias: 0.5});
+        const separated = Math.abs(hidden.pos.x - other.pos.x) > 0
+                       || Math.abs(hidden.pos.y - other.pos.y) > 0;
+
+        hidden.view.div.style.display = '';
+        return {
+            boxWidth: hidden.view.div.getBoundingClientRect().width,
+            estimated: !!half && half.hw > 0,
+            counted,
+            coveredByFit: covered.maxX >= 6 && covered.maxY >= 6,
+            separated,
+        };
+    });
+
+    assert.ok(state.estimated, 'an unmeasurable card gets an estimated footprint, not null');
+    assert.ok(state.counted, 'and is counted in what Fit covers');
+    assert.ok(state.coveredByFit, 'and is inside the bounding box Fit uses');
+    assert.ok(state.separated, 'and is moved by the separation');
+
+    // The estimate is a fallback, not a replacement: a card that can be measured still is.
+    const real = await page.evaluate(() => {
+        const n = Object.values(Graph.nodes)[0];
+        const box = n.view.div.getBoundingClientRect();
+        const perPx = 2 * Graph.zoom.mag() / Svg.windowScale();
+        return Math.abs(Graph.planeHalfExtent(n).hw - box.width * perPx / 2);
+    });
+    assert.ok(real < 1e-9, `a measurable card uses its own box, off by ${real}`);
+});

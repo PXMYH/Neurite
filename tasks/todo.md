@@ -67,6 +67,20 @@ Each phase ends green in the browser and in one commit.
       `display: none` element, the chip label was still paleturquoise, and a `max-width`
       reintroduced the bare-strip defect it was written to fix. Acted on; see the commit.
 
+## Two corrections to claims made in earlier commit messages
+
+Both caught by the final review, recorded here because a commit cannot be amended once it
+is pushed and a wrong number left standing is worse than the mistake.
+
+- "Fit ... margin 1.46" holds at 1600px wide only. The chrome insets are absolute pixels,
+  so the margin climbs as the viewport shrinks: measured 1.4601 at 1600x1000, 1.6122 at
+  1280x800 and 1.7418 at 1024x700. The behaviour is right at all three -- 0 cards off
+  screen, 0 behind chrome -- but the single number was not the whole picture.
+- "0 of 66 pairs overlapping, worst ratio 1.0521" reads as a contradiction and is not one.
+  The ratio is the separating-axis clearance, where 1.0 is exactly touching and 1.05 is 5%
+  clear; the review's "worst 0" is overlap depth on a different scale. Both say the same
+  thing. The sentence should have named its scale.
+
 ## What is left, and why it is left rather than half-done
 
 Ranked by what it would cost a reader building a real graph.

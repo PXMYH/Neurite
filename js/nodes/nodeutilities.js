@@ -19,6 +19,11 @@ class Graph {
     rotation = new vec2(1, 0);
     zoom = new vec2(1, 0); // bigger is farther out
 
+    // The default card box in CSS pixels, used only to estimate the footprint of a card
+    // whose rendered box cannot be read. Measured on a text note at scale 1: 344 x 160.
+    static nominalCardW = 344;
+    static nominalCardH = 160;
+
     addEdge(edge){
         this.addEdgeView(edge.view);
         this.edges[edge.edgeKey] = edge;
@@ -48,14 +53,36 @@ class Graph {
     // (`Graph = new Graph()`, main.js:309), so a static here would be reachable
     // only through the shadowed class name.
     planeHalfExtent(node){
-        const box = node.view?.div?.getBoundingClientRect();
-        if (!box || !box.width) return null;
-
         // Two plane units span min(viewportW, viewportH) screen px at |zoom| = 1,
         // and `pos` is compared at whatever the live zoom is, so the conversion
         // has to carry it.
         const perPx = 2 * this.zoom.mag() / Svg.windowScale();
-        return {hw: box.width * perPx / 2, hh: box.height * perPx / 2};
+
+        const box = node.view?.div?.getBoundingClientRect();
+        if (box && box.width) return {hw: box.width * perPx / 2, hh: box.height * perPx / 2};
+
+        // An estimate rather than null, so nothing silently drops a card it cannot measure.
+        //
+        // This returned null for an unmeasurable card, and every caller skips a null:
+        // `Hud.contentBounds` left it out of the bounding box Fit covers, and
+        // `relaxOverlaps` left it out of the separation -- while the HUD's own count still
+        // included it. So a card with a zero-width box was a note the reader was told they
+        // had, that Fit would not bring into view and Tidy would not move. A review saw
+        // exactly that: 3 of 12 cards at a 0x0 box, still in `Graph.nodes`, still
+        // `display: flex`, after a session of repeated resizes. It could not be reproduced,
+        // and a defence that costs four lines does not need a reproduction to be worth
+        // having.
+        //
+        // The estimate mirrors what Node.draw would put on screen -- the same
+        // intrinsicScale, scale and zoom terms (nodeclass.js:129) -- against the default
+        // card box, so a card off by its own content's width is wrong by a little instead of
+        // absent entirely.
+        const drawScale = (node.intrinsicScale ?? 1) * (node.scale ?? 1)
+                        * (this.zoom.mag2() ** -settings.zoomContentExp);
+        if (!Number.isFinite(drawScale) || drawScale <= 0) return null;
+
+        return {hw: Graph.nominalCardW * drawScale * perPx / 2,
+                hh: Graph.nominalCardH * drawScale * perPx / 2};
     }
 
     // Push a freshly placed card off any card it landed on.
