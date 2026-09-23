@@ -83,7 +83,9 @@ class Node {
         On.dblclick(div, this.onDblClick);
         On.mousedown(div, this.onMouseDown);
         On.mouseup(document, this.onMouseUp);
-        On.wheel(div, this.onWheel);
+        // Not passive: this handler takes the wheel over a card and zooms the canvas
+        // with it, which means cancelling the page's own response to it.
+        On.wheel(div, this.onWheel, {passive: false});
     }
     toJSON() {
         return JSON.stringify({...this}, (k, v) => {

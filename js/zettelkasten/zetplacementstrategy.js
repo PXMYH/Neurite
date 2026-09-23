@@ -2,6 +2,17 @@ class NodePlacementStrategy {
     // How many placements one lap of the spiral spreads over the viewport. Chosen
     // so neighbouring slots sit further apart than a default card is wide.
     static SPREAD_SLOTS = 12;
+
+    // The smallest a note placed along a path may be, as a fraction of the root's
+    // scale. The decay is geometric, so without a floor the twentieth note on a Radial
+    // path is 0.8^19 of the first -- about a hundredth, which is body text a quarter of
+    // a pixel tall. See calculateNewPosition.
+    //
+    // 0.55, measured rather than picked: a title is 15px, so this is the fraction that
+    // puts the deepest note's title at 8px on screen at the default view. 0.35 was tried
+    // first and gave 5.25px, which is visible and not readable.
+    static minScale = 0.55;
+
     #spreadIndex = 0;
 
     constructor(pathObject, nodeObjects = {}) {
@@ -32,7 +43,21 @@ class NodePlacementStrategy {
 
         if (nodeKeys.length === 0) {
             Logger.debug("No nodes in nodeObjects, starting from -1,0.");
-            return createTextNodeWithPosAndScale(currentNodeTitle, '', 0.05, -.5, 0);
+            // Scale 1, not 0.05.
+            //
+            // This is the first note of a graph typed into the notes pane, and every
+            // note after it inherits from it through calculateNewPosition below -- so
+            // 0.05 was the seed of a graph nobody could read. Measured on twenty notes
+            // typed into the pane: `node.scale` ran 0.05 down to 0.01638, cards were
+            // 16.3px wide falling to 5.3px, and the body text rendered between 0.75 and
+            // 0.25 of a pixel. Fit made it worse rather than better, because fitting
+            // twenty specks means zooming out. At no zoom level were two notes legible
+            // at once.
+            //
+            // The same note made by double-clicking the canvas gets scale 1 and 15px
+            // text. One object, two creation paths, a 20-60x difference -- and the pane
+            // is the path the app is built around.
+            return createTextNodeWithPosAndScale(currentNodeTitle, '', 1, -.5, 0);
         }
 
         if (this.currentPathIndex >= this.path.length) {
@@ -120,7 +145,18 @@ class NodePlacementStrategy {
     calculateNewPosition(startNode, currentPathPoint) {
         const newX = startNode.pos.x + currentPathPoint.x * startNode.scale;
         const newY = startNode.pos.y + currentPathPoint.y * startNode.scale;
-        const newScale = startNode.scale * currentPathPoint.scale;
+
+        // Clamped, because this multiplies rather than sets: each note is the previous
+        // one's scale times the path's, so a path scale under 1 decays geometrically and
+        // the twentieth note is a speck. `ZetPath` supplies 0.8 for Radial, which is
+        // 0.8^k -- 0.01 by the twentieth. The decay is the "notes get smaller as they get
+        // further from the root" idea, and it is a reasonable idea down to the point where
+        // a note stops being readable, which is where it stops.
+        //
+        // Notes past that depth share a size instead of continuing to shrink, so a graph
+        // has a gradient rather than a vanishing point.
+        const newScale = Math.max(startNode.scale * currentPathPoint.scale,
+                                  NodePlacementStrategy.minScale);
         return { newX, newY, newScale };
     }
 

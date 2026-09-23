@@ -1,9 +1,20 @@
 ﻿On.dblclick(document, (e) => {
     e.stopPropagation();
 
-    // Ensure the click target is the background SVG
-    const isSvgBackground = e.target.id === 'svg_bg';
-    if (!isSvgBackground) return;
+    // The canvas, including the fractal drawn on it.
+    //
+    // This tested `e.target.id === 'svg_bg'` exactly, and the fractal's hairs are
+    // `<path>` children of that same svg -- so a double-click that happened to land on
+    // one hit the path, failed the test, and did nothing. Measured on an empty graph with
+    // a 20px grid over 1075 points: 63 of them, 5.9%, had a path on top, with no feedback
+    // to say why the gesture had failed. Raising the line count from 128 to 384 made it
+    // more likely, so the fix and the cause arrived together.
+    //
+    // Anything inside the svg counts now, which is every layer the canvas draws --
+    // fractal hairs, the mouse path, edges. A card is not inside it (`#nodes` is a
+    // sibling of `#svg_bg`), and the chrome stops these events before they arrive
+    // (dropdown.js:296), so widening this does not take a gesture from anything else.
+    if (!svg.contains(e.target)) return;
 
     if (e.getModifierState(controls.altKey.value)) {
         // Alt + double click => Create LLM node

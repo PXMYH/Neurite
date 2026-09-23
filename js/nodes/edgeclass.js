@@ -330,7 +330,12 @@ class EdgeView {
         const endWeight = adjustedStartScale / totalAdjustedScale;
         const midPoint = startPoint.scale(startWeight).plus(endPoint.scale(endWeight));
 
-        const arrowScaleFactor = 1.5;
+        // 0.85, down from 1.5. The arrowhead measured 23.6px against a 220px card --
+        // 10.7% of the card's width -- which was fine while nothing was drawing one and
+        // dominant now that every reference does. An arrowhead's job is to say which way
+        // the relation runs, and it does that at a size that does not compete with the
+        // notes it sits between.
+        const arrowScaleFactor = 0.85;
         const arrowLength = ((startScale + endScale) / 2 * wscale * 5) * arrowScaleFactor;
         const arrowWidth = ((startScale + endScale) / 2 * wscale * 3) * arrowScaleFactor;
         const direction = endPoint.minus(startPoint);

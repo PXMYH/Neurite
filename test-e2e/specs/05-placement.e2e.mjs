@@ -105,3 +105,68 @@ test('a note title is legible at the default zoom', async () => {
     assert.ok(px.onScreen >= 13,
         `title renders at ${px.onScreen.toFixed(1)}px (${px.declared}px x scale ${px.scale.toFixed(3)})`);
 });
+
+// Notes typed into the notes pane, which is the flow the whole app is built around and
+// the one none of these tests had exercised. `window.createNote` sets
+// `zetPlacementOverride` (neuralapi.js:607) and takes the spread path, so every legibility
+// assertion above was measuring the branch that was already fine. Typing goes through the
+// ZetPath walk, where the first note was seeded at scale 0.05 and each one after it
+// multiplied by 0.8 -- twenty notes ended at 0.016, with body text a quarter of a pixel.
+test('notes typed into the pane are legible, however many there are', async () => {
+    await page.evaluate(async () => {
+        const cm = window.currentActiveZettelkastenMirror;
+        const lines = [];
+        for (let i = 1; i <= 20; i++) lines.push(`${Tag.node} Typed ${i}`, `Body of typed note ${i}.`, '');
+        cm.setValue(lines.join('\n'));
+        cm.refresh();
+    });
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length >= 20, undefined, { timeout: 20000 });
+    await page.waitForTimeout(1500);
+
+    const sizes = await page.evaluate(() => {
+        const out = [];
+        for (const n of Object.values(Graph.nodes)) {
+            if (n.removed) continue;
+            const declared = parseFloat(getComputedStyle(n.view.titleInput).fontSize);
+            const m = new DOMMatrixReadOnly(getComputedStyle(n.content).transform);
+            out.push({ t: n.getTitle(), scale: n.scale, titlePx: declared * m.a });
+        }
+        return out;
+    });
+
+    assert.ok(sizes.length >= 20, `twenty notes exist, got ${sizes.length}`);
+    const smallest = sizes.reduce((a, b) => (a.titlePx < b.titlePx ? a : b));
+    // 8px is not comfortable, but it is a size a reader can see and one zoom step from
+    // reading. A quarter of a pixel is not.
+    assert.ok(smallest.titlePx >= 8,
+        `the smallest title renders at ${smallest.titlePx.toFixed(2)}px ("${smallest.t}", scale ${smallest.scale})`);
+
+    // And the range is bounded, so a graph does not become a size gradient.
+    const largest = sizes.reduce((a, b) => (a.titlePx > b.titlePx ? a : b));
+    assert.ok(largest.titlePx / smallest.titlePx <= 4,
+        `largest/smallest is ${(largest.titlePx / smallest.titlePx).toFixed(2)} (${largest.titlePx.toFixed(1)} vs ${smallest.titlePx.toFixed(1)})`);
+});
+
+// The canvas responds to a double-click everywhere, including where the fractal drew a
+// line. The gesture tested `e.target.id === 'svg_bg'` exactly, and the hairs are children
+// of that svg, so 5.9% of the canvas silently did nothing.
+test('double-click makes a note even where the fractal drew a line', async () => {
+    await page.waitForFunction(() => document.querySelectorAll('#bg path').length > 20,
+        undefined, { timeout: 15000 });
+
+    const onAPath = await page.evaluate(() => {
+        for (const p of document.querySelectorAll('#bg path')) {
+            const b = p.getBoundingClientRect();
+            if (b.width < 4 || b.height < 4) continue;
+            const x = Math.round(b.x + b.width / 2), y = Math.round(b.y + b.height / 2);
+            if (document.elementFromPoint(x, y)?.tagName === 'path') return { x, y };
+        }
+        return null;
+    });
+    if (!onAPath) return;  // no hair sat under a probe point this run
+
+    const before = await page.evaluate(() => Object.keys(Graph.nodes).length);
+    await page.mouse.dblclick(onAPath.x, onAPath.y);
+    await page.waitForFunction((n) => Object.keys(Graph.nodes).length === n + 1, before,
+        { timeout: 8000 });
+});

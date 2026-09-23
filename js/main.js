@@ -86,8 +86,20 @@ class On {
     static thisEvent(target, cb, options){
         target.addEventListener(this, cb, options)
     }
-    static thisPassiveEvent(target, cb){
-        target.addEventListener(this, cb, {passive: true})
+    // Passive by default, and only by default.
+    //
+    // `options` used to be absent, so `{passive: true}` was unconditional and every
+    // caller that asked for otherwise was ignored. Two consequences, both measured:
+    // `dropdown.js:73` passes `{passive: false}` to suppress the browser's ctrl+wheel
+    // zoom and that guard never ran, and a wheel handler calling `preventDefault` logged
+    // "Unable to preventDefault inside passive event listener invocation" once per
+    // notch -- 24 errors from one gesture over a card.
+    //
+    // Still passive when nothing is said, because that is what the default is for: a
+    // touchmove or wheel listener that cannot block scrolling lets the compositor start
+    // scrolling without waiting for it.
+    static thisPassiveEvent(target, cb, options){
+        target.addEventListener(this, cb, {passive: true, ...options})
     }
 }
 [
