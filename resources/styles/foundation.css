@@ -215,6 +215,18 @@ textarea.title-input {
     border-color: var(--ui-accent);
 }
 
+/* A note with a link armed from it.
+
+   Shift and mousedown arms a link and the next mousedown on any note completes it, with
+   no time limit -- so this state could sit there unmarked while a reader did something
+   else, and then turn an ordinary click into an edge they never asked for. It reads as
+   pending rather than as selected: a dashed accent edge, which is the one border
+   treatment nothing else in the app uses. */
+.window.link-pending {
+    border-style: dashed;
+    border-color: var(--ui-accent);
+}
+
 /* One ring, not two.
 
    `.window.selected` adds a `::before` ring in the accent (styles.css:341) on top of the

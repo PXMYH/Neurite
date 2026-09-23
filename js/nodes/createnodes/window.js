@@ -131,8 +131,18 @@ class NodeView {
     // looking at -- measured, two notes settled clear and ended up 3% overlapped
     // after their bodies landed. The second pass is what makes the number true.
     static settlePlacement(node){
+        // The view the note arrived into. The second pass runs 300ms later, and
+        // `keepInView` clamps a card into whatever is on screen at the time -- so if the
+        // reader pans or zooms in that window, a pass meant to make their new note
+        // visible instead drags it to wherever they have since gone. "Make sure the note
+        // you just made is in view" stops being a true statement the moment they move.
+        const arrivedAt = {panX: Graph.pan.x, panY: Graph.pan.y, zoom: Graph.zoom.mag()};
+
         const settle = ()=>{
             if (Graph.nodes[node.uuid] !== node) return;
+            const viewMoved = Graph.pan.x !== arrivedAt.panX
+                           || Graph.pan.y !== arrivedAt.panY
+                           || Graph.zoom.mag() !== arrivedAt.zoom;
             for (let round = 0; round < 3; round++) {
                 // Graph-wide, biased towards moving the newcomer. Moving only the new
                 // card cannot clear a pile -- with three cards already on one spot there
@@ -140,7 +150,10 @@ class NodeView {
                 // At 0.85 a new note absorbs most of each correction and an arrangement a
                 // reader made is barely touched.
                 Graph.relaxOverlaps({bias: 0.85, favour: node});
-                Graph.keepInView(node);
+                // Separation still applies -- two cards on the same spot is wrong wherever
+                // the reader is looking -- but the clamp only applies while they are still
+                // looking at the place the note arrived in.
+                if (!viewMoved) Graph.keepInView(node);
             }
         };
         settle();

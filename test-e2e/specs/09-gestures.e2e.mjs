@@ -146,8 +146,42 @@ test('Tidy separates a pile', async () => {
     const tidied = await worst();
     assert.ok(tidied >= 1, `no pair overlaps after Tidy; worst ratio ${tidied.toFixed(3)}`);
 
-    // And it stays: the anchors moved with the cards.
+    // And it stays: the anchors moved with the cards. An anchored card is sprung back to
+    // `anchor` every frame, so a relaxation that moved `pos` alone would snap back.
     await page.waitForTimeout(1200);
     const held = await worst();
     assert.ok(held >= 1, `still clear a second later; worst ratio ${held.toFixed(3)}`);
+});
+
+// Shift and mousedown arms a link that the next mousedown anywhere completes, with no
+// time limit. The state was real and had nothing on screen saying so, in an app with no
+// undo -- arm one, forget, click a note later, and an edge appears that was never asked
+// for. `Node.prev` is an accessor now so the marker survives all five of its assignment
+// sites, including the two that clear it for reasons other than completing the link.
+test('a note with a link armed from it is marked', async () => {
+    const a = await addNote(page, 'A', 'first');
+    const b = await addNote(page, 'B', 'second');
+    await page.waitForTimeout(600);
+
+    const armed = await page.evaluate(([ia, ib]) => {
+        Node.prev = Graph.nodes[ia];
+        const marked = Graph.nodes[ia].view.div.classList.contains('link-pending');
+        const border = getComputedStyle(Graph.nodes[ia].view.div).borderStyle;
+        Node.prev = Graph.nodes[ib];
+        return {
+            marked, border,
+            followed: Graph.nodes[ib].view.div.classList.contains('link-pending'),
+            released: !Graph.nodes[ia].view.div.classList.contains('link-pending'),
+        };
+    }, [a, b]);
+    assert.ok(armed.marked, 'the armed card is marked');
+    assert.equal(armed.border, 'dashed', 'and reads as pending rather than selected');
+    assert.ok(armed.followed, 'arming a different note moves the mark');
+    assert.ok(armed.released, 'and takes it off the first');
+
+    const cleared = await page.evaluate(() => {
+        Node.prev = null;
+        return document.querySelectorAll('.link-pending').length;
+    });
+    assert.equal(cleared, 0, 'clearing the armed link clears the mark');
 });

@@ -1,5 +1,24 @@
 class Node {
-    static prev = null;
+    // The note a pending link starts from, behind an accessor so the card can show it.
+    //
+    // Shift and mousedown on a note arms a link, and the *next* mousedown on any note
+    // completes it -- with nothing on screen saying so, and no time limit. Arm one,
+    // forget, click a note three seconds later, and an edge appears that was never
+    // asked for, in an app with no undo. The state was real and invisible; now the card
+    // it started from is marked while it lasts.
+    //
+    // An accessor rather than a call at each of the five assignment sites, because the
+    // marker has to survive every one of them, including `interface.js:207` clearing it
+    // on a canvas drag and `window.js:475` clearing it because the armed card was
+    // deleted.
+    static #prev = null;
+
+    static get prev(){ return Node.#prev }
+    static set prev(node){
+        Node.#prev?.view?.div?.classList.remove('link-pending');
+        Node.#prev = node;
+        node?.view?.div?.classList.add('link-pending');
+    }
 
     // How far the pointer travels before a press counts as a drag rather than a click.
     // A press under this distance keeps the pending Edge alive, so Shift plus a click
