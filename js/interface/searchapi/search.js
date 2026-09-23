@@ -83,7 +83,20 @@ function setupZettelkastenSearchBar() {
 function openNodeSearch(){
     Modal.open('zetSearchModal');
     setupZettelkastenSearchBar();
-    performZettelkastenSearch(Elem.byId('Searchbar').value);
+    const bar = Elem.byId('Searchbar');
+    performZettelkastenSearch(bar.value);
+
+    // Focus the field, which is the only reason anyone opened this. Focus was left on
+    // the toolbar button, so finding a note you cannot see was: click Search, then
+    // click into the box, then type -- and the second click is not something a reader
+    // should have to discover. Deferred a frame because Modal.open clones the template
+    // into the modal body, so the element focused here has to be the one that ended up
+    // in the document rather than the one that was in the template.
+    Promise.delay(0).then(()=>{
+        const live = Elem.byId('Searchbar');
+        live?.focus();
+        live?.select?.();
+    });
 }
 
 On.click(Elem.byId('nodeSearchButton'), openNodeSearch);

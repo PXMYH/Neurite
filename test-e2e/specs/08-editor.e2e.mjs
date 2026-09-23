@@ -97,6 +97,38 @@ test('a note whose body contains a link shows that body', async () => {
     assert.equal(occurrences, 1, `the line appears once, saw ${occurrences}`);
 });
 
+// Finding a note you cannot see is the other half of an endless canvas, and it used to
+// take three actions: click Search, click into the box, type. Focus stayed on the
+// toolbar button, and the second click is not something a reader should have to work out.
+test('search opens with the caret in it and finds a note that is off screen', async () => {
+    for (const t of ['Encoding', 'Retrieval', 'Consolidation']) await addNote(page, t, `About ${t}.`);
+    await page.waitForTimeout(700);
+
+    // Pan away, so the notes are genuinely unreachable by looking.
+    await page.evaluate(() => { Graph.pan_set(new vec2(60, 40)) });
+    await page.waitForTimeout(200);
+    const visible = await page.evaluate(() => Object.values(Graph.nodes)
+        .filter(n => { const uv = fromZtoUV(n.pos); return uv.x > 0 && uv.x < 1 && uv.y > 0 && uv.y < 1 })
+        .length);
+    assert.equal(visible, 0, 'nothing is on screen to start with');
+
+    await page.click('#nodeSearchButton');
+    await page.waitForFunction(() => document.activeElement?.id === 'Searchbar', undefined, { timeout: 5000 });
+
+    // Typed without clicking into the field first, which is the whole point.
+    await page.keyboard.type('retr');
+    await page.waitForFunction(
+        () => (document.getElementById('search-results')?.textContent || '').includes('Retrieval'),
+        undefined, { timeout: 5000 });
+
+    const state = await page.evaluate(() => ({
+        typed: document.getElementById('Searchbar').value,
+        count: document.getElementById('search-results').children.length,
+    }));
+    assert.equal(state.typed, 'retr', 'the keystrokes reached the field');
+    assert.equal(state.count, 1, 'one note matched');
+});
+
 test('the notes pane can be opened from the menu', async () => {
     // tab1 had no tablink, so the CodeMirror every node is built from was loaded and
     // unreachable: a reader could edit a note in its card and never learn the map has
