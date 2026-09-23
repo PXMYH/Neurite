@@ -52,9 +52,32 @@ class Hud {
         On.click(panel.querySelector('[data-act="home"]'), ()=>Hud.home());
         this.bindMapDragging();
         this.bindKeys();
+        this.buildEmptyHint(root);
 
         setInterval(Hud.update, Hud.intervalMs);
         Hud.update();
+    }
+
+    // What to do on an empty canvas.
+    //
+    // A first load is a black field with a fractal in it and no instruction anywhere:
+    // the gesture that makes a note is a double-click, which leaves no trace until
+    // someone tries it, and the three modified forms and the tool row are not
+    // discoverable from looking. So the canvas says so, once, and stops saying it the
+    // moment there is a note -- a hint that outstays its welcome is furniture.
+    //
+    // `pointer-events: none` throughout, because the thing it is telling you to do is
+    // double-click the space it occupies.
+    static buildEmptyHint(root){
+        const hint = Html.make.div('canvas-hint');
+        hint.innerHTML = `
+            <p class="canvas-hint-lead">Double-click anywhere to write a note</p>
+            <p class="canvas-hint-keys">
+                <span><kbd>Shift</kbd> + drag a note onto another to link them</span>
+                <span><kbd>0</kbd> fit &middot; <kbd>Home</kbd> reset &middot; scroll to zoom</span>
+            </p>`;
+        root.appendChild(hint);
+        this.hint = hint;
     }
 
     // The plane rectangle every note occupies, including the space its card takes
@@ -112,6 +135,8 @@ class Hud {
         const mag = 1 / Math.max(Graph.zoom.mag(), Number.MIN_VALUE);
         Hud.elemScale.innerHTML = '&times;' + Hud.formatMag(mag);
         Hud.elemCount.textContent = frame.count === 1 ? '1 note' : frame.count + ' notes';
+
+        if (Hud.hint) Hud.hint.classList.toggle('is-hidden', frame.count > 0);
     }
 
     // Thirteen decades of zoom will not fit in a fixed number of digits, so the

@@ -37,6 +37,43 @@ test('the panel mounts inside the chrome layer and is on screen', async () => {
     assert.ok(state.onScreen, 'panel is within the viewport');
 });
 
+// A first load was a black field with a fractal in it and no instruction anywhere. The
+// gesture that makes a note leaves no trace until someone tries it, so the canvas says
+// so once and retires the moment there is something on it.
+test('the empty canvas says what to do, and stops once there is a note', async () => {
+    const empty = await page.evaluate(() => {
+        const h = document.querySelector('.canvas-hint');
+        const box = h?.getBoundingClientRect();
+        return {
+            present: !!h,
+            visible: h ? getComputedStyle(h).opacity !== '0' : false,
+            // It must not eat the double-click it is asking for.
+            pointerEvents: h && getComputedStyle(h).pointerEvents,
+            centred: box ? Math.abs((box.left + box.width / 2) - window.innerWidth / 2) < 4 : false,
+            mentionsTheGesture: /double-click/i.test(h?.textContent || ''),
+        };
+    });
+    assert.ok(empty.present, 'the hint exists on an empty canvas');
+    assert.ok(empty.visible, 'and is visible');
+    assert.equal(empty.pointerEvents, 'none', 'and does not intercept the gesture it describes');
+    assert.ok(empty.centred, 'and is centred');
+    assert.ok(empty.mentionsTheGesture, 'and names the gesture');
+
+    await addNote(page, 'First', 'A note.');
+
+    // The state, not the opacity: opacity is transitioned over 400ms, so reading it
+    // straight after the change catches a value mid-fade and reports "still visible"
+    // for a hint that is already on its way out. The class is what the code decides.
+    await page.waitForFunction(
+        () => document.querySelector('.canvas-hint')?.classList.contains('is-hidden'),
+        undefined, { timeout: 5000 });
+
+    // And it does reach fully transparent, once the transition has run.
+    await page.waitForFunction(
+        () => getComputedStyle(document.querySelector('.canvas-hint')).opacity === '0',
+        undefined, { timeout: 5000 });
+});
+
 test('the scale readout tracks the zoom', async () => {
     const start = await view(page);
     assert.match(start.scale, /1(\.0)?$/, `starts near unity, got "${start.scale}"`);

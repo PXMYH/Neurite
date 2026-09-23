@@ -306,6 +306,56 @@ textarea.title-input {
     outline-offset: -2px;
 }
 
+/* The empty canvas says what to do, and then stops saying it.
+
+   Centred on the viewport rather than on the graph's origin, because it is addressed
+   to the reader and not to the plane. `pointer-events: none` on everything here: the
+   instruction is to double-click this space. */
+.canvas-hint {
+    position: absolute;
+    left: 50%;
+    top: 46%;
+    transform: translate(-50%, -50%);
+    z-index: var(--z-hud);
+    pointer-events: none;
+    text-align: center;
+    max-width: 44ch;
+    /* Held back rather than announced. It is a prompt on a blank page, and a blank
+       page is the one moment the fractal behind it is the whole product. */
+    opacity: 1;
+    transition: opacity 400ms ease;
+}
+
+.canvas-hint.is-hidden {
+    opacity: 0;
+}
+
+.canvas-hint-lead {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
+}
+
+.canvas-hint-keys {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--text-base);
+    color: var(--text-faint);
+}
+
+.canvas-hint kbd {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--ui-chrome-rule);
+    color: var(--text-muted);
+}
+
 /* Edges, which are the graph.
 
    An edge is a filled ribbon rather than a stroked line -- its width is geometry,
