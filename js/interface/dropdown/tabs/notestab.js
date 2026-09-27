@@ -110,6 +110,8 @@ On.mousedown(zetVertDragHandle, (e)=>{
     zetIsVertResizing = true;
     initialY = e.clientY;
     initialHeight = App.zetPanes.container.offsetHeight;
+    // The stylesheet's limit again, as for the width.
+    maxHeight = parseFloat(getComputedStyle(App.zetPanes.container).maxHeight) || maxHeight;
 
     // Prevent text selection while resizing
     document.body.style.userSelect = 'none';
@@ -123,12 +125,9 @@ function zetHandleVertMouseMove(event) {
     requestAnimationFrame(() => {
         // Calculate the difference in the y position
         const dy = event.clientY - initialY;
-        const newHeight = initialHeight + dy;
-
-        // Update the height if within the boundaries
-        if (newHeight > 50 && newHeight <= maxHeight) {
-            App.zetPanes.container.style.height = newHeight + 'px';
-        }
+        // Clamped, not refused, as the width is: +250px in one move left it where it was.
+        const newHeight = Math.min(Math.max(initialHeight + dy, 50), maxHeight);
+        App.zetPanes.container.style.height = newHeight + 'px';
     });
 }
 

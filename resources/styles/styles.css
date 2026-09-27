@@ -2655,6 +2655,10 @@ input[type="checkbox"] {
        to the menu's right edge, and the menu's 16px left margin kept on the right. */
     max-width: calc(100vw - 74px);
     min-width: min(270px, calc(100vw - 74px));
+    /* The same for the height and the bottom handle: 124px from the window's top to the
+       pane, 37px from the pane to the menu's bottom edge, and 16px to spare. A pane made
+       700px tall kept its height in a 600px window, its handle at y=814. */
+    max-height: calc(100vh - 177px);
     height: 60vh;
     width: 270px;
 }

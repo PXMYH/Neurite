@@ -231,3 +231,33 @@ test('the notes pane handle stays on screen when the window shrinks', async () =
         assert.ok(Math.abs(pane - (h.pane + dx)) <= 2, `a ${dx}px drag took the pane from ${h.pane} to ${pane}`);
     }
 });
+
+// The same for the height. A drag past the limit in one move was refused outright, and a
+// pane made tall kept its height in a short window: measured, its bottom handle at y=814
+// in a 600px window.
+test('the notes pane bottom handle stays on screen when the window shrinks', async () => {
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    await page.click("button.menu-row.tablink:has-text('Notes')");
+    await page.waitForTimeout(500);
+
+    const handle = () => page.evaluate(() => {
+        const h = document.getElementById('zetVertDragHandle');
+        const r = h.getBoundingClientRect();
+        const x = r.x + r.width / 2, y = r.y + r.height / 2;
+        return { x, y, onScreen: y < innerHeight && document.elementFromPoint(x, y) === h,
+                 pane: document.getElementById('zetPaneContainer').offsetHeight };
+    });
+    let h = await handle();
+    await page.mouse.move(h.x, h.y);
+    await page.mouse.down();
+    await page.mouse.move(h.x, h.y + 250);                           // one move, past the limit
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    assert.ok((await handle()).pane > h.pane, 'a drag past the limit still makes the pane taller');
+
+    await page.setViewportSize({ width: 1600, height: 600 });
+    await page.waitForTimeout(300);
+    h = await handle();
+    assert.ok(h.onScreen, 'and its handle can still be reached in a short window');
+});
