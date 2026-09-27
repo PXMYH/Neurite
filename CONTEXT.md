@@ -23,8 +23,9 @@ pair of coordinates, and so are the Graph's pan and zoom.
 _Avoid_: canvas, viewport, grid, coordinates, xy
 
 **Fractal**:
-The Mandelbrot set drawn under the Graph. It is the terrain, not a backdrop:
-its shape pulls Nodes toward the set's boundary as they move.
+The escape-time fractal drawn under the Graph — the Mandelbrot set unless the
+reader picks another equation. It is the terrain, not a backdrop: its shape
+pulls every Node that is not pinned toward the set's boundary as it moves.
 _Avoid_: background, backdrop, wallpaper, texture
 
 **Saved View**:
@@ -48,7 +49,9 @@ _Avoid_: node class, node kind, node subclass, variant
 
 **Edge**:
 A connection between two Nodes, both drawn and simulated — it holds the two
-Nodes at a distance from each other.
+Nodes at a distance from each other. The Saved Graph keeps every Edge, whatever
+its two Nodes are. Between two text Nodes it is also written as a Ref, and
+there the Refs decide: the Edge lasts while either Node Section names the other.
 _Avoid_: link, connection, relation, arrow, line, join
 
 **AI Node**:
@@ -74,7 +77,7 @@ _Avoid_: tab, instance, buffer, document, editor, sheet
 
 **Node Section**:
 The run of lines in a Pane that describes one Node: its Title line, then its
-body, up to the next Title.
+body, up to the next Title line. An `AI:` line is the Title line of an AI Node.
 _Avoid_: block, chunk, entry, note, paragraph, stanza
 
 **Title**:
@@ -94,7 +97,9 @@ _Avoid_: link syntax, wikilink, bracket, delimiter
 
 **Ref**:
 A mention of another Node's Title inside a Node Section. A Ref is how an Edge
-is written down.
+is written down in a Pane, so it can name only a Node with a Title line there:
+a text Node, or an AI Node written as an `AI:` line. An Edge to any other Node
+is kept by the Saved Graph alone.
 _Avoid_: link, backlink, mention, citation, pointer
 
 ### Models

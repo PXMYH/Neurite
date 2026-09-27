@@ -257,7 +257,8 @@ function makeGraph(text){
         if (start === -1) return {startLineNo: 0, endLineNo: 0};
 
         let end = start + 1;
-        while (end < all.length && !titleOfLine(all[end])) end += 1;
+        // An AI section ends a note's section as well, as in the real parser.
+        while (end < all.length && !titleOfLine(all[end]) && !all[end].startsWith('AI:')) end += 1;
         return {startLineNo: start, endLineNo: end - 1};
     };
 
@@ -367,4 +368,50 @@ test('a ref naming no section at all is dropped, not retried forever', ()=>{
     assert.deepEqual(graph.edgesOf('Test 1'), ['Test 2'], 'the resolvable ref still connects');
     assert.equal(graph.titles().includes('Nowhere'), false, 'a dangling ref must not make a node');
     assert.equal(graph.processor.deferredRefs, null, 'the retry queue must be drained, not left armed');
+});
+
+// What CONTEXT.md says an Edge between two text Nodes is: it lasts while either Node
+// Section names the other. The connect gesture writes a Ref into both; the reader
+// deletes them in the Pane, which is an edit pass each.
+test('an Edge between two notes lasts while either one names the other', ()=>{
+    const graph = makeGraph(['## P', '[[Q]]', '## Q', '[[P]]'].join('\n'));
+    graph.processor.processAs(graph.Pass.rewrite);
+    assert.deepEqual(graph.edgesOf('P'), ['Q'], 'an Edge to start from');
+
+    graph.setText(['## P', '', '## Q', '[[P]]'].join('\n'));
+    graph.processor.processAs(graph.Pass.edit);
+    assert.deepEqual(graph.edgesOf('P'), ['Q'], 'Q still names P');
+
+    graph.setText(['## P', '', '## Q', ''].join('\n'));
+    graph.processor.processAs(graph.Pass.edit);
+    assert.deepEqual(graph.edgesOf('P'), [], 'neither names the other');
+});
+
+// An edit pass reparses only the notes an edit touched, and it used to find one: the
+// note holding the first changed line. An edit that writes several sections at once --
+// a paste, a `setValue` -- left the rest with an empty card and no Edges until the next
+// full pass.
+test('an edit that writes two notes at once gives the second its edge', ()=>{
+    const graph = makeGraph('');
+    graph.processor.processAs(graph.Pass.edit);
+
+    graph.setText(['## One', 'First body.', '', '## Two', 'Second body. [[One]]', ''].join('\n'));
+    graph.processor.processAs(graph.Pass.edit);
+
+    assert.deepEqual(graph.titles().sort(), ['One', 'Two'], 'the edit should make both notes');
+    assert.deepEqual(graph.edgesOf('Two'), ['One']);
+});
+
+// The first changed line came from `findIndex(...) || fallback`, and -1, the answer for a
+// text that is the old one with its tail cut off, is truthy. So deleting the last line of
+// the pane reparsed nothing, and the note it belonged to kept the Edge the line had made.
+test('deleting the last line of the pane updates the note it was in', ()=>{
+    const graph = makeGraph(['## B', 'b', '## A', 'a', '[[B]]'].join('\n'));
+    graph.processor.processAs(graph.Pass.rewrite);
+    assert.deepEqual(graph.edgesOf('A'), ['B'], 'an Edge for the edit to remove');
+
+    graph.setText(['## B', 'b', '## A', 'a'].join('\n'));
+    graph.processor.processAs(graph.Pass.edit);
+
+    assert.deepEqual(graph.edgesOf('A'), []);
 });

@@ -592,7 +592,12 @@ function updateNodeEdgesLength(node) {
 function edgeFromJSON(edgeData) {
     const nodes = Graph.nodes;
     const pts = edgeData.p.map((k) => nodes[k]);
-    if (pts.includes(undefined)) Logger.warn("missing keys", edgeData, nodes);
+    // An Edge to a Node that did not come back is dropped, not built. Building it threw
+    // (`String.uuidOf(undefined)`) into the loader's per-Node guard, so the Node that
+    // *did* come back skipped its other Edges and its `TextNode.init`. Measured: a save
+    // of A -> B and A -> C with C's card cut out came back with A's and B's bodies
+    // empty and no C at all -- one unreadable card cost the graph its text (#49).
+    if (pts.includes(undefined)) return Logger.warn("Dropped an Edge to a missing Node:", edgeData.edgeKey);
 
     // Check if edge already exists
     const edgeKey = edgeData.edgeKey;

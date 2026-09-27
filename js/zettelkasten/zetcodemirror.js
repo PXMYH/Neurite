@@ -108,6 +108,19 @@ class ZettelkastenParser {
                 break;
             }
         }
+        // An AI section ends a note's section too, as deleteNodeByTitle says below. The
+        // title map holds Tag.node lines only, so a note written above an AI Node took
+        // the AI section in as its body: one keystroke in the note put `AI: Helper` and
+        // its prompt on the note's card, and typing on that card wrote the note's words
+        // into the prompt.
+        if (nodeLineNo !== undefined) {
+            for (let i = nodeLineNo + 1; i < nextNodeLineNo; i++) {
+                if (!this.cm.getLine(i).startsWith(LLM_TAG)) continue;
+
+                nextNodeLineNo = i;
+                break;
+            }
+        }
 
         const lineCount = this.cm.lineCount();
         return {

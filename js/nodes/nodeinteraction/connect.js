@@ -41,7 +41,11 @@ function connectNodes(node1, node2) {
         addEdgeToZettelkasten(title1, title2);
         addEdgeToZettelkasten(title2, title1);
     } else if (node1 !== node2) {
-        connectDistance(node1, node2, node1.pos.minus(node2.pos).mag() / 2, undefined, true);
+        // `connectDistance` works the length out itself. Half the distance used to be
+        // passed here, into the parameter that is the spring's strength -- saved with the
+        // Graph as `s`, so a pointer-drawn Edge to a non-text Node was as stiff as it was
+        // long (measured s = l = 0.377) the moment either end was released (#49).
+        connectDistance(node1, node2);
     }
 }
 

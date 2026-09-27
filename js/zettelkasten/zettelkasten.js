@@ -124,18 +124,39 @@ class ZettelkastenProcessor {
         return this.placementStrategy.calculatePositionAndScale(currentNodeTitle);
     }
 
-    findFirstChangedLine(lines){
-        const prevLines = this.prevNoteInputLines;
-        return lines.findIndex( (line, i)=>(line !== prevLines[i]) )
-            || Math.min(prevLines.length, lines.length);
-    }
-    findChangedNode(lines){
-        for (let i = this.findFirstChangedLine(lines); i >= 0; i--) {
-            if (lines[i] === undefined) break;
+    // The titles of the notes an edit touched: the one its first changed line sits in,
+    // and every one whose title line it wrote.
+    //
+    // It was the first one only. An edit that writes several sections at once -- a
+    // paste, a `setValue` -- left the rest with an empty card and no Edges until the
+    // next full pass: measured, `## One` and `## Two` with `[[One]]` written in one edit
+    // gave Two an empty body and no Edge. And the first changed line came from
+    // `findIndex(...) || fallback`, so a change on line 0 counted as none.
+    findChangedTitles(lines){
+        const prev = this.prevNoteInputLines;
+        // The changed span: what lies between the lines the edit left alone at either end.
+        let start = 0;
+        while (start < lines.length && lines[start] === prev[start]) start++;
+        let end = lines.length;
+        for (let p = prev.length; end > start && p > start && lines[end - 1] === prev[p - 1]; p--) end--;
 
-            const match = lines[i].match(ZettelkastenParser.regexpNodeTitle);
-            if (match) return Node.byTitle(match[1].trim());
+        const titles = new Set();
+        const titleOf = (line)=>(line.startsWith(Tag.node) ? line.substr(Tag.node.length).trim() : null) ;
+        for (let i = Math.min(start, lines.length - 1); i >= 0; i--) {
+            // A change inside an AI section is no note's; handleLlmPromptLine has it.
+            if (lines[i].startsWith(LLM_TAG)) break;
+
+            const title = titleOf(lines[i]);
+            if (title === null) continue;
+
+            titles.add(title);
+            break;
         }
+        for (let i = start; i < end; i++) {
+            const title = titleOf(lines[i]);
+            if (title !== null) titles.add(title);
+        }
+        return titles;
     }
 
     forEachNodeWrap(cb, ct){
@@ -162,7 +183,7 @@ class ZettelkastenProcessor {
             currentNodeTitle = this.processLine(line, index, currentNodeTitle)
         });
 
-        if (!mode.full) this.processChangedNode(this.noteInputLines);
+        if (!mode.full) this.processChangedNodes(this.noteInputLines);
 
         this.drainDeferredRefs();
 
@@ -232,12 +253,14 @@ class ZettelkastenProcessor {
         }
     }
 
-    // Updated to handle processChangedNode
-    processChangedNode(lines){
-        const changedNode = this.findChangedNode(lines);
-        if (!changedNode) return;
+    processChangedNodes(lines){
+        for (const title of this.findChangedTitles(lines)) {
+            if (this.wrapPerTitle[title]) this.processChangedNode(lines, title);
+        }
+    }
 
-        const changedNodeTitle = changedNode.getTitle();
+    processChangedNode(lines, changedNodeTitle){
+        const changedNode = this.wrapPerTitle[changedNodeTitle].node;
         const range = this.parser.getNodeSectionRange(changedNodeTitle);
         const { startLineNo, endLineNo } = range;
 
@@ -687,6 +710,21 @@ class ZettelkastenProcessor {
         currentNodeTitle = nodeTitle;
 
         let wrap = wrapPerTitle[nodeTitle];
+
+        // Restoring binds to the AI Node the saved markup already rebuilt, as
+        // `handleNode` does for text Nodes. With no such branch this made a second AI
+        // Node on every reload, and its Edges with it -- measured, one AI Node and one
+        // Edge became two of each after one reload and three after two (#49). Only an
+        // AI Node will do: a text Node may carry the same Title.
+        if (this.mode.restoring && (!wrap || wrap.node.removed)) {
+            const saved = Graph.filterNodes( (node)=>node.isLLM && !node.removed
+                && node.getTitle()?.toLowerCase() === nodeTitle.toLowerCase() )[0];
+            if (saved) {
+                wrap = new NodeWrap(saved, nodeTitle, i);
+                wrapPerLine[i] = wrapPerTitle[nodeTitle] = wrap;
+                this.initLlmWrap(wrap);
+            }
+        }
 
         if (!wrap || wrap.node.removed) {
             if (wrapPerLine[i] && !wrapPerLine[i].node.removed) {
