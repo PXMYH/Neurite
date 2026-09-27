@@ -608,14 +608,29 @@ Node.Extensions = {
 
         view.rewindowify();
     },
+    // A saved field, found by what it is where the saves name it by child indices: [0,0,1]
+    // is a card's Title, [0,1,0] a note's body. The card's markup moved under both -- the
+    // Title became a textarea in a wrapper, the link strip went in above the body -- so the
+    // paths led to the wrapper and to the "+ link" button. A restored card then took its
+    // Title from its markup, written when it was built: a note typed into the Pane, or
+    // renamed on its card, came back under an old Title, and the pass made it a second
+    // Node. The saves had the right Title all along.
     "textarea": (node, o) => {
-        let e = node.content;
-        for (const w of o.p) {
-            e = e.children[w];
+        const path = JSON.stringify(o.p);
+        let e = (path === '[0,0,1]') ? node.content.querySelector('.title-input')
+              : (path === '[0,1,0]') ? node.content.querySelector('.node-textarea')
+              : null;
+        if (!e) {
+            e = node.content;
+            for (const w of o.p) {
+                e = e?.children[w];
+            }
         }
+        if (!e) return;
 
         const p = o.p;
-        e.value = o.v;
+        // A save from while the path was wrong can hold nothing for the Title.
+        if (o.v !== undefined && o.v !== null) e.value = o.v;
 
         node.push_extra_cb( (n)=>({
             f: "textarea",

@@ -236,7 +236,8 @@ class ZetPanes {
 
         const where = (entry)=>{
             const holder = window.zetPaneList.find( (p)=>(p.processor === entry.holder) );
-            return (holder === pane ? 'higher up in this Archive' : 'in ' + this.getPaneName(holder?.paneId));
+            return (holder === pane ? 'elsewhere in this Archive'
+                  : holder ? 'in ' + this.getPaneName(holder.paneId) : 'in another Archive');
         };
         const first = taken[0];
         this.status.textContent = (taken.length === 1)
@@ -275,9 +276,12 @@ class ZetPanes {
         if (window.zetPaneList.length === 1) {
             return window.alert(`“${name}” is the only Archive, and new notes are written into the one shown, so it cannot be deleted. Make another first.`);
         }
+        // Said from the text as well as from the notes: an Archive of taken Title lines and
+        // prose makes no note, and "It holds no notes." read as nothing to lose.
         const count = ZetPanes.noteCount(pane);
-        const question = (count === 0) ? `Delete the Archive “${name}”? It holds no notes.`
-            : `Delete the Archive “${name}” and the ${count === 1 ? 'note' : count + ' notes'} written in it?`;
+        const question = (count > 0) ? `Delete the Archive “${name}” and the ${count === 1 ? 'note' : count + ' notes'} written in it?`
+            : pane.cm.getValue().trim() ? `Delete the Archive “${name}” and its text? None of it is a note yet.`
+            : `Delete the empty Archive “${name}”?`;
         if (!await window.confirm(question)) return;
 
         this.removePane(pane.paneId);
@@ -389,7 +393,7 @@ class ZetPanes {
         this.renamedOnLoad = [];
     }
 
-    restorePane(paneName, paneContent) {
+    restorePane(paneName, paneContent, taken = []) {
         const paneId = `zet-pane-${this.paneCounter}`;
         const pane = this.createPane(paneId, paneName);
 
@@ -397,10 +401,13 @@ class ZetPanes {
         this.switchPane(paneId);
 
         // Every title in paneContent already has a node, so the pass must bind to
-        // it rather than spawn a duplicate.
+        // it rather than spawn a duplicate. The Titles it was saved as having taken lines
+        // for stay taken, whichever Pane restores first (#64).
         const restored = window.zetPaneList.at(-1);
+        restored.processor.takenOnSave = new Set(taken.map( (title)=>String(title).toLowerCase() ));
         restored.processor.writeAs(ZettelkastenProcessor.Pass.restore,
             ()=>restored.cm.setValue(paneContent));
+        delete restored.processor.takenOnSave;
         // A Saved Graph from before #64 can give one Title to two sections, with a Node for
         // each: the later is renamed, and the load says so (`reportRenames`).
         for (const renamed of restored.processor.applyRenames()) {
@@ -413,10 +420,16 @@ class ZetPanes {
     // One notice for a load that renamed anything, since the next autosave keeps the new
     // Titles: a rename nobody was told of is a note the reader cannot find by its name.
     reportRenames(){
+        // A Title saved as taken is held by a Pane restored after the one that took it; one
+        // pass now, with every Pane back, says which.
+        for (const pane of window.zetPaneList) {
+            if (pane.processor.taken?.some( (t)=>!t.holder )) pane.processor.processAs(ZettelkastenProcessor.Pass.rewrite);
+        }
+
         const renamed = (this.renamedOnLoad ?? []).splice(0);
         if (!renamed.length) return;
 
-        const lines = renamed.map( (r)=>`“${r.from}” in ${r.archive} is now “${r.to}”.` );
+        const lines = renamed.map( (r)=>`“${r.from}” in ${r.archive} is now “${r.to}”, and so are its links there.` );
         window.alert(['A Title names one note, and this graph had some Titles in two places, so one of each was renamed as it opened:', ...lines].join('\n'));
     }
 

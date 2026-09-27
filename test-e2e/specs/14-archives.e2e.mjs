@@ -182,3 +182,96 @@ test('a note typed into the Pane, and one renamed on its card, each come back as
     await saveAndReload(page);
     assert.deepEqual(await where(), before, 'a reload made a second note, or moved one');
 });
+
+// ---- found by the Phase 3 reviews ----
+
+// A load gave each Title to whichever Archive it restored first: a note in Archive 2 with a
+// taken copy in Archive 1 opened as the copy, its own section the one marked.
+test('a note keeps its Title through a reload when an Archive restored before it holds a taken copy', async () => {
+    await openNotes(page);
+    await page.click('#archiveNew');
+    await page.keyboard.type('## Alpha\noriginal\n');
+    await page.waitForTimeout(300);
+    await page.click('.archive-choice .select-replacer');
+    await page.click(".archive-choice .dropdown-option:has-text('Archive 1')");
+    await type(page, '## Alpha\ncopy\n');
+    await saveAndReload(page);
+
+    const after = await page.evaluate(() => ({
+        alpha: Object.values(Graph.nodes).filter((n) => n.getTitle() === 'Alpha').map((n) => n.textarea.value.trim()),
+        taken: window.zetPaneList.map((p) => p.processor.taken.map((t) => t.title)),
+    }));
+    assert.deepEqual(after.alpha, ['original'], 'the note opened as its taken copy');
+    assert.deepEqual(after.taken, [['Alpha'], []]);
+});
+
+// The saved card's Title was its markup, written when the card was built, and the saves also
+// keep the Title in the card's saved fields -- which pointed at the wrong elements, so a
+// graph saved before the markup was kept current still came back with a second, empty card.
+test('a card whose saved markup has an old Title comes back under its Title, once', async () => {
+    await page.evaluate(() => window.createNote('Alpha', 'body'));
+    await page.waitForTimeout(600);
+    await page.evaluate(async () => {
+        await App.viewGraphs.saveNow();
+        const table = localforage.createInstance({ name: 'graphs', storeName: 'graph-data' });
+        for (const key of await table.keys()) {
+            const text = await table.getItem(key);
+            if (typeof text === 'string') await table.setItem(key, text.replace('>Alpha</textarea>', '>An old title</textarea>'));
+        }
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length > 0, undefined, { timeout: 15000 });
+    await page.waitForTimeout(800);
+    assert.deepEqual(await page.evaluate(() => Object.values(Graph.nodes).map((n) => n.getTitle())), ['Alpha']);
+});
+
+test("deleting an AI Node leaves a note with the same Title in its Archive", async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('AI: Helper\nsummarize\n\n## Helper\nmy note\n'));
+    await page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.isLLM), undefined, { timeout: 8000 });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { window.confirm = async () => true; });
+    const ai = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.isLLM).view.div.querySelector('#button-delete'));
+    await ai.asElement().click();
+    await page.waitForFunction(() => !Object.values(Graph.nodes).some((n) => n.isLLM), undefined, { timeout: 5000 });
+    assert.equal(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), '## Helper\nmy note\n',
+        "the note's section went with the AI Node");
+});
+
+test('typing a space after a Title another Archive holds, on a card, keeps the space', async () => {
+    await openNotes(page);
+    await type(page, '## Beta\nb\n');
+    await page.click('#archiveNew');
+    await page.keyboard.type('## Rust\nr\n');
+    await page.waitForTimeout(300);
+    const title = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta').view.titleInput);
+    await title.asElement().click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.type('rust ownership');
+    await page.waitForTimeout(300);
+    assert.deepEqual(await page.evaluate(() => Object.values(Graph.nodes).map((n) => n.getTitle()).sort()), ['Rust', 'rust ownership']);
+});
+
+test("an AI Node renamed on its card is renamed in its Archive's text", async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('AI: Helper\nsummarize\n'));
+    await page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.isLLM), undefined, { timeout: 8000 });
+    await page.waitForTimeout(400);
+    const [uuid] = await page.evaluate(() => Object.keys(Graph.nodes));
+    const title = await page.evaluateHandle(() => Object.values(Graph.nodes)[0].view.titleInput);
+    await title.asElement().click();
+    await page.keyboard.press('End');
+    await page.keyboard.type('X');
+    await page.waitForTimeout(300);
+    assert.equal(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), 'AI: HelperX\nsummarize\n');
+    assert.deepEqual(await page.evaluate(() => Object.keys(Graph.nodes)), [uuid], 'the AI Node was made again');
+});
+
+test('Delete says an Archive of text will go, when none of it is a note', async () => {
+    await openNotes(page);
+    await type(page, '## Alpha\na\n');
+    await page.click('#archiveNew');
+    await page.keyboard.type('## Alpha\ntaken, and some prose\n');
+    await page.waitForTimeout(300);
+    await page.click('#archiveDelete');
+    assert.equal(await dialog(page), 'Delete the Archive “Archive 2” and its text? None of it is a note yet.');
+});

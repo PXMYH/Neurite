@@ -704,7 +704,13 @@ View.Graphs = class {
                 // positional -- it only has to be unique, and the loader reads these
                 // in document order.
                 const name = App.zetPanes.getPaneName(pane.paneId);
-                const paneSaveElement = `<div id="zettelkasten-pane-${index}" data-pane-name="${encodeURIComponent(name)}" style="display:none;">${encodeURIComponent(content)}</div>`;
+                // The Titles this Pane has taken lines for, held in another Pane (#64). Without
+                // them a load gave each Title to whichever Pane it restored first, so a note
+                // could open as the taken copy, and its own section as the one marked.
+                const taken = [...new Set((pane.processor.taken ?? [])
+                    .filter( (t)=>(t.holder !== pane.processor) ).map( (t)=>t.title ))];
+                const takenAttr = (taken.length ? ` data-taken="${encodeURIComponent(JSON.stringify(taken))}"` : '');
+                const paneSaveElement = `<div id="zettelkasten-pane-${index}" data-pane-name="${encodeURIComponent(name)}"${takenAttr} style="display:none;">${encodeURIComponent(content)}</div>`;
                 zettelkastenPanesSaveElements.push(paneSaveElement);
             });
 
@@ -857,7 +863,8 @@ View.Graphs = class {
         zettelkastenPaneSaveElements.forEach((elem) => {
             const paneContent = decodeURIComponent(elem.innerHTML);
             const paneName = decodeURIComponent(elem.dataset.paneName);
-            App.zetPanes.restorePane(paneName, paneContent);
+            const taken = (elem.dataset.taken ? JSON.parse(decodeURIComponent(elem.dataset.taken)) : []);
+            App.zetPanes.restorePane(paneName, paneContent, taken);
         });
         App.zetPanes.reportRenames();
 

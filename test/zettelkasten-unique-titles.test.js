@@ -101,6 +101,7 @@ function makeWorld(){
         createLlmNode: (title)=>makeNode(title, 'ai'),
         sortedBrackets: ['[['],
         bracketsMap: {'[[': ']]'},
+        getClosingBracket: ()=>']]',
         Promise: {delay: ()=>({then(cb){ cb() }})},
         setTimeout: ()=>0,
         clearTimeout(){},
@@ -119,6 +120,10 @@ function makeWorld(){
     };
     const zcm = read('js/zettelkasten/zetcodemirror.js');
     vm.runInNewContext([
+        // Node 22 has no `RegExp.escape`, which `renameNode` calls.
+        "if (!RegExp.escape) RegExp.escape = (s)=>s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')",
+        slice(src, 'function replaceInBrackets(', 'replaceInBrackets'),
+        slice(src, 'function renameNode(', 'renameNode'),
         slice(zcm, 'function paneHoldingTitle(', 'paneHoldingTitle'),
         slice(zcm, 'function getUniqueNodeTitle(', 'getUniqueNodeTitle'),
         src.slice(src.indexOf('class NodeWrap {'), src.indexOf('\n}\n', src.indexOf('class ZettelkastenProcessor {')) + 2),
@@ -174,11 +179,79 @@ test('once the Title is let go, the Archive that marked it makes the Node', ()=>
     const two = world.addPane('Archive 2');
     two.cm.setValue('## Alpha\nbody two\n');
 
-    one.cm.setValue('## Something else\n');
+    // Deleted: free at once.
+    one.cm.setValue('');
     const alpha = world.titled('Alpha');
     assert.equal(alpha.length, 1, 'the freed Title made no Node in the Archive that had marked it');
     assert.equal(alpha[0].textarea.value, 'body two\n');
     assert.deepEqual([...two.processor.taken], []);
+});
+
+test('a Title typed over is let go when the typing moves off its line', ()=>{
+    const world = makeWorld();
+    const one = world.addPane('Archive 1');
+    one.cm.setValue('## Alpha\nbody one\n');
+    const two = world.addPane('Archive 2');
+    two.cm.setValue('## Alpha\nbody two\n');
+
+    one.cm.setValue('## Something else\nbody one\n');
+    assert.equal(world.titled('Alpha').length, 0, 'the Title went while its line was still being typed');
+    one.cm.setValue('## Something else\nbody one, and more\n');
+    assert.equal(world.titled('Alpha').length, 1);
+    assert.equal(world.titled('Alpha')[0].textarea.value, 'body two\n');
+});
+
+// Backspace on a note's Title line and type it back: the same Node throughout, and a copy of
+// the Title elsewhere -- in another Archive, or in the same one above or below -- stays taken.
+// The copy took the Title at the backspace, and the note, typed back, was the one taken.
+for (const [where, setup] of [
+    ['in another Archive', (world)=>{
+        const one = world.addPane('Archive 1');
+        one.cm.setValue('## Alpha\nthe note\n');
+        world.addPane('Archive 2').cm.setValue('## Alpha\nthe copy\n');
+        return {pane: one, text: (t)=>`## ${t}\nthe note\n`};
+    }],
+    ['below it', (world)=>{
+        const one = world.addPane('Archive 1');
+        one.cm.setValue('## Alpha\nthe note\n\n## Alpha\nthe copy\n');
+        return {pane: one, text: (t)=>`## ${t}\nthe note\n\n## Alpha\nthe copy\n`};
+    }],
+    ['above it', (world)=>{
+        const one = world.addPane('Archive 1');
+        one.cm.setValue('## Alpha\nthe note\n');
+        one.cm.setValue('## Alpha\nthe copy\n\n## Alpha\nthe note\n');
+        return {pane: one, text: (t)=>`## Alpha\nthe copy\n\n## ${t}\nthe note\n`};
+    }],
+]) {
+    test(`a note's Title backspaced and typed back keeps its Node, with a copy ${where}`, ()=>{
+        const world = makeWorld();
+        const {pane, text} = setup(world);
+        const [note] = world.titled('Alpha');
+        assert.equal(world.titled('Alpha').length, 1);
+        assert.equal(note.textarea.value.trim(), 'the note', 'the copy took the note over');
+
+        pane.cm.setValue(text('Alph'));
+        pane.cm.setValue(text('Alpha'));
+        pane.cm.setValue(text('Alpha') + 'and a new line\n');   // the typing moves on
+
+        assert.equal(note.removed, false, 'the note was deleted');
+        assert.deepEqual(world.titled('Alpha'), [note], 'the copy has the Title now');
+        assert.equal(note.textarea.value.trim().split('\n')[0], 'the note');
+    });
+}
+
+// Deleting the note right above a taken Title line moved the taken line up to where the note's
+// Title line had been, and the note's Node stayed, waiting for it; typing on the line renamed it.
+test("a deleted note's Node is let go, not handed to the taken line that moves up", ()=>{
+    const world = makeWorld();
+    const pane = world.addPane('Archive 1');
+    pane.cm.setValue('## Alpha\na\n\n## Beta\nb\n\n## Alpha\ncopy\n');
+    const [beta] = world.titled('Beta');
+
+    pane.cm.setValue('## Alpha\na\n\n## Alpha\ncopy\n');
+    assert.equal(beta.removed, true, "Beta's Node outlived its section");
+    pane.cm.setValue('## Alpha\na\n\n## Alpha 2\ncopy\n');
+    assert.equal(beta.getTitle(), 'Beta', "Beta's Node was renamed for another note");
 });
 
 test('in one Archive the first section with a Title owns it, and the later one is marked', ()=>{
@@ -236,13 +309,18 @@ test('a Saved Graph with one Title in two Archives opens with the later renamed,
     const one = world.addPane('Archive 1');
     assert.deepEqual([...restore(one, '## Alpha\nbody one\n')], []);
     const two = world.addPane('Archive 2');
-    const renamed = restore(two, '## Alpha\nbody two\n');
+    const gamma = world.makeNode('Gamma');
+    const renamed = restore(two, '## Alpha\nbody two\n## Gamma\nsee [[Alpha]]\n');
 
     assert.deepEqual([...renamed].map((r)=>[r.from, r.to]), [['Alpha', 'Alpha (2)']]);
-    assert.equal(two.cm.getValue(), '## Alpha (2)\nbody two\n', 'the later line is renamed in the text');
+    // Its Refs there with it: they meant this Archive's Alpha, and left alone drew their
+    // Edges to the other's.
+    assert.equal(two.cm.getValue(), '## Alpha (2)\nbody two\n## Gamma\nsee [[Alpha (2)]]\n',
+        'the later line, and the Refs in its Archive, are renamed in the text');
     assert.equal(first.getTitle(), 'Alpha');
     assert.equal(second.getTitle(), 'Alpha (2)', 'and the second Node with it, so it keeps its place');
-    assert.equal(world.live().length, 2, 'no Node was made or lost');
+    assert.equal(world.live().length, 3, 'no Node was made or lost');
+    assert.equal(gamma.removed, false);
     assert.equal(one.processor.wrapPerTitle['Alpha'].node, first);
     assert.equal(two.processor.wrapPerTitle['Alpha (2)'].node, second);
 });

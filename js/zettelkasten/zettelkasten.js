@@ -32,11 +32,14 @@ function replaceInBrackets(s, from, to) {
 // The Title line that is the Node's -- the first with the Title, in its own Pane -- and every
 // Ref to it. `heading` is false for another Pane, where a Title line with the name is a taken
 // copy (#64): renaming every one of them rewrote lines the reader had not touched.
-function renameNode(from, to, heading = true) {
+//
+// `lineTag` is the Title line's tag: `AI:` for an AI Node, whose rename on its card never reached
+// its line, so the next pass named the Node back and built it again at every keystroke.
+function renameNode(from, to, heading = true, lineTag = Tag.node) {
     //(\n|^)(((#node:)[\t ]*from[\t ]*)|((#ref:)([^,\n]+,)*[\t ]*from[\t ]*(,[^,\n]+)*))(?=(\n|$))
     //$1$4$6$7 to$8$9
     const fe = RegExp.escape(from);
-    const nodeRE = '(' + RegExp.escape(Tag.node) + ")[\\t ]*" + fe + "[\\t ]*";
+    const nodeRE = '(' + RegExp.escape(lineTag) + ")[\\t ]*" + fe + "[\\t ]*";
     const refRE = '(' + RegExp.escape(Tag.ref) + ")([^,\\n]+,)*[\\t ]*" + fe + "[\\t ]*(,[^,\\n]+)*";
     const tag = "((" + nodeRE + ")|(" + refRE + "))";
     const re = new RegExp("(\n|^)" + tag + "(?=(\n|$))", "g");
@@ -140,12 +143,7 @@ class ZettelkastenProcessor {
     // gave Two an empty body and no Edge. And the first changed line came from
     // `findIndex(...) || fallback`, so a change on line 0 counted as none.
     findChangedTitles(lines){
-        const prev = this.prevNoteInputLines;
-        // The changed span: what lies between the lines the edit left alone at either end.
-        let start = 0;
-        while (start < lines.length && lines[start] === prev[start]) start++;
-        let end = lines.length;
-        for (let p = prev.length; end > start && p > start && lines[end - 1] === prev[p - 1]; p--) end--;
+        const {start, end} = this.changedSpan(lines);
 
         const titles = new Set();
         const titleOf = (line)=>(line.startsWith(Tag.node) ? line.substr(Tag.node.length).trim() : null) ;
@@ -170,6 +168,62 @@ class ZettelkastenProcessor {
         return titles;
     }
 
+    // What an edit changed: the lines between the ones it left alone at either end, as
+    // [start, end) in the new text and [start, prevEnd) in the old.
+    changedSpan(lines){
+        const prev = this.prevNoteInputLines;
+        let start = 0;
+        while (start < lines.length && start < prev.length && lines[start] === prev[start]) start++;
+        let end = lines.length, prevEnd = prev.length;
+        while (end > start && prevEnd > start && lines[end - 1] === prev[prevEnd - 1]) { end--; prevEnd--; }
+        return {start, end, prevEnd};
+    }
+
+    // Where each of this Pane's Titles is held before the walk decides anything (#64). A
+    // Node keeps its Title line: where the edit left the line alone, the line is where it
+    // was, give or take the lines the edit added or took above it; where the reader is
+    // typing on the line itself, the Node keeps both its Title and the one it had when the
+    // typing began (`typedFrom`). Any other line with one of those Titles is taken while it
+    // lasts. By reading order alone, a copy typed above a note took the note over, and
+    // "## Alpha" backspaced to "## Alph" and typed back lost the note to a copy.
+    reserveHeld(lines){
+        const {start, end, prevEnd} = this.changedSpan(lines);
+        const delta = end - prevEnd;
+        this.typing = {start, end};
+        this.reserved = new Map();
+        const titleAt = (i)=>{
+            const line = lines[i];
+            if (line?.startsWith(Tag.node)) return line.substr(Tag.node.length).trim();
+            if (line?.startsWith(LLM_TAG)) return line.substr(LLM_TAG.length).trim() || "Untitled";
+            return null;
+        };
+        this.forEachNodeWrap( (wrap)=>{
+            const old = wrap.lineNum;
+            if (wrap.node.removed || typeof old !== 'number') return;
+
+            let line = (old < start) ? old : (old >= prevEnd) ? old + delta : (old < end ? old : null);
+            const title = (line === null ? null : titleAt(line));
+            const typed = (title !== null && line >= start && line < end);
+            if (!typed) delete wrap.typedFrom;
+            if (title === null || (!typed && title.toLowerCase() !== wrap.title.toLowerCase())) return;
+
+            // An edit can be read two ways when what it added begins with a line the text
+            // already had: a copy of "## Alpha" pasted above the note reads, line by line,
+            // as the note's body replaced. The section whose body is the Node's is its own.
+            const body = (TextArea.ofNode(wrap.node)?.value ?? '').trim();
+            if (!typed && this.sectionBody(line) !== body) {
+                const own = lines.findIndex( (text, i)=>(i !== line
+                    && titleAt(i)?.toLowerCase() === wrap.title.toLowerCase() && this.sectionBody(i) === body) );
+                if (own !== -1) line = own;
+            }
+
+            this.reserved.set(wrap.title.toLowerCase(), line);
+            if (wrap.typedFrom) this.reserved.set(wrap.typedFrom.toLowerCase(), line);
+        });
+    }
+    // The line is under the reader's edit, not moved there by lines added or taken above.
+    isTyped(lineNo){ return Boolean(this.typing && lineNo >= this.typing.start && lineNo < this.typing.end) }
+
     forEachNodeWrap(cb, ct){
         const wrapPerTitle = this.wrapPerTitle;
         for (const title in wrapPerTitle) cb.call(ct, wrapPerTitle[title]);
@@ -188,14 +242,31 @@ class ZettelkastenProcessor {
     // on `Node`: this file loads before `class Node` is declared.
     static isText = (node)=>Boolean(node.isTextNode);
     static isAi = (node)=>Boolean(node.isLLM);
+    // A Title line renamed as it is typed keeps the Title it had when the typing began, until
+    // the typing leaves the line or comes back to that Title (`reserveHeld`).
+    static typedFrom(wrap, from, typing){
+        if (!typing) return delete wrap.typedFrom;
+
+        wrap.typedFrom ??= from;
+        if (wrap.typedFrom.toLowerCase() === wrap.title.toLowerCase()) delete wrap.typedFrom;
+    }
 
     // The Titles this Pane holds, in lower case, and whether it holds one: a section of it is
     // one of this Pane's Nodes. `exceptWrap` is a Node being renamed, which does not count.
-    heldTitles(){ return new Set(Object.keys(this.wrapPerTitle).map( (title)=>title.toLowerCase() )) }
+    // A Title a Node is being typed away from still counts as its own (`reserveHeld`).
+    heldTitles(){
+        const held = new Set();
+        this.forEachNodeWrap( (wrap)=>{
+            held.add(wrap.title.toLowerCase());
+            if (wrap.typedFrom) held.add(wrap.typedFrom.toLowerCase());
+        });
+        return held;
+    }
     holdsTitle(key, exceptWrap = null){
         for (const title in this.wrapPerTitle) {
             const wrap = this.wrapPerTitle[title];
-            if (wrap !== exceptWrap && !wrap.node.removed && title.toLowerCase() === key) return true;
+            if (wrap === exceptWrap || wrap.node.removed) continue;
+            if (title.toLowerCase() === key || wrap.typedFrom?.toLowerCase() === key) return true;
         }
         return false;
     }
@@ -211,14 +282,23 @@ class ZettelkastenProcessor {
         this.claimed = new Set();
         this.taken = [];
         this.renames = [];
+        this.bodies = new Set();
+        this.reserveHeld(this.noteInputLines);
 
         this.noteInputLines.forEach((line, index) => {
             currentNodeTitle = this.processLine(line, index, currentNodeTitle)
         });
 
+        // Where each of this Pane's Nodes is, for the lookups by Title that run between passes
+        // (`ZettelkastenParser.getNodeTitleLine`): a taken copy above a note is not the note.
+        const held = new Map();
+        this.forEachNodeWrap( (wrap)=>{ if (typeof wrap.lineNum === 'number') held.set(wrap.title.toLowerCase(), wrap.lineNum) } );
+        this.parser.heldLines = held;
+
         if (!mode.full) this.processChangedNodes(this.noteInputLines);
 
         this.drainDeferredRefs();
+        this.writeBodies();
 
         this.deleteInactiveNodesFromDict(this.wrapPerTitle);
         this.deleteInactiveNodesFromDict(this.wrapPerLine);
@@ -248,19 +328,22 @@ class ZettelkastenProcessor {
     // rename is reported rather than made silently.
     takes(title, lineNo, prefix, isType){
         const key = title.toLowerCase();
-        const holder = (this.claimed.has(key) ? this : paneHoldingTitle(title, this)?.processor);
-        if (!holder) {
+        const kept = this.reserved?.get(key);
+        // Saved as taken, its holder in a Pane not restored yet (`ZetPanes.restorePane`).
+        const savedTaken = Boolean(this.mode.restoring && this.takenOnSave?.has(key));
+        const holder = ((kept !== undefined && kept !== lineNo) || this.claimed.has(key)) ? this
+                     : (paneHoldingTitle(title, this)?.processor ?? (savedTaken ? null : undefined));
+        if (holder === undefined) {
             this.claimed.add(key);
             return false;
         }
 
-        const saved = this.mode.restoring && this.unboundNode(title, lineNo, isType);
+        const saved = this.mode.restoring && !savedTaken && this.unboundNode(title, lineNo, isType);
         if (saved) this.renames.push({lineNo, prefix, title, node: saved});
         else this.taken.push({title, lineNo, holder});
 
         const waiting = this.wrapPerLine[lineNo];
-        const typedOn = (this.noteInputLines[lineNo] !== this.prevNoteInputLines[lineNo]);
-        if (!this.mode.full && typedOn && waiting && !waiting.node.removed) waiting.live = true;
+        if (!this.mode.full && this.isTyped(lineNo) && waiting && !waiting.node.removed) waiting.live = true;
         return true;
     }
 
@@ -286,6 +369,17 @@ class ZettelkastenProcessor {
         let end = lineNo + 1;
         while (end < lines.length && !lines[end].startsWith(Tag.node) && !lines[end].startsWith(LLM_TAG)) end += 1;
         return lines.slice(lineNo + 1, end).join('\n').trim();
+    }
+
+    // Each body the pass rebuilt, written once, now, when the walk is done. A full pass
+    // cleared every body at its Title line and wrote it back a line at a time, each 20ms
+    // later -- one card overlay rebuilt per line of text, and a save, which runs a full
+    // pass and then reads the cards at once, stored every body empty.
+    writeBodies(){
+        for (const wrap of this.bodies) {
+            if (!wrap.node.removed) TextArea.update.call(TextArea.ofNode(wrap.node), wrap.plainText);
+        }
+        this.bodies = null;
     }
 
     // Each taken Title line gets a class the Pane styles, and the Notes panel is told, so it
@@ -326,12 +420,15 @@ class ZettelkastenProcessor {
             node.view.titleInput.value = to;
             return {lineNo, prefix, from: title, to};
         });
-        const cm = this.noteInput;
-        this.writeAs(ZettelkastenProcessor.Pass.restore, ()=>cm.operation( ()=>{
-            for (const {lineNo, prefix, to} of done) {
-                cm.replaceRange(prefix + ' ' + to, {line: lineNo, ch: 0}, {line: lineNo, ch: cm.getLine(lineNo).length});
-            }
-        }));
+        // The Refs in this Pane follow the rename: they meant this Pane's note, and left as
+        // they were they drew their Edges to the other Archive's instead.
+        let lines = this.noteInput.getValue().split('\n');
+        for (const {lineNo, prefix, from, to} of done) {
+            lines = renameNode(from, to, false)(lines.join('\n')).split('\n');
+            lines[lineNo] = prefix + ' ' + to;
+        }
+        const text = lines.join('\n');
+        this.writeAs(ZettelkastenProcessor.Pass.restore, ()=>this.noteInput.setValue(text));
         return done;
     }
 
@@ -398,10 +495,22 @@ class ZettelkastenProcessor {
         }
     }
 
+    // A Node's own section: from its Title line -- the one the pass bound it to -- to the next
+    // Title line. By its Title alone the first section with it was found, which is a taken
+    // copy when one sits above the note (#64), and the note took the copy's body and Refs.
+    sectionOf(wrap, lines){
+        const startLineNo = wrap.lineNum;
+        if (typeof startLineNo !== 'number' || lines[startLineNo] === undefined) {
+            return this.parser.getNodeSectionRange(wrap.title);
+        }
+        let endLineNo = startLineNo;
+        while (endLineNo + 1 < lines.length && !lines[endLineNo + 1].startsWith(Tag.node)
+               && !lines[endLineNo + 1].startsWith(LLM_TAG)) endLineNo += 1;
+        return {startLineNo, endLineNo};
+    }
+
     processChangedNode(lines, changedNodeTitle){
-        const changedNode = this.wrapPerTitle[changedNodeTitle].node;
-        const range = this.parser.getNodeSectionRange(changedNodeTitle);
-        const { startLineNo, endLineNo } = range;
+        const { startLineNo, endLineNo } = this.sectionOf(this.wrapPerTitle[changedNodeTitle], lines);
 
         let nodeContainsReferences = false;
         let nodeReferencesCleared = false;
@@ -413,11 +522,7 @@ class ZettelkastenProcessor {
                 nodeReferencesCleared = false;
             }
         }
-        if (lines.length && startLineNo < endLineNo) {
-            const textArea = TextArea.ofNode(changedNode);
-            const text = this.wrapPerTitle[changedNodeTitle].plainText;
-            TextArea.update.call(textArea, text);
-        }
+        if (lines.length && startLineNo < endLineNo) this.bodies.add(this.wrapPerTitle[changedNodeTitle]);
 
         // Clear references if no references are found and they haven't been cleared already
         if (!nodeContainsReferences && !nodeReferencesCleared) {
@@ -437,6 +542,7 @@ class ZettelkastenProcessor {
             const savedNode = this.unboundNode(currentNodeTitle, i, ZettelkastenProcessor.isText);
             if (savedNode) {
                 const wrap = this.makeZetWrap(savedNode, currentNodeTitle);
+                wrap.lineNum = i;
                 wrapPerLine[i] = wrapPerTitle[currentNodeTitle] = wrap;
                 return currentNodeTitle;
             }
@@ -452,7 +558,9 @@ class ZettelkastenProcessor {
                 if (wrapPerTitle[title] === wrap) delete wrapPerTitle[title];
                 wrap.title = currentNodeTitle;
                 wrap.live = true;
+                wrap.lineNum = i;
                 wrap.node.view.titleInput.value = currentNodeTitle;
+                ZettelkastenProcessor.typedFrom(wrap, title, this.isTyped(i) && !this.mode.full);
             } else {
                 const node = (nodefromWindow) ? TextNode.create(currentNodeTitle)
                            : this.spawnNodeFromZettelkasten(currentNodeTitle);
@@ -470,12 +578,13 @@ class ZettelkastenProcessor {
                 if (!this.mode.restoring) node.view.flashAsNew();
 
                 const wrap = this.makeZetWrap(node, currentNodeTitle);
+                wrap.lineNum = i;
                 wrapPerLine[i] = wrap;
                 wrapPerTitle[currentNodeTitle] = wrap;
             }
         } else {
             wrap.plainText = '';
-            if (this.mode.full) wrap.node.textarea.value = wrap.plainText;
+            if (this.mode.full) this.bodies.add(wrap);
             const lineNum = wrap.lineNum;
             if (wrapPerLine[lineNum] === wrap) delete wrapPerLine[lineNum];
             wrap.live = true;
@@ -502,23 +611,29 @@ class ZettelkastenProcessor {
         const titleInput = e.currentTarget;
         if (e.target !== titleInput) return;
 
-        let newName = titleInput.value.trim().replace(',', '');
-        // If a count was previously added, attempt to remove it
+        let typed = titleInput.value;
+        // If a count was previously added, attempt to remove it -- the " (2)" it added, and no
+        // more: a space the reader typed before it is theirs.
         if (wrap.countAdded) {
-            const updatedTitle = newName.replace(/\(\d+\)$/, '').trim();
-            if (updatedTitle !== newName) {
-                newName = updatedTitle;
-                titleInput.value = newName;
+            const stripped = typed.replace(/ \(\d+\)$/, '');
+            if (stripped !== typed) {
+                typed = titleInput.value = stripped;
                 wrap.countAdded = false;
             }
         }
+        let newName = typed.trim().replace(',', '');
         const name = wrap.title;
         if (newName === name) return;
 
         const wrapPerTitle = this.wrapPerTitle;
-        delete wrapPerTitle[name];
         // Taken in any Pane, in any case (#64); it asked this Pane only, and exactly.
         const unique = getUniqueNodeTitle(newName, wrap);
+        // A space typed after a Title that is taken is the next word on its way: the count
+        // went in at once, and the space with it -- "rust ownership" became "rustownership"
+        // when another Archive had a "Rust".
+        if (unique !== newName && /\s$/.test(typed)) return;
+
+        delete wrapPerTitle[name];
         const countAdded = wrap.countAdded = (unique !== newName);
         if (countAdded) {
             titleInput.value = newName = unique;
@@ -622,7 +737,7 @@ class ZettelkastenProcessor {
 
         // Check if the startLineIndex and endLineIndex are provided and within the bounds of the lines array
         if (startLineIndex === null || endLineIndex === null || startLineIndex < 0 || endLineIndex >= lines.length) {
-            const range = this.parser.getNodeSectionRange(currentNodeTitle);
+            const range = this.sectionOf(wrap, lines);
             startLineIndex = range.startLineNo + 1; // +1 to skip the title
             endLineIndex = range.endLineNo;
         }
@@ -653,8 +768,10 @@ class ZettelkastenProcessor {
             // worse rather than better -- the note filled itself in a pass or two
             // later, after the reader had already concluded it had not saved and typed
             // it again. Every line of prose that carries a link took this path, which
-            // in a knowledge graph is most of them.
-            TextArea.update.call(TextArea.ofNode(wrap.node), wrap.plainText);
+            // in a knowledge graph is most of them. Inside a pass it is written once, at
+            // the end (`writeBodies`).
+            if (this.bodies) this.bodies.add(wrap);
+            else TextArea.update.call(TextArea.ofNode(wrap.node), wrap.plainText);
         }
     }
 
@@ -838,12 +955,7 @@ class ZettelkastenProcessor {
 
     handleLineWithoutTags(wrap, line, partial){
         wrap.plainText += (wrap.plainText ? '\n' : '') + line;
-        if (partial) return;
-
-        const textArea = TextArea.ofNode(wrap.node);
-
-        // getDebouncedTextareaUpdate(textArea)(wrap.plainText);
-        Promise.delay(20).then(TextArea.update.bind(textArea, wrap.plainText));
+        if (!partial) this.bodies?.add(wrap);
     }
 
     deleteInactiveNodesFromDict(dict){
@@ -895,10 +1007,13 @@ class ZettelkastenProcessor {
         if (!wrap || wrap.node.removed) {
             if (wrapPerLine[i] && !wrapPerLine[i].node.removed) {
                 wrap = wrapPerTitle[nodeTitle] = wrapPerLine[i];
-                delete wrapPerTitle[wrap.title];
+                const title = wrap.title;
+                if (wrapPerTitle[title] === wrap) delete wrapPerTitle[title];
                 wrap.title = nodeTitle;
                 wrap.live = true;
+                wrap.lineNum = i;
                 wrap.node.view.titleInput.value = nodeTitle;
+                ZettelkastenProcessor.typedFrom(wrap, title, this.isTyped(i) && !this.mode.full);
             } else {
                 const sx = (Math.random() - 0.5) * 1.8;
                 const sy = (Math.random() - 0.5) * 1.8;
@@ -935,8 +1050,8 @@ class ZettelkastenProcessor {
             wrap.title = newName;
 
             const noteInput = this.noteInput;
-            const f = renameNode(oldName, newName);
-            noteInput.setValue(f(noteInput.getValue()));
+            const f = renameNode(oldName, newName, true, LLM_TAG);
+            this.writeAs(ZettelkastenProcessor.Pass.rewrite, ()=>noteInput.setValue(f(noteInput.getValue())));
             noteInput.refresh();
         });
     }

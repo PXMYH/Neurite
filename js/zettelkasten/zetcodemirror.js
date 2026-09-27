@@ -139,8 +139,14 @@ class ZettelkastenParser {
         return lines.join('\n');
     }
 
+    // The line of the section that is the Node, where the pass put it (`heldLines`): a taken
+    // copy of its Title above it is the first line with the Title, and is not the note (#64).
     getNodeTitleLine(title) {
         const lowerCaseTitle = title.toLowerCase();
+        const held = this.heldLines?.get(lowerCaseTitle);
+        const heldText = (held === undefined) ? null : this.cm.getLine(held);
+        if (heldText?.startsWith(Tag.node) && heldText.substr(Tag.node.length).trim().toLowerCase() === lowerCaseTitle) return held;
+
         const sorted = Array.from(this.nodeTitleToLineMap).sort((a, b) => a[1] - b[1]);
         for (const [mapTitle, mapLineNo] of sorted) {
             if (mapTitle.toLowerCase() === lowerCaseTitle) return mapLineNo
@@ -154,15 +160,20 @@ class ZettelkastenParser {
     // through the next AI section and took it along.
     //
     // Returns whether this pane held the section, so a caller can stop looking.
-    deleteNodeByTitle(title) {
-        let startLineNo = this.nodeTitleToLineMap.get(title);
-        if (startLineNo === undefined) {
+    //
+    // The kind of Node picks the kind of line: a text Node's section starts at its Title
+    // line, the one the pass bound it to (`getNodeTitleLine`), an AI Node's at its `AI:`
+    // line. Looked up by Title alone, deleting an AI Node took a `## ` note with the same
+    // Title -- a taken copy -- with it, and left the `AI:` line to make the AI Node again.
+    deleteNodeByTitle(title, isAi = false) {
+        let startLineNo = (isAi ? undefined : this.getNodeTitleLine(title));
+        if (startLineNo === undefined && isAi) {
             this.cm.eachLine( (line)=>{
                 if (startLineNo !== undefined || !line.text.startsWith(LLM_TAG)) return;
                 if (line.text.slice(LLM_TAG.length).trim() === title) startLineNo = line.lineNo();
             });
-            if (startLineNo === undefined) return false;
         }
+        if (startLineNo === undefined) return false;
 
         let endLineNo = startLineNo;
         for (let i = startLineNo + 1; i < this.cm.lineCount(); i++) {
@@ -533,7 +544,7 @@ function deleteNodeAndItsZetText(node){
     if (!title) return;
 
     for (const pane of (holder ? [holder, ...window.zetPaneList] : window.zetPaneList)) {
-        if (pane.parser.deleteNodeByTitle(title)) return;
+        if (pane.parser.deleteNodeByTitle(title, Boolean(node.isLLM))) return;
     }
 }
 
