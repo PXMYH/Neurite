@@ -1,9 +1,10 @@
 <div class="submenu">
     <!-- The main prompt, from the Notes tab. First in the tab because it is the action
          and everything under it is configuration. Nothing was rewired: `sendMessage`,
-         `autoGrow`, `#aiLoadingIcon`, `#aiErrorIcon` and `#regen-button` all bind by id,
-         and `body.ai-disabled #prompt-form` in styles.css still hides it -- redundantly
-         now, since it hides `#tab4` around it as well. Issue #65. -->
+         `autoGrow`, `#aiLoadingIcon`, `#aiErrorIcon` and `#regen-button` all bind by id.
+         `body.ai-disabled #prompt-form` in styles.css hides it, and is not redundant with
+         the rule that hides `#tab4` around it: every AI Node's regenerate button carries
+         the same id (ainode.js), so that rule is also what hides those. Issue #65. -->
     <form id="prompt-form" onsubmit="sendMessage(event);">
         <div style="display: flex; width: 100%; padding-bottom: 12px;">
 

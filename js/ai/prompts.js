@@ -76,33 +76,21 @@ ${nodeTag} Zettelkasten:
 - Saving happens on its own. The menu's Open... and Save to... rows move a .neurite file in and out of the browser.
 
 ${nodeTag} Advanced Controls:
-- Checkboxes beside the prompt in the Ai tab provide additional features.
-- API key setup needed for Open-Ai, Google Search, and Wolfram Alpha. API key inputs are in the Ai tab. LocalHost servers required for Extracts, Wolfram, and Wiki. Instructions are in Github link at the ? tab.
+- The checkboxes under Context Settings, in the menu's Ai panel, provide additional features.
+- API key setup needed for Open-Ai, Google Search, and Wolfram Alpha. API key inputs are in the Ai panel. LocalHost servers required for Extracts, Wolfram, and Wiki. Instructions are in the Github link in the Help panel.
 - Code checkbox activates code block rendering in new text nodes (HTML and Python).
 - Search checkbox displays relevant webpages or pdfs. Requires Google Search API key unless a direct link is input as your prompt. Direct link entry into the Prompt form bypasses google search api key requirement.
 - Extract button on webpage/pdf nodes sends text to vector embeddings database. Requires extracts localhost server.
 - Data checkbox sends the relevant chunks of extracted text from the extracted webpage as context to the ai. Requires webscrape localhost.
-- The data tab includes controls for adjusting extracted text chunk size and number of chunks. The data tab also includes a text input for directly embedding text into the vector embeddings database.
+- The Vector-DB button, also under Context Settings, uploads a file into the vector embeddings database, with its chunk size set before it is stored, and deletes stored files.
 - Wolfram checkbox displays relevant Wolfram Alpha results. Requires Wolfram localhost server.
 - Wiki checkbox displays relevant Wikipedia results. Requires Wiki localhost server.
 - Auto checkbox sets the AI into self-prompting mode.
 - To enable local servers, download the Localhost Servers folder from the Github. Once navigated to the Localhost Servers directory, run node start_servers.js
 
-New Update!
-Download the latest version of **Neurite Desktop** ↓
-<a href="https://github.com/satellitecomponent/Neurite/releases/download/electron-2025.04.06.064247/Neurite-1.0.0-arm64.dmg" target="_blank">macOS</a>
-<a href="https://github.com/satellitecomponent/Neurite/releases/download/electron-2025.04.06.064247/Neurite.Setup.1.0.0.exe" target="_blank">Windows</a>
-<a href="https://github.com/satellitecomponent/Neurite/releases/download/electron-2025.04.06.064247/Neurite-1.0.0.AppImage" target="_blank">Linux</a>
-
-${nodeTag} Unchain from the traditional limitations of a browser
-Forget tabs! Neurite is all about graphs. Open as many browser windows as you want and display them side by side in our infinite fractal canvas.
-The desktop release also includes a full web browsing experience inside link nodes — no more restrictions on which links you can open.
-- Forward and backward navigation built into each link node
-- Create new link nodes by directly dragging out URLs
-- Works with any site, no sandboxing limitations
-- Automatic updates built-in
-
-Neurite Desktop can be opened like any other app you've installed.
+${nodeTag} Neurite for Mac
+Neurite also runs as a Mac app, for Apple silicon, from the releases page of this fork: https://github.com/PXMYH/Neurite/releases
+It is the same Neurite in its own window, and it keeps its graphs apart from the browser's.
 
 Make sure to exclusivly reference the above described controls. Avoid divergence from the above how-to.`;
 }

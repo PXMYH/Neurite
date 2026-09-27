@@ -190,3 +190,38 @@ test('the notes pane widens when its side handle is dragged right', async () => 
     assert.ok(Math.abs(pane1.width - pane0.width - 120) <= 2,
         `a 120px drag widened the pane by ${Math.round(pane1.width - pane0.width)}px`);
 });
+
+// A pane widened in a wide window kept its width when the window shrank: measured, 1370px
+// at 1600px stayed 1370px at 1000px, its handle off screen and nothing left to narrow it.
+test('the notes pane handle stays on screen when the window shrinks', async () => {
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    await page.click("button.menu-row.tablink:has-text('Notes')");
+    await page.waitForTimeout(500);
+
+    const handle = () => page.evaluate(() => {
+        const h = document.getElementById('zetHorizDragHandle');
+        const r = h.getBoundingClientRect();
+        const x = r.x + r.width / 2, y = r.y + r.height / 2;
+        return { x, y, onScreen: document.elementFromPoint(x, y) === h,
+                 pane: document.getElementById('zetPaneContainer').offsetWidth };
+    });
+    let h = await handle();
+    await page.mouse.move(h.x, h.y);
+    await page.mouse.down();
+    for (let x = h.x; x <= h.x + 1100; x += 50) await page.mouse.move(x, h.y);
+    await page.mouse.up();
+    assert.ok((await handle()).pane > 1000, 'the pane should be wide before the window shrinks');
+
+    await page.setViewportSize({ width: 1000, height: 1000 });
+    await page.waitForTimeout(300);
+    h = await handle();
+    assert.ok(h.onScreen, 'the handle can still be reached');
+
+    await page.mouse.move(h.x, h.y);
+    await page.mouse.down();
+    await page.mouse.move(h.x - 300, h.y, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    assert.ok(Math.abs((await handle()).pane - (h.pane - 300)) <= 2, 'and a drag narrows the pane');
+});

@@ -2648,7 +2648,13 @@ input[type="checkbox"] {
     border: none;
     resize: none;
     overflow: auto;
-    min-width: 270px;
+    /* Never wider than the window leaves room for, so the side handle stays on screen.
+       The drag writes a width in px; a pane widened to 1370px at 1600px stayed 1370px
+       when the window shrank to 1000px, with its handle off screen and no way left to
+       narrow it. 74px: 27px from the window's left edge to the pane, 31px from the pane
+       to the menu's right edge, and the menu's 16px left margin kept on the right. */
+    max-width: calc(100vw - 74px);
+    min-width: min(270px, calc(100vw - 74px));
     height: 60vh;
     width: 270px;
 }
@@ -2976,7 +2982,7 @@ td {
         }
 
         /* The panel is a content-sized grid, so each tab decides how wide the menu is:
-           Notes settles at ~300px, Saves at ~530px. `width: 100%` was circular here --
+           Notes settles at 312px, Help at 502px. `width: 100%` was circular here --
            it resolved against a track the content had already stretched -- and thirty
            rows of sentences stretched it to the whole window. Declared in px, and
            clamped so a phone gets the viewport instead of a horizontal scrollbar. */
