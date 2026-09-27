@@ -157,10 +157,22 @@ test('keywords come from the AI answer once there is a conversation', async ()=>
 });
 
 test('keywords fall back to the longest words when the AI gives none', async ()=>{
-    // A failed call answers undefined; so does one with no quotes in it.
+    // A failed call answers undefined; so does one with no quotes in it. "does" is as long
+    // as "deep" and "zoom", and is left out as a word every message has.
     for (const answer of [undefined, 'no quotes here']) {
-        assert.deepEqual(Array.from(await keywords(answer)), ['mandelbrot', 'deep', 'does']);
+        assert.deepEqual(Array.from(await keywords(answer)), ['mandelbrot', 'deep', 'zoom']);
     }
-    assert.deepEqual(Array.from(await keywords('unused', '')), ['mandelbrot', 'deep', 'does'],
+    assert.deepEqual(Array.from(await keywords('unused', '')), ['mandelbrot', 'deep', 'zoom'],
         'and a first exchange, with no conversation yet, never asks');
+});
+
+// A first exchange searches by these words. "What is a fractal?" gave "fractal?", "What"
+// and "is", and "is" ranked every note that uses it with the one about fractals.
+test("a first exchange's keywords leave out punctuation and the words every message has", async ()=>{
+    const src = slice(read('js/interface/searchapi/searchapi.js'), 'async function generateKeywords(');
+    const ctx = vm.createContext({Logger: logger, getLastPromptsAndResponses: ()=> ''});
+    vm.runInContext(src + ';globalThis.generateKeywords = generateKeywords;', ctx);
+    assert.deepEqual(Array.from(await ctx.generateKeywords('What is a fractal?', 3)), ['fractal']);
+    assert.deepEqual(Array.from(await ctx.generateKeywords('Is c++ faster than python?', 3)),
+        ['faster', 'python', 'c++'], 'a word that ends in symbols keeps them');
 });

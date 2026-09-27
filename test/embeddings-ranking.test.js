@@ -114,18 +114,26 @@ test('with embeddings down, only a keyword match is relevant', async ()=>{
     assert.deepEqual(Array.from(await h.search(''), (n)=> n.uuid), [], 'and an empty term matches nothing');
 });
 
-// A first exchange searches by the message's own longest words, punctuation and all:
-// "What is a fractal?" is the term "fractal?, What, is". A title match by substring gave
-// "is" the x10 in "History of Rome" and "Poisson distribution", over "Mandelbrot set".
-test('a keyword counts as a whole word, in the title as in the text', async ()=>{
+// A title match by substring gave "is" the x10 in "History of Rome" and "Poisson
+// distribution", over "Mandelbrot set" (the first-exchange keywords that sent "is" are
+// pinned in backend-failure-paths.test.js). A keyword counts from the start of a word, in
+// the title as in the text -- so a plural or a longer word still counts -- and anywhere in a
+// script written without spaces.
+test('a keyword counts from the start of a word, in the title as in the text', async ()=>{
     const h = searchHarness( ()=> [], [
-        ['rome', 'History of Rome', 'Rome was not built in a day.'],
-        ['poisson', 'Poisson distribution', 'Counts of events in an interval.'],
+        ['rome', 'History of Rome', 'Rome is old, and this is its story.'],
+        ['poisson', 'Poisson distribution', 'It is a distribution of counts.'],
         ['mandel', 'Mandelbrot set', 'The fractal set in the complex plane.'],
+        ['plural', 'Fractals', 'Shapes that repeat.'],
+        ['han', '分形几何', '自相似'],
         ['code', 'Languages', 'I write c++ daily.'],
     ]);
-    assert.deepEqual(Array.from(await h.search('fractal?, What, is'), (n)=> n.uuid), ['mandel']);
-    assert.deepEqual(Array.from(await h.search('c++'), (n)=> n.uuid), ['code'], 'and a word that ends in symbols');
+    const found = async (term)=> Array.from(await h.search(term), (n)=> n.uuid).sort();
+    assert.deepEqual(await found('fractal'), ['mandel', 'plural']);
+    assert.deepEqual(await found('ist'), [], '"ist" is inside "History" and "distribution", at no word start');
+    assert.deepEqual(await found('mandel'), ['mandel'], 'the start of a longer word');
+    assert.deepEqual(await found('分形'), ['han'], 'and a script with no spaces');
+    assert.deepEqual(await found('c++'), ['code'], 'and a word that ends in symbols');
 });
 
 // A title holding one of the keywords earns the x10 -- the whole term never was in one.

@@ -2,12 +2,23 @@ async function generateKeywords(message, count, specificContext = null, node = n
     const lastPromptsAndResponses = specificContext || getLastPromptsAndResponses(2, 150);
     const isEmpty = !lastPromptsAndResponses || !/\S/.test(lastPromptsAndResponses);
 
+    // The message's own longest words -- without sentence punctuation at their ends, and
+    // without the words every message has. "What is a fractal?" searched the notes for
+    // "fractal?", "What" and "is", and "is" ranked every note that uses it as high as the
+    // one about fractals.
+    const common = new Set(['the', 'and', 'are', 'was', 'were', 'for', 'from', 'with', 'that',
+        'this', 'these', 'those', 'what', 'when', 'where', 'which', 'who', 'whom', 'whose',
+        'why', 'how', 'does', 'did', 'have', 'has', 'had', 'not', 'but', 'can', 'could',
+        'would', 'should', 'will', 'about', 'into', 'there', 'their', 'they', 'them', 'then',
+        'than', 'your', 'you', 'its', 'our', 'any', 'all', 'some', 'just', 'like', 'also',
+        'very', 'more', 'most', 'much', 'many', 'such', 'only', 'over', 'after', 'before',
+        'being', 'been', 'here', 'each', 'other', 'tell', 'explain', 'please']);
     const longestWords = ()=>message
-        .split(' ')
-        .filter(word => word.trim().length > 0)
+        .split(/\s+/)
+        .map( (word)=>word.replace(/^[.,;:!?"'()[\]{}]+|[.,;:!?"'()[\]{}]+$/g, '') )
+        .filter( (word)=>word.length >= 3 && !common.has(word.toLowerCase()) )
         .sort((a, b) => b.length - a.length)
-        .slice(0, count)
-        .map(String.trim);
+        .slice(0, count);
 
     if (isEmpty) return longestWords();
 

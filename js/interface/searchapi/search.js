@@ -182,11 +182,15 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
     const keywords = searchTermLowered.split(/,\s*/)
         .map( (keyword)=>keyword.replace(/^[\s.,;:!?"'()[\]{}]+|[\s.,;:!?"'()[\]{}]+$/g, '') )
         .filter(Boolean);
-    // A keyword as a whole word, in the title and the text alike, and in any script: `\b`
-    // knows only ASCII letters, could never close after "c++", and the title test was a
-    // substring -- "is" earned the x10 in "History of Rome", over "Mandelbrot set".
-    const wholeWords = keywords.map( (keyword)=>new RegExp(
-        `(?<![\\p{L}\\p{N}])${escapeRegExp(keyword)}(?![\\p{L}\\p{N}])`, 'iu') );
+    // A keyword as the start of a word, in the title and the text alike: "fractal" finds
+    // "Fractals" and "mandel" finds "Mandelbrot", while "is" no longer finds "History" --
+    // the title test was a substring, and gave "History of Rome" the x10 over "Mandelbrot
+    // set". `\b` knows only ASCII letters and could never close after "c++". Scripts
+    // written without spaces between words (Han, Kana, Thai) have no word starts to find,
+    // so there a keyword matches anywhere, as before.
+    const unspaced = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
+    const wordStarts = keywords.map( (keyword)=>new RegExp(
+        (unspaced.test(keyword) ? '' : '(?<![\\p{L}\\p{N}])') + escapeRegExp(keyword), 'iu') );
 
     // Text Nodes only, filtered before anything is embedded. Every Node used to be
     // embedded and the others skipped afterwards, so an image, link or AI Node cost a
@@ -223,10 +227,10 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
         // three keywords a send searches by, the whole term was never in a title, so the
         // x10 below could not apply.
         const title = node.view.titleInput.value;
-        const titleMatchScore = wholeWords.some( (word)=>word.test(title) ) ? 1 : 0;
+        const titleMatchScore = wordStarts.some( (word)=>word.test(title) ) ? 1 : 0;
 
         const text = node.getText();
-        const contentMatchScore = wholeWords.filter( (word)=>word.test(text) ).length;
+        const contentMatchScore = wordStarts.filter( (word)=>word.test(text) ).length;
 
         const weightedTitleScore = titleMatchScore * 10;
         const weightedContentScore = contentMatchScore;
