@@ -49,7 +49,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Double Click</code></td>
-    <td>Anchor a node</td>
+    <td>A note arrives pinned. Double click releases it to the fractal; again pins it where it is.</td>
   </tr>
   <tr>
     <td><code>Ctrl + Shift + M</code></td>

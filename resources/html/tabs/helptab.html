@@ -10,7 +10,8 @@
      `createnodes.js` (the double-click branches), `movenodes.js` (`directionMap`),
      `edgeclass.js` (`onClick` / `onDblClick` / `onWheel`), `mandelbrot.js` (the
      Alt-key switch), `dropdown.js` (`toolShortcuts`), `togglenodestate.js` (the
-     drag box), `nodemode.js` (Escape).
+     drag box), `nodemode.js` (Escape), `hud.js` (`bindKeys`), `interface.js`
+     (`onWheel`).
 
      Shift, Alt and Control are the defaults, not constants: they are
      `controls.shiftKey` / `altKey` / `controlKey` in `globals.js` and the control
@@ -34,8 +35,22 @@
             <td>Zoom. Zoom in before making nodes, so they have room to grow.</td>
         </tr>
         <tr>
+            <td><kbd>Alt</kbd> + scroll</td>
+            <td>Turn the view about the pointer.</td>
+        </tr>
+        <tr>
+            <td><kbd>0</kbd> <kbd>t</kbd> <kbd>Home</kbd> <kbd>+</kbd> <kbd>-</kbd></td>
+            <td>
+                Fit, Tidy and Home, the buttons at the bottom left, and zoom in and out.
+                Fit takes the selection when there is one, and every note when not.
+            </td>
+        </tr>
+        <tr>
             <td><kbd>Esc</kbd></td>
-            <td>Drop a node that is following the pointer.</td>
+            <td>
+                Drop a node that is following the pointer, a link you started, and the
+                selection. An open menu or dialog takes it first.
+            </td>
         </tr>
     </table>
 
@@ -140,8 +155,9 @@
         <tr>
             <td>Double-click a window</td>
             <td>
-                Anchor it, so the fractal stops carrying it. Again releases it. Inside
-                a text box, hold <kbd>Alt</kbd> as well.
+                A note arrives pinned, and stays where you put it. Double-click releases
+                it to the fractal, which carries it along; again pins it where it is.
+                Inside a text box, hold <kbd>Alt</kbd> as well.
             </td>
         </tr>
         <tr>
@@ -154,7 +170,10 @@
         </tr>
         <tr>
             <td>Drag a title bar</td>
-            <td>Move one window. <kbd>Shift</kbd> + scroll over it resizes it.</td>
+            <td>
+                Move the window, and the rest of the selection with it when it is in one.
+                <kbd>Shift</kbd> + scroll over it resizes it, or the whole selection.
+            </td>
         </tr>
         <tr>
             <td><kbd>Alt</kbd> + drag or click</td>
@@ -202,10 +221,6 @@
         <tr>
             <td><kbd>Alt</kbd> + <kbd>c</kbd></td>
             <td>Release every kept line.</td>
-        </tr>
-        <tr>
-            <td><kbd>Alt</kbd> + <kbd>s</kbd></td>
-            <td>Save the lines as a PNG file.</td>
         </tr>
         <tr>
             <td>Fractal panel</td>

@@ -92,9 +92,21 @@ test('the reference overrides the grid the global table rule would draw', ()=>{
 // claim to hold. These are the rows most likely to rot, because each one names a
 // literal that lives in exactly one handler.
 const CLAIMS = [
-    {row: /Alt<\/kbd> \+ <kbd>s/, says: /PNG/,
-     file: 'js/mandelbrot/mandelbrot.js', code: /a\.download = name \+ "\.png"/,
-     why: 'the fractal-line export writes a PNG, whatever the row says'},
+    {row: /<kbd>Alt<\/kbd> \+ scroll/, says: /Turn the view/,
+     file: 'js/interface/interface.js', code: /Graph\.applyRotationDelta\(angle\)/,
+     why: 'Alt and the wheel no longer turn the view, so the row promises a gesture that is gone'},
+    {row: /<kbd>0<\/kbd> <kbd>t<\/kbd>/, says: /Fit takes the selection/,
+     file: 'js/interface/hud.js', code: /contentBounds\(selection\.uuids\.size/,
+     why: 'Fit no longer fits the selection, so zoom-to-selection has no route left (#40)'},
+    {row: /<kbd>Esc<\/kbd><\/td>/, says: /and the\s+selection/,
+     file: 'js/nodes/nodeinteraction/nodemode.js', code: /App\.selectedNodes\.clear\(\)/,
+     why: 'Escape no longer clears the selection, so the row promises a way out that is gone'},
+    {row: /Double-click a window/, says: /arrives pinned/,
+     file: 'js/nodes/createnodes/window.js', code: /node\.anchorForce = 1;/,
+     why: 'a new note no longer arrives pinned, so the row describes the double-click backwards'},
+    {row: /Drag a title bar/, says: /rest of the selection/,
+     file: 'js/nodes/nodeclass.js', code: /node\.pos = node\.pos\.plus\(delta\)/,
+     why: 'a drag no longer carries the pinned Nodes of a selection, which every note is'},
     {row: /<kbd>1<\/kbd>/, says: /note, link, file tree, Ai/,
      file: 'js/interface/dropdown/dropdown.js', code: /const toolShortcuts = \{/,
      why: 'the digit shortcuts are gone, so the row promises four keys that do nothing'},
@@ -149,6 +161,18 @@ test('every control the reference names is still implemented', ()=>{
         assert.match(match[0], claim.says, 'the row no longer says what it did');
         assert.match(read(claim.file), claim.code, claim.why);
     }
+});
+
+// A key is shipped with a visible control that prints it (#40). Alt+S had none, and what it
+// saved was the SVG layer alone -- the Fractal and the Edges, and none of the Nodes, which are
+// HTML -- so it is gone from the key map and from the reference, and not replaced.
+test('Alt+S, the export that left out every Node, is gone from the keys and the reference', ()=>{
+    const mandelbrot = read('js/mandelbrot/mandelbrot.js');
+    const altSwitch = mandelbrot.slice(mandelbrot.indexOf('if (e.altKey) {'));
+    assert.match(altSwitch, /case 'f':/, 'the Alt key map was not found; this test reads nothing');
+    assert.doesNotMatch(altSwitch.slice(0, altSwitch.indexOf('});')), /case 's':/);
+    assert.doesNotMatch(mandelbrot, /download_svg_screenshot/);
+    assert.doesNotMatch(help, /<kbd>Alt<\/kbd> \+ <kbd>s<\/kbd>/);
 });
 
 test('the keys the reference does not repeat are the ones the reader can rebind', ()=>{

@@ -36,7 +36,7 @@ class Hud {
             </div>
             <div class="hud-row hud-actions">
                 <button type="button" class="hud-btn" data-act="fit"
-                        data-tooltip="Fit every note on screen (0)">Fit</button>
+                        data-tooltip="Fit the selection on screen, or every note when nothing is selected (0)">Fit</button>
                 <button type="button" class="hud-btn" data-act="tidy"
                         data-tooltip="Push overlapping notes apart, without rearranging the map (T)">Tidy</button>
                 <button type="button" class="hud-btn" data-act="home"
@@ -97,11 +97,12 @@ class Hud {
     // The plane rectangle every note occupies, including the space its card takes
     // up -- a bounding box of centre points alone would cut the outermost cards in
     // half in the overview and misreport what "fit" has to cover.
-    static contentBounds(){
+    // Every Node, or those `only` keeps.
+    static contentBounds(only){
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         let count = 0;
         for (const node of Object.values(Graph.nodes)) {
-            if (node.removed) continue;
+            if (node.removed || (only && !only(node))) continue;
             const half = Graph.planeHalfExtent(node) || {hw: 0, hh: 0};
             minX = Math.min(minX, node.pos.x - half.hw);
             maxX = Math.max(maxX, node.pos.x + half.hw);
@@ -245,8 +246,11 @@ class Hud {
     }
 
     // Put every note on screen.
+    // The selection when there is one, which is zoom-to-selection without a key of its own
+    // (#40); every note when there is not.
     static fitAll(){
-        const box = Hud.contentBounds();
+        const selection = App.selectedNodes;
+        const box = Hud.contentBounds(selection.uuids.size ? selection.hasNode.bind(selection) : null);
         if (!box) return Hud.home();
 
         Autopilot.stop();

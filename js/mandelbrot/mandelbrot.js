@@ -824,16 +824,16 @@ Fractal.removeNonPreserved = function(child){
     if (!child.classList.contains('preserve')) svg_bg.removeChild(child)
 }
 
+// Alt+S was a third key here: it saved `svg_bg` -- the Fractal and the Edges -- as a PNG, and
+// every Node, being HTML, was absent from it, with nothing on screen to say so or to show the
+// key existed (#40). Removed rather than fixed: the menu's Screenshot row takes what is on
+// screen, and what an exported image of a Graph includes is its own question (#47).
 On.keydown(document, (e)=>{
     if (e.altKey) {
         switch (e.key) {
             case 'f': // toggle preservation
                 Logger.info("Adding preservation fractal lines.");
                 Elem.forEachChild(svg_bg, Fractal.addPreservation);
-                break;
-            case 's': // take screenshot
-                download_svg_screenshot("NeuriteSVG" + new Date().toISOString());
-                Logger.info("Screenshot taken and downloaded.");
                 break;
             case 'c': // clear all preservations
                 Logger.info("Clearing all preserved fractal lines.");
@@ -842,49 +842,6 @@ On.keydown(document, (e)=>{
         }
     }
 });
-
-function download_svg_screenshot(name) {
-    var svg = Elem.byId('svg_bg');
-    var bgColorInput = Elem.byId('colorPicker').value;
-
-    // Ensure the SVG has explicit dimensions
-    svg.setAttribute('width', svg.clientWidth);
-    svg.setAttribute('height', svg.clientHeight);
-
-    const xml = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = function () {
-        const canvas = Html.new.canvas();
-        canvas.width = svg.clientWidth;
-        canvas.height = svg.clientHeight;
-        var ctx = canvas.getContext('2d');
-
-        // If the selected color is not black, use it as the background color
-        if (bgColorInput !== '#000000') {
-            ctx.fillStyle = bgColorInput;  // Set background color from the input
-            ctx.fillRect(0, 0, canvas.width, canvas.height);  // Fill background
-        } else {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);  // Keep it transparent
-        }
-
-        ctx.drawImage(img, 0, 0);
-
-        // for the download
-        const a = Html.make.a(canvas.toDataURL("image/png"));
-        a.download = name + ".png";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        // Clean up
-        URL.revokeObjectURL(url);
-    }
-    img.src = url;
-    img.onerror = Logger.err.bind(Logger, "Failed to load the image");
-}
 
 function gcd(a, b){ return (b === 0 ? a : gcd(b, a % b)) }
 

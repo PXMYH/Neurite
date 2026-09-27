@@ -271,6 +271,37 @@ test('the box a Mod + drag draws is the accent, and blurs nothing behind it', as
     assert.equal(box.border, 'rgb(115, 150, 212)', `the box is not the accent (${box.accent})`);
 });
 
+test('Fit takes the selection when there is one, and every note when there is not', async () => {
+    // Zoom-to-selection, without a key of its own (#40).
+    ({ context, page } = await openNeurite(browser));
+    const [a, b, c] = await threeNotes(page);
+    const onScreen = () => page.evaluate(() => Object.values(Graph.nodes).filter((n) => {
+        const r = n.view.div.getBoundingClientRect();
+        return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+    }).map((n) => n.getTitle()).sort());
+    const centreOf = (id) => page.evaluate((id) => {
+        const r = Graph.nodes[id].view.div.getBoundingClientRect();
+        return { x: r.x + r.width / 2, w: r.width };
+    }, id);
+    const fit = async () => { await page.keyboard.press('0'); await page.waitForTimeout(500); };
+
+    await fit();
+    assert.deepEqual(await onScreen(), ['Alpha', 'Beta', 'Gamma']);
+    const allWidth = (await centreOf(c)).w;
+    await clickCard(page, c, await modKey(page));
+    await page.evaluate(() => document.activeElement?.blur());
+    await fit();
+    const zoomed = await centreOf(c);
+    const width = await page.evaluate(() => innerWidth);
+    assert.ok(zoomed.w > allWidth * 1.2, 'Fit did not zoom in on the selected note');
+    assert.ok(Math.abs(zoomed.x - width / 2) < width * 0.1, 'the selected note is not in the middle');
+
+    await page.keyboard.press('Escape');
+    await fit();
+    assert.deepEqual(await onScreen(), ['Alpha', 'Beta', 'Gamma'], 'Fit after Escape left a note off screen');
+    assert.ok(a && b, 'three notes were made');
+});
+
 for (const [platform, key, other, label] of [['MacIntel', 'Meta', 'Control', 'Cmd'], ['Win32', 'Control', 'Meta', 'Ctrl']]) {
     test(`on ${platform}, ${label} + click and ${label} + drag select, and the Help says ${label}`, async () => {
         // On a Mac, Control and a click is the secondary click: Blink and WebKit fire
