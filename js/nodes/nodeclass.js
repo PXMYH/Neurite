@@ -268,11 +268,19 @@ class Node {
         }, 4000); // 4 secs
     }
 
+    // What the Node says, and not what its card says about other Nodes. The link strip names
+    // each Node this one is linked to, and its "+ link" is on every card: measured, a search
+    // for "link" matched every Node, and "gam" each Node linked to Gamma. One text node at a
+    // time rather than each element's `textContent`, which is the only way to leave a
+    // subtree out.
     searchStrings() {
         function* search(e) {
-            yield e.textContent;
+            if (e.classList.contains('link-strip')) return;
             if (e.value) yield e.value;
-            for (const c of e.children) yield* search(c);
+            for (const c of e.childNodes) {
+                if (c.nodeType === document.TEXT_NODE) yield c.data;
+                else if (c.nodeType === document.ELEMENT_NODE) yield* search(c);
+            }
         }
         return search(this.content);
     }

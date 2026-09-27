@@ -249,17 +249,20 @@ test('the add control opens the connect picker for this card', ()=>{
     assert.deepEqual(card.connectOpened, [card.node], 'the picker must be about this note');
 });
 
-test('the add control invites on an empty row and shrinks beside chips', ()=>{
+test('the add control says what it adds, beside chips too, and teaches the shortcut', ()=>{
     const empty = makeCard();
     const linked = makeCard({links: ['Fractal geometry']});
 
     const {strip: emptyStrip} = paint(empty);
     const {strip: linkedStrip} = paint(linked);
 
-    // With nothing beside it, a bare glyph says nothing about what it adds.
     assert.deepEqual(classesOf(emptyStrip), ['link-add'], 'the row exists before any link does');
     assert.equal(emptyStrip.children[0].textContent, '+ link');
-    assert.equal(linkedStrip.children[1].textContent, '+');
+    // It shrank to a bare "+" after the first link, which says nothing about what it adds
+    // -- and it is the way to connect a Node that every Node shows (#50).
+    const add = linkedStrip.children[1];
+    assert.equal(add.textContent, '+ link', 'the add control lost its word beside a chip');
+    assert.match(add.title, /Shift/, 'the add control no longer teaches the Shift shortcut');
 });
 
 test('a chip goes to the note it names', ()=>{

@@ -21,19 +21,24 @@ function nodesForSearchTerm(searchTerm, maxResults) {
         }
 
         const searchable = [...node.searchStrings()].join().toLowerCase();
+        const title = (node.view?.titleInput?.value ?? '').toLowerCase();
         let numMatches = 0;
+        let inTitle = 0;
         for (const keyword of keywords) {
             if (searchable.includes(keyword)) {
                 numMatches += 1;
             }
+            if (title.includes(keyword)) inTitle += 1;
         }
 
         if (numMatches > 0) {
-            matched.push({ node, numMatches });
+            matched.push({ node, numMatches, inTitle });
         }
     });
 
-    matched.sort((a, b) => b.numMatches - a.numMatches);
+    // A Node named by the query before a Node that only mentions it: the connect modal's
+    // Enter takes the first one (#50).
+    matched.sort((a, b) => (b.numMatches - a.numMatches) || (b.inTitle - a.inTitle));
 
     matched.forEach((match, index) => {
         const isTopResult = !maxResults || index < maxResults;

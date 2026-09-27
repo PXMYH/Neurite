@@ -138,6 +138,65 @@ test('a modal takes the first Escape, and the Connect tool the next', async () =
     assert.equal(await tool(page), 'false');
 });
 
+// The connect modal, as "+ link" opens it.
+const picker = (page) => page.evaluate(() => ({
+    query: document.getElementById('connectModalSearchBar')?.value,
+    focused: document.activeElement?.id,
+    items: [...document.querySelectorAll('#nodeList li')].map((li) => li.textContent),
+}));
+// The strip is painted from the frame loop, so a card can exist a frame before its "+ link".
+const openPicker = async (page, uuid) => {
+    await page.waitForFunction((id) => Graph.nodes[id].view.div.querySelector('.link-add'), uuid);
+    await page.evaluate((id) => Graph.nodes[id].view.div.querySelector('.link-add').click(), uuid);
+    await page.waitForFunction(() => Modal.current?.id === 'nodeConnectionModal');
+};
+
+test('"+ link" opens a list of the nearest Nodes, with the caret in its search', async () => {
+    // It opened with the Node's own Title as the query and the Node left out of the
+    // results, so the list was empty; and the caret was not in the field.
+    const [a] = await fourNotes(page);
+    const nearest = await page.evaluate((id) => {
+        const origin = Graph.nodes[id].pos;
+        return Object.values(Graph.nodes).filter((n) => n.uuid !== id)
+            .sort((p, q) => p.pos.minus(origin).mag() - q.pos.minus(origin).mag())
+            .map((n) => n.getTitle());
+    }, a);
+    await openPicker(page, a);
+    assert.deepEqual(await picker(page),
+        { query: '', focused: 'connectModalSearchBar', items: nearest });
+});
+
+test('in the list, a Node named by the query comes first, and Enter links it', async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror
+        .setValue('## Alpha\na\n\n## Mentions\nsee gamma here\n\n## Gamma\ng\n'));
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 3, undefined, { timeout: 5000 });
+    const [a, g] = await page.evaluate(() => ['Alpha', 'Gamma']
+        .map((t) => Object.keys(Graph.nodes).find((k) => Graph.nodes[k].getTitle() === t)));
+    await openPicker(page, a);
+    await page.fill('#connectModalSearchBar', 'gamma');
+    assert.deepEqual((await picker(page)).items, ['Gamma', 'Mentions']);
+    await page.keyboard.press('Enter');
+    assert.ok(await joined(page, a, g), 'Enter did not link the first Node in the list');
+});
+
+test("search reads a card's own words, not the links on it", async () => {
+    // Every card's strip says "+ link" and names the Nodes it is linked to, and search
+    // read the strip: "link" matched every Node, "gamma" each Node linked to Gamma.
+    await page.evaluate(() => window.currentActiveZettelkastenMirror
+        .setValue('## Alpha\na [[Gamma]]\n\n## Beta\nb\n\n## Gamma\ng\n'));
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 1, undefined, { timeout: 5000 });
+    await page.click('#nodeSearchButton');
+    const results = async (term) => {
+        await page.fill('#Searchbar', term);
+        return page.evaluate(() => [...document.querySelectorAll('#search-results .search-result-title')]
+            .map((d) => d.textContent));
+    };
+    assert.deepEqual(await results('link'), []);
+    assert.deepEqual(await results('beta'), ['Beta']);
+    // Alpha's prose names Gamma, so it is found; Gamma's chip names Alpha, so it is not.
+    assert.deepEqual(await results('alpha'), ['Alpha']);
+});
+
 test('a message to the window leaves the connect mode as it was', async () => {
     // Any page in a Link Node can post to this window. `data.nodeMode ?? 0` turned the
     // mode off on each message, and a `null` message threw.

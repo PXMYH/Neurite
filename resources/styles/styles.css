@@ -1304,6 +1304,12 @@ textarea.title-input.title-input-stowed {
             background-color: #293e34; /* Light green background for connected nodes */
         }
 
+        /* Linked in a mark as well as in a colour: a green a reader cannot tell from
+           grey was the only difference between a Node that is linked and one that is not. */
+        #nodeList li.connected::before {
+            content: "✓ ";
+        }
+
         #nodeList li.disconnected {
             /* You can add specific styles for disconnected nodes if needed */
         }
