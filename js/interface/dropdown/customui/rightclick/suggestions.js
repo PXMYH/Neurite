@@ -25,6 +25,11 @@
     // so the click that dismissed the menu ran that row -- and near the left edge its labels
     // began at x -215. So: below the menu, else above it and the pointer, else to the side
     // away from the pointer, else the other side; the first that fits and covers neither.
+    // A side is measured from the menu or the pointer, whichever is further out: the menu
+    // opens 5px from the pointer, so a list measured from the menu alone ended over it.
+    // Where none fits whole, the first that covers neither once pulled onto the screen, and
+    // failing that, the first that at least leaves the pointer clear -- the click that
+    // dismisses the menu lands there, and runs the row under it.
     placeBeside(menu, pointer) {
         const style = this.container.style;
         style.transform = '';
@@ -36,7 +41,8 @@
         const clampX = (x)=>Math.max(edge, Math.min(x, W - w - edge));
         const clampY = (y)=>Math.max(edge, Math.min(y, H - h - edge));
         const leftOfMenu = (pointer.x >= m.right);   // the menu flipped to the pointer's left
-        const side = (left)=>({x: (left ? m.left - gap - w : m.right + gap), y: clampY(m.top)});
+        const side = (left)=>({y: clampY(m.top), x: (left ? Math.min(m.left, pointer.x) - gap - w
+                                                         : Math.max(m.right, pointer.x + 1) + gap)});
         const candidates = [
             {x: clampX(m.left), y: m.bottom + gap},
             {x: clampX(m.left), y: Math.min(m.top, pointer.y) - gap - h},
@@ -46,8 +52,12 @@
         const fits = (c)=>(c.x >= edge && c.x + w <= W - edge && c.y >= edge && c.y + h <= H - edge);
         const covers = (c, r)=>(c.x < r.right && c.x + w > r.left && c.y < r.bottom && c.y + h > r.top);
         const dot = {left: pointer.x, right: pointer.x + 1, top: pointer.y, bottom: pointer.y + 1};
-        const at = candidates.find( (c)=>fits(c) && !covers(c, m) && !covers(c, dot) )
-                ?? {x: clampX(candidates[2].x), y: candidates[2].y};
+        const clear = (c)=>!covers(c, m) && !covers(c, dot);
+        const onScreen = candidates.map( (c)=>({x: clampX(c.x), y: clampY(c.y)}) );
+        const at = candidates.find( (c)=>fits(c) && clear(c) )
+                ?? onScreen.find(clear)
+                ?? onScreen.find( (c)=>!covers(c, dot) )
+                ?? onScreen[2];
         style.left = at.x + 'px';
         style.top = at.y + 'px';
     }

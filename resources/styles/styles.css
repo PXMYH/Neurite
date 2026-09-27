@@ -773,9 +773,11 @@ body {
     }
 
     /* A finger's target where the pointer is one, as the chip's × has: the control is
-       40x18px, and it is the one way to link a Node on a screen with no keyboard. The
-       chips before it paint above it (`.link-chip`), so it takes no press meant for them,
-       and the strip, which clips both targets, is as tall as they are there. */
+       40x18px, and it is the one way to link a Node on a screen with no keyboard. There
+       the strip spaces its rows 44px apart, with 13px above the first and below the last,
+       so each row's 44px targets end where the next row's begin and the strip clips none
+       of them. A row 4px from the next let "+ link" on the second take the lower half of
+       the × above it: a tap meant to unlink opened the link modal. */
     .link-add {
         position: relative;
     }
@@ -788,7 +790,8 @@ body {
         }
 
         .link-strip {
-            min-height: 44px;
+            padding-block: calc((44px - 18px) / 2);
+            row-gap: calc(44px - 18px);
         }
     }
 

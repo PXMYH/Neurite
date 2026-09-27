@@ -109,7 +109,8 @@ function addEventsToUserInputTextarea(userInputTextarea, textarea, node, display
 
     // A press in the body is text, and stays in the body -- except a press that is a gesture on
     // the card: Alt reaches the card underneath, and so does a primary press that connects
-    // (the Connect tool, Shift, or a link armed from another Node) or selects (`Mod`). The body
+    // (the Connect tool, Shift, or any armed link: a click on the armed Node's own body drops
+    // it, as a click on its header does, and places no caret) or selects (`Mod`). The body
     // is most of a card, and those gestures armed nothing and selected nothing there: measured,
     // 0 of 48 points on a card's body (#50).
     On.mousedown(userInputTextarea, (e)=>{

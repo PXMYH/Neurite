@@ -17,8 +17,9 @@ class NodeMode {
         On.keydown(window, this.onEscape, true);
         On.click(this.tool, this.onToolClick);
         // A Shift released in another window never sends its keyup here, and the mode stayed
-        // on -- lit, and taking a double-click on an Edge as a delete. The blur says so, and
-        // where no blur came, the next press does: it reports the key up.
+        // on -- lit, and taking a double-click on an Edge as a delete. The blur says so, for
+        // any key; where no blur came, the next press does for a modifier, whose state it
+        // reports.
         On.blur(window, this.onBlur);
         On.mousedown(window, this.onPress, true);
     }
@@ -88,19 +89,21 @@ class NodeMode {
         this.setLocked(false);
         App.selectedNodes.clear();
     }
-    // Only a mode the key holds on, and only when the key is a modifier a press can report:
-    // a key rebound to a letter reads as up on every press, and a CapsLock or a toggle mode
-    // is on while it is on.
-    static modifiers = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph']);
-    get isHeldByKey(){ return (this.trigger === "down" && NodeMode.modifiers.has(this.key)) }
+    // A mode the key holds on, which is the one a keyup lost to another window leaves on --
+    // any key, a letter too. Not CapsLock's, which is the lock's, and not a toggle's, which
+    // stays as it was left.
+    get isHeldByKey(){ return (this.trigger === "down" && this.key !== "CapsLock") }
     onBlur = ()=>{
         if (this.locked || !this.val || !this.isHeldByKey) return;
 
         this.switch(0);
         this.autoToggleAllOverlays();
     }
+    // A press reports the state of a modifier only: a key rebound to a letter read as up on
+    // every press, and the press turned the mode off before it could arm anything.
+    static modifiers = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph']);
     onPress = (e)=>{
-        if (!this.isHeldByKey || e.getModifierState(this.key)) return;
+        if (!NodeMode.modifiers.has(this.key) || e.getModifierState(this.key)) return;
         this.onBlur();
     }
     onKeyUp = (e)=>{

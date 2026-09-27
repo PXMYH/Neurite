@@ -616,6 +616,14 @@ test('a connect key rebound to a letter still connects', async () => {
     await press(page, b);
     await page.keyboard.up('z');
     assert.ok(await joined(page, a, b), 'holding the rebound key and clicking two Nodes made no Edge');
+
+    // Held while the window loses focus, it goes off as Shift does. The blur left a letter on,
+    // with its keyup gone to the other window, and two plain clicks then joined two notes.
+    await page.keyboard.down('z');
+    assert.equal(await tool(page), 'true');
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    assert.equal(await tool(page), 'false', "a blur left the rebound key's mode on");
+    await page.keyboard.up('z');
 });
 
 test('a select list left open in a closed modal does not keep Escape from the Plane', async () => {
@@ -671,17 +679,63 @@ test("in a short window the action list goes beside the menu, over neither it no
     }
 });
 
-test('"+ link" takes a finger-sized press on a touch screen', { skip: !isIPad && 'a coarse pointer only' }, async () => {
-    // Its 44px target was clipped by the strip to 24px.
+test('wherever the menu opens, the action list lies over neither the pointer nor the menu', async () => {
+    // The menu opens 5px from the pointer, and the list on the pointer's side was measured
+    // from the menu alone, so it ended over the pointer and was never used; the fallback
+    // then put it on the menu, or under the pointer, where the dismissing click ran a row.
+    // Measured at 1024x600: "Zoom to it" under the pointer, and with pins, over the search.
+    await page.setViewportSize({ width: 1024, height: 600 });
     const [a] = await fourNotes(page);
-    const hit = await page.evaluate((id) => {
-        const add = Graph.nodes[id].view.div.querySelector('.link-add');
-        const r = add.getBoundingClientRect();
-        const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-        const reach = (dy) => document.elementFromPoint(cx, cy + dy) === add;
-        return { up: reach(-20), down: reach(20) };
+    const counts = await page.evaluate((id) => {
+        const list = document.getElementById('suggestions-container');
+        const menu = document.getElementById('customContextMenu');
+        const meets = (p, q) => p.left < q.right && p.right > q.left && p.top < q.bottom && p.bottom > q.top;
+        const seen = { opened: 0, underPointer: 0, overMenu: 0, offScreen: 0 };
+        for (const pinned of [0, 3]) {
+            ['zoomTo', 'toggleSelect', 'delete'].slice(0, pinned).forEach((k) => App.pinnedItems.addItem(k));
+            for (let y = 4; y < innerHeight; y += 24) for (let x = 4; x < innerWidth; x += 24) {
+                App.menuContext.open(x, y, Graph.nodes[id].view.div);
+                if (pinned) App.menuContext.inputField.click();     // the search shows the list
+                if (list.style.display !== 'block') { App.menuContext.hide(); continue; }
+                seen.opened++;
+                const l = list.getBoundingClientRect();
+                if (list.contains(document.elementFromPoint(x, y))) seen.underPointer++;
+                if (meets(l, menu.getBoundingClientRect())) seen.overMenu++;
+                if (l.left < 0 || l.top < 0 || l.right > innerWidth || l.bottom > innerHeight) seen.offScreen++;
+                App.menuContext.hide();
+            }
+        }
+        return seen;
     }, a);
-    assert.deepEqual(hit, { up: true, down: true });
+    assert.ok(counts.opened > 1000, `the list opened ${counts.opened} times`);
+    assert.deepEqual({ ...counts, opened: 0 }, { opened: 0, underPointer: 0, overMenu: 0, offScreen: 0 });
+});
+
+test('"+ link" and each × take a finger-sized press on a touch screen, in one row of links or two', { skip: !isIPad && 'a coarse pointer only' }, async () => {
+    // "+ link"'s 44px target was clipped by the strip to 24px. Where the links wrapped, rows
+    // 4px apart let "+ link" take the lower half of the × above it: a tap meant to unlink
+    // opened the link modal.
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\na [[Beta]] [[Gamma]]'
+        + ' [[Delta]] [[Epsilon]] [[Zeta]] [[Eta]]\n\n## Beta\nb\n\n## Gamma\ng\n\n## Delta\nd\n\n## Epsilon\ne\n\n'
+        + '## Zeta\nz\n\n## Eta\nh\n'));
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 6, undefined, { timeout: 8000 });
+    await page.waitForTimeout(800);
+    for (const [title, rows] of [['Alpha', 2], ['Beta', 1]]) {
+        const hits = await page.evaluate((t) => {
+            const strip = Object.values(Graph.nodes).find((n) => n.getTitle() === t).view.div.querySelector('.link-strip');
+            const takes = (el) => {
+                const r = el.getBoundingClientRect(), cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+                return [-20, 20].every((dy) => el.contains(document.elementFromPoint(cx, cy + dy)));
+            };
+            return {
+                rows: new Set([...strip.children].map((c) => Math.round(c.getBoundingClientRect().top))).size,
+                cuts: [...strip.querySelectorAll('.link-chip-cut')].map(takes),
+                add: takes(strip.querySelector('.link-add')),
+            };
+        }, title);
+        assert.ok(hits.rows >= rows, `${title}'s links are on ${hits.rows} row(s)`);
+        assert.deepEqual(hits, { rows: hits.rows, cuts: hits.cuts.map(() => true), add: true }, title);
+    }
 });
 
 test('"+ link": ArrowUp with no row chosen goes to the last row', async () => {
