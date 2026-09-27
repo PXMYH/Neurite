@@ -552,6 +552,38 @@ test('a right-click neither arms nor finishes a link, and a plain click on a bod
     assert.ok(await joined(page, a, c), 'a plain click on a body left the link armed');
 });
 
+test('on a Mac, Control + click is the right-click: it neither arms nor finishes a link', async () => {
+    // It reports button 0 there, and it armed and finished links as a left click did, from
+    // a header and from a body, writing Refs into both notes.
+    await context.close();
+    ({ context, page, errors } = await openNeurite(browser, {
+        setup: (ctx) => ctx.addInitScript(() => Object.defineProperty(Navigator.prototype, 'platform', { get: () => 'MacIntel' })),
+    }));
+    const controlClick = async (p) => {
+        await page.keyboard.down('Control');
+        await page.mouse.click(p.x, p.y);
+        await page.keyboard.up('Control');
+    };
+    const [a, b, c] = await fourNotes(page);
+    await page.keyboard.down('Shift');
+    await press(page, a);
+    await page.keyboard.up('Shift');
+    await controlClick(await cardSpot(page, b));
+    await controlClick(await bodySpot(page, c));
+    assert.equal(await joined(page, a, b), false, 'a Control + click on a header finished the link');
+    assert.equal(await joined(page, a, c), false, 'a Control + click on a body finished the link');
+    assert.equal(await armed(page), a, 'the link is no longer armed');
+    // Two: the first leaves Gamma's text, where the Control + click put the caret.
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    assert.equal(await armed(page), null);
+
+    await page.click('#connectTool');
+    await controlClick(await cardSpot(page, b));
+    assert.equal(await armed(page), null, 'a Control + click armed a link');
+    assert.ok(!(await paneText(page)).includes('[['), 'Refs were written into the notes');
+});
+
 test('an Escape during the press that would finish a link cancels it', async () => {
     const [a, b] = await fourNotes(page);
     await page.keyboard.down('Shift');

@@ -149,7 +149,11 @@ var controls = {
 const Mod = {
     isMac: /Mac|iPhone|iPad/.test(navigator.platform),
     get isCommand(){ return Mod.isMac && controls.controlKey.value === 'Control' },
-    isHeld(e){ return Mod.isCommand ? e.metaKey : e.getModifierState(controls.controlKey.value) }
+    isHeld(e){ return Mod.isCommand ? e.metaKey : e.getModifierState(controls.controlKey.value) },
+    // A primary press. Control and a click on a Mac reports button 0 (measured, Blink and
+    // WebKit) though it is the secondary click, and it armed and finished links as the right
+    // button did.
+    isPrimary(e){ return e.button === 0 && !(Mod.isMac && e.ctrlKey) }
 };
 // The Help panel names that key as the platform does. Its tab is in the page before any
 // script runs (`PageLoad.mainLoad`).

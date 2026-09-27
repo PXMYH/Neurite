@@ -116,7 +116,7 @@ function addEventsToUserInputTextarea(userInputTextarea, textarea, node, display
         if (!userInputTextarea.contains(e.target)) return;
         if (e.getModifierState(controls.altKey.value)) return;
         const gesture = App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e) || Node.prev;
-        if (e.button === 0 && gesture) return;
+        if (Mod.isPrimary(e) && gesture) return;
 
         e.stopPropagation();
         // We still allow default behavior, so the contenteditable div remains interactable.

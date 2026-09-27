@@ -327,8 +327,8 @@ class Node {
         // not a press: a drag that began on the second Node finished the link and moved the
         // Node as well. Shift itself counts as well as the mode, since a Shift pressed while
         // the caret was in a text field never turned the mode on (`NodeMode.isOnFor`).
-        // The primary button only: a right-click armed and finished links too, and wrote Refs.
-        const primary = (e.button === 0);
+        // A primary press only: a right-click armed and finished links too, and wrote Refs.
+        const primary = Mod.isPrimary(e);
         const armed = (primary ? Node.prev : null);
         this.#linkOnClick = armed;
         if (primary && !armed && App.interface.nodeMode.isOnFor(e)) Node.prev = this;
