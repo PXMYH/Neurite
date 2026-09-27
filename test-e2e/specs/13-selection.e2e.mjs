@@ -1,6 +1,6 @@
 import { test, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -181,7 +181,7 @@ test('a group drag, the arrows and f move a selection of pinned Nodes as one', a
     assert.ok(a3.pinHere && b3.pinHere, 'a pin stayed behind when f moved its Node');
 });
 
-test('Shift + scroll over a selected card scales the whole selection about the pointer', async () => {
+test('Shift + scroll over a selected card scales the whole selection about the pointer', { skip: isIPad && 'mobile WebKit takes no wheel' }, async () => {
     ({ context, page } = await openNeurite(browser));
     const [a, b] = await threeNotes(page);
     const key = await modKey(page);

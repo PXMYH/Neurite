@@ -10,6 +10,9 @@ const BASE_URL = process.env.NEURITE_E2E_URL || 'http://127.0.0.1:9123/';
 // Safari's engine, a touch screen, a 1194x834 window -- so a pointer decision meets the
 // tablet before the tablet work builds on it. It needs `npx playwright install webkit`.
 const IPAD = process.env.NEURITE_E2E_BROWSER === 'webkit-ipad';
+// For a test to skip itself where Playwright cannot drive the gesture: mobile WebKit takes no
+// `mouse.wheel`. The tablet's own gestures are the iPad map's.
+export const isIPad = IPAD;
 
 export function launchBrowser() {
     // Headless is the point: this runs unattended as an eval, not for watching.
