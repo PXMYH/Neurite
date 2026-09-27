@@ -27,6 +27,9 @@ Select.selectOption = function(select, option){
 function createSelectWithWrapper(selectId, wrapperName, nodeIndex) {
     const select = Html.make.select('model-selector custom-select ignoreSetup');
     select.id = selectId + '-' + nodeIndex;
+    // Named after the global dropdown it mirrors, which has the label this one lacks.
+    const name = CustomDropdown.nameOf(Elem.byId(selectId));
+    if (name) select.setAttribute('aria-label', name);
 
     const container = Html.make.div('dropdown-container');
     container.appendChild(select);
@@ -87,10 +90,28 @@ CustomDropdown.carryAccessibility = function(select, selectReplacer, optionsRepl
     }
     // The name and the description stay written on the select in the markup, next
     // to the control they belong to, and are copied here rather than duplicated.
-    for (const name of ['aria-label', 'aria-describedby', 'title']) {
+    for (const name of ['aria-describedby', 'title']) {
         const value = select.getAttribute(name);
         if (value) selectReplacer.setAttribute(name, value);
     }
+    // The listbox is named too: a screen reader announces it on its own when it opens.
+    const name = CustomDropdown.nameOf(select);
+    if (name) {
+        selectReplacer.setAttribute('aria-label', name);
+        optionsReplacer.setAttribute('aria-label', name);
+    }
+}
+
+// A deliberate `aria-label` on the select, else the `<label>` that points at it. That
+// label names the select and nothing else, and the select is `display: none`, so the
+// name has to be carried across like the rest -- 9 of the 10 replacers in the panels had
+// none, and a screen reader said "combobox, collapsed" with nothing to say which
+// setting it was. `labels` rather than a `label[for=id]` query: it is native, and it
+// also finds a label that wraps the control.
+CustomDropdown.nameOf = function(select){
+    return select?.getAttribute('aria-label')
+        || select?.labels?.[0]?.textContent.trim().replace(/\s+/g, ' ')
+        || '';
 }
 
 CustomDropdown.open = function(selectReplacer, optionsReplacer){

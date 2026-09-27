@@ -105,7 +105,7 @@
                             <button id="openOllamaModalButton" class="linkbuttons">+ Ollama</button>
                         </label>
                         <div class="dropdown-container">
-                            <select id="local-model-select" class="model-selector custom-select">
+                            <select id="local-model-select" class="model-selector custom-select" aria-label="Ollama">
                                 <option value="llama3">none</option>
                             </select>
                         </div>
@@ -115,7 +115,7 @@
                             <button id="openNeuriteModalButton" class="linkbuttons">Neurite</button>
                         </label>
                         <div class="dropdown-container">
-                            <select id="neurite-model-select" class="model-selector custom-select">
+                            <select id="neurite-model-select" class="model-selector custom-select" aria-label="Neurite">
                                 <option value="rhizome">Rhizome</option>
                                 <option value="fractalgpt">FractalGPT</option>
                             </select>
@@ -127,7 +127,7 @@
                             <button id="deleteApiConfigBtn" class="linkbuttons">-</button>
                         </label>
                         <div class="dropdown-container">
-                            <select id="custom-model-select" class="model-selector custom-select">
+                            <select id="custom-model-select" class="model-selector custom-select" aria-label="Custom">
                                 <option value="none">none</option>
                                 <!-- dynamic values -->
                             </select>
@@ -165,7 +165,7 @@
                     </button>
                     <button id="openVectorDbButton" title="Upload files for AI to interact with" class="linkbuttons search-button">Vector-DB</button>
                     <div class="dropdown-container">
-                        <select id="embeddingsModelSelect" class="model-selector custom-select">
+                        <select id="embeddingsModelSelect" class="model-selector custom-select" aria-label="Embeddings model">
                             <option value="local-embeddings-gte-small">gte-small (in-browser)</option>
                             <option value="local-embeddings-all-MiniLM-L6-v2">all-MiniLM-L6-v2 (in-browser)</option>
 
