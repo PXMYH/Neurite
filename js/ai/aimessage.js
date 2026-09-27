@@ -86,13 +86,15 @@ async function sendMessage(event, autoModeMessage) {
     // keywords or the note search ran regenerated instead: `removeLastResponse` deleted
     // the last exchange from the notes. The AI Node's send does the same at its start.
     // The loading icon too: the keywords are a round trip before the answer's call shows it.
-    Ai.isResponding = true;
-    Ai.shouldContinue = true;
-    Ai.mainPrompt.setPause();
-    Elem.byId('aiLoadingIcon').style.display = 'block';
-
     let answer, again = false;
     try {
+        // Inside the `try`: once `Ai.send` is set, nothing may leave it set, or every send
+        // after would be refused as one already running.
+        Ai.isResponding = true;
+        Ai.shouldContinue = true;
+        Ai.mainPrompt.setPause();
+        Elem.byId('aiLoadingIcon').style.display = 'block';
+
         answer = await askWithContext(message, autoModeMessage, activeInstance, send);
     } catch (err) {
         // A helper that threw ends the send like any failure: said on screen, and the
