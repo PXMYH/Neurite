@@ -200,7 +200,7 @@ function returnLinkNodes() {
         const node = processLinkInput(defaultUrl);
         return node; // return for Electron
     } else {
-        window.prompt("Enter a Link or Search Query", '', 'New Link')
+        window.prompt("Enter a Link or Search Query", '', 'New Link Node')
             // `maybePromise` was never defined, so every Link Node made this way ended in a
             // ReferenceError logged as "Failed to get prompt input".
             .then(linkInput => {

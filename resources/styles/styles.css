@@ -2922,16 +2922,22 @@ input[type="checkbox"] {
         cursor: pointer;
     }
 
-        /* The target past the words, to the app's 24px, without making the line taller:
-           the words alone were 32 x 18px. */
+        /* The target a little past the words at either side. Not above or below: two
+           buttons on adjacent lines overlapped there, and a click near the foot of one
+           selected the other's Title. An inline target in a sentence is sized by the
+           sentence (WCAG 2.5.8). */
         .archive-status-line::after {
             content: "";
             position: absolute;
-            inset: -4px -4px;
+            inset: 0 -4px;
         }
 
+    /* Its type is the sentence's: the universal rule gives every element 16px grey, and
+       a span in 12.5px text read "(line 3" at 16px and made the status 10px taller. */
     .archive-status-entry {
         white-space: nowrap;
+        font: inherit;
+        color: inherit;
     }
 
         .archive-status-line:hover {

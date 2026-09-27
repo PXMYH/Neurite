@@ -50,11 +50,17 @@ Modal.open = function (contentId) {
     App.menuContext.hide();
     Logger.debug("Opened Modal:", contentId);
 
+    // A dialog this one replaces is left unanswered, and its caller told so.
+    Modal.settleUnanswered();
+
     // Where the keyboard was, to go back to: after a Rename it was left on `body`, twelve
     // Tabs from the button. Read before the body is replaced, which takes the focused
-    // control with it, and kept when one dialog opens another: an alert from inside
-    // Custom Endpoint goes back to the button that opened Custom Endpoint.
-    if (!Modal.current) Modal.returnFocus = document.activeElement;
+    // control with it. A dialog opened from inside another -- the alert Custom Endpoint
+    // shows -- keeps the first one's, since the focus is in the modal or lost; but one
+    // opened while the reader works beside an open modal goes back to where they were:
+    // an alert over Search Nodes took the note's next keystroke to the tool bar.
+    const at = document.activeElement;
+    if (!Modal.current || (at !== document.body && !Modal.div.contains(at))) Modal.returnFocus = at;
     Modal.div.removeAttribute('aria-describedby');
 
     // Clear filepath input from header.
@@ -165,6 +171,7 @@ Modal.close = function () {
     Modal.div.style.display = 'none';
     Modal.closeOverlay;
     Modal.current = null;
+    Modal.settleUnanswered();
 
     // Only when the dialog had the keyboard: a click on the Graph behind moved it on.
     const back = Modal.returnFocus;
@@ -174,6 +181,17 @@ Modal.close = function () {
 }
 
 On.click(Modal.btnClose, Modal.close);
+
+// An alert, a confirm or a prompt is a promise its caller awaits, settled by its own
+// buttons. Left by Escape or the ×, or replaced by another dialog, it settled nothing, and
+// `await confirm(...)` never returned. Each leaves here what no answer means; its buttons
+// resolve before they close, so this finds the promise already settled.
+Modal.unanswered = null;
+Modal.settleUnanswered = function () {
+    const settle = Modal.unanswered;
+    Modal.unanswered = null;
+    settle?.();
+}
 
 // Tab goes round the dialog's own controls while it waits for an answer. It went on into
 // the tool bar and the page behind, where nothing answers it. Every step is taken here, not

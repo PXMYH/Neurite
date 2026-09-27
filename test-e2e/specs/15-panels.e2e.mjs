@@ -267,6 +267,41 @@ test('a dialog opened from inside another gives the focus back to what opened th
     assert.equal(await page.evaluate(() => document.activeElement.id), 'addApiConfigBtn');
 });
 
+// The same rule took the keyboard from a reader working beside an open modal: with Search
+// Nodes open and the caret in a note, an alert's OK sent the next keystroke to the tool bar.
+test('an alert that comes up while the reader writes beside an open modal gives the caret back', async () => {
+    await openMenu(page);
+    await openPanel(page, 'Notes');
+    await page.click('#nodeSearchButton');
+    assert.equal(await page.evaluate(() => Modal.current?.id), 'zetSearchModal');
+    await page.click('#zetPaneContainer .zet-pane.active .CodeMirror-lines');
+    await page.keyboard.type('## Alpha');
+    await page.evaluate(() => { window.alert('Something happened.'); });
+    await page.click('#customModal .modal-ok');
+    await page.keyboard.type('X');
+    assert.equal(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), '## AlphaX');
+});
+
+// Left by Escape or the ×, an alert, a confirm or a prompt settled nothing: `await
+// confirm(...)` never returned.
+test('a dialog left by Escape or its × still answers its caller', async () => {
+    for (const [ask, leave, expected] of [['confirm', 'Escape', false], ['prompt', 'Escape', null],
+                                          ['alert', 'Escape', 'answered'], ['confirm', 'x', false]]) {
+        await page.evaluate((ask) => {
+            window.answer = 'pending';
+            window[ask]('A question?').then((value) => { window.answer = (value === undefined ? 'answered' : value); });
+        }, ask);
+        await page.waitForTimeout(100);
+        if (leave === 'x') await page.click('#customModal .close');
+        else {
+            await page.focus('#customModal .modal-ok');   // on a button, where the prompt's own Escape is not
+            await page.keyboard.press('Escape');
+        }
+        await page.waitForTimeout(100);
+        assert.equal(await page.evaluate(() => window.answer), expected, `${ask} left by ${leave}`);
+    }
+});
+
 // The panels are drawn over the overview, and one that ended just short of its foot left
 // Fit, Tidy and Home showing under it as if they were its own.
 test('the overview is out of sight under a panel that reaches it, and back when the menu closes',

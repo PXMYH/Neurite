@@ -217,7 +217,7 @@ NodeActions.llm = class LLMNodeActions extends NodeActions.base {
         const promptTextarea = this.node.promptTextArea;
         // Check if the prompt textarea is empty
         if (!promptTextarea.value.trim()) {
-            window.prompt("Please enter your prompt:", '', 'Ask the Ai')
+            window.prompt("Please enter your prompt:", '', 'Prompt the Model')
                 .then( (userInput)=>{
                     if (userInput === null || userInput.trim() === '') {
                         return Logger.info("No prompt entered")

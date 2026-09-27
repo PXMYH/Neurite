@@ -120,10 +120,14 @@ CustomDropdown.open = function(selectReplacer, optionsReplacer){
     selectReplacer.classList.remove('closed');
     selectReplacer.setAttribute('aria-expanded', 'true');
 }
+// The keyboard goes back to the control, not with the list it was in: a press in the list
+// focuses it, and closing it then -- a choice, Escape, Enter -- left the focus on `body`.
 CustomDropdown.close = function(selectReplacer, optionsReplacer){
+    const inList = optionsReplacer.contains(document.activeElement);
     optionsReplacer.classList.remove('show');
     selectReplacer.classList.add('closed');
     selectReplacer.setAttribute('aria-expanded', 'false');
+    if (inList) selectReplacer.focus({preventScroll: true});
 }
 
 CustomDropdown.populateOptions = function(select, optionsReplacer, selectedDiv){
@@ -164,12 +168,8 @@ CustomDropdown.closeAfterChoice = function(optionsReplacer){
     const selectReplacer = optionsReplacer.closest('.select-replacer');
     if (!selectReplacer) return;
 
-    // A click on an option focuses the list, which the choice is about to hide; the
-    // keyboard goes back to the control rather than to `body`.
-    const inList = optionsReplacer.contains(document.activeElement);
     CustomDropdown.close(selectReplacer, optionsReplacer);
     selectReplacer.parentElement.style.zIndex = "20";
-    if (inList) selectReplacer.focus({preventScroll: true});
 }
 
 CustomDropdown.addOption = function(select, text, value, key){

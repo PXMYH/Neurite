@@ -328,15 +328,22 @@ test('the status line says why once, and its line selects the taken Title', asyn
     await page.evaluate(() => window.zetPaneList[0].processor.writeAs(ZettelkastenProcessor.Pass.edit,
         () => window.zetPaneList[0].cm.replaceRange('\n## Beta\nb\n\n## Gamma\ng\n', { line: 99 })));
     await type(page, '\n## Beta\nagain\n\n## Gamma\nagain\n');
+    // Its target reaches past the words at either side, and not above or below, where two on
+    // adjacent lines overlapped and a click near the foot of one selected the other's Title.
+    // And in the sentence's type: the universal rule set "(line 3" in 16px grey.
     const entries = await page.evaluate(() => [...document.querySelectorAll('#archiveStatus .archive-status-entry')].map((entry) => {
-        const button = entry.querySelector('button').getBoundingClientRect();
-        const x = button.left + button.width / 2;
-        const edge = (y) => document.elementFromPoint(x, y)?.closest('.archive-status-line') !== null;
-        return { lines: entry.getClientRects().length, target: edge(button.top - 2) && edge(button.bottom + 2) };
+        const elem = entry.querySelector('button');
+        const button = elem.getBoundingClientRect();
+        const x = button.left + button.width / 2, y = button.top + button.height / 2;
+        const hits = (px, py) => document.elementFromPoint(px, py)?.closest('.archive-status-line') === elem;
+        return { lines: entry.getClientRects().length, wide: hits(button.left - 2, y) && hits(button.right + 2, y),
+            tall: hits(x, button.top - 2) || hits(x, button.bottom + 2),
+            type: [entry, elem].map((el) => getComputedStyle(el).fontSize).join() };
     }));
+    const statusType = await page.evaluate(() => getComputedStyle(document.getElementById('archiveStatus')).fontSize);
     assert.match((await state(page)).status ?? '', /^3 Title lines make no note.*“Alpha”.*“Beta”.*“Gamma”/);
     assert.equal(entries.length, 3, 'a line button is not kept with its "("');
-    assert.deepEqual(entries, entries.map(() => ({ lines: 1, target: true })));
+    assert.deepEqual(entries, entries.map(() => ({ lines: 1, wide: true, tall: false, type: `${statusType},${statusType}` })));
 });
 
 // Tab went through a dialog's text box and on into the page behind -- and a Tab typed into
@@ -372,6 +379,15 @@ test('Tab from a long open list goes on to the next control', async () => {
     assert.equal(after.open, false, 'the list stayed open');
     if (isIPad) assert.notEqual(after.focus, 'body');
     else assert.equal(after.focus, 'archiveNew');
+
+    // A press inside the list -- on its scrollbar, say -- puts the focus in it, and Escape
+    // then closed the list with the focus in it: on `body`.
+    await page.focus('.archive-choice .select-replacer');
+    await page.keyboard.press('Enter');
+    await page.evaluate(() => document.querySelector('.archive-choice .options-replacer').focus());
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await page.evaluate(() => [document.querySelector('.archive-choice .options-replacer').classList.contains('show'),
+        document.activeElement.classList.contains('select-replacer')]), [false, true], 'Escape in the list lost the keyboard');
 });
 
 // The dialog offered the name with the caret after it, so "Learning" made "Archive 1Learning";

@@ -30,13 +30,17 @@ window.prompt = async (message, defaultValue = '', title = null) => {
 
     return new Promise((resolve) => {
         const handleOk = () => {
-            Modal.close();
             resolve(inputEl.value);
+            Modal.close();
             cleanup();
         };
 
         const handleCancel = () => {
+            resolve(null);
             Modal.close();
+            cleanup();
+        };
+        Modal.unanswered = ()=>{
             resolve(null);
             cleanup();
         };
@@ -76,9 +80,10 @@ window.alert = async (message) => {
 
     return new Promise((resolve) => {
         okBtn.addEventListener('click', () => {
-            Modal.close();
             resolve();
+            Modal.close();
         }, { once: true });
+        Modal.unanswered = resolve;
         okBtn.focus();
     });
 }
@@ -93,9 +98,10 @@ window.confirm = async (message) => {
 
     return new Promise((resolve) => {
         const cleanup = (result) => {
-            Modal.close();
             resolve(result);
+            Modal.close();
         };
+        Modal.unanswered = ()=>resolve(false);
         okBtn.addEventListener('click', () => cleanup(true), { once: true });
         cancelBtn.addEventListener('click', () => cleanup(false), { once: true });
         // The keyboard starts on the answer that changes nothing: the dialog opened with focus
