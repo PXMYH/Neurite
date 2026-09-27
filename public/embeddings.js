@@ -20,21 +20,30 @@ class Model {
     // to the extractor for the next, so one failed extraction handed `undefined` to the
     // request after it, which threw, which handed `undefined` on again -- every later
     // request in the session failed. A pipeline that failed to load was never retried
-    // either. Now a failed load is forgotten and tried again on the next request, and a
-    // link in the queue always settles, whatever its request did.
+    // either. Now a failed load is tried again once the requests queued behind it have
+    // had its failure, and the queue never stays rejected, whatever a request did.
     #extractor = null;
     #queue = Promise.resolve();
+    #loads = 0;
     constructor(apiName, pipelineName){
         this.apiName = apiName;
         this.pipelineName = pipelineName;
     }
 
     initialize(){
-        this.#extractor ??= Model.load(this.urlTransformers)
+        this.#extractor ??= Model.load(this.#libraryUrl())
             .then(this.#getExtractor.bind(this))
             .then(this.#postReady.bind(this))
             .catch(this.#onInitError);
         return this.#extractor;
+    }
+    // A retry cannot ask for the library by the same URL. A Worker keeps a failed module
+    // fetch in its module map: measured in Chromium, three `import()`s of one URL after a
+    // failure made one request between them, and all three failed. So each retry asks
+    // under a URL the map has not seen; the CDN serves the same file for it.
+    #libraryUrl(){
+        const n = this.#loads++;
+        return n === 0 ? this.urlTransformers : `${this.urlTransformers}?attempt=${n + 1}`;
     }
     #getExtractor(transformers){
         const { pipeline, env } = transformers;
@@ -54,9 +63,13 @@ class Model {
         post('ready', this.apiName);
         return extractor;
     }
+    // Forgotten once the requests already queued have had it, so they share this one
+    // failed attempt. Forgetting it at once made an attempt per queued request -- a
+    // search over 50 notes queues 50, each a download or a network timeout. The first
+    // request queued after them tries again.
     #onInitError = (err)=>{
         console.error("Error initializing embeddings:", err);
-        this.#extractor = null;
+        this.#queue = this.#queue.then( ()=>{ this.#extractor = null } );
         return Promise.reject(err);
     }
 
@@ -73,7 +86,12 @@ class Model {
         const run = ()=>this.initialize()
             .then( (extractor)=>extractor(text, {pooling: 'mean', normalize: true}) )
             .then(this.#postResult.bind(this, id), this.#postError.bind(this, id));
-        return this.#queue = this.#queue.then(run);
+        const link = this.#queue.then(run);
+        // A reply that throws -- an output with no `data`, an error with no `message` --
+        // rejects its own link, and a rejected queue skipped every request after it: the
+        // same poisoned chain by another door. The caller still hears of it, from `link`.
+        this.#queue = link.catch( ()=>{} );
+        return link;
     }
     #postResult(id, output){ post('result', Array.from(output.data), id) }
     #postError = (id, err)=>{ post.error(err.message, id) }

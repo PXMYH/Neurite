@@ -97,6 +97,14 @@ test('Node search embeds text Nodes only, and ranks by the cosine', async ()=>{
     assert.equal(found[0].uuid, 'b', 'the Node whose vector matches the query ranks first');
 });
 
+// With embeddings down every vector is `[]`. The relevant notes sent to the model have to be
+// the keyword matches alone, not every Node padded in behind them with a cosine of 0.
+test('with embeddings down, only a keyword match is relevant', async ()=>{
+    const h = searchHarness( ()=> [] );
+    const found = await h.search('beta');
+    assert.deepEqual(Array.from(found, (n)=> n.uuid), ['b']);
+});
+
 test('an edited Node is embedded again, and a failed embedding is not kept', async ()=>{
     let fail = true;
     const vectors = (t)=> (t.includes('gamma') && fail) ? [] : [1, 1];
@@ -116,8 +124,11 @@ test('an edited Node is embedded again, and a failed embedding is not kept', asy
         'the edited Node is embedded from its new text');
 });
 
-// The Worker, with its library swapped for a fake through `Model.load`.
-function workerHarness({loadFailures = 0, failCalls = []} = {}){
+// The Worker, with its library swapped for a fake through `Model.load`. The fake keeps a
+// module map the way a Worker does, failures included: an `import()` of a URL that failed
+// once fails again without going back to the network (measured in Chromium). So `loads`
+// counts real fetches, and a retry under the same URL cannot pass.
+function workerHarness({loadFailures = 0, failCalls = [], noDataCalls = []} = {}){
     const posted = [];
     const ctx = vm.createContext({
         self: {postMessage: (m)=> posted.push(m)},
@@ -126,21 +137,31 @@ function workerHarness({loadFailures = 0, failCalls = []} = {}){
     });
     vm.runInContext(read('public/embeddings.js') + ';globalThis.M = Model; globalThis.models = models;', ctx);
     let loads = 0, extractions = 0;
-    ctx.M.load = async ()=> {
-        loads++;
-        if (loads <= loadFailures) throw new Error('offline');
-        return {
-            env: {},
-            pipeline: async ()=> async (text)=> {
-                extractions++;
-                if (failCalls.includes(extractions)) throw new Error('extraction failed');
-                return {data: [text.length]};
-            },
-        };
+    const urls = [];
+    const library = {
+        env: {},
+        pipeline: async ()=> async (text)=> {
+            extractions++;
+            if (failCalls.includes(extractions)) throw new Error('extraction failed');
+            if (noDataCalls.includes(extractions)) return undefined;
+            return {data: [text.length]};
+        },
+    };
+    const moduleMap = new Map();
+    ctx.M.load = (url)=> {
+        if (!moduleMap.has(url)) {
+            loads++;
+            urls.push(url);
+            moduleMap.set(url, loads <= loadFailures
+                ? Promise.reject(new Error('offline')) : Promise.resolve(library));
+        }
+        return moduleMap.get(url);
     };
     const model = ctx.models['local-embeddings-gte-small'];
-    return {model, posted, loads: ()=> loads};
+    return {model, posted, loads: ()=> loads, urls};
 }
+
+const repliesOf = (posted)=> posted.filter( (m)=> m.id !== undefined ).map( (m)=> `${m.id}:${m.type}` );
 
 test('one failed extraction does not fail the requests after it', async ()=>{
     const h = workerHarness({failCalls: [2]});
@@ -153,7 +174,30 @@ test('a pipeline that failed to load is loaded again on the next request', async
     const h = workerHarness({loadFailures: 1});
     await h.model.generate('first', 1);
     await h.model.generate('second', 2);
-    const replies = h.posted.filter( (m)=> m.id !== undefined ).map( (m)=> `${m.id}:${m.type}` );
-    assert.deepEqual(replies, ['1:error', '2:result']);
+    assert.deepEqual(repliesOf(h.posted), ['1:error', '2:result']);
     assert.equal(h.loads(), 2);
+    assert.notEqual(h.urls[1], h.urls[0], 'the retry has to ask under a URL the module map has not seen');
+});
+
+// A search queues one request per text Node. Forgetting the failed load at once made one
+// attempt per queued request, each a download or a network timeout.
+test('one failed load answers every request queued behind it, and is tried once', async ()=>{
+    const h = workerHarness({loadFailures: 1});
+    await Promise.all(['a', 'bb', 'ccc'].map( (t, i)=> h.model.generate(t, i + 1) ));
+    assert.deepEqual(repliesOf(h.posted), ['1:error', '2:error', '3:error']);
+    assert.equal(h.loads(), 1, 'one attempt between the three');
+
+    await h.model.generate('later', 4);
+    assert.deepEqual(repliesOf(h.posted).slice(3), ['4:result'], 'the next request after them tries again');
+});
+
+// A reply that throws rejects its own link. Kept as the queue, that rejection skipped every
+// request after it.
+test('a reply that throws does not stop the requests after it', async ()=>{
+    const h = workerHarness({noDataCalls: [1]});
+    const first = h.model.generate('a', 1);
+    const second = h.model.generate('bb', 2);
+    await assert.rejects(first, 'the caller of the broken reply still hears of it');
+    await second;
+    assert.deepEqual(repliesOf(h.posted), ['2:result']);
 });

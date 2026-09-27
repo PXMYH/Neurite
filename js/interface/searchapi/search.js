@@ -229,8 +229,12 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
         Logger.debug("Cosine Similarity:", similarity);
 
         const similarityThreshold = -1;
+        // A failed embedding is `[]`, and says nothing about the Node. Its cosine is 0,
+        // which clears the threshold, so with embeddings down every Node came back as
+        // relevant, unranked; only a keyword match can admit a Node without both vectors.
+        const ranked = keywordEmbedding?.length > 0 && nodeEmbeddings[i]?.length > 0;
 
-        if (weightedTitleScore + weightedContentScore > 0 || similarity > similarityThreshold) {
+        if (weightedTitleScore + weightedContentScore > 0 || (ranked && similarity > similarityThreshold)) {
             matched.push({
                 node,
                 title: node.title,
