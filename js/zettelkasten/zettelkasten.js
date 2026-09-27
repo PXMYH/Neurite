@@ -194,7 +194,7 @@ class ZettelkastenProcessor {
     // once per keystroke, and separating the graph on each one would fight the caret.
     scheduleRelax(){
         clearTimeout(this.relaxTimer);
-        this.relaxTimer = setTimeout(()=>{ Graph.relaxOverlaps() }, ZettelkastenProcessor.relaxDelayMs);
+        this.relaxTimer = setTimeout(()=>{ Graph.relaxInBackground() }, ZettelkastenProcessor.relaxDelayMs);
     }
 
     processLine(line, index, currentNodeTitle){

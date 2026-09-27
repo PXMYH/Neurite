@@ -11,23 +11,47 @@ function createSyntaxTextarea() {
 
     editorWrapper.append(displayDiv, textarea);
 
-    function updateEditorHeight() {
+    // Reads only; the write it returns is run by `EditorHeights` after every other
+    // card's read, so measuring one card never waits on a layout another card dirtied.
+    function measureEditorHeight() {
+        if (!editorWrapper.isConnected) return null;
         const wrapperHeight = editorWrapper.offsetHeight;
         const wrapperStyle = window.getComputedStyle(editorWrapper);
         const maxHeight = 300;
-        if (wrapperStyle.height === '100%' || wrapperHeight >= maxHeight) return;
+        if (wrapperStyle.height === '100%' || wrapperHeight >= maxHeight) return null;
 
         const wrapperRect = editorWrapper.getBoundingClientRect();
         const bottomOffset = 20; // Space to leave at the bottom of the screen
-        if (wrapperRect.bottom + bottomOffset < window.innerHeight) { // above the bottom
-            editorWrapper.style.height = textarea.scrollHeight + 'px';
-        }
+        if (wrapperRect.bottom + bottomOffset >= window.innerHeight) return null; // below it
+
+        const height = textarea.scrollHeight + 'px';
+        return ()=>{ editorWrapper.style.height = height };
     }
 
-    On.input(textarea, updateEditorHeight);
+    On.input(textarea, ()=>EditorHeights.request(measureEditorHeight));
 
     return editorWrapper;
 }
+
+// A card's editor grows to fit its text, up to 300px, and measuring it costs a layout of
+// the whole page. Measured inside each card's own input event, a burst of n notes paid n
+// full layouts, each one bigger than the last: at 200 notes that was 9.4s of a 17s
+// profile, with the page frozen through it. Queued instead, and run once a frame with
+// every read taken before any height is written, so a burst costs one layout however
+// many cards it touched.
+const EditorHeights = {
+    queue: new Set(),
+    request(measure){
+        if (this.queue.size === 0) requestAnimationFrame(this.flush);
+        this.queue.add(measure);
+    },
+    flush: ()=>{
+        const measures = [...EditorHeights.queue];
+        EditorHeights.queue.clear();
+        const writes = measures.map( (measure)=>measure() );
+        for (const write of writes) write?.();
+    }
+};
 
 function addEventsToUserInputTextarea(userInputTextarea, textarea, node, displayDiv) {
     syncInputTextareaWithHiddenTextarea(userInputTextarea, textarea);

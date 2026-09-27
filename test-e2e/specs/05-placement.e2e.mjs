@@ -41,8 +41,8 @@ test('a new AI note lands inside the viewport', async () => {
 // Ten, not five. Five notes can be separated by moving only the newest one; ten cannot
 // -- a card arriving into a cluster of three has no free direction and settles on top of
 // one of them, which is how a real graph ended up with several cards more than half
-// occluded. The relaxation moves whatever pair is worst, so this is the count that tells
-// the difference.
+// occluded. The relaxation moves both cards of every overlapping pair, so this is the
+// count that tells the difference.
 test('notes created in a row do not land on top of each other', async () => {
     for (const t of ['One', 'Two', 'Three', 'Four', 'Five',
                      'Six', 'Seven', 'Eight', 'Nine', 'Ten']) {
@@ -169,4 +169,93 @@ test('double-click makes a note even where the fractal drew a line', async () =>
     await page.mouse.dblclick(onAPath.x, onAPath.y);
     await page.waitForFunction((n) => Object.keys(Graph.nodes).length === n + 1, before,
         { timeout: 8000 });
+});
+
+// Screen-space overlap among the cards that are drawn: the same separating-axis test as
+// above, on rendered boxes.
+function overlapsOnScreen() {
+    const boxes = Object.values(Graph.nodes)
+        .map((n) => n.view.div.getBoundingClientRect()).filter((b) => b.width);
+    let overlapping = 0;
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i], b = boxes[j];
+        const dx = Math.abs(a.x + a.width / 2 - b.x - b.width / 2);
+        const dy = Math.abs(a.y + a.height / 2 - b.y - b.height / 2);
+        if (dx < (a.width + b.width) / 2 && dy < (a.height + b.height) / 2) overlapping++;
+    }
+    return { onScreen: boxes.length, overlapping };
+}
+
+// A hundred notes at once -- a pasted outline, an import, an AI answer -- is an ordinary
+// size for a knowledge graph, and it froze the page for 89 seconds: settling each arrival
+// made six graph-wide separation passes, each capped at 4000 single-pair steps, and every
+// card's editor forced a whole-page layout as its text arrived. After the fix the longest
+// stall measured 572ms. The limit here leaves room for a slower machine and still catches
+// either cost coming back (2.6s with only the first of them fixed).
+test('a hundred notes arriving at once neither freeze the page nor pile up', async () => {
+    await page.evaluate(`window.overlapsOnScreen = ${overlapsOnScreen}`);
+    const result = await page.evaluate(async () => {
+        let last = performance.now(), longest = 0;
+        const beat = setInterval(() => {
+            const now = performance.now();
+            longest = Math.max(longest, now - last);
+            last = now;
+        }, 20);
+        for (let i = 0; i < 100; i++) {
+            await window.createNote(`Burst ${i}`, 'Lorem ipsum dolor sit amet. '.repeat(10));
+        }
+        await new Promise((r) => setTimeout(r, 6000));
+        clearInterval(beat);
+        return { notes: Object.keys(Graph.nodes).length, longest, ...window.overlapsOnScreen() };
+    });
+
+    assert.equal(result.notes, 100, 'every note arrived');
+    assert.ok(result.longest < 1500, `the page stalled for ${Math.round(result.longest)}ms at most`);
+    assert.equal(result.overlapping, 0, `${result.overlapping} pairs overlap among ${result.onScreen} cards on screen`);
+});
+
+// The separation has to finish, not just not freeze: a pile of cards on one spot comes
+// clear. The single-pair relaxation never cleared a pile of 100 inside its cap, and a
+// bounded sweep stopped with overlaps left and nothing coming back for them.
+test('a pile of a hundred cards on one spot comes clear', async () => {
+    const result = await page.evaluate(async () => {
+        for (let i = 0; i < 100; i++) await window.createNote(`Pile ${i}`, 'A short body.');
+        await new Promise((r) => setTimeout(r, 1500));
+        for (const n of Object.values(Graph.nodes)) { n.pos = new vec2(0, 0); n.anchor = n.pos; }
+        return Graph.relaxInBackground({}, { totalMs: 10000 });
+    });
+    assert.ok(result.clear, `still overlapping after ${result.passes} passes`);
+});
+
+// A paste of several notes into the notes pane arrives as one batch. Batches above four
+// were briefly not pulled into view at all, and the placement puts a pasted note up to
+// three screens away: 4 of 5 were out of sight.
+test('five notes pasted into the notes pane all land in view', async () => {
+    await page.evaluate(`window.overlapsOnScreen = ${overlapsOnScreen}`);
+    const result = await page.evaluate(async () => {
+        const text = Array.from({ length: 5 }, (_, i) => `${Tag.node} Pasted ${i}\nBody of pasted note ${i}.`).join('\n\n');
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.setValue(cm.getValue() + '\n' + text);
+        await new Promise((r) => setTimeout(r, 2500));
+        const inside = Object.values(Graph.nodes).map((n) => n.view.div.getBoundingClientRect())
+            .filter((b) => b.width && b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight);
+        return { notes: Object.keys(Graph.nodes).length, inside: inside.length, ...window.overlapsOnScreen() };
+    });
+    assert.equal(result.notes, 5);
+    assert.equal(result.inside, 5, `${result.inside} of 5 pasted notes are wholly on screen`);
+    assert.equal(result.overlapping, 0, `${result.overlapping} pairs overlap`);
+});
+
+// The clearance a separation leaves between two cards was an absolute 1e-6 Plane units,
+// which is 145 card-widths at zoom 1e-8: pairs were flung out of sight (2 of 5).
+test('notes made deep in the zoom stay in view', async () => {
+    const uv = await page.evaluate(async () => {
+        Graph.zoom = new vec2(1e-8, 0);
+        await new Promise((r) => setTimeout(r, 300));
+        for (let i = 0; i < 5; i++) await window.createNote(`Deep ${i}`, 'A short body.');
+        await new Promise((r) => setTimeout(r, 2000));
+        return Object.values(Graph.nodes).map((n) => { const p = fromZtoUV(n.pos); return [p.x, p.y]; });
+    });
+    const out = uv.filter(([u, v]) => !(u > 0 && u < 1 && v > 0 && v < 1));
+    assert.equal(out.length, 0, `out of view: ${JSON.stringify(out)}`);
 });

@@ -162,26 +162,36 @@ class Graph {
     // the placement had already created between existing notes untouched, which measured
     // 0.75 of clear on a ten-note graph however many passes ran. A new note arriving is
     // the moment to fix the pile it is arriving into.
-    // `passes` is high because each pass resolves exactly one pair -- the deepest -- and
-    // separating one pair inside a cluster creates new overlaps, so a pile of ten needs
-    // far more passes than it has pairs. Measured: 120 passes took a ten-card pile from
-    // 0.01 to 0.68 of clear, and stopped short. It is cheap to raise: the card extents
-    // are measured once up front, so a pass is arithmetic over cached numbers with no
-    // layout read in it.
-    relaxOverlaps({passes = 4000, bias = 0.5, favour = null} = {}){
+    // Every overlapping pair is resolved on each pass, and the pass repeats until one
+    // finds nothing. This resolved only the single deepest pair per pass, with a cap of
+    // 4000 passes, and the arithmetic did not survive a real graph: 100 notes arriving
+    // at once never came clear inside the cap, every call cost ~285ms, and settling each
+    // arrival made six of them -- the page froze for 89 seconds. Resolving the whole
+    // sweep each pass is the ordinary way to relax contacts. It is not quick for a real
+    // pile -- a review measured 1,428 passes to clear 100 notes piled on arrival, and
+    // 6,105 for 200 -- but each pass is arithmetic over cached extents, so it is a
+    // matter of time rather than of never.
+    //
+    // `favour` is a card, or a Set of cards, that absorbs `bias` of each correction it
+    // is part of. `budgetMs` bounds what one call may take whatever the graph's size, so
+    // no call freezes the page; `relaxInBackground` is what carries on when one call's
+    // budget was not enough. Returns the passes run and whether the Graph came clear.
+    relaxOverlaps({passes = 20000, bias = 0.5, favour = null, budgetMs = 40} = {}){
         const nodes = Object.values(this.nodes).filter( (n)=>!n.removed );
-        if (nodes.length < 2) return 0;
+        if (nodes.length < 2) return {passes: 0, clear: true};
 
         const extents = new Map();
         for (const node of nodes) {
             const half = this.planeHalfExtent(node);
             if (half) extents.set(node, half);
         }
+        const favoured = (favour instanceof Set) ? favour : new Set(favour ? [favour] : []);
 
-        const margin = 0.06, epsilon = 1e-6;
-        let moves = 0;
+        const margin = 0.06;
+        const deadline = performance.now() + budgetMs;
+        let moving = 0;
         for (let pass = 0; pass < passes; pass++) {
-            let worst = null;
+            let moved = false;
             for (let i = 0; i < nodes.length; i++) {
                 for (let j = i + 1; j < nodes.length; j++) {
                     const a = nodes[i], b = nodes[j];
@@ -193,32 +203,95 @@ class Graph {
                     const overY = (ea.hh + eb.hh) * (1 + margin) - Math.abs(dy);
                     if (overX <= 0 || overY <= 0) continue;
 
-                    const depth = Math.min(overX, overY);
-                    if (!worst || depth > worst.depth) worst = {a, b, dx, dy, overX, overY, depth};
+                    // The card that has to move most is the one the caller named, if any.
+                    const aFav = favoured.has(a), bFav = favoured.has(b);
+                    const aShare = (aFav === bFav) ? 0.5 : aFav ? bias : 1 - bias;
+                    // Along the axis of least penetration, which is the shortest way out
+                    // and what keeps a row of notes a row.
+                    const along = (overX < overY) ? 'x' : 'y';
+                    // A resolved pair ends strictly clear rather than touching. In units
+                    // of the cards, not of the Plane: an absolute 1e-6 is 145 card-widths
+                    // at zoom 1e-8, and flung the pair out of sight (measured, 2 of 5).
+                    const clearance = 1e-6 * (along === 'x' ? ea.hw + eb.hw : ea.hh + eb.hh);
+                    const push = (along === 'x' ? overX : overY) + clearance;
+                    const sign = Math.sign((along === 'x' ? dx : dy) || 1);
+                    this.#shiftAlong(a, along, sign * push * aShare);
+                    this.#shiftAlong(b, along, -sign * push * (1 - aShare));
+                    moved = true;
                 }
             }
-            if (!worst) return moves;
-
-            const {a, b, dx, dy, overX, overY} = worst;
-            // The card that has to move most is the one the caller named, if any.
-            const aShare = (favour === a) ? bias : (favour === b) ? 1 - bias : 0.5;
-            const along = (overX < overY) ? 'x' : 'y';
-            const push = (along === 'x' ? overX : overY) + epsilon;
-            const sign = Math.sign((along === 'x' ? dx : dy) || 1);
-
-            const shift = (node, amount)=>{
-                node.pos = (along === 'x')
-                    ? new vec2(node.pos.x + amount, node.pos.y)
-                    : new vec2(node.pos.x, node.pos.y + amount);
-                // An anchored card is held to `anchor` by a spring every frame, so moving
-                // `pos` without moving the anchor snaps it straight back.
-                if (node.anchorForce) node.anchor = node.pos;
-            };
-            shift(a, sign * push * aShare);
-            shift(b, -sign * push * (1 - aShare));
-            moves += 1;
+            if (!moved) return {passes: moving, clear: true};
+            moving += 1;
+            if (performance.now() > deadline) break;
         }
-        return moves;
+        return {passes: moving, clear: false};
+    }
+    #shiftAlong(node, along, amount){
+        node.pos = (along === 'x')
+            ? new vec2(node.pos.x + amount, node.pos.y)
+            : new vec2(node.pos.x, node.pos.y + amount);
+        // A pinned card's anchor goes with it, so the pin names where the card now is.
+        if (node.anchorForce) node.anchor = node.pos;
+    }
+
+    // Keep relaxing, a frame's worth of work at a time, until the Graph is clear or
+    // `totalMs` of work has gone in. One call is bounded so the page never freezes, and
+    // this is what finishes the job when a bound was not enough: a 200-note burst left
+    // 24-28 overlapping pairs after its settle passes, with nothing coming back for them.
+    relaxInBackground(options = {}, {sliceMs = 12, totalMs = 3000} = {}){
+        let passes = 0, spent = 0;
+        return new Promise( (resolve)=>{
+            const slice = ()=>{
+                const started = performance.now();
+                const result = this.relaxOverlaps({...options, budgetMs: sliceMs});
+                passes += result.passes;
+                spent += performance.now() - started;
+                if (result.clear || spent >= totalMs) return resolve({passes, clear: result.clear});
+                requestAnimationFrame(slice);
+            };
+            slice();
+        });
+    }
+
+    // Whether these cards could all sit on screen at once without landing on each
+    // other: their area, gutters included, against half the view's. Half, because a
+    // separation packs nowhere near perfectly. A batch that fits is pulled into view
+    // card by card; one that does not is moved into view as a block.
+    fitInView(nodes){
+        const perPx = 2 * this.zoom.mag() / Svg.windowScale();
+        const viewArea = (window.innerWidth * perPx) * (window.innerHeight * perPx);
+        let area = 0;
+        for (const node of nodes) {
+            const half = this.planeHalfExtent(node);
+            if (half) area += (2 * half.hw * 1.06) * (2 * half.hh * 1.06);
+        }
+        return area <= viewArea / 2;
+    }
+
+    // Bring a set of cards to the middle of the view together, drawing their spread in
+    // until it fits: their arrangement keeps its shape, only its place and size change,
+    // and the separation that follows opens it back out as far as the cards need.
+    // Moving the block was not enough on its own: a pasted batch of 20 arrived as a ring
+    // 7,500px across, so centring it left every card at least partly off screen.
+    gatherIntoView(nodes){
+        const live = nodes.filter( (node)=>!node.removed );
+        if (live.length === 0) return;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const node of live) {
+            minX = Math.min(minX, node.pos.x); maxX = Math.max(maxX, node.pos.x);
+            minY = Math.min(minY, node.pos.y); maxY = Math.max(maxY, node.pos.y);
+        }
+        const centre = new vec2((minX + maxX) / 2, (minY + maxY) / 2);
+        // The short side of the view spans 2|zoom| Plane units. 0.7 of it still fits
+        // when the view is rotated by any angle (a square needs 1/sqrt 2).
+        const room = 0.7 * 2 * this.zoom.mag();
+        const spread = Math.max(maxX - minX, maxY - minY);
+        const shrink = (spread > room) ? room / spread : 1;
+        // The view's middle is `pan`: fromZtoUV(pan) is (0.5, 0.5).
+        for (const node of live) {
+            node.pos = this.pan.plus(node.pos.minus(centre).scale(shrink));
+            if (node.anchorForce) node.anchor = node.pos;
+        }
     }
 
     // Pull a card back on screen if it arrived, or got pushed, off the edge.
@@ -257,6 +330,8 @@ class Graph {
         // uv -> z is the inverse of fromZtoUV: ((uv - 0.5) * 2) * zoom + pan.
         const t = new vec2((targetU - 0.5) * 2, (targetV - 0.5) * 2);
         node.pos = t.cmult(this.zoom).cadd(this.pan);
+        // A pinned card's anchor goes with it, so the pin names where the card now is.
+        if (node.anchorForce) node.anchor = node.pos;
     }
 
     clear(){

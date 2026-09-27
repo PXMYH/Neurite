@@ -192,8 +192,16 @@ textarea.title-input {
 
    So the cap goes on the card, and then the strip wraps inside it. Scoped with :has()
    to cards that actually hold prose: an image or video card is `fit-content` for a good
-   reason and is left alone. 344px is the 340px column plus the card's own border. */
+   reason and is left alone. 344px is the 340px column plus the card's own border.
+
+   And `max-content` rather than `fit-content`, so the width does not depend on where
+   the card is. A card is absolutely positioned, and `fit-content` clamps to the space
+   left between its left edge and the edge of the page: a review measured 344px in the
+   middle of the screen and 288px once the card came within its own width of the right
+   edge. A card that changes size when it moves defeats every separation that measured
+   it before the move. */
 .window:has(.editor-wrapper) {
+    width: max-content;
     max-width: 344px;
 }
 

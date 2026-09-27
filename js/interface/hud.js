@@ -363,13 +363,17 @@ class Hud {
     // state where a note cannot be read at all. Both halves of a pair move equally here
     // because no card is the newcomer.
     static tidy(){
-        // `relaxOverlaps` returns passes, not pairs -- it resolves the deepest pair each
-        // pass and re-measures, so one overlapping pair can take many passes. The log said
-        // "Tidy resolved 384 overlaps" for nine, which is a number a reader would have had
-        // to be wrong about on purpose.
-        const passes = Graph.relaxOverlaps({bias: 0.5});
-        Logger.info('Tidy settled the graph in', passes, 'passes');
-        return passes;
+        // Passes, not pairs -- each pass resolves every overlap it finds and then looks
+        // again, so one pass can move many cards. The log once said "Tidy resolved 384
+        // overlaps" for nine, which is a number a reader would have had to be wrong about
+        // on purpose. Run a frame at a time until clear, so a big pile neither freezes
+        // the page nor stops half-done while the log says "settled".
+        return Graph.relaxInBackground({bias: 0.5}, {sliceMs: 16, totalMs: 5000})
+            .then( ({passes, clear})=>{
+                if (clear) Logger.info('Tidy settled the graph in', passes, 'passes');
+                else Logger.warn('Tidy stopped after', passes, 'passes with overlaps left');
+                return {passes, clear};
+            });
     }
 
     // Rescale without touching rotation. `zoom` is one complex number carrying both,

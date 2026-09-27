@@ -148,35 +148,68 @@ class NodeView {
     // frame was measured against a card shorter than the one the reader ends up
     // looking at -- measured, two notes settled clear and ended up 3% overlapped
     // after their bodies landed. The second pass is what makes the number true.
+    //
+    // Batched: every note that arrives in the same task settles together, in one pass
+    // over the graph rather than one per note. A pasted outline, an import or an AI
+    // answer brings dozens at once, and settling each alone made six graph-wide passes
+    // per note -- with 100 notes that was 600 of them back to back.
+    //
+    // A batch that fits on screen is pulled into view card by card, as a single note
+    // always was. One that does not fit is gathered into view as a block, keeping its
+    // shape, and separated from there -- clamping more cards into the view than it can
+    // hold would only trade their visibility for overlap, since the clamp goes last.
+    // Leaving a pasted batch where the placement put it, up to three screens away, is
+    // not an option either: that left 4 of 5 pasted notes out of sight (measured by
+    // review, when batches above four were not clamped at all).
+    static #settling = new Set();
+
     static settlePlacement(node){
-        // The view the note arrived into. The second pass runs 300ms later, and
-        // `keepInView` clamps a card into whatever is on screen at the time -- so if the
-        // reader pans or zooms in that window, a pass meant to make their new note
-        // visible instead drags it to wherever they have since gone. "Make sure the note
-        // you just made is in view" stops being a true statement the moment they move.
+        if (NodeView.#settling.size === 0) Promise.delay(0).then(NodeView.#settleBatch);
+        NodeView.#settling.add(node);
+        NodeView.#pin(node);
+    }
+    static #settleBatch = ()=>{
+        const batch = [...NodeView.#settling];
+        NodeView.#settling.clear();
+        // The view the notes arrived into, read as the first pass runs so nothing can
+        // move it in between. The second pass runs 300ms later, and `keepInView` clamps a
+        // card into whatever is on screen at the time -- so if the reader pans or zooms in
+        // that window, a pass meant to make their new note visible instead drags it to
+        // wherever they have since gone. "Make sure the note you just made is in view"
+        // stops being a true statement the moment they move.
         const arrivedAt = {panX: Graph.pan.x, panY: Graph.pan.y, zoom: Graph.zoom.mag()};
+        const fits = Graph.fitInView(batch);
+        if (!fits) Graph.gatherIntoView(batch);
 
         const settle = ()=>{
-            if (Graph.nodes[node.uuid] !== node) return;
+            const live = batch.filter( (node)=>Graph.nodes[node.uuid] === node );
+            if (live.length === 0) return;
             const viewMoved = Graph.pan.x !== arrivedAt.panX
                            || Graph.pan.y !== arrivedAt.panY
                            || Graph.zoom.mag() !== arrivedAt.zoom;
+            const clamp = fits && !viewMoved;
+            const favour = new Set(live);
+            let result;
             for (let round = 0; round < 3; round++) {
-                // Graph-wide, biased towards moving the newcomer. Moving only the new
-                // card cannot clear a pile -- with three cards already on one spot there
-                // is no free direction for it to take, so it lands on top of one of them.
-                // At 0.85 a new note absorbs most of each correction and an arrangement a
+                // Graph-wide, biased towards moving the newcomers. Moving only a new card
+                // cannot clear a pile -- with three cards already on one spot there is no
+                // free direction for it to take, so it lands on top of one of them. At
+                // 0.85 a new note absorbs most of each correction and an arrangement a
                 // reader made is barely touched.
-                Graph.relaxOverlaps({bias: 0.85, favour: node});
+                result = Graph.relaxOverlaps({bias: 0.85, favour});
                 // Separation still applies -- two cards on the same spot is wrong wherever
                 // the reader is looking -- but the clamp only applies while they are still
-                // looking at the place the note arrived in.
-                if (!viewMoved) Graph.keepInView(node);
+                // looking at the place the notes arrived in.
+                if (clamp) live.forEach( (node)=>Graph.keepInView(node) );
             }
+            // A pile too big for three bounded passes is finished off a frame at a time.
+            if (!result.clear) Graph.relaxInBackground({bias: 0.85, favour});
         };
         settle();
         Promise.delay(300).then(settle);
+    }
 
+    static #pin(node){
         // And then it stays where it was put.
         //
         // An unanchored card is carried by the fractal's own gradient --
