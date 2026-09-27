@@ -2,8 +2,9 @@
 
 <div class="function-call-container">
 
-    <!-- Sub-dropdown for function calls -->
-    <div class="function-call-panel hidden">
+    <!-- Sub-dropdown for function calls. `inert` while folded (`togglePanel`), or its
+         controls are Tab stops at height 0. -->
+    <div class="function-call-panel hidden" inert>
         <!-- Function call list -->
         <div class="function-call-list custom-scrollbar">
             <!-- Function call items will be added here dynamically -->
@@ -56,8 +57,10 @@
             <textarea id="neurite-function-cm"></textarea>
         </div>
     </div>
-    <!-- Toggle button for function call panel -->
-    <div class="toggle-panel" onclick="toggleFunctionCallPanel()">
+    <!-- Toggle button for function call panel: a button to the keyboard and to a screen
+         reader as well (`togglepanel.js` answers Enter and Space), not only to a mouse. -->
+    <div class="toggle-panel" onclick="toggleFunctionCallPanel()" role="button" tabindex="0"
+         aria-label="Function console" aria-expanded="false">
         <div class="bar left-bar"></div>
         <div class="icon-wrapper">
             <!-- Wrapper for the icon only -->

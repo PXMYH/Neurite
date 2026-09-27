@@ -1,231 +1,206 @@
 <div class="submenu">
-    <div class="label-bar-container">
-        <label for="fractalSettingsContainer" class="button-label" onclick="toggleFractalSettingsPanel()">Controls</label>
-        <div class="fractal-settings-container" id="fractalSettingsContainer">
-            <div class="fractal-settings-panel hidden">
-                <div class="settingsSlider centered" title="Adjusts exponent of current fractal" style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <label style="white-space: nowrap;">
-                            <span id="equation"></span>
-                        </label>
-                        <div id="julia-constant" style="display: none;">
-                            (<span id="julia-x">0.256</span>, <span id="julia-y">0.01</span>)
-                        </div>
-                        <div class="dropdown-container" title="Select the current fractal equation">
-                            <select id="fractal-select" class="model-selector custom-select"
-                                    aria-label="Fractal equation" aria-describedby="fractal-select-help">
-                                <option value="mandelbrot">Mandelbrot</option>
-                                <option value="julia">Julia Set</option>
-                                <option value="burningShip">Burning Ship</option>
-                                <option value="tricorn">Tricorn</option>
-                                <option value="buffalo">Buffalo</option>
-                                <option value="henon">Henon Map</option>
-                                <option value="ikeda">Ikeda Map</option>
-                                <!--<option value="inverseMandelbrot">Inverse Brot</option>-->
-                            </select>
-                            <!-- The same words as the `title` above, in the accessibility tree:
-                                 a title is hover-only, so it reaches neither the keyboard nor a
-                                 screen reader. `CustomDropdown.setup` hides this select behind a
-                                 div replacer and carries both the name and this description over
-                                 to it. -->
-                            <p id="fractal-select-help" class="visually-hidden">Which equation draws the Fractal under the Graph and pulls Nodes toward its boundary. Julia Set adds a constant, shown beside the equation, that can be dragged to change it.</p>
-                        </div>
+    <!-- Headed groups, not accordions (#32): both were folded behind a heading a keyboard
+         could not reach, and every control here is one a reader tunes while looking at
+         the Fractal, so it is worth seeing without a click. -->
+    <div class="settings-section" id="fractalSettingsContainer">
+        <div class="button-label settings-heading">Controls</div>
+        <div class="fractal-settings-panel">
+            <div class="settingsSlider centered" title="Adjusts exponent of current fractal" style="margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <label style="white-space: nowrap;">
+                        <span id="equation"></span>
+                    </label>
+                    <div id="julia-constant" style="display: none;">
+                        (<span id="julia-x">0.256</span>, <span id="julia-y">0.01</span>)
                     </div>
-                    <input id="exponent" type="range" min="1" max="8" value="2"
-                           aria-label="Exponent" aria-describedby="exponent-help">
-                    <p id="exponent-help" class="visually-hidden">The power the equation raises z to, from 1 to 8. It appears in the equation beside the menu; the Henon and Ikeda maps have no exponent to raise.</p>
+                    <div class="dropdown-container" title="Select the current fractal equation">
+                        <select id="fractal-select" class="model-selector custom-select"
+                                aria-label="Fractal equation" aria-describedby="fractal-select-help">
+                            <option value="mandelbrot">Mandelbrot</option>
+                            <option value="julia">Julia Set</option>
+                            <option value="burningShip">Burning Ship</option>
+                            <option value="tricorn">Tricorn</option>
+                            <option value="buffalo">Buffalo</option>
+                            <option value="henon">Henon Map</option>
+                            <option value="ikeda">Ikeda Map</option>
+                            <!--<option value="inverseMandelbrot">Inverse Brot</option>-->
+                        </select>
+                        <!-- The same words as the `title` above, in the accessibility tree:
+                             a title is hover-only, so it reaches neither the keyboard nor a
+                             screen reader. `CustomDropdown.setup` hides this select behind a
+                             div replacer and carries both the name and this description over
+                             to it. -->
+                        <p id="fractal-select-help" class="visually-hidden">Which equation draws the Fractal under the Graph and pulls Nodes toward its boundary. Julia Set adds a constant, shown beside the equation, that can be dragged to change it.</p>
+                    </div>
                 </div>
-                <div class="settingsSlider centered" title="Adjust smoothness of fractal lines. Lower to reduce lag" style="margin-bottom: 10px;">
-                    <div style="display:flex; justify-content: space-between;">
-                        <div class="number-input-wrapper" style="width: 45%">
-                            <div id="quality_value">Quality:</div>
-                            <input id="quality_value_number" class="number-input" type="number" min="0" max="100" value="16" step="0.1"
-                                   aria-label="Quality" aria-describedby="quality-help">
-                        </div>
-                        <div class="number-input-wrapper" style="width: 30%" title="Add idleness to save energy">
-                            <div id="frames_delay_value">Delay:</div>
-                            <input id="frames_delay_value_number" class="number-input" type="number" min="0" max="9" value="0" step="1">
-                        </div>
-                        <div id="fps" style="text-align: right; width: 20%">?? fps (Is javascript enabled?)</div>
-                    </div>
-                    <input id="quality" type="range" min="0" max="100" value="16"
-                           aria-label="Quality" aria-describedby="quality-help">
-                    <p id="quality-help" class="visually-hidden">How finely the Fractal's lines are traced, from 0 to 100. Every step up costs frame rate, and the fps reading beside it is what it is costing now.</p>
-                </div>
-                <div class="gridLayout">
-
-                    <div class="settingsSlider" title="Adjusts length of fractal lines. Lower to reduce lag">
-                        <div class="number-input-wrapper">
-                            <label for="length">Length:</label>
-                            <input id="length_value" class="number-input" type="number" min="0" max="100" value="50" step="1">
-                        </div>
-                        <input id="length" type="range" min="0" max="100" value="50">
-                    </div>
-
-                    <div class="settingsSlider" title="Adjusts width of fractal lines">
-                        <div class="number-input-wrapper">
-                            <label for="renderWidthMultSlider">Width:</label>
-                            <input id="renderWidthMultValue" class="number-input" type="number" min="0" max="12" value="0.5" step="0.01">
-                        </div>
-                        <input type="range" id="renderWidthMultSlider" min="0" max="12" value="0.5" step="0.01">
-                    </div>
-
-                    <div class="settingsSlider" title="Adjusts amount of fractal lines. Lower to reduce lag">
-                        <div class="number-input-wrapper">
-                            <label for="maxLinesSlider">Lines:</label>
-                            <input id="maxLinesValue" class="number-input" type="number" min="0" max="2048" value="128" step="32">
-                        </div>
-                        <input type="range" id="maxLinesSlider" min="0" max="2048" value="128" step="1">
-                    </div>
-
-                    <div class="settingsSlider" title="Adjusts fractal line generation speed. Lower to reduce lag">
-                        <div class="number-input-wrapper">
-                            <label for="regenDebtSlider">Speed:</label>
-                            <input id="regenDebtValue" class="number-input" type="number" min="0" max="4" value="1" step="0.01">
-                        </div>
-                        <input type="range" id="regenDebtSlider" min="0" max="4" value="1" step="0.01">
-                    </div>
-                    <div class="settingsSlider" title="Adjusts cursor's control of line generation">
-                        <div class="number-input-wrapper">
-                            <label for="flashlightStrength">Strength:</label>
-                            <input id="flashlightStrength_value" class="number-input" type="number" min="0" max="100" value="0" step="1"
-                                   aria-label="Strength" aria-describedby="flashlightStrength-help">
-                        </div>
-                        <!-- No aria-label on the slider: the label above already names it, and
-                             an aria-label would replace that name rather than add to it. -->
-                        <input id="flashlightStrength" type="range" min="0" max="100" value="0" step="1"
-                               aria-describedby="flashlightStrength-help">
-                        <p id="flashlightStrength-help" class="visually-hidden">The share of new Fractal lines drawn near the pointer instead of across the whole view, from 0 to 100. Radius sets how wide near is.</p>
-                    </div>
-
-                    <div class="settingsSlider" title="Adjusts radius of line generation around cursor">
-                        <div class="number-input-wrapper">
-                            <label for="flashlightRadius">Radius:</label>
-                            <input id="flashlightRadius_value" class="number-input" type="number" min="0" max="100" value="0" step="1">
-                        </div>
-                        <input type="range" id="flashlightRadius" min="0" max="100" value="0" step="1">
-                    </div>
-
-                    <div class="settingsSlider" title="Delay between segment reveals">
-                        <div class="number-input-wrapper" style="flex-direction: column;">
-                            <label for="renderDelaySlider">Draw Speed:</label>
-                            <input id="draw_speed_value" class="number-input" type="number" min="0" max="300" value="0" step="1">
-                        </div>
-                        <input type="range" id="renderDelaySlider" min="0" max="300" value="0" step="1">
-                    </div>
-                    
-                    <div class="settingsSlider" title="Adjust zoom sensitivity for mouse wheel and drag zooming">
-                        <div class="number-input-wrapper" style="flex-direction: column;">
-                            <label for="zoomSpeedSlider">Zoom Speed:</label>
-                            <input id="zoom_speed_value" class="number-input" type="number" min="0.1" max="5" value="1" step="0.1">
-                        </div>
-                        <input type="range" id="zoomSpeedSlider" min="0.1" max="5" step="0.1" value="1.0">
-                    </div>
-
-                </div>
-                <!-- Additional fractal settings sliders here -->
+                <input id="exponent" type="range" min="1" max="8" value="2"
+                       aria-label="Exponent" aria-describedby="exponent-help">
+                <p id="exponent-help" class="visually-hidden">The power the equation raises z to, from 1 to 8. It appears in the equation beside the menu; the Henon and Ikeda maps have no exponent to raise.</p>
             </div>
-            <div class="toggle-panel" onclick="toggleFractalSettingsPanel()" style="padding-top: 15px;">
-                <div class="bar left-bar"></div>
-                <div class="icon-wrapper">
-                    <div class="toggle-icon">
-                        <svg aria-hidden="true" viewBox="0 0 24 24">
-                            <use xlink:href="#chevron-down-icon"></use>
-                        </svg>
+            <div class="settingsSlider centered" title="Adjust smoothness of fractal lines. Lower to reduce lag" style="margin-bottom: 10px;">
+                <div style="display:flex; justify-content: space-between;">
+                    <div class="number-input-wrapper" style="width: 45%">
+                        <div id="quality_value">Quality:</div>
+                        <input id="quality_value_number" class="number-input" type="number" min="0" max="100" value="16" step="0.1"
+                               aria-label="Quality" aria-describedby="quality-help">
                     </div>
+                    <div class="number-input-wrapper" style="width: 30%" title="Add idleness to save energy">
+                        <div id="frames_delay_value">Delay:</div>
+                        <input id="frames_delay_value_number" class="number-input" type="number" min="0" max="9" value="0" step="1">
+                    </div>
+                    <div id="fps" style="text-align: right; width: 20%">?? fps (Is javascript enabled?)</div>
                 </div>
-                <div class="bar right-bar"></div>
+                <input id="quality" type="range" min="0" max="100" value="16"
+                       aria-label="Quality" aria-describedby="quality-help">
+                <p id="quality-help" class="visually-hidden">How finely the Fractal's lines are traced, from 0 to 100. Every step up costs frame rate, and the fps reading beside it is what it is costing now.</p>
+            </div>
+            <div class="gridLayout">
+
+                <div class="settingsSlider" title="Adjusts length of fractal lines. Lower to reduce lag">
+                    <div class="number-input-wrapper">
+                        <label for="length">Length:</label>
+                        <input id="length_value" class="number-input" type="number" min="0" max="100" value="50" step="1">
+                    </div>
+                    <input id="length" type="range" min="0" max="100" value="50">
+                </div>
+
+                <div class="settingsSlider" title="Adjusts width of fractal lines">
+                    <div class="number-input-wrapper">
+                        <label for="renderWidthMultSlider">Width:</label>
+                        <input id="renderWidthMultValue" class="number-input" type="number" min="0" max="12" value="0.5" step="0.01">
+                    </div>
+                    <input type="range" id="renderWidthMultSlider" min="0" max="12" value="0.5" step="0.01">
+                </div>
+
+                <div class="settingsSlider" title="Adjusts amount of fractal lines. Lower to reduce lag">
+                    <div class="number-input-wrapper">
+                        <label for="maxLinesSlider">Lines:</label>
+                        <input id="maxLinesValue" class="number-input" type="number" min="0" max="2048" value="128" step="32">
+                    </div>
+                    <input type="range" id="maxLinesSlider" min="0" max="2048" value="128" step="1">
+                </div>
+
+                <div class="settingsSlider" title="Adjusts fractal line generation speed. Lower to reduce lag">
+                    <div class="number-input-wrapper">
+                        <label for="regenDebtSlider">Speed:</label>
+                        <input id="regenDebtValue" class="number-input" type="number" min="0" max="4" value="1" step="0.01">
+                    </div>
+                    <input type="range" id="regenDebtSlider" min="0" max="4" value="1" step="0.01">
+                </div>
+                <div class="settingsSlider" title="Adjusts cursor's control of line generation">
+                    <div class="number-input-wrapper">
+                        <label for="flashlightStrength">Strength:</label>
+                        <input id="flashlightStrength_value" class="number-input" type="number" min="0" max="100" value="0" step="1"
+                               aria-label="Strength" aria-describedby="flashlightStrength-help">
+                    </div>
+                    <!-- No aria-label on the slider: the label above already names it, and
+                         an aria-label would replace that name rather than add to it. -->
+                    <input id="flashlightStrength" type="range" min="0" max="100" value="0" step="1"
+                           aria-describedby="flashlightStrength-help">
+                    <p id="flashlightStrength-help" class="visually-hidden">The share of new Fractal lines drawn near the pointer instead of across the whole view, from 0 to 100. Radius sets how wide near is.</p>
+                </div>
+
+                <div class="settingsSlider" title="Adjusts radius of line generation around cursor">
+                    <div class="number-input-wrapper">
+                        <label for="flashlightRadius">Radius:</label>
+                        <input id="flashlightRadius_value" class="number-input" type="number" min="0" max="100" value="0" step="1">
+                    </div>
+                    <input type="range" id="flashlightRadius" min="0" max="100" value="0" step="1">
+                </div>
+
+                <div class="settingsSlider" title="Delay between segment reveals">
+                    <div class="number-input-wrapper" style="flex-direction: column;">
+                        <label for="renderDelaySlider">Draw Speed:</label>
+                        <input id="draw_speed_value" class="number-input" type="number" min="0" max="300" value="0" step="1">
+                    </div>
+                    <input type="range" id="renderDelaySlider" min="0" max="300" value="0" step="1">
+                </div>
+                    
+                <div class="settingsSlider" title="Adjust zoom sensitivity for mouse wheel and drag zooming">
+                    <div class="number-input-wrapper" style="flex-direction: column;">
+                        <label for="zoomSpeedSlider">Zoom Speed:</label>
+                        <input id="zoom_speed_value" class="number-input" type="number" min="0.1" max="5" value="1" step="0.1">
+                    </div>
+                    <input type="range" id="zoomSpeedSlider" min="0.1" max="5" step="0.1" value="1.0">
+                </div>
+
             </div>
         </div>
     </div>
-    
 
-    <div class="label-bar-container">
-        <label for="colorSettingsContainer" class="button-label" onclick="toggleColorSettingsPanel()">Color</label>
-        <div class="color-settings-container" id="colorSettingsContainer">
-            <div class="color-settings-panel hidden">
-                <div id="colorselection">
-                    <div class="color-picker-container">
-                        <div class="color-picker-item">
-                            <label for="rColor">R</label>
-                            <input type="color" id="rColor" name="rColor" value="#FF0000">
-                        </div>
-                        <div class="color-picker-item">
-                            <label for="gColor">G</label>
-                            <input type="color" id="gColor" name="gColor" value="#00FF00">
-                        </div>
-                        <div class="color-picker-item">
-                            <label for="bColor">B</label>
-                            <input type="color" id="bColor" name="bColor" value="#0000FF">
-                        </div>
-                        <div class="color-picker-item">
-                            <label for="colorPicker">BG</label>
-                            <input type="color" id="colorPicker" name="colorPicker" value="#000000" style="background:#222226;">
-                        </div>
+    <div class="settings-section" id="colorSettingsContainer">
+        <div class="button-label settings-heading">Color</div>
+        <div class="color-settings-panel">
+            <div id="colorselection">
+                <div class="color-picker-container">
+                    <div class="color-picker-item">
+                        <label for="rColor">R</label>
+                        <input type="color" id="rColor" name="rColor" value="#FF0000">
                     </div>
+                    <div class="color-picker-item">
+                        <label for="gColor">G</label>
+                        <input type="color" id="gColor" name="gColor" value="#00FF00">
+                    </div>
+                    <div class="color-picker-item">
+                        <label for="bColor">B</label>
+                        <input type="color" id="bColor" name="bColor" value="#0000FF">
+                    </div>
+                    <div class="color-picker-item">
+                        <label for="colorPicker">BG</label>
+                        <input type="color" id="colorPicker" name="colorPicker" value="#000000" style="background:#222226;">
+                    </div>
+                </div>
                     
 
-                    <div id="colorsliders">
-                        <input type="range" min="0" max="255" id="rSlider" value="0" style="display: none;">
-                        <div class="gridLayout">
+                <div id="colorsliders">
+                    <input type="range" min="0" max="255" id="rSlider" value="0" style="display: none;">
+                    <div class="gridLayout">
 
-                            <div class="settingsSlider" title="Adjusts fractal line brightness">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="cSlider">Brightness:</label>
-                                    <input id="c_value" class="number-input" type="number" min="0" max="255" value="128" step="1">
-                                </div>
-                                <input type="range" min="0" max="255" id="cSlider" value="128">
+                        <div class="settingsSlider" title="Adjusts fractal line brightness">
+                            <div class="number-input-wrapper" style="flex-direction: column;">
+                                <label for="cSlider">Brightness:</label>
+                                <input id="c_value" class="number-input" type="number" min="0" max="255" value="128" step="1">
                             </div>
-
-                            <div class="settingsSlider" title="Adjusts fractal line vibrance">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="sSlider">Saturation:</label>
-                                    <input id="s_value" class="number-input" type="number" min="0" max="255" value="127" step="1">
-                                </div>
-                                <input type="range" min="0" max="255" id="sSlider" value="127">
-                            </div>
-
-                            <div class="settingsSlider" title="Adjusts opacity of fractal lines">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="outer_opacity">Outer Opacity:</label>
-                                    <input id="outer_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1">
-                                </div>
-                                <input id="outer_opacity" type="range" min="0" max="100" value="100">
-                            </div>
-
-                            <div class="settingsSlider" title="Adjusts opacity of fractal line's interior">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="inner_opacity">Inner Opacity:</label>
-                                    <input id="inner_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1">
-                                </div>
-                                <input id="inner_opacity" type="range" min="0" max="100" value="100">
-                            </div>
-
-                            <div class="settingsSlider" id="inversion-settings" title="Inverts color scheme of whole page">
-                                <!-- Slider for Inversion -->
-                                <label for="inversion-slider">Inversion</label>
-                                <input type="range" id="inversion-slider" min="0" max="100" value="0">
-                            </div>
-                            <div class="settingsSlider" id="hue-rotation-settings" title="Rotates color scheme of the whole page around the color wheel">
-                                <!-- Slider for Hue Rotation -->
-                                <label for="hue-rotation-slider">Hue Rotation</label>
-                                <input type="range" id="hue-rotation-slider" min="0" max="360" value="0">
-                            </div>
-
+                            <input type="range" min="0" max="255" id="cSlider" value="128">
                         </div>
+
+                        <div class="settingsSlider" title="Adjusts fractal line vibrance">
+                            <div class="number-input-wrapper" style="flex-direction: column;">
+                                <label for="sSlider">Saturation:</label>
+                                <input id="s_value" class="number-input" type="number" min="0" max="255" value="127" step="1">
+                            </div>
+                            <input type="range" min="0" max="255" id="sSlider" value="127">
+                        </div>
+
+                        <div class="settingsSlider" title="Adjusts opacity of fractal lines">
+                            <div class="number-input-wrapper" style="flex-direction: column;">
+                                <label for="outer_opacity">Outer Opacity:</label>
+                                <input id="outer_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1">
+                            </div>
+                            <input id="outer_opacity" type="range" min="0" max="100" value="100">
+                        </div>
+
+                        <div class="settingsSlider" title="Adjusts opacity of fractal line's interior">
+                            <div class="number-input-wrapper" style="flex-direction: column;">
+                                <label for="inner_opacity">Inner Opacity:</label>
+                                <input id="inner_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1">
+                            </div>
+                            <input id="inner_opacity" type="range" min="0" max="100" value="100">
+                        </div>
+
+                        <div class="settingsSlider" id="inversion-settings" title="Inverts color scheme of whole page">
+                            <!-- Slider for Inversion -->
+                            <label for="inversion-slider">Inversion</label>
+                            <input type="range" id="inversion-slider" min="0" max="100" value="0">
+                        </div>
+                        <div class="settingsSlider" id="hue-rotation-settings" title="Rotates color scheme of the whole page around the color wheel">
+                            <!-- Slider for Hue Rotation -->
+                            <label for="hue-rotation-slider">Hue Rotation</label>
+                            <input type="range" id="hue-rotation-slider" min="0" max="360" value="0">
+                        </div>
+
                     </div>
                 </div>
-            </div>
-            <div class="toggle-panel" onclick="toggleColorSettingsPanel()" style="padding-top: 15px;">
-                <div class="bar left-bar"></div>
-                <div class="icon-wrapper">
-                    <div class="toggle-icon">
-                        <svg aria-hidden="true" viewBox="0 0 24 24">
-                            <use xlink:href="#chevron-down-icon"></use>
-                        </svg>
-                    </div>
-                </div>
-                <div class="bar right-bar"></div>
             </div>
         </div>
     </div>

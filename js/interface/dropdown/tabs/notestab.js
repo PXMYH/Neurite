@@ -53,20 +53,31 @@ On.resize(window, updateMaxDimensions);
 // menu is anchored at the left of the screen, so the pane grows rightwards. It sat on the
 // left edge and subtracted the drag, so it pulled the wrong way on an edge that cannot
 // move; measured, a drag of +120px left the pane at 270px wide (#65).
+//
+// It sets the menu's width, not the pane's (#32): the pane fills its panel, and every
+// panel has the one width, so a pane widened here does not leave the next panel opened
+// narrower than the menu it sits in.
 let zetHorizDragHandle = Elem.byId('zetHorizDragHandle');
 let zetIsHorizResizing = false;
 let initialX;
 let initialWidth;
+let panelAroundPane;
+let minWidth;
 
 On.mousedown(zetHorizDragHandle, (e)=>{
     updateMaxDimensions(); // Update dimensions at the start of each drag
     zetIsHorizResizing = true;
     initialX = e.clientX;
     initialWidth = App.zetPanes.container.offsetWidth;
+    // What the menu holds beside the pane: its border and the panel's padding.
+    panelAroundPane = document.querySelector('.dropdown-content').offsetWidth - initialWidth;
     // The stylesheet's limit (`.zet-pane-container`), so the drag and the CSS agree on
     // how wide the pane may go. At 1000px they did not -- 926px against 900px -- and a
     // pane the CSS had clamped to 926px refused every narrowing drag short of 26px.
     maxWidth = parseFloat(getComputedStyle(App.zetPanes.container).maxWidth) || maxWidth;
+    // And its narrowest: the drag sets every panel's width now, and 50px made a menu no
+    // panel could be read in.
+    minWidth = parseFloat(getComputedStyle(App.zetPanes.container).minWidth) || 50;
 
     // Prevent text selection while resizing
     document.body.style.userSelect = 'none';
@@ -94,8 +105,8 @@ function zetHandleHorizMouseMove(event) {
         const dx = event.clientX - initialX;
         // Clamped, not refused: a move past either limit used to leave the pane where the
         // last move inside them had put it, however far the pointer went.
-        const newWidth = Math.min(Math.max(initialWidth + dx, 50), maxWidth);
-        App.zetPanes.container.style.width = newWidth + 'px';
+        const newWidth = Math.min(Math.max(initialWidth + dx, minWidth), maxWidth);
+        document.querySelector('.dropdown-content').style.setProperty('--ui-panel-width', (newWidth + panelAroundPane) + 'px');
     });
 }
 

@@ -82,6 +82,15 @@
     --ui-chrome-border: transparent;
     /* The hairline inside an island: a divider between tool groups, not an edge. */
     --ui-chrome-rule: #8883;
+    /* The menu's one width, for its list and for every panel (#32). Each sized the menu to
+       itself -- measured 312, 382, 339, 343, 971, 312 and 502px -- so it changed width
+       under the pointer from one panel to the next, and at 312px a two-column grid of
+       sliders was two cramped columns. The Notes panel's side handle is the one thing
+       that changes it (`zetHandleHorizMouseMove`), for all of them. */
+    --ui-panel-width: 480px;
+    /* The section rule each side of a panel heading. `#8882` rendered as faint broken
+       stubs rather than a rule (#32). */
+    --ui-panel-rule: #8886;
     /* Hover on a chrome control. Excalidraw's dark `--button-hover-bg`. Opaque now
        rather than white-at-low-alpha: the island under it is opaque too, so the
        wash had nothing left to let through, and a named colour is one fewer
@@ -1633,9 +1642,12 @@ textarea.title-input.title-input-stowed {
        outgrew the window ran off the top, where nothing could. */
     max-height: calc(100dvh - 88px);
     overflow-y: auto;
-    /* Widths here are content-driven -- each tab sizes the panel to itself -- so a
-       horizontal scrollbar can only ever come from something spilling sideways by a
-       few px, never from content worth reaching. Clipping it also keeps that spill
+    /* One width for the list and every panel, and never wider than the window leaves
+       room for (the 16px gutter each side). */
+    width: min(var(--ui-panel-width), calc(100vw - 32px));
+    box-sizing: border-box;
+    /* A horizontal scrollbar here could only ever come from something spilling sideways
+       by a few px, never from content worth reaching. Clipping it also keeps that spill
        from stealing 15px of height and starting a vertical scrollbar with it. */
     overflow-x: hidden;
     /* Absorbs the few px the note pane hangs below its tab, which would otherwise
@@ -1818,6 +1830,94 @@ textarea.title-input.title-input-stowed {
                 .settings-heading {
                     cursor: default;
                     margin-bottom: 10px;
+                }
+
+                /* The one group that stays folded (#32): the API keys, entered once and
+                   then left alone. A native `<details>`, so Enter and Space open it and a
+                   screen reader says whether it is open; the mark after the words says
+                   so on screen, turned down when it is. */
+                .settings-fold > summary {
+                    list-style: none;
+                    cursor: pointer;
+                }
+
+                    .settings-fold > summary::-webkit-details-marker {
+                        display: none;
+                    }
+
+                    /* The chevron the console's toggle uses (`docs/icons.md`), pointing
+                       at the words while folded and down when open. */
+                    .settings-fold > summary .fold-mark {
+                        width: 14px;
+                        height: 14px;
+                        flex: none;
+                        transform: rotate(-90deg);
+                        transition: transform var(--ui-transition);
+                    }
+
+                    .settings-fold[open] > summary .fold-mark {
+                        transform: none;
+                    }
+
+                    .settings-fold > summary:hover {
+                        color: var(--ui-chrome-text-strong);
+                    }
+
+                    .settings-fold > summary:focus-visible {
+                        outline: 2px solid var(--ui-accent);
+                        outline-offset: 2px;
+                    }
+
+            /* Inside the menu's panels the panel's width is the one to fill (#32). These
+               are fixed for the AI Node, which shares the classes and stays as it is. */
+            .menu-detail .checkboxarray {
+                width: 100%;
+            }
+
+            .menu-detail .settingsSlider.centered {
+                width: auto;
+                margin-left: 0;
+                margin-right: 0;
+            }
+
+            /* The rows of a group span it, label at the left and control at the right,
+               as the Settings panel's do. Right-aligned and shrunk to their content, the
+               model rows left half the panel empty and cut the model names short. */
+            .menu-detail .model-select-panel,
+            .menu-detail .inference-template-wrapper,
+            .menu-detail .context-settings-panel {
+                align-items: stretch;
+            }
+
+            .menu-detail .dropdown-wrapper {
+                justify-content: space-between;
+                gap: 10px;
+            }
+
+                /* The control takes the right-hand end of the row, whatever sits before
+                   it -- a label, or the embeddings row's two buttons. */
+                .menu-detail .dropdown-wrapper > .dropdown-container {
+                    width: min(250px, 60%);
+                    margin-left: auto;
+                }
+
+                    .menu-detail .dropdown-wrapper .select-container {
+                        width: 100%;
+                    }
+
+            /* The key rows the same way: each input started where its label ended, so
+               six inputs made six ragged left edges. */
+            .menu-detail .api-inputs > div {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                margin-bottom: 6px;
+            }
+
+                .menu-detail .api-inputs .api-input {
+                    width: min(250px, 60%);
+                    box-sizing: border-box;
                 }
 
                 .settings-row {
@@ -2268,20 +2368,8 @@ textarea#prompt {
     /* Was a row, which left the four key buttons sharing whatever the key inputs
        did not take: a 55px column, narrow enough that every one of `Save Keys`,
        `Clear Keys`, `Keys .txt` and `Load Keys` broke across two lines. Stacking
-       the panel gives them the full width to sit in. The open height is measured
-       from `scrollHeight` in `togglePanel`, so the slide animation still fits. */
+       the panel gives them the full width to sit in. */
     flex-direction: column;
-    overflow: hidden;
-    transition: height 0.2s ease;
-    height: 0; /* Start with 0 height for the initial state if hidden */
-}
-
-.api-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    overflow: hidden;
 }
 
 .api-inputs {
@@ -2386,10 +2474,22 @@ textarea#prompt {
         line-height: 1;
     }
 
-/* Hide the checkbox visually but remain accessible */
+/* Clipped, not hidden. `display: none` took every checkbox out of the tab order, so no
+   keyboard could turn one on (#32). The label is what is drawn and what a pointer clicks;
+   the box is still what takes the focus, and its label shows the ring for it. */
 input[type="checkbox"] {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
 }
+
+    input[type="checkbox"]:focus-visible + label {
+        outline: 2px solid var(--ui-accent);
+        outline-offset: 2px;
+    }
 
     input[type="checkbox"] + label {
         padding: 19px;
@@ -2488,10 +2588,8 @@ input[type="checkbox"] {
             flex-direction: column;
             gap: 2px;
             padding: 8px;
-            /* Every label is one short word, so the panel would otherwise shrink to
-               the width of "Settings" and read as a tooltip. Close to the 290px the
-               tab panels ask for, so opening one is a step rather than a jump. */
-            min-width: 260px;
+            /* As wide as every panel it opens (`--ui-panel-width`), so opening one is
+               neither a step nor a jump. */
             box-sizing: border-box;
         }
 
@@ -2648,7 +2746,9 @@ input[type="checkbox"] {
 
         .tabcontent {
             display: none;
-            min-width: 290px;
+            /* The menu's width is the panel's (`.dropdown-content`), so nothing inside
+               it widens it: a row of Saved Views made it 971px. */
+            min-width: 0;
         }
 
 /* `.tablink` is now only ever a `.menu-row`, so the chip styling it used to carry --
@@ -2701,6 +2801,9 @@ input[type="checkbox"] {
     background-color: transparent; /* Make it transparent */
     position: absolute;
     bottom: 0;
+    /* From the panel's left edge, or it starts after the padding and its 100% ends 10px
+       past the right one -- a sideways scroll in a panel that fits. */
+    left: 0;
     z-index: 1;
 }
 
@@ -2713,17 +2816,20 @@ input[type="checkbox"] {
     /* Never wider than the window leaves room for, so the side handle stays on screen.
        The drag writes a width in px; a pane widened to 1370px at 1600px stayed 1370px
        when the window shrank to 1000px, with its handle off screen and no way left to
-       narrow it. 74px: 27px from the window's left edge to the pane, 31px from the pane
-       to the menu's right edge, and the menu's 16px left margin kept on the right. */
-    max-width: calc(100vw - 74px);
-    min-width: min(270px, calc(100vw - 74px));
+       narrow it. 54px: 27px from the window's left edge to the pane, 11px from the pane
+       to the menu's right edge, and the menu's 16px left margin kept on the right -- the
+       same limit the menu has (`.dropdown-content`), or a drag between the two moved
+       nothing. The narrowest is what the drag stops at, too (`zetHandleHorizMouseMove`). */
+    max-width: calc(100vw - 54px);
+    min-width: min(270px, calc(100vw - 54px));
     /* The same for the height and the bottom handle: 201px from the window's top to the
        pane (the Archive controls take 77px above it), 37px from the pane to the menu's
        bottom edge, and 16px to spare. A pane made 700px tall kept its height in a 600px
        window, its handle at y=814. */
     max-height: calc(100dvh - 254px);
     height: 60vh;
-    width: 270px;
+    /* The panel's width (#32), which the side handle sets for every panel. */
+    width: 100%;
 }
 
 /* The Archive controls above the text (#64): the select across the full width, the three
@@ -3090,15 +3196,11 @@ td {
             border-color: #8882;
         }
 
-        /* The panel is a content-sized grid, so each tab decides how wide the menu is:
-           Notes settles at 312px, Help at 502px. `width: 100%` was circular here --
-           it resolved against a track the content had already stretched -- and thirty
-           rows of sentences stretched it to the whole window. Declared in px, and
-           clamped so a phone gets the viewport instead of a horizontal scrollbar. */
+        /* The menu has one width (`--ui-panel-width`, #32), so Help takes it rather than
+           setting its own: at 500px it was the one panel that sized the menu, and inside
+           the menu's own scroll it scrolled again, in a 500px box of its own. */
         #howto {
-            max-height: 500px; /* adjust this value as needed */
-            width: min(500px, 92vw);
-            overflow-y: auto;
+            width: auto;
         }
 
             #howto .howto-intro {
@@ -4687,63 +4789,26 @@ code.language-markdown {
     box-sizing: border-box;
 }
 
+/* The four groups of the Ai and Fractal panels. They were accordions, folded to height 0
+   and animated open by `togglePanel`; they are headed groups now, always open (#32), and
+   these rules only lay out what is in them. */
 .context-settings-panel {
     display: flex;
     flex-direction: column; /* Align children vertically */
     align-items: center; /* Center-align the children */
-    transition: height 0.2s ease;
-    height: 0; /* Start with 0 height for the initial state if hidden */
     width: 100%; /* Ensure the panel takes full width */
 }
 
-.context-settings-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    overflow: hidden;
-}
 .model-select-panel {
     display: flex;
-    transition: height 0.2s ease;
-    height: 0;
     flex-direction: column;
     align-items: flex-end;
 }
 
-.model-select-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-}
-
-.fractal-settings-panel {
-    display: flex;
-    transition: height 0.2s ease;
-    height: 0;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.fractal-settings-container {
-    display: flex;
-    width: 100%;
-    flex-wrap: wrap;
-}
-
+.fractal-settings-panel,
 .color-settings-panel {
     display: flex;
-    transition: height 0.2s ease;
-    height: 0;
     flex-direction: column;
-    overflow: hidden;
-}
-
-.color-settings-container {
-    display: flex;
-    width: 100%;
-    flex-wrap: wrap;
 }
 
 
@@ -4829,16 +4894,18 @@ code.language-markdown {
     gap: 8px; /* Space between bars and the label text */
 }
 
-    .button-label:hover::before,
-    .button-label:hover::after {
+    .button-label:not(.settings-heading):hover::before,
+    .button-label:not(.settings-heading):hover::after {
         background-color: #555; /* Change color on hover for bars and pseudo-elements */
     }
 
+    /* A rule each side of the words, so a heading reads as a section break. At `#8882`
+       it read as two faint stubs (#32). */
     .button-label::before,
     .button-label::after {
         content: ''; /* Necessary for displaying the pseudo-element */
-        background-color: #8882;
-        height: 2px; /* Thickness of the bar, matching .bar */
+        background-color: var(--ui-panel-rule);
+        height: 1px;
         flex-grow: 1; /* Allow bars to take up available space on either side */
         transition: background-color 0.3s ease; /* Smooth transition for background color, matching .bar */
     }

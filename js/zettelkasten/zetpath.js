@@ -247,13 +247,9 @@ function adjustSliderVisibilityBasedOnPathType(styleName) {
     //
     // The harm is the layout, not the visibility. `.settingsSlider` is
     // `display: flex; flex-direction: column` (styles.css:3575), which `display: block`
-    // inline overrides, so a label and its slider stop stacking. Nothing became
-    // visible: all sixteen in the Fractal tab sit inside `.fractal-settings-panel` or
-    // `.color-settings-panel`, both `.hidden`, which is `display: none` -- an inline
-    // `display: block` on a descendant of a hidden ancestor shows nothing. It waits
-    // instead: `togglepanel.js` opens a panel by removing `.hidden` and sizing it from
-    // `scrollHeight`, so the reader meets the broken stack, measured at the wrong
-    // height, the next time they expand either one.
+    // inline overrides, so a label and its slider stop stacking -- on screen at once
+    // since #32, now that the Fractal tab's two groups are always open; before that it
+    // waited behind their folds for the next time a reader opened one.
     //
     // The line that showed "general sliders (without any specific class)" is gone with
     // it. Its selector was `.settingsSlider:not(.spiral-slider):not(.branching-slider)`,

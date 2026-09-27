@@ -112,6 +112,8 @@ test('retired artwork is absent from the sprite', ()=>{
     assert.equal(sprite.includes('bi-sliders2'), false, 'the unnamed Bootstrap sliders should be removed');
 });
 
+// Two folds are left in the panels since #32 made the rest headed groups: the function
+// console's toggle and the API Keys `<details>`.
 test('every panel toggle uses the same Lucide chevron', ()=>{
     const files = [
         'resources/html/tabs/fractaltab.html',
@@ -121,7 +123,7 @@ test('every panel toggle uses the same Lucide chevron', ()=>{
     const markup = files.map(read).join('\n');
     const chevrons = markup.match(/<use\b[^>]*(?:href|xlink:href)="#chevron-down-icon"/g) || [];
 
-    assert.equal(chevrons.length, 6, 'all six panel toggles should use chevron-down-icon');
+    assert.equal(chevrons.length, 2, 'both folds should use chevron-down-icon');
     assert.doesNotMatch(markup, /<\/svg>\s*<path\b/,
         'a path after </svg> cannot render inside that SVG');
 });
