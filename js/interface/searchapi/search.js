@@ -176,8 +176,17 @@ const nodeCache = new LRUCache(MAX_CACHE_SIZE);
 Embeddings.search = async function(searchTerm, maxNodesOverride){
     const searchTermLowered = searchTerm.toLowerCase();
     const maxNodes = maxNodesOverride ?? Elem.byId('node-count-slider').value;
-    // No empty keyword: its pattern, `\b\b`, matches every note that has a word in it.
-    const keywords = searchTermLowered.split(/,\s*/).filter(Boolean);
+    // Each keyword without sentence punctuation at its ends -- a first exchange's keywords
+    // are the message's own words, "fractal?" among them -- and no empty one, whose pattern
+    // matched every note with a word in it.
+    const keywords = searchTermLowered.split(/,\s*/)
+        .map( (keyword)=>keyword.replace(/^[\s.,;:!?"'()[\]{}]+|[\s.,;:!?"'()[\]{}]+$/g, '') )
+        .filter(Boolean);
+    // A keyword as a whole word, in the title and the text alike, and in any script: `\b`
+    // knows only ASCII letters, could never close after "c++", and the title test was a
+    // substring -- "is" earned the x10 in "History of Rome", over "Mandelbrot set".
+    const wholeWords = keywords.map( (keyword)=>new RegExp(
+        `(?<![\\p{L}\\p{N}])${escapeRegExp(keyword)}(?![\\p{L}\\p{N}])`, 'iu') );
 
     // Text Nodes only, filtered before anything is embedded. Every Node used to be
     // embedded and the others skipped afterwards, so an image, link or AI Node cost a
@@ -212,15 +221,12 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
 
         // A title that holds any keyword, not the whole comma-separated term: with the
         // three keywords a send searches by, the whole term was never in a title, so the
-        // x10 below could not apply. One keyword is the same test as before.
-        const titleLowered = node.view.titleInput.value.toLowerCase();
-        const titleMatchScore = keywords.some( (keyword)=>titleLowered.includes(keyword) ) ? 1 : 0;
+        // x10 below could not apply.
+        const title = node.view.titleInput.value;
+        const titleMatchScore = wholeWords.some( (word)=>word.test(title) ) ? 1 : 0;
 
-        // Escaped: a keyword like "c++" was a pattern that threw.
-        const contentMatchScore = keywords.filter(keyword => {
-            const regex = new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'gi');
-            return node.getText().match(regex);
-        }).length;
+        const text = node.getText();
+        const contentMatchScore = wholeWords.filter( (word)=>word.test(text) ).length;
 
         const weightedTitleScore = titleMatchScore * 10;
         const weightedContentScore = contentMatchScore;

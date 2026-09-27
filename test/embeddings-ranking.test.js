@@ -59,18 +59,20 @@ test('cosineSimilarity answers 0, never NaN, when there is nothing to compare', 
 });
 
 // A Graph of 3 text Nodes and 3 AI Nodes, a fake `Embeddings.fetch` that counts, and the
-// real `Embeddings.search`.
-function searchHarness(vectors){
-    const node = (uuid, isTextNode, text)=> ({
-        uuid, isTextNode, title: uuid,
-        getTitle: ()=> uuid, getText: ()=> node.texts[uuid] ?? text,
-        view: {titleInput: {value: uuid}}, content: {innerText: text},
+// real `Embeddings.search`. `spec` swaps in text Nodes of its own: [uuid, title, text].
+function searchHarness(vectors, spec = null){
+    const node = (uuid, isTextNode, text, title = uuid)=> ({
+        uuid, isTextNode, title,
+        getTitle: ()=> title, getText: ()=> node.texts[uuid] ?? text,
+        view: {titleInput: {value: title}}, content: {innerText: text},
     });
     node.texts = {};
-    const nodes = {
-        a: node('a', true, 'alpha'), b: node('b', true, 'beta'), c: node('c', true, 'gamma'),
-        x: node('x', false, 'ai one'), y: node('y', false, 'ai two'), z: node('z', false, 'ai three'),
-    };
+    const nodes = spec
+        ? Object.fromEntries(spec.map( ([uuid, title, text])=> [uuid, node(uuid, true, text, title)] ))
+        : {
+            a: node('a', true, 'alpha'), b: node('b', true, 'beta'), c: node('c', true, 'gamma'),
+            x: node('x', false, 'ai one'), y: node('y', false, 'ai two'), z: node('z', false, 'ai three'),
+        };
     const calls = [];
     const cache = new Map();
     const ctx = vm.createContext({
@@ -110,6 +112,20 @@ test('with embeddings down, only a keyword match is relevant', async ()=>{
     const h = searchHarness( ()=> [] );
     assert.deepEqual(Array.from(await h.search(term), (n)=> n.uuid), ['b']);
     assert.deepEqual(Array.from(await h.search(''), (n)=> n.uuid), [], 'and an empty term matches nothing');
+});
+
+// A first exchange searches by the message's own longest words, punctuation and all:
+// "What is a fractal?" is the term "fractal?, What, is". A title match by substring gave
+// "is" the x10 in "History of Rome" and "Poisson distribution", over "Mandelbrot set".
+test('a keyword counts as a whole word, in the title as in the text', async ()=>{
+    const h = searchHarness( ()=> [], [
+        ['rome', 'History of Rome', 'Rome was not built in a day.'],
+        ['poisson', 'Poisson distribution', 'Counts of events in an interval.'],
+        ['mandel', 'Mandelbrot set', 'The fractal set in the complex plane.'],
+        ['code', 'Languages', 'I write c++ daily.'],
+    ]);
+    assert.deepEqual(Array.from(await h.search('fractal?, What, is'), (n)=> n.uuid), ['mandel']);
+    assert.deepEqual(Array.from(await h.search('c++'), (n)=> n.uuid), ['code'], 'and a word that ends in symbols');
 });
 
 // A title holding one of the keywords earns the x10 -- the whole term never was in one.
