@@ -186,7 +186,12 @@ class ZetPanes {
             scrollbarStyle: 'simple',
             theme: 'default',
             mode: 'custom',
-            virtualRendering: true
+            virtualRendering: true,
+            // Escape is the way out of the editor, as it is out of every panel. The
+            // default keymap answers every Escape itself, and Tab types a tab, so no key
+            // got the caret out. An open completion list still takes the first Escape:
+            // its keymap is asked before this one.
+            extraKeys: {Esc: false}
         });
 
         const zettelkastenParser = new ZettelkastenParser(cm);

@@ -111,6 +111,8 @@ View.Code = class CodeView {
         lineWrapping = true;
         scrollbarStyle = 'simple';
         theme = 'default';
+        // Escape leaves the console, as it leaves the notes editor: see notestab.js.
+        extraKeys = {Esc: false};
         #userScrolledUp = false;
 
         constructor(textArea){

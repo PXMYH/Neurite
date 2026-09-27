@@ -378,24 +378,56 @@ test('Escape from a menu panel keeps the caret in a note', async () => {
     assert.equal(state.open, true, 'one Escape is one step, not a close');
 });
 
-// The notes editor lives in the menu, and CodeMirror answers Escape itself. The menu took
-// it anyway and stepped the Notes panel back to the list, out from under the caret.
-test('Escape in the notes editor leaves the editor and the panel alone', async () => {
+// Escape is the way out of the two editors in the menu, as it is out of every panel.
+// CodeMirror's default keymap answered every Escape and Tab typed a tab, so once the caret
+// was in the notes editor or the function console, no key got it out: measured, Escape
+// and then Tab three times left focus in the editor each time. An open completion list
+// is the one thing inside that still takes the first Escape.
+test('Escape in the notes editor closes its completion list, then leaves the panel', async () => {
     await page.click('.menu-button');
     await page.waitForTimeout(300);
     await page.click("button.menu-row.tablink:has-text('Notes')");
     await page.waitForTimeout(400);
     await page.click('#tab1 .CodeMirror');
+    await page.keyboard.type('## Alpha\nAl');
+    await page.evaluate(() => window.currentActiveZettelkastenMirror
+        .showHint({ hint: CodeMirror.hint.anyword, completeSingle: false }));
+    await page.waitForSelector('.CodeMirror-hints', { timeout: 2000 });
+
+    const state = () => page.evaluate(() => ({
+        hint: Boolean(document.querySelector('.CodeMirror-hints')),
+        editor: window.currentActiveZettelkastenMirror.hasFocus(),
+        panel: document.querySelector('.menu-panel').classList.contains('detail-open'),
+        row: document.activeElement?.matches('.menu-row.tablink')
+            ? document.activeElement.textContent.trim().split(/\s+/)[0] : null,
+    }));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(100);
+    const first = await state();
+    assert.equal(first.hint, false, 'the first Escape closes the list');
+    assert.ok(first.editor && first.panel, 'and does nothing else');
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(100);
+    const second = await state();
+    assert.equal(second.panel, false, 'the second steps the panel back to the list');
+    assert.equal(second.row, 'Notes', "and puts focus on the panel's row");
+});
+
+test('Escape in the function console closes the menu onto its button', async () => {
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('.neurite-function-cm-style').CodeMirror.focus());
     await page.keyboard.type('x');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(100);
 
     const state = await page.evaluate(() => ({
-        editorFocused: window.currentActiveZettelkastenMirror.hasFocus(),
-        panel: document.querySelector('.menu-panel').classList.contains('detail-open'),
+        open: document.querySelector('.dropdown-content').classList.contains('open'),
+        onButton: document.activeElement?.classList.contains('menu-button'),
     }));
-    assert.ok(state.editorFocused, 'the editor lost the caret');
-    assert.ok(state.panel, 'the Notes panel stepped back to the list');
+    assert.equal(state.open, false, 'the menu closed');
+    assert.ok(state.onButton, 'focus is on the menu button, not lost');
 });
 
 // A card whose rendered box cannot be read must not vanish from the things that operate on

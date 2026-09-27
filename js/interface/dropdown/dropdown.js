@@ -253,8 +253,8 @@ On.click(menuButton, (e)=>{
         //
         // The loop that stood here removed a class nobody adds (`active`, where `openTab`
         // writes `activeTab`) and hid `tabcontent[i]` for as many i as there are
-        // tablinks -- one short of the tabs, now that one tab has no link. `openTab`
-        // hides every `.tabcontent` and clears every `activeTab` itself.
+        // tablinks -- one short of the tabs while Notes had no row. `openTab` hides
+        // every `.tabcontent` and clears every `activeTab` itself.
         MainMenu.showList();
 
         // If there's any selected text, deselect it
@@ -288,10 +288,11 @@ On.click(menuButton, (e)=>{
 // clears it. The other two Escape consumers need no guard -- `CustomDropdown` calls
 // `stopPropagation` while its list is open, so this never sees that key, and
 // `NodeMode`'s Escape only stops nodes following the mouse.
-// An Escape that something inside already answered is theirs, not the menu's. The
-// notes editor lives in this menu now, and CodeMirror handles Escape itself -- its
-// keymap clears a multiple selection and closes its own dialogs -- marking the event
-// handled on the way. Stepping the menu on top of that took the caret out of the editor.
+// An Escape that something inside already answered is theirs, not the menu's: in the
+// notes editor or the function console, an open completion list closes on the first
+// Escape and the menu steps on the second. Both editors leave a bare Escape to this
+// handler (`extraKeys: {Esc: false}`). CodeMirror's default keymap answers every
+// Escape, and with this guard that left no key that got the caret out of either one.
 On.keydown(document, (e)=>{
     if (e.key !== 'Escape' || !dropdownContent.classList.contains('open')) return;
     if (Modal.current) return;
@@ -299,10 +300,10 @@ On.keydown(document, (e)=>{
 
     if (MainMenu.div.classList.contains('detail-open')) return MainMenu.showList(e);
 
-    // Take the hamburger only when the reader loses nothing by it (`noFocusToLose`).
-    // Read before the click, not after: by then the panel is inert and the browser has
-    // already blurred out of it, so `contains` answers `false` every time and the
-    // refocus never happens at all.
+    // Take the hamburger only when the reader loses nothing by it (`noFocusToLose`), asked
+    // before the click, in the state the reader pressed Escape in. After it, the answer
+    // rests on when the browser blurs out of the inert panel -- measured in Chromium, still
+    // the row straight after the click and <body> 50ms later, both of which answer `true`.
     const noFocusToLose = MainMenu.noFocusToLose();
     menuButton.click();
     if (noFocusToLose) menuButton.focus();
