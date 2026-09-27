@@ -1,6 +1,10 @@
 const Pyodide = new (class {
     prom = null;
-    url = "/* @vite-ignore */ https://cdn.jsdelivr.net/pyodide/v0.23.0/full/pyodide.mjs";
+    // A plain URL. This held "/* @vite-ignore */ " inside the string -- a Vite directive
+    // that belongs inside `import(...)`, and that Vite never sees here anyway, since this
+    // file is loaded by PageLoad rather than bundled -- so import() asked for a relative
+    // path beginning "/*" and Python never loaded, in the browser or the app.
+    url = "https://cdn.jsdelivr.net/pyodide/v0.23.0/full/pyodide.mjs";
     load(){
         return this.prom = import(this.url).then(this.#onImported, this.#onError)
     }
