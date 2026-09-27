@@ -654,6 +654,23 @@ test('Escape closes the right-click menu before the menu panel it opened over', 
     assert.equal(await panelOpen(), true, 'one Escape closed both the right-click menu and the panel');
 });
 
+test('a menu closed within a frame of opening leaves no action list behind', async () => {
+    // The list opens a frame after the menu, and opened even when an Escape, or a click
+    // elsewhere, had closed the menu inside that frame: on its own, over the tool bar, where
+    // it took the next click meant for the Connect tool. Measured on an iPad in WebKit.
+    const [a] = await fourNotes(page);
+    const shown = await page.evaluate(async (id) => {
+        const div = Graph.nodes[id].view.div;
+        const r = div.getBoundingClientRect();
+        App.menuContext.open(r.x + r.width / 2, r.y + r.height / 2, div);
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        return { menu: document.getElementById('customContextMenu').style.display,
+                 list: document.getElementById('suggestions-container').style.display };
+    }, a);
+    assert.deepEqual(shown, { menu: 'none', list: 'none' });
+});
+
 test("in a short window the action list goes beside the menu, over neither it nor the pointer", async () => {
     // Where it fitted neither below nor above, it was put at the top of the window, on the menu
     // and its focused search; flipped above near the right edge, it ended under the pointer.

@@ -280,7 +280,12 @@ Menu.Context.prototype.setupSuggestions = function(pageX, pageY){
 
         menu.placeBeside(App.menuContext.menu, {x: pageX, y: pageY});
     }
+    // A frame later -- and only while the menu is still open on the Node it was opened for.
+    // An Escape or a click elsewhere inside that frame closed the menu, and the list opened
+    // anyway, on its own, over whatever was under it, until the next right-click.
     requestAnimationFrame(() => {
+        if (this.menu.style.display !== 'block' || this.targetModel !== node) return;
+
         const items = [...this.menu.children];
         const actionItems = items.filter(li => !li.classList.contains('input-item'));
         if (actionItems.length === 0) displaySuggestions('');
