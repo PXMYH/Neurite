@@ -50,6 +50,12 @@ async function sendMessage(event, autoModeMessage) {
         event.stopPropagation();
     }
 
+    // One send at a time, as an AI Node has. Pressed again while one ran -- Enter in the
+    // prompt -- the first send's end took the prompt to rest while the second still ran,
+    // so a click then deleted the first exchange; in auto mode it forked a second loop.
+    // The text stays in the box for when this one is done.
+    if (!autoModeMessage && Ai.send) return;
+
     const activeInstance = getActiveZetCMInstanceInfo();
 
     const promptElement = Elem.byId('prompt');
@@ -68,6 +74,13 @@ async function sendMessage(event, autoModeMessage) {
         Ai.originalUserMessage = message;
     }
 
+    // This send's identity. A stop drops it (`Ai.haltZettelkasten`), and a send that is no
+    // longer `Ai.send` has been stopped: it asks for nothing more, and leaves the state to
+    // whoever holds it now. A shared flag could not tell a stopped send from the one sent
+    // after it: stopped during a helper that cannot be aborted and sent again, the first
+    // resumed when the helper settled, and both questions were answered.
+    const send = Ai.send = {asked: Boolean(autoModeMessage)};   // a self-prompt has no question to give back
+
     // The send is under way from here, helpers and all, so the prompt's button stops it.
     // Until the answer's own call began it read "not responding", and a click while the
     // keywords or the note search ran regenerated instead: `removeLastResponse` deleted
@@ -78,34 +91,45 @@ async function sendMessage(event, autoModeMessage) {
     Ai.mainPrompt.setPause();
     Elem.byId('aiLoadingIcon').style.display = 'block';
 
-    let answer;
+    let answer, again = false;
     try {
-        answer = await askWithContext(message, autoModeMessage, activeInstance);
+        answer = await askWithContext(message, autoModeMessage, activeInstance, send);
+    } catch (err) {
+        // A helper that threw ends the send like any failure: said on screen, and the
+        // question given back if it was never written into the notes.
+        Logger.err("While sending:", err);
+        Elem.byId('aiErrorIcon').style.display = 'block';
+        const box = Elem.byId('prompt');
+        if (Ai.send === send && !send.asked && !box.value) box.value = message;
     } finally {
-        // Whatever ended the send -- its answer, a stop, no key, Neurite signed out, a
-        // helper that threw -- it ends here, and the start above is undone. Only the
-        // answer's own call used to undo it, so a send that never reached one stayed
-        // "responding", and auto mode went round again on nothing: measured, 25 passes
-        // and 49 sign-in dialogs in 3 s with Neurite signed out.
-        Elem.hideById('aiLoadingIcon');
-        if (!answer || !Ai.isAutoModeEnabled) {
-            Ai.isResponding = false;
-            Ai.mainPrompt.setRefresh();
+        // Whatever ended the send -- its answer, no key, Neurite signed out, a helper that
+        // threw -- it ends here, and the start above is undone; a stop has undone it
+        // already. Only the answer's own call used to, so a send that never reached one
+        // stayed "responding", and auto mode went round again on nothing: measured, 25
+        // passes and 49 sign-in dialogs in 3 s with Neurite signed out. It goes round
+        // again only on an answer with words in it -- one of only whitespace went round
+        // 1,172 times in 3 s -- and only while the box is still ticked.
+        if (Ai.send === send) {
+            Ai.send = null;
+            again = Boolean(answer?.trim()) && Elem.byId('auto-mode-checkbox').checked;
+            Elem.hideById('aiLoadingIcon');
+            if (!again) {
+                Ai.isResponding = false;
+                Ai.mainPrompt.setRefresh();
+            }
         }
     }
 
-    if (answer && Ai.isResponding && Elem.byId('auto-mode-checkbox').checked) {
-        sendMessage(null, extractLastPrompt())
-    }
+    if (again) sendMessage(null, extractLastPrompt());
 }
 
 // Everything between a send's start and its answer: the helpers that gather the context,
 // then the answer's own call. Answers what that call returned, or nothing when the send was
 // stopped before it -- and each helper is a request, so the stop is read after every one.
-async function askWithContext(message, autoModeMessage, activeInstance){
+async function askWithContext(message, autoModeMessage, activeInstance, send){
     const noteInput = activeInstance.textarea;
     const cm = activeInstance.cm;
-    const stopped = ()=>!Ai.shouldContinue;
+    const stopped = ()=>(Ai.send !== send);
 
     // Check if the last character in the note-input is not a newline, and add one if needed
     if (noteInput.value.length > 0 && noteInput.value[noteInput.value.length - 1] !== '\n') {
@@ -215,6 +239,7 @@ async function askWithContext(message, autoModeMessage, activeInstance){
     } else if (autoModeMessage) {
         cm.replaceRange(`\n`, CodeMirror.Pos(lineBeforeAppend));
     }
+    send.asked = true;
 
     activeInstance.ui.scrollToLine(cm, lineBeforeAppend + 2); // Scroll to the new last line
     userScrolledUp = false;
@@ -222,7 +247,7 @@ async function askWithContext(message, autoModeMessage, activeInstance){
     // Handle Wolfram Loop after appending the prompt.
 
     const wolframData = (!Elem.byId('enable-wolfram-alpha').checked) ? ''
-                      : await fetchWolfram(message);
+                      : await fetchWolfram(message, false, null, "", stopped);
     if (stopped()) return;
     if (wolframData) aiCall.addSystemPrompt(Prompt.wolfram(wolframData));
 

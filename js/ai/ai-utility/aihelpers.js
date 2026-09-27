@@ -267,6 +267,9 @@ Ai.haltZettelkasten = function(){
 
     Ai.isResponding = false;
     Ai.shouldContinue = false;
+    // The send that was running is over: it reads this, and asks for nothing more.
+    Ai.send = null;
+    Elem.hideById('aiLoadingIcon');
 
     Ai.mainPrompt.setLatestUserMessage();
 }

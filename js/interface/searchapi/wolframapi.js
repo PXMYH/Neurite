@@ -8,7 +8,7 @@ let wolframCallCounter = 0;
 
 const wolframUnreachable = "Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai panel. Localhosts can be found at the Github link in the Help panel.";
 
-async function fetchWolfram(message, isAINode = false, node = null, wolframContext = "") {
+async function fetchWolfram(message, isAINode = false, node = null, wolframContext = "", isStopped = null) {
     // Only the localhost gateway answers Wolfram. Without it, the reformulation below is
     // an AI round trip for a query nobody can send -- paid on every send, and on every
     // pass of auto mode, before the fetch failed anyway. `useProxy` is the gateway as it
@@ -18,8 +18,10 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
         alert(wolframUnreachable);
         return;
     }
-    // A send stopped while this ran asks for nothing more -- this is a helper of it.
-    const stopped = ()=>!((isAINode && node) ? node.shouldContinue : Ai.shouldContinue);
+    // A send stopped while this ran asks for nothing more -- this is a helper of it. The
+    // send says whether it is (`isStopped`); a shared flag cannot tell a stopped send from
+    // the one sent after it.
+    const stopped = isStopped || (()=>!((isAINode && node) ? node.shouldContinue : Ai.shouldContinue));
     if (stopped()) return;
 
     let wolframAlphaResult = "not-enabled";

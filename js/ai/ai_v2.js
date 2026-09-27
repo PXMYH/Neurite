@@ -3,7 +3,9 @@ const Ai = {
     latestUserMessage: null,
     isAutoModeEnabled: false,
     originalUserMessage: null,
-    shouldContinue: true
+    shouldContinue: true,
+    // The main prompt's send under way, as an identity: see `sendMessage`.
+    send: null
 };
 
 let failCounter = 0;
@@ -167,7 +169,8 @@ class AiCall {
         function onStreamingResponse(content) {
             // Verify if the request is still active
             if (!activeRequests.has(requestId) || !node.shouldContinue || content.trim() === "[DONE]") return;
-            if (node.shouldContinue && content.trim() !== "[DONE]") TextArea.append.call(node.aiResponseTextArea, content)
+            TextArea.append.call(node.aiResponseTextArea, content);
+            streamedResponse += content;
         }
 
         function onError(errorMsg) {
@@ -194,7 +197,10 @@ class AiCall {
             inferenceOverride: this.inferenceOverride || Ai.determineModel(node),
             controller, // node-specific controller
             requestId
-        });
+        // What was streamed, as the main prompt's call answers: the dummy responses stream
+        // and return nothing, so a Node's send read no answer, and its auto mode and message
+        // loop stopped after one pass.
+        }).then( (responseData)=>(streamedResponse || responseData) );
     }
 }
 

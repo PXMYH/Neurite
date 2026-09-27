@@ -236,6 +236,18 @@ AiNode.HaltResponse = function (node) {
     node.shouldContinue = false;
     node.regenerateButton.innerHTML = Svg.refresh;
 
+    // The send under way is over now, not when the helper it waits on settles: it reads
+    // `node.send`, and asks for nothing more. Its question goes back where it was typed if
+    // it never reached the conversation -- into an empty box only, so nothing typed since
+    // is lost -- and its loader stops.
+    const send = node.send;
+    node.send = null;
+    if (send && !send.asked && !node.promptTextArea.value) {
+        node.promptTextArea.value = node.latestUserMessage || '';
+    }
+    const loadingIcon = node.content.querySelector('#aiLoadingIcon-' + node.index);
+    if (loadingIcon) loadingIcon.style.display = 'none';
+
     const resHandler = nodeResponseHandlers.get(node);
     if (resHandler?.inCodeBlock) {
         resHandler.codeBlockContent += '```\n'; // Add closing backticks

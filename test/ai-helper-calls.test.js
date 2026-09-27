@@ -113,3 +113,16 @@ test('a streamed call marked as a helper leaves the send alone', async ()=>{
     assert.equal(ctx.Ai.isResponding, true);
     assert.equal(ctx.Ai.shouldContinue, false, 'the stop still holds');
 });
+
+// A streamed answer to an AI Node is what was streamed. The dummy responses stream and
+// return nothing, so a Node's send read no answer, and its auto mode and message loop
+// stopped after one pass.
+test("an AI Node's streamed answer is what was streamed", async ()=>{
+    const {ctx} = load();
+    ctx.TextArea = {append(){}};
+    ctx.Ai.determineModel = ()=> ({providerId: 'OpenAi', model: 'm'});
+    ctx.callAiApi = async ({onStreamingResponse})=>{ onStreamingResponse('ANSWER'); return undefined };
+    const node = makeNode();
+
+    assert.equal(await ctx.AiCall.stream(node).addUserPrompt('the question').exec(), 'ANSWER');
+});

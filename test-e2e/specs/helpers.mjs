@@ -22,8 +22,11 @@ export function launchBrowser() {
 // empty. Only `pageerror` is collected, never console.error: the console carries
 // failed fetches whenever the optional localhost gateway (7070) or Ollama is not
 // running, which is an environment difference rather than a regression.
-export async function openNeurite(browser) {
+// `setup(context)` runs before the first navigation: a route the page needs at boot -- to
+// hide a running gateway, say -- has to exist before the page asks.
+export async function openNeurite(browser, { setup } = {}) {
     const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+    if (setup) await setup(context);
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));

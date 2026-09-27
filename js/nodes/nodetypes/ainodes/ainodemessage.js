@@ -3,6 +3,9 @@
         Logger.info("AI is currently responding. Wait for the current response to complete before sending a new message.");
         return;
     }
+    // This send's identity, as `Ai.send` is the main prompt's: a stop drops it
+    // (`AiNode.HaltResponse`), and a send that no longer holds it asks for nothing more.
+    const send = node.send = {asked: Boolean(autoModeMessage)};   // a self-prompt has no question to give back
     node.aiResponding = true;
     node.aiResponseHalted = false;
     node.shouldContinue = true;
@@ -15,32 +18,40 @@
     if (loadingIcon) loadingIcon.style.display = 'block';
     if (node.regenerateButton) node.regenerateButton.innerHTML = Svg.pause;
 
-    let answer;
+    let answer, again = false, handsOver = false;
     try {
-        answer = await AiNode.ask(node, message, autoModeMessage);
+        answer = await AiNode.ask(node, message, autoModeMessage, send);
     } catch (err) {
         Logger.err("While getting response:", err);
         if (errorIcon) errorIcon.style.display = 'block';
+        if (node.send === send && !send.asked && !node.promptTextArea.value) {
+            node.promptTextArea.value = node.latestUserMessage;
+        }
     } finally {
         // Whatever ended the send, it ends here, as the main prompt's does: a send that
-        // never reached an answer -- no key, a stop, a helper that threw -- left the
-        // Node responding with its loader spinning, and in auto mode went round again.
-        if (loadingIcon) loadingIcon.style.display = 'none';
-        if (!answer || !node.isAutoModeEnabled) {
-            node.aiResponding = false;
-            if (node.regenerateButton) node.regenerateButton.innerHTML = Svg.refresh;
+        // never reached an answer -- no key, a helper that threw -- left the Node
+        // responding with its loader spinning, and in auto mode went round again. A stop
+        // has ended it already. What comes next is decided once: the message loop takes
+        // over when the answer has AI Nodes to go to -- and the Node is at rest for it, or
+        // its next send was refused as still responding -- and auto mode goes round again
+        // only on an answer with words in it (one of only whitespace went round 2,360
+        // times in 3 s), and only while its box is still ticked.
+        if (node.send === send) {
+            node.send = null;
+            const answered = Boolean(answer?.trim());
+            handsOver = answered && node.shouldAppendQuestion
+                     && AiNode.calculateDirectionalityLogic(node).length > 0;
+            again = answered && !handsOver && node.autoCheckbox.checked;
+            if (loadingIcon) loadingIcon.style.display = 'none';
+            if (!again) {
+                node.aiResponding = false;
+                if (node.regenerateButton) node.regenerateButton.innerHTML = Svg.refresh;
+            }
         }
     }
-    if (!answer) return;
 
-    if (node.shouldContinue && node.shouldAppendQuestion) {
-        const hasConnectedAiNode = AiNode.calculateDirectionalityLogic(node).length > 0;
-        if (hasConnectedAiNode) {
-            return node.aiNodeMessageLoop.questionConnectedAiNodes()
-        }
-    }
-
-    if (node.aiResponding && node.isAutoModeEnabled) {
+    if (handsOver) return node.aiNodeMessageLoop.questionConnectedAiNodes();
+    if (again) {
         const lastPrompt = extractLastPrompt(node);
         AiNode.sendMessage(node, lastPrompt, lastPrompt);
     }
@@ -49,8 +60,8 @@
 // Everything between an AI Node's send starting and its answer, as `askWithContext` is
 // for the main prompt. Answers what the answer's call returned, or nothing when the send
 // was stopped before it; each helper is a request, so the stop is read after every one.
-AiNode.ask = async function (node, message, autoModeMessage) {
-    const stopped = ()=>!node.shouldContinue;
+AiNode.ask = async function (node, message, autoModeMessage, send) {
+    const stopped = ()=>(node.send !== send);
     const nodeIndex = node.index;
 
     const maxTokens = node.content.querySelector('#node-max-tokens-' + node.index).value;
@@ -74,14 +85,6 @@ AiNode.ask = async function (node, message, autoModeMessage) {
     // Clear the prompt textarea
     node.promptTextArea.value = '';
     node.promptTextArea.dispatchEvent(new Event('input'));
-
-    // Stopped before the question was written into the conversation: it goes back where
-    // the reader typed it, or it would be in neither place.
-    const stoppedBeforeAsking = ()=>{
-        if (!stopped()) return false;
-        if (!autoModeMessage) node.promptTextArea.value = latestUserMessage;
-        return true;
-    };
 
     const aiIdentity = node.getTitle() || "an Ai Assistant";
 
@@ -163,17 +166,17 @@ AiNode.ask = async function (node, message, autoModeMessage) {
         // passed as the context: the prompt read "Recent conversation:[object Object]" and
         // the call went out under the global model.
         const arrKeywords = await generateKeywords(latestUserMessage, 3, truncatedRecentContext, node);
-        if (stoppedBeforeAsking()) return;
+        if (stopped()) return;
         const strKeywords = arrKeywords.join(' ');
         const summaries = await Wikipedia.getSummaries([arrKeywords[0]]);
-        if (stoppedBeforeAsking()) return;
+        if (stopped()) return;
         aiCall.addSystemPrompt(Prompt.wikipedia(strKeywords, summaries));
     }
 
     let searchQuery = null;
     let filteredKeys = null;
     const allConnectedNodesData = await node.getAllConnectedNodesData(true);
-    if (stoppedBeforeAsking()) return;
+    if (stopped()) return;
 
     if (
         isGoogleSearchEnabled(nodeIndex) ||
@@ -186,7 +189,7 @@ AiNode.ask = async function (node, message, autoModeMessage) {
             Logger.err("In constructing search query:", err);
         }
     }
-    if (stoppedBeforeAsking()) return;
+    if (stopped()) return;
 
     if (isGoogleSearchEnabled(nodeIndex)) {
         const content = handleNaturalLanguageSearch(searchQuery, latestUserMessage);
@@ -204,7 +207,7 @@ AiNode.ask = async function (node, message, autoModeMessage) {
         node,
         allConnectedNodesData
     );
-    if (stoppedBeforeAsking()) return;
+    if (stopped()) return;
     if (prompt) aiCall.addSystemPrompt(prompt);
 
     let totalTokenCount = TokenCounter.forMessages(aiCall.messages);
@@ -275,10 +278,11 @@ AiNode.ask = async function (node, message, autoModeMessage) {
     if (!autoModeMessage) {
         handleUserPromptAppend(node.aiResponseTextArea, latestUserMessage);
     }
+    send.asked = true;
 
     const id = 'enable-wolfram-alpha-checkbox-' + nodeIndex;
     const wolframData = Elem.byId(id).checked
-                        && await fetchWolfram(latestUserMessage, true, node, truncatedRecentContext);
+                        && await fetchWolfram(latestUserMessage, true, node, truncatedRecentContext, stopped);
     if (stopped()) return;
     if (wolframData) {
         aiCall.addSystemPrompt(Prompt.wolfram(wolframData));
