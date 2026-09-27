@@ -3811,11 +3811,17 @@ input[type=range] {
     color: #bbb;
 }
 
+/* A text cursor: a plain click places the caret. With the pointer modifier held a click goes
+   to the note, and the pointer says so (`zet-going` on body). */
 .node-title {
     color: paleturquoise;
-    cursor: pointer;
+    cursor: text;
     text-decoration: underline;
 }
+
+    .zet-going .CodeMirror .node-title {
+        cursor: pointer;
+    }
 
     .node-title.current-node-section {
         color: #cbffff;

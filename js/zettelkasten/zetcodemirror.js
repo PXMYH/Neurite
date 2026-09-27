@@ -579,6 +579,12 @@ function getEdgeInfo(startTitle, endTitle) {
 
 
 
+// Whether the pointer modifier is down, for the pointer over a Title (`.zet-going`).
+const ZetGoing = (e)=>document.body.classList.toggle('zet-going', Mod.isHeld(e)) ;
+On.keydown(window, ZetGoing);
+On.keyup(window, ZetGoing);
+On.blur(window, ()=>document.body.classList.remove('zet-going') );
+
 class ZettelkastenUI {
     constructor(codeMirrorInstance, textarea, parser) {
         this.cm = codeMirrorInstance;
@@ -614,33 +620,18 @@ class ZettelkastenUI {
 
             const isWithin = this.isWithinMarkedText(cm, pos, 'node-title');
 
+            // A plain click in a Title places the caret, as a click in text does, and the
+            // pointer modifier (Cmd on a Mac, Ctrl elsewhere) goes to the note. Every mention
+            // of a Title is marked -- 2,434 of them in the AI bundle -- and a plain click on
+            // any flew the view off the text being written.
             if (isWithin) {
-                const lineMarkers = cm.findMarksAt(pos);
-                const titles = lineMarkers.filter(marker => marker.className === 'node-title')
+                if (!Mod.isHeld(e)) return;
+
+                const titles = cm.findMarksAt(pos).filter(marker => marker.className === 'node-title')
                     .map(marker => cm.getRange(marker.find().from, marker.find().to));
-
                 if (titles.length > 0) {
-                    const longestTitle = titles.reduce((a, b) => a.length > b.length ? a : b);
-                    const markerForLongestTitle = lineMarkers.find(marker => {
-                        const rangeText = cm.getRange(marker.find().from, marker.find().to);
-                        return rangeText === longestTitle;
-                    });
-
-                    if (markerForLongestTitle) {
-                        const from = markerForLongestTitle.find().from;
-                        const to = markerForLongestTitle.find().to;
-
-                        if (pos.ch === from.ch || pos.ch === to.ch) {
-                            if (longestTitle.length === 1) {
-                                handleTitleClick(longestTitle);
-                            } else {
-                                cm.setCursor(pos);
-                            }
-                        } else {
-                            e.preventDefault();
-                            handleTitleClick(longestTitle);
-                        }
-                    }
+                    e.preventDefault();
+                    handleTitleClick(titles.reduce((a, b) => a.length > b.length ? a : b));
                 }
             } else {
                 const leftPos = CodeMirror.Pos(pos.line, pos.ch - 1);
@@ -689,7 +680,7 @@ class ZettelkastenUI {
 
             this.ignoreTextAreaChanges = false;
             this.parser.identifyNodeTitles();
-            this.highlightNodeTitles();
+            this.highlightNodeTitles(changeObj);
         });
 
         this.cm.on('scroll', () => {
@@ -707,40 +698,52 @@ class ZettelkastenUI {
         return false;
     }
 
-    highlightNodeTitles() {
-        this.cm.getAllMarks().forEach(mark => mark.clear());
+    // Every mention of a Title, marked: one expression for all of them, over the lines the
+    // change touched. It was an expression per Title per line, over every line, at every
+    // keystroke -- 310,000 of them in the AI bundle's largest Archive (3,263 lines, 95 Titles),
+    // 70ms a key. Whole words only: "RAG" inside "leverage" is not the note RAG. Every line
+    // again when the Titles themselves changed, and only this Pane's marks are touched.
+    highlightNodeTitles(change = null) {
+        const cm = this.cm;
+        const pattern = ZettelkastenUI.titlePattern();
+        const whole = (!change || pattern !== this.markedWith);
+        this.markedWith = pattern;
+        const first = (whole ? cm.firstLine() : change.from.line);
+        const last = (whole ? cm.lastLine() : Math.min(cm.lastLine(), change.from.line + change.text.length - 1));
 
-        this.cm.eachLine((line) => {
-            nodeTitles.forEach((title) => {
-                if (title.length < 1) return;
+        cm.operation( ()=>{
+            const marks = (whole ? cm.getAllMarks()
+                : cm.findMarks(CodeMirror.Pos(first, 0), CodeMirror.Pos(last, cm.getLine(last).length)));
+            for (const mark of marks) if (mark.className === 'node-title') mark.clear();
+            if (!pattern) return;
 
-                const escapedTitle = RegExp.escape(title);
-                const regex = new RegExp(escapedTitle, "ig");
-                let match;
+            cm.eachLine(first, last + 1, (line)=>{
+                const lineNo = line.lineNo();
+                for (const match of line.text.matchAll(pattern)) {
+                    // Not inside a prompt block, which is text for the model.
+                    if (cm.getTokenTypeAt(CodeMirror.Pos(lineNo, match.index + 1)) === 'prompt-block') continue;
 
-                while ((match = regex.exec(line.text))) {
-                    const idx = match.index;
-                    if (idx !== -1) {
-                        const token = this.cm.getTokenAt(CodeMirror.Pos(line.lineNo(), idx));
-
-                        // Skip highlighting if the token belongs to a prompt block
-                        if (token && token.type === "prompt-block") {
-                            continue;
-                        }
-
-                        this.cm.markText(
-                            CodeMirror.Pos(line.lineNo(), idx),
-                            CodeMirror.Pos(line.lineNo(), idx + title.length),
-                            {
-                                className: 'node-title',
-                                handleMouseEvents: true
-                            }
-                        );
-                    }
+                    cm.markText(CodeMirror.Pos(lineNo, match.index), CodeMirror.Pos(lineNo, match.index + match[0].length),
+                                {className: 'node-title', handleMouseEvents: true, attributes: ZettelkastenUI.markAttributes});
                 }
             });
         });
     }
+    // One expression for every Title, longest first so the longer of two that start at one
+    // place wins, and made again only when the Titles change.
+    static titlePattern(){
+        const key = [...nodeTitles].join('\n');
+        if (key === ZettelkastenUI.patternKey) return ZettelkastenUI.pattern;
+
+        ZettelkastenUI.patternKey = key;
+        const titles = [...nodeTitles].filter(Boolean).sort( (a, b)=>(b.length - a.length) );
+        ZettelkastenUI.pattern = (!titles.length) ? null
+            : new RegExp(`(?<![\\p{L}\\p{N}_])(?:${titles.map(RegExp.escape).join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
+        return ZettelkastenUI.pattern;
+    }
+    static patternKey = null;
+    static pattern = null;
+    static markAttributes = {title: (Mod.isMac ? 'Cmd' : 'Ctrl') + '-click to go to this note'};
 
     scrollToLine(cm, lineNumber) {
         const validLineNumber = Math.min(lineNumber, cm.lastLine());

@@ -283,6 +283,7 @@ class ZettelkastenProcessor {
         this.taken = [];
         this.renames = [];
         this.bodies = new Set();
+        this.refsHandled = new Set();
         this.reserveHeld(this.noteInputLines);
 
         this.noteInputLines.forEach((line, index) => {
@@ -298,6 +299,7 @@ class ZettelkastenProcessor {
         if (!mode.full) this.processChangedNodes(this.noteInputLines);
 
         this.drainDeferredRefs();
+        this.refsHandled = null;
         this.writeBodies();
 
         this.deleteInactiveNodesFromDict(this.wrapPerTitle);
@@ -741,11 +743,18 @@ class ZettelkastenProcessor {
             startLineIndex = range.startLineNo + 1; // +1 to skip the title
             endLineIndex = range.endLineNo;
         }
-        const allReferences = [];
-        this.forEachReferenceInRange(startLineIndex, endLineIndex, lines, function(ref) {
-            allReferences.push(ref);
-        });
-        this.handleRefTags(allReferences, currentNodeTitle);
+        // The Refs of the whole section, reconciled once a pass for each note: every Ref
+        // line of a note did it again, with the same result -- 40 reconciliations for one
+        // keystroke in a note with 40 Ref lines. A Ref to a note further down is retried
+        // after the walk (`drainDeferredRefs`), whichever line found it.
+        if (!this.refsHandled?.has(wrap)) {
+            this.refsHandled?.add(wrap);
+            const allReferences = [];
+            this.forEachReferenceInRange(startLineIndex, endLineIndex, lines, function(ref) {
+                allReferences.push(ref);
+            });
+            this.handleRefTags(allReferences, currentNodeTitle);
+        }
 
         // Build plain text for node after tags
         if (shouldAppend) {
@@ -798,9 +807,12 @@ class ZettelkastenProcessor {
         // Get all nodes from all CodeMirror instances
         const wrapPerTitle = getAllInternalZetNodeWraps();
 
-        // Initialize set with UUIDs from current node references
+        // Initialize set with UUIDs from current node references. A Ref to the note's own
+        // Title is no Edge: an Edge joins two Nodes, and one from a note to itself -- two
+        // notes of the AI bundle name themselves -- made the next pass throw below, on an
+        // Edge with no other end, at every keystroke in that Pane.
         const uuidOfRef = (ref)=>Node.byTitle(ref)?.uuid ;
-        const allReferenceUUIDs = new Set(references.map(uuidOfRef).filter(uuid => uuid));
+        const allReferenceUUIDs = new Set(references.map(uuidOfRef).filter(uuid => uuid && uuid !== thisNode.uuid));
 
         // Whether each connected note names this one, asked once per note for the whole pass
         // and read against one copy of each Pane's lines. The three loops below asked again
@@ -828,6 +840,13 @@ class ZettelkastenProcessor {
 
         // Remove edges not found in reference UUIDs and ensure both nodes are text nodes
         currentEdges.forEach((edge, uuid) => {
+            // No other end: an Edge from this note to itself, which a Saved Graph from before
+            // can hold. It goes; anything else without one is left alone.
+            if (uuid === null) {
+                if (edge.pts.every( (pt)=>(pt === thisNode) )) edge.remove();
+                currentEdges.delete(uuid);
+                return;
+            }
             if (allReferenceUUIDs.has(uuid)) return;
 
             const otherNode = edge.pts.find(hasUuidThis, uuid);
@@ -853,6 +872,8 @@ class ZettelkastenProcessor {
                 unresolved = true;
                 return;
             }
+            if (target === thisNode) return;
+
             named.add(target.uuid);
             if (currentEdges.has(target.uuid)) return;
 

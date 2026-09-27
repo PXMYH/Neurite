@@ -43,10 +43,20 @@ test('a note with overflowing text scrolls before the canvas zooms', async () =>
         return !!ed && ed.scrollHeight - ed.clientHeight > 1;
     }, uuid, { timeout: 10000 });
 
-    const pt = await page.evaluate((id) => {
+    // And drawn where it arrived: the card is placed on the frame after it exists, and the
+    // body can reach it first -- the point was then taken at the corner the card was built
+    // in, and the wheel turned over the canvas.
+    const box = () => page.evaluate((id) => {
         const b = Graph.nodes[id].view.div.querySelector('.editable-div').getBoundingClientRect();
         return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) };
     }, uuid);
+    let pt = await box();
+    for (let i = 0; i < 20; i++) {
+        await page.waitForTimeout(100);
+        const again = await box();
+        if (again.x === pt.x && again.y === pt.y) break;
+        pt = again;
+    }
     const zoomBefore = await page.evaluate(() => Graph.zoom.mag());
     await page.mouse.move(pt.x, pt.y);
     for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 120);
