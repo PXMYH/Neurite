@@ -14,6 +14,9 @@ async function forget(userMessage, combinedContext) {
 
     const response = await aiCall.exec(); // mock calling the AI API
     Logger.info(response);
+    // A call that failed or was stopped answers nothing, which is nothing to forget.
+    // `response.split` on it threw, and took the send with it.
+    if (!response) return new Set();
     // Extract the node titles to forget from the AI's response
     const titlesToForget = new Set(response.split('\n'));
     Logger.info(titlesToForget);

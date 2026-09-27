@@ -7,11 +7,50 @@
     node.aiResponseHalted = false;
     node.shouldContinue = true;
     // Shown from the start, with the stop button: the helpers below, the keywords above
-    // all, are a round trip before the answer's own call would show either.
-    const nodeLoadingIcon = node.content.querySelector('#aiLoadingIcon-' + node.index);
-    if (nodeLoadingIcon) nodeLoadingIcon.style.display = 'block';
+    // all, are a round trip before the answer's own call would show either. The Node's
+    // own icons: the bare `aiLoadingIcon` this used to reach is the main prompt's, by
+    // the window's named access, so a Node's answer turned the prompt's loader off.
+    const loadingIcon = node.content.querySelector('#aiLoadingIcon-' + node.index);
+    const errorIcon = node.content.querySelector('#aiErrorIcon-' + node.index);
+    if (loadingIcon) loadingIcon.style.display = 'block';
     if (node.regenerateButton) node.regenerateButton.innerHTML = Svg.pause;
 
+    let answer;
+    try {
+        answer = await AiNode.ask(node, message, autoModeMessage);
+    } catch (err) {
+        Logger.err("While getting response:", err);
+        if (errorIcon) errorIcon.style.display = 'block';
+    } finally {
+        // Whatever ended the send, it ends here, as the main prompt's does: a send that
+        // never reached an answer -- no key, a stop, a helper that threw -- left the
+        // Node responding with its loader spinning, and in auto mode went round again.
+        if (loadingIcon) loadingIcon.style.display = 'none';
+        if (!answer || !node.isAutoModeEnabled) {
+            node.aiResponding = false;
+            if (node.regenerateButton) node.regenerateButton.innerHTML = Svg.refresh;
+        }
+    }
+    if (!answer) return;
+
+    if (node.shouldContinue && node.shouldAppendQuestion) {
+        const hasConnectedAiNode = AiNode.calculateDirectionalityLogic(node).length > 0;
+        if (hasConnectedAiNode) {
+            return node.aiNodeMessageLoop.questionConnectedAiNodes()
+        }
+    }
+
+    if (node.aiResponding && node.isAutoModeEnabled) {
+        const lastPrompt = extractLastPrompt(node);
+        AiNode.sendMessage(node, lastPrompt, lastPrompt);
+    }
+}
+
+// Everything between an AI Node's send starting and its answer, as `askWithContext` is
+// for the main prompt. Answers what the answer's call returned, or nothing when the send
+// was stopped before it; each helper is a request, so the stop is read after every one.
+AiNode.ask = async function (node, message, autoModeMessage) {
+    const stopped = ()=>!node.shouldContinue;
     const nodeIndex = node.index;
 
     const maxTokens = node.content.querySelector('#node-max-tokens-' + node.index).value;
@@ -35,6 +74,14 @@
     // Clear the prompt textarea
     node.promptTextArea.value = '';
     node.promptTextArea.dispatchEvent(new Event('input'));
+
+    // Stopped before the question was written into the conversation: it goes back where
+    // the reader typed it, or it would be in neither place.
+    const stoppedBeforeAsking = ()=>{
+        if (!stopped()) return false;
+        if (!autoModeMessage) node.promptTextArea.value = latestUserMessage;
+        return true;
+    };
 
     const aiIdentity = node.getTitle() || "an Ai Assistant";
 
@@ -116,14 +163,17 @@
         // passed as the context: the prompt read "Recent conversation:[object Object]" and
         // the call went out under the global model.
         const arrKeywords = await generateKeywords(latestUserMessage, 3, truncatedRecentContext, node);
+        if (stoppedBeforeAsking()) return;
         const strKeywords = arrKeywords.join(' ');
         const summaries = await Wikipedia.getSummaries([arrKeywords[0]]);
+        if (stoppedBeforeAsking()) return;
         aiCall.addSystemPrompt(Prompt.wikipedia(strKeywords, summaries));
     }
 
     let searchQuery = null;
     let filteredKeys = null;
     const allConnectedNodesData = await node.getAllConnectedNodesData(true);
+    if (stoppedBeforeAsking()) return;
 
     if (
         isGoogleSearchEnabled(nodeIndex) ||
@@ -136,6 +186,7 @@
             Logger.err("In constructing search query:", err);
         }
     }
+    if (stoppedBeforeAsking()) return;
 
     if (isGoogleSearchEnabled(nodeIndex)) {
         const content = handleNaturalLanguageSearch(searchQuery, latestUserMessage);
@@ -153,6 +204,7 @@
         node,
         allConnectedNodesData
     );
+    if (stoppedBeforeAsking()) return;
     if (prompt) aiCall.addSystemPrompt(prompt);
 
     let totalTokenCount = TokenCounter.forMessages(aiCall.messages);
@@ -227,6 +279,7 @@
     const id = 'enable-wolfram-alpha-checkbox-' + nodeIndex;
     const wolframData = Elem.byId(id).checked
                         && await fetchWolfram(latestUserMessage, true, node, truncatedRecentContext);
+    if (stopped()) return;
     if (wolframData) {
         aiCall.addSystemPrompt(Prompt.wolfram(wolframData));
 
@@ -263,33 +316,7 @@ ${autoModePrompt}`;
         node.aiNodeMessageLoop = new AiNode.MessageLoop(node);
     }
 
-    // Stopped while the helpers above ran: the answer is not asked for. It was, and
-    // arrived to be thrown away -- a request paid for after the reader said stop.
-    if (!node.shouldContinue) {
-        if (nodeLoadingIcon) nodeLoadingIcon.style.display = 'none';
-        return;
-    }
-
-    aiCall.exec()
-    .then( ()=>{
-        aiLoadingIcon.style.display = 'none';
-
-        if (node.shouldContinue && node.shouldAppendQuestion) {
-            const hasConnectedAiNode = AiNode.calculateDirectionalityLogic(node).length > 0;
-            if (hasConnectedAiNode) {
-                return node.aiNodeMessageLoop.questionConnectedAiNodes()
-            }
-        }
-
-        if (node.aiResponding && node.isAutoModeEnabled) {
-            const lastPrompt = extractLastPrompt(node);
-            AiNode.sendMessage(node, lastPrompt, lastPrompt);
-        }
-    })
-    .catch( (err)=>{
-        Logger.err("While getting response:", err);
-        aiErrorIcon.style.display = 'block';
-    });
+    return aiCall.exec();
 }
 
 AiNode.MessageLoop = class {

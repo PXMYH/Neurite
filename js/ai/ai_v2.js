@@ -29,9 +29,17 @@ class AiCall {
     constructor(stream, node){
         this.node = node || null;
         this.stream = Boolean(stream);
+        // Whether this call is a helper inside a send rather than its answer: see below.
+        this.helper = !this.stream;
     }
     static single(node){ return new AiCall(false, node) }
     static stream(node){ return new AiCall(true, node) }
+    // A streamed call that is still not the answer: Wolfram's reformulation, which the
+    // reader watches arrive but which is only the query for the answer to come.
+    asHelper(){
+        this.helper = true;
+        return this;
+    }
 
     addSystemPrompt(prompt){
         this.messages.push(Message.system(prompt));
@@ -45,14 +53,15 @@ class AiCall {
         return (this.node) ? this.#callchatLLMnode() : this.#callchatAPI();
     }
 
-    // A single, non-streamed call is always a helper inside a send -- the keywords, a
-    // search query, a vector-database query, what to forget -- never the answer. So it
-    // leaves the conversation's state to the call that streams the answer. Driving it
-    // too, its start and end flipped the conversation to "not responding" between the
-    // helper and the answer, so the stop button regenerated instead of stopping; and
-    // its failure halted the Node, so the answer asked for after it was dropped
-    // (measured with a 429 on the keyword call: the answer arrived and was thrown away).
-    get #isHelper(){ return !this.stream }
+    // A helper inside a send -- the keywords, a search query, a vector-database query,
+    // what to forget, Wolfram's reformulation -- is not the answer, so it leaves the
+    // send's state to the send and to the answer's call. Driving it too, its start and
+    // end flipped the send to "not responding" before the answer, so the stop button
+    // regenerated instead of stopping; its start reset a stop already pressed; and its
+    // failure halted the Node, so the answer asked for after it was dropped (measured
+    // with a 429 on the keyword call: the answer arrived and was thrown away). Every
+    // single call is one; a streamed one says so with `asHelper`.
+    get #isHelper(){ return this.helper }
     static #helperFailed(errorMsg){ Logger.warn("An AI helper call failed:", errorMsg) }
 
     async #callchatAPI(){

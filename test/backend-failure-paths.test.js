@@ -48,21 +48,23 @@ test('a Wikipedia search that finds nothing returns nothing instead of throwing'
 
 // `fetchWolfram` in a sandbox: `useProxy` is whether the gateway answered its health check,
 // and `fetch` is what the Wolfram route then does.
-function wolfram({useProxy, fetch, gatewayUp = false}){
+function wolfram({useProxy, fetch, gatewayUp = false, stopped = false}){
     const src = slice(read('js/interface/searchapi/wolframapi.js'), 'async function fetchWolfram(');
     const alerts = [];
-    let reformulations = 0;
+    let reformulations = 0, helper = false;
     const ctx = vm.createContext({
         useProxy, fetch,
         wolframUnreachable: 'unreachable',
         Logger: logger,
         alert: (m)=> alerts.push(m),
-        // `Request.send` answers the response, or undefined when the request failed.
-        Request: {send: async ()=> (gatewayUp ? {ok: true} : undefined)},
-        Host: {urlForPath: (p)=> 'http://localhost:7070' + p, checkServer: {ct: class {}}},
+        // `Host.recheck` answers whether the gateway is up now; its own rules are pinned in
+        // provider-routes.test.js, next to the rest of handleapikeys.js.
+        Host: {urlForPath: (p)=> 'http://localhost:7070' + p, recheck: async ()=> useProxy || gatewayUp},
+        Ai: {shouldContinue: !stopped},
         Elem: {byId: ()=> ({value: ''})},
         AiCall: {stream: ()=> {
             const call = {messages: [], addSystemPrompt(){ return call }, addUserPrompt(){ return call },
+                          asHelper(){ helper = true; return call },
                           exec: async ()=> { reformulations++; return 'Reformulated: "integral of x"' }};
             return call;
         }},
@@ -72,12 +74,27 @@ function wolfram({useProxy, fetch, gatewayUp = false}){
         CodeMirror: {Pos: ()=> 0},
     });
     vm.runInContext(src + ';globalThis.fetchWolfram = fetchWolfram;', ctx);
-    const node = {aiResponseDiv: {innerHTML: ''}};
+    const node = {aiResponseDiv: {innerHTML: ''}, shouldContinue: !stopped};
     return {
         call: ()=> ctx.fetchWolfram('integrate x', true, node, 'earlier talk'),
-        alerts, reformulations: ()=> reformulations,
+        alerts, reformulations: ()=> reformulations, helper: ()=> helper,
     };
 }
+
+// A stop pressed while the gateway was asked must hold: the reformulation is a request.
+test('Wolfram in a send already stopped asks for nothing', async ()=>{
+    const w = wolfram({useProxy: true, stopped: true, fetch: ()=> assert.fail('no query after a stop')});
+    assert.equal(await w.call(), undefined);
+    assert.equal(w.reformulations(), 0);
+});
+
+// Streamed, so the reader watches it form, and still not the answer: marked as a helper,
+// or its start and end drove the send's own state.
+test("Wolfram's reformulation is a helper call", async ()=>{
+    const w = wolfram({useProxy: true, fetch: async ()=> ({ok: true, json: async ()=> ({})})});
+    await w.call();
+    assert.equal(w.helper(), true);
+});
 
 // With no gateway the Wolfram query can never be sent, so the AI round trip that
 // reformulates it was paid for nothing -- on every send, and every pass of auto mode.

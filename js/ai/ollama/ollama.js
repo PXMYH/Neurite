@@ -13,8 +13,10 @@ Ollama.getBaseUrl = function(){
          : Ollama.userBaseUrl()
 }
 // Read when used, not copied at boot. The copy `Host.checkServer` took was what the model
-// list, pulls, deletes and embeddings used, so after the reader changed the URL in the
-// Ollama manager they went on asking the old host while chat asked the new one.
+// list, pulls, deletes and embeddings used, so on the direct route, after the reader
+// changed the URL in the Ollama manager, they went on asking the old host while chat
+// asked the new one. Through the gateway the gateway holds the URL, and learns a new one
+// when a proxied call sends it the keys (`Host.provideAPIKeys`).
 Object.defineProperty(Ollama, 'baseUrl', {get: Ollama.getBaseUrl});
 
 

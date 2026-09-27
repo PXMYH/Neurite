@@ -51,8 +51,6 @@ async function sendMessage(event, autoModeMessage) {
     }
 
     const activeInstance = getActiveZetCMInstanceInfo();
-    const noteInput = activeInstance.textarea;
-    const cm = activeInstance.cm;
 
     const promptElement = Elem.byId('prompt');
     const promptValue = promptElement.value;
@@ -80,12 +78,42 @@ async function sendMessage(event, autoModeMessage) {
     Ai.mainPrompt.setPause();
     Elem.byId('aiLoadingIcon').style.display = 'block';
 
+    let answer;
+    try {
+        answer = await askWithContext(message, autoModeMessage, activeInstance);
+    } finally {
+        // Whatever ended the send -- its answer, a stop, no key, Neurite signed out, a
+        // helper that threw -- it ends here, and the start above is undone. Only the
+        // answer's own call used to undo it, so a send that never reached one stayed
+        // "responding", and auto mode went round again on nothing: measured, 25 passes
+        // and 49 sign-in dialogs in 3 s with Neurite signed out.
+        Elem.hideById('aiLoadingIcon');
+        if (!answer || !Ai.isAutoModeEnabled) {
+            Ai.isResponding = false;
+            Ai.mainPrompt.setRefresh();
+        }
+    }
+
+    if (answer && Ai.isResponding && Elem.byId('auto-mode-checkbox').checked) {
+        sendMessage(null, extractLastPrompt())
+    }
+}
+
+// Everything between a send's start and its answer: the helpers that gather the context,
+// then the answer's own call. Answers what that call returned, or nothing when the send was
+// stopped before it -- and each helper is a request, so the stop is read after every one.
+async function askWithContext(message, autoModeMessage, activeInstance){
+    const noteInput = activeInstance.textarea;
+    const cm = activeInstance.cm;
+    const stopped = ()=>!Ai.shouldContinue;
+
     // Check if the last character in the note-input is not a newline, and add one if needed
     if (noteInput.value.length > 0 && noteInput.value[noteInput.value.length - 1] !== '\n') {
         cm.replaceRange('\n', CodeMirror.Pos(cm.lastLine()));
     }
 
     const arrKeywords = await generateKeywords(message, 3); // number of desired keywords
+    if (stopped()) return;
     // Comma-separated: `Embeddings.search` splits on commas, so a space-joined list was
     // one phrase no note contains -- with embeddings down, no note was ever relevant.
     const strKeywords = arrKeywords.join(', ');
@@ -93,6 +121,7 @@ async function sendMessage(event, autoModeMessage) {
     let wikipediaPrompt;
     if (Wikipedia.isEnabled()) {
         const summaries = await Wikipedia.getSummaries([arrKeywords[0]]);
+        if (stopped()) return;
         wikipediaPrompt = Prompt.wikipedia(strKeywords, summaries);
     }
 
@@ -106,6 +135,7 @@ async function sendMessage(event, autoModeMessage) {
             Logger.err("In constructing search query:", err);
         }
     }
+    if (stopped()) return;
 
     let googleSearchPrompt;
     if (isGoogleSearchEnabled()) {
@@ -127,6 +157,7 @@ async function sendMessage(event, autoModeMessage) {
     }
 
     const searchQueryPrompt = await Prompt.searchQuery(message, searchQuery, filteredKeys, topN);
+    if (stopped()) return;
     if (searchQueryPrompt) aiCall.addSystemPrompt(searchQueryPrompt);
 
     // calculate remaining tokens
@@ -141,6 +172,7 @@ async function sendMessage(event, autoModeMessage) {
     Logger.debug(`existingTitles`, existingTitles, context);
 
     const topMatchedNodes = await Graph.searchNotes(strKeywords);
+    if (stopped()) return;
     const nodeContents = filterAndProcessNodesByExistingTitles(topMatchedNodes, existingTitles);
     Logger.debug(nodeContents);
 
@@ -149,6 +181,7 @@ async function sendMessage(event, autoModeMessage) {
     // If forgetting is enabled, extract titles to forget
     if (Elem.byId('forget-checkbox').checked) {
         const titlesToForget = await forget(message, `${context}\n\n${topMatchedNodesContent}`);
+        if (stopped()) return;
         Logger.info("Titles to Forget:", titlesToForget);
 
         context = removeTitlesFromContext(context, titlesToForget);
@@ -175,9 +208,6 @@ async function sendMessage(event, autoModeMessage) {
     ${autoModePrompt}`;
     aiCall.addUserPrompt(prompt);
 
-    // Stopped while the helpers ran: nothing is written and nothing more is asked for.
-    if (!Ai.shouldContinue) return Elem.hideById('aiLoadingIcon');
-
     const lineBeforeAppend = cm.lastLine();
 
     if (!autoModeMessage) {
@@ -193,14 +223,8 @@ async function sendMessage(event, autoModeMessage) {
 
     const wolframData = (!Elem.byId('enable-wolfram-alpha').checked) ? ''
                       : await fetchWolfram(message);
+    if (stopped()) return;
     if (wolframData) aiCall.addSystemPrompt(Prompt.wolfram(wolframData));
 
-    // And stopped during Wolfram, whose reformulation streams like an answer.
-    if (!Ai.shouldContinue) return Elem.hideById('aiLoadingIcon');
-
-    await aiCall.exec();
-
-    if (Ai.isResponding && Elem.byId('auto-mode-checkbox').checked) {
-        sendMessage(null, extractLastPrompt())
-    }
+    return aiCall.exec();
 }

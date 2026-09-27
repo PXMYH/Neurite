@@ -97,3 +97,19 @@ test("a global helper call leaves the prompt's state alone, and keeps a stop", a
     assert.equal(ctx.Ai.isResponding, true);
     assert.equal(ctx.Ai.shouldContinue, false, 'the stop still holds for the next step');
 });
+
+// Streamed, and still not the answer: Wolfram's reformulation. It says so, and is then a
+// helper like any single call -- its start and end ended "responding" before the answer,
+// and its start reset a stop already pressed.
+test('a streamed call marked as a helper leaves the send alone', async ()=>{
+    const {ctx, handed} = load();
+    ctx.Ai.isResponding = true;
+    ctx.Ai.shouldContinue = false;
+
+    await ctx.AiCall.stream().asHelper().addUserPrompt('reformulate').exec();
+
+    handed[0].onBeforeCall();
+    handed[0].onAfterCall();
+    assert.equal(ctx.Ai.isResponding, true);
+    assert.equal(ctx.Ai.shouldContinue, false, 'the stop still holds');
+});

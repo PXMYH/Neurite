@@ -225,6 +225,18 @@ Host.checkServer.ct = class {
     onSuccess(){ return "Connected to Localhost Servers" }
     onFailure(){ return "Not connected to Localhost Servers" }
 }
+// `useProxy` is the gateway as `checkServer` found it at boot. A feature that needs the
+// gateway asks again through this before it says the gateway is not there -- at most once
+// in 5 s, since with no gateway each look is a refused request and two console errors.
+// Found up, it is up for everything: every reader of `useProxy` reads it when it runs.
+Host.recheck = async function(){
+    if (useProxy || Date.now() - Host.recheck.at < 5000) return useProxy;
+
+    Host.recheck.at = Date.now();
+    if (await Request.send(new Host.checkServer.ct())) useProxy = true;
+    return useProxy;
+}
+Host.recheck.at = -Infinity;
 
 Host.provideAPIKeys = async function(){
     await Request.send(new Host.provideAPIKeys.ct())

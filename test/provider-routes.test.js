@@ -88,7 +88,7 @@ function loadRouting(useProxy){
     const route = (providerId, model = 'some-model')=>
         getAPIParams([{role: 'user', content: 'hi'}], false, null, {providerId, model});
 
-    return {route, ProviderRoutes, alerts, errors};
+    return {route, ProviderRoutes, alerts, errors, sandbox};
 }
 
 // The provider ids a user can actually pick, straight out of the dropdown markup.
@@ -213,4 +213,25 @@ test('the proxy route never attaches a key to the request itself', ()=>{
         assert.equal(route(providerId, model).headers.get('Authorization'), null,
             `${providerId} attached a Bearer header on the proxy route`);
     }
+});
+
+// `useProxy` is the gateway as it was at boot. A feature that needs the gateway asks again
+// through `Host.recheck` -- not every time, since with no gateway each look is a refused
+// request and two console errors -- and a gateway found up is up for everything after.
+test('the gateway is asked again at most once in 5 s, and found up it stays up', async ()=>{
+    const { sandbox } = loadRouting(false);
+    let asked = 0, up = false;
+    sandbox.Request.send = async ()=> { asked++; return up ? {ok: true} : undefined };
+
+    assert.equal(await sandbox.Host.recheck(), false, 'no gateway');
+    assert.equal(await sandbox.Host.recheck(), false, 'still none');
+    assert.equal(asked, 1, 'and asked once between the two');
+
+    up = true;
+    sandbox.Host.recheck.at -= 5000;           // five seconds on
+    assert.equal(await sandbox.Host.recheck(), true, 'a gateway started since is found');
+    assert.equal(Boolean(sandbox.useProxy), true, 'and every reader of useProxy sees it');
+    assert.equal(asked, 2);
+    assert.equal(await sandbox.Host.recheck(), true);
+    assert.equal(asked, 2, 'found up, it is not asked again');
 });

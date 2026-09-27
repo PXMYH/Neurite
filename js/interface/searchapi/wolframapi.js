@@ -12,12 +12,15 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
     // Only the localhost gateway answers Wolfram. Without it, the reformulation below is
     // an AI round trip for a query nobody can send -- paid on every send, and on every
     // pass of auto mode, before the fetch failed anyway. `useProxy` is the gateway as it
-    // was at boot, so it is asked once more before the answer is no: a gateway started
-    // after the page was refused for the rest of the session.
-    if (!useProxy && !(await Request.send(new Host.checkServer.ct()))) {
+    // was at boot, so it is asked again before the answer is no (`Host.recheck`): a
+    // gateway started after the page was refused for the rest of the session.
+    if (!(await Host.recheck())) {
         alert(wolframUnreachable);
         return;
     }
+    // A send stopped while this ran asks for nothing more -- this is a helper of it.
+    const stopped = ()=>!((isAINode && node) ? node.shouldContinue : Ai.shouldContinue);
+    if (stopped()) return;
 
     let wolframAlphaResult = "not-enabled";
     let wolframAlphaTextResult = "";
@@ -33,7 +36,9 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
         window.currentActiveZettelkastenMirror.replaceRange(`${tagValues.nodeTag} Wolfram ${wolframCallCounter}\n`, CodeMirror.Pos(window.currentActiveZettelkastenMirror.lastLine()));
     }
 
-    const aiCall = AiCall.stream(isAINode && node)
+    // Streamed, so the reader watches the query form, and still a helper: the answer
+    // comes after it (see `AiCall.asHelper`).
+    const aiCall = AiCall.stream(isAINode && node).asHelper()
         .addSystemPrompt(wolframMessage)
         .addUserPrompt(message + " Wolfram Query");
 
@@ -48,6 +53,9 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
         // Add a line break to node.aiResponseDiv after the call is complete
         node.aiResponseDiv.innerHTML += '<br />';
     }
+    // Stopped, or a reformulation that answered nothing: there is no query to send, and
+    // reading the missing answer below threw out of the send.
+    if (stopped() || !fullResponse) return;
 
     // The regular expression to match text between quotation marks
     const regex = /"([^"]*)"/g;
