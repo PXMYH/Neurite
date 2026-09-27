@@ -456,6 +456,26 @@ textarea.title-input {
     fill: #b9cdf0;
 }
 
+/* The ribbon under the pointer, in the arrow's hover colour. It was `lightskyblue`, a
+   sixth blue, set from JS; a class beats the colour attributes `EdgeView.draw` writes. */
+.edge-link-hover {
+    fill: #b9cdf0;
+    stroke: #b9cdf0;
+}
+
+/* An Edge's pointer target (`EdgeView.makeHalo`): its centre line, 30 screen px wide at
+   any zoom -- `non-scaling-stroke` keeps the width out of the Plane's scale -- and seen
+   only as the pointer it gives. The drawn ribbon was the target before, 2 px either side
+   of its middle when zoomed out. */
+.edge-halo {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 30px;
+    vector-effect: non-scaling-stroke;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
 /* A light-theme leftover that was forced into the dark editor with !important at
    z-index 1000: a white block with a #ccc border and black line numbers, sitting
    inside the note body. */

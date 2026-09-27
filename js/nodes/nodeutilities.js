@@ -30,7 +30,7 @@ class Graph {
     }
     addEdgeView(edgeView){
         this.edgeViews[edgeView.id] = edgeView;
-        this.htmlEdges.append(edgeView.svgArrow, edgeView.svgBorder, edgeView.svgLink);
+        this.htmlEdges.append(edgeView.svgArrow, edgeView.svgBorder, edgeView.svgLink, edgeView.svgHalo);
     }
     addNode(node){
         let id = this.nodes.length;
@@ -353,6 +353,7 @@ class Graph {
         edgeView.svgArrow.remove();
         edgeView.svgBorder.remove();
         edgeView.svgLink.remove();
+        edgeView.svgHalo.remove();
         delete this.edgeViews[edgeView.id];
     }
     deleteNode(target){

@@ -230,6 +230,8 @@ function makeFakeGraph(){
     function connectDistance(a, b){
         const edge = {
             pts: [a, b],
+            // As `new Edge` starts one: no direction.
+            directionality: {start: null, end: null},
             remove(){
                 for (const pt of edge.pts) pt.edges = pt.edges.filter((e)=>(e !== edge));
             }
@@ -297,13 +299,22 @@ function makeGraph(text){
     const snapshot = ()=>Object.keys(processor.wrapPerTitle).sort()
         .map((title)=>`${title} -> ${edgesOf(title).join(', ')}`);
 
+    // Where the arrow between two notes points: the Title at `start`, where its tip is drawn.
+    const tipBetween = (a, b)=>{
+        const edge = nodes.get(a).edges.find((e)=>e.pts.includes(nodes.get(b)));
+        assert.ok(edge, `expected an Edge between ${a} and ${b}`);
+        return edge.directionality.start?.getTitle() ?? 'none';
+    };
+
     return {
         processor,
         Pass: Processor.Pass,
         setText(next){ text = next },
         titles: ()=>Object.keys(processor.wrapPerTitle),
         edgesOf,
-        snapshot
+        snapshot,
+        tipBetween,
+        nodes
     };
 }
 
@@ -414,4 +425,33 @@ test('deleting the last line of the pane updates the note it was in', ()=>{
     graph.processor.processAs(graph.Pass.edit);
 
     assert.deepEqual(graph.edgesOf('A'), []);
+});
+
+// Where a Ref's arrow points (#51): at the Node the Ref names. The parser recorded the note
+// holding the Ref as `start`, and `start` is where the tip is drawn, so every Ref pointed
+// back at its own note. Between two notes the Refs decide the direction on every pass.
+test('an arrow points at the note a Ref names, and both ways is neither', ()=>{
+    const graph = makeGraph(['## A', 'See [[B]].', '## B', 'b'].join('\n'));
+    graph.processor.processAs(graph.Pass.rewrite);
+    assert.equal(graph.tipBetween('A', 'B'), 'B');
+
+    graph.setText(['## A', 'See [[B]].', '## B', 'b [[A]]'].join('\n'));
+    graph.processor.processAs(graph.Pass.rewrite);
+    assert.equal(graph.tipBetween('A', 'B'), 'none', 'each names the other');
+
+    graph.setText(['## A', 'a', '## B', 'b [[A]]'].join('\n'));
+    graph.processor.processAs(graph.Pass.edit);
+    assert.equal(graph.tipBetween('A', 'B'), 'A', 'now only B names A, on the edit pass that removed the other Ref');
+});
+
+test('a direction recorded the old way is put right on the next pass', ()=>{
+    const graph = makeGraph(['## A', 'See [[B]].', '## B', 'b'].join('\n'));
+    graph.processor.processAs(graph.Pass.rewrite);
+    // What the parser used to write: the note holding the Ref as `start`.
+    const edge = graph.nodes.get('A').edges[0];
+    edge.directionality.start = graph.nodes.get('A');
+    edge.directionality.end = graph.nodes.get('B');
+
+    graph.processor.processAs(graph.Pass.rewrite);
+    assert.equal(graph.tipBetween('A', 'B'), 'B');
 });

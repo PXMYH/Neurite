@@ -41,13 +41,15 @@ class Edge {
         }
     }
 
+    // Removed the same way whatever the two Nodes are (#51): every Ref that writes the Edge
+    // goes first -- a text Node's Refs to the other end -- and then the Edge. Only a pair of
+    // text Nodes had its Refs removed, so an Edge from a note to an AI Node written in the
+    // Pane came back at the next pass: measured, gone after the chip's x, back after a save.
     removeInstance() {
-        const pts = this.pts;
-        if (pts[0].isTextNode && pts[1].isTextNode) {
-            removeEdgeFromAllInstances(pts[0], pts[1]);
-        } else {
-            this.remove();
-        }
+        const [a, b] = this.pts;
+        if (a.isTextNode) removeEdgeFromZettelkasten(a.getTitle(), b.getTitle());
+        if (b.isTextNode) removeEdgeFromZettelkasten(b.getTitle(), a.getTitle());
+        this.remove();
     }
 
     scaleLength(amount) {
@@ -63,6 +65,11 @@ class Edge {
         return edge.scaleLength(this.valueOf())
     }
 
+    // `directionality.start` is the Node the arrow points at: `EdgeView.makeSvgArrow`
+    // reflects the arrowhead through its centre (`rotatePoint`), so its tip is drawn at
+    // `start`, not `end`. Between two notes a direction is written as a Ref in `end`'s
+    // section naming `start` -- the note that names the other points at it -- and the
+    // parser reads the direction back from the Refs on every pass (`handleRefTags`).
     toggleDirection() {
         const pts = this.pts;
         const direction = this.directionality;
@@ -162,19 +169,22 @@ class EdgeView {
         this.svgArrow = this.makePath('edge-arrow');
         this.svgBorder = this.makePath('edge-border');
         this.svgLink = this.makeLink();
+        this.svgHalo = this.makeHalo();
     }
 
     attachEventListeners(elem){
         On.wheel(elem, this.onWheel);
         On.mouseover(elem, this.toggleMouseOver.bind(this, true));
         On.mouseout(elem, this.toggleMouseOver.bind(this, false));
+        On.mousedown(elem, this.onMouseDown);
         On.dblclick(elem, this.onDblClick);
         On.click(elem, this.onClick);
     }
     draw(){
         const mouseIsOver = this.mouseIsOver;
-        this.svgLink.setAttribute('stroke', mouseIsOver ? "lightskyblue" : this.style.stroke);
-        this.svgLink.setAttribute('fill', mouseIsOver ? "lightskyblue" : this.style.fill);
+        // The hover colour is the stylesheet's (`.edge-link-hover`), with the arrow's.
+        this.svgLink.setAttribute('stroke', this.style.stroke);
+        this.svgLink.setAttribute('fill', this.style.fill);
 
         const stressValue = Math.max(this.model.stress(), 0.01);
         let wscale = this.style['stroke-width'] / (0.5 + stressValue) * (mouseIsOver ? 2 : 1.6);
@@ -187,6 +197,7 @@ class EdgeView {
         const path = this[funcMakePath](this.model.pts, wscale);
         if (!path) return;
         this.svgLink.setAttribute('d', path);
+        this.svgHalo.setAttribute('d', this.centreLine);
 
         if (!hasDirection) {
             this.svgArrow.style.display = 'none';
@@ -210,6 +221,7 @@ class EdgeView {
     }
     toggleMouseOver(status){
         this.mouseIsOver = status;
+        this.svgLink.classList.toggle('edge-link-hover', status);
         this.svgArrow.classList.toggle('edge-arrow-hover', status);
         this.svgBorder.classList.toggle('edge-border-hover', status);
     }
@@ -231,6 +243,15 @@ class EdgeView {
         path.dataset.viewType = 'edgeViews';
         path.dataset.viewId = this.id;
         this.attachEventListeners(path);
+        return path;
+    }
+    // What the pointer aims at (#51): the Edge's centre line, stroked 30 screen px wide
+    // and invisible, above the three paths that draw it (`.edge-halo`). The drawn ribbon
+    // was the only target, and it is as thin as it looks -- measured, 9 px either side of
+    // its middle at x1 and 2 px at x0.25, where it all but could not be hit.
+    makeHalo(){
+        const path = this.makePath('edge-halo');
+        path.style.display = '';
         return path;
     }
     makeStraightPath(pts, wscale){
@@ -258,6 +279,7 @@ class EdgeView {
         if (firstPoint.isInvalid()) return '';
 
         path.push(" ", firstPoint.toSvg(), "z");
+        this.centreLine = "M " + pts[0].pos.toSvg() + " L " + pts[1].pos.toSvg();
         return path.join('');
     }
     makeCurvedPath(pts, wscale){
@@ -306,6 +328,13 @@ class EdgeView {
 
         const controlPointRight2 = endRight.plus(vecBase).minus(vecRight);
         if (controlPointRight2.isInvalid()) return '';
+
+        // The same curve at no width, which its two sides agree on: `vecRight` is
+        // `-vecLeft`, so both sides' control points meet here.
+        this.centreLine = "M " + startPoint.toSvg()
+            + " C " + startPoint.minus(vecBase).minus(vecLeft).toSvg()
+            + ", " + endPoint.plus(vecBase).plus(vecLeft).toSvg()
+            + ", " + endPoint.toSvg();
 
         return "M "
             + startLeft.toSvg()
@@ -389,8 +418,15 @@ class EdgeView {
         return new vec2(2 * center.x - point.x, 2 * center.y - point.y);
     }
 
+    // A click is a press and a release in one place. A pan that starts on an Edge carries
+    // the Edge along under the pointer, so it ended on the same path and clicked it too:
+    // measured, a 170px pan from an Edge's middle reversed its direction.
+    static clickSlop = 4;
+    onMouseDown = (e)=>{ this.downAt = {x: e.clientX, y: e.clientY} }
     onClick = (e)=>{
         if (App.nodeMode) return;
+        const d = this.downAt;
+        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > EdgeView.clickSlop) return;
 
         this.model.toggleDirection();
         this.draw();

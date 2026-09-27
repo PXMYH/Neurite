@@ -673,6 +673,8 @@ body {
     /* 10px left is what `.header-container` and `.editor-wrapper` both use, so the
        chips start on the same vertical as the title and the prose. */
     padding: 4px 8px 4px 10px;
+    /* Keeps the chip x's widened target inside the strip (see `.link-chip-cut`). */
+    overflow: hidden;
 }
 
 /* Every control in the row is a real <button>, so each one has to have the body
@@ -702,6 +704,8 @@ body {
     border-radius: 999px;
     background-color: rgba(255, 255, 255, 0.06);
     transition: var(--ui-transition);
+    /* Positioned, so a later chip paints above an earlier chip's widened x target. */
+    position: relative;
 }
 
     .link-chip:hover {
@@ -716,6 +720,9 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* Above its own x's widened target, so a press on the title goes to the title. */
+    position: relative;
+    z-index: 1;
 }
 
 /* The one control here that destroys work, so it stays quiet until aimed at --
@@ -724,7 +731,26 @@ body {
     color: rgba(255, 255, 255, 0.35);
     font-size: 13px;
     line-height: 13px;
+    /* The glyph is 8x13px, and was the whole target. A 24px square around it (#51) --
+       44px across for a finger -- drawn by the pseudo-element below, so the row keeps
+       its height. It never takes a press from anything else: its own label and every
+       later chip paint above it (`.link-chip`, `.link-chip-label`), and the strip clips
+       it (`overflow: hidden` on `.link-strip`), so the header and the note body keep
+       theirs. The one control here that destroys work cannot be reached by accident. */
+    position: relative;
 }
+
+    .link-chip-cut::after {
+        content: "";
+        position: absolute;
+        inset: calc((13px - 24px) / 2) calc((8px - 24px) / 2);
+    }
+
+    @media (pointer: coarse) {
+        .link-chip-cut::after {
+            inset: calc((13px - 44px) / 2) calc((8px - 44px) / 2);
+        }
+    }
 
     .link-chip-cut:hover,
     .link-chip-cut:focus-visible {

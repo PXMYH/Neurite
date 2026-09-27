@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, paneText } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -130,4 +130,98 @@ test('an Edge written as a Ref between two notes survives a reload', async () =>
 
     await saveAndReload(page, 2);
     assert.deepEqual(await snapshot(page), made);
+});
+
+// ---- #51: pointing at an Edge, and taking it away ----
+
+// The screen middle of the first Edge, and the unit normal to it there.
+const edgeMiddle = () => page.evaluate(() => {
+    const [a, b] = Object.values(Graph.edges)[0].pts.map((n) => {
+        const r = n.view.div.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, nx: -(b.y - a.y) / len, ny: (b.x - a.x) / len };
+});
+async function paneEdges(text, count = 1) {
+    await page.evaluate((t) => window.currentActiveZettelkastenMirror.setValue(t), text);
+    await page.waitForFunction((n) => Object.keys(Graph.edges).length >= n, count, { timeout: 5000 });
+    await page.waitForTimeout(1200);
+}
+const tip = () => page.evaluate(() => Object.values(Graph.edges)[0].directionality.start?.getTitle() ?? 'none');
+
+// The drawn arrowhead, read off its path: which Node its tip is on the way to.
+test('the arrow points at the note a Ref names', async () => {
+    await paneEdges('## Alpha\nSee [[Beta]].\n\n## Beta\nb\n');
+    const drawnAt = await page.evaluate(() => {
+        const edge = Object.values(Graph.edges)[0];
+        const nums = (edge.view.svgArrow.getAttribute('d').match(/-?\d+(\.\d+)?(e-?\d+)?/g) || []).map(Number);
+        const [b1x, b1y, tx, ty, b2x, b2y] = nums;
+        const v = { x: tx - (b1x + b2x) / 2, y: ty - (b1y + b2y) / 2 };
+        const [a, b] = edge.pts;
+        const d = b.pos.toSvg().minus(a.pos.toSvg());
+        return (v.x * d.x + v.y * d.y > 0 ? b : a).getTitle();
+    });
+    assert.equal(drawnAt, 'Beta');
+});
+
+// A pan that starts on an Edge carries it along under the pointer, so it ended on the Edge
+// and clicked it: measured, a 170px pan reversed the direction. And the drawn ribbon was the
+// only target -- 2 px either side of its middle when zoomed out.
+test('a pan from an Edge leaves its direction, and a click near it, zoomed out, changes it', async () => {
+    await paneEdges('## Alpha\nSee [[Beta]].\n\n## Beta\nb\n');
+    await page.evaluate(() => { Graph.zoom = Graph.zoom.scale(4) });   // zoomed out, x0.25
+    await page.waitForTimeout(600);
+    assert.equal(await tip(), 'Beta');
+
+    let m = await edgeMiddle();
+    await page.mouse.move(m.x, m.y);
+    await page.mouse.down();
+    await page.mouse.move(m.x + 150, m.y + 80, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    assert.equal(await tip(), 'Beta', 'the pan changed nothing');
+
+    m = await edgeMiddle();
+    await page.mouse.click(m.x + m.nx * 12, m.y + m.ny * 12);
+    await page.waitForTimeout(300);
+    assert.equal(await tip(), 'none', 'a click 12px off the middle line reaches the Edge');
+});
+
+// One removal rule for every Node Type: the Refs that write an Edge go, then the Edge. Only
+// a pair of notes had its Refs removed, so an Edge from a note to an AI Node written in the
+// Pane came back at the next pass.
+test("an Edge to an AI Node written in the Pane stays gone after its chip's x", async () => {
+    await paneEdges('AI: Helper\n\n## Alpha\nSee [[Helper]].\n');
+    await page.evaluate(() => {
+        const alpha = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Alpha');
+        alpha.view.div.querySelector('.link-chip-cut').click();
+    });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => App.viewGraphs.saveNow());
+    await page.waitForTimeout(500);
+    assert.equal(await page.evaluate(() => Object.keys(Graph.edges).length), 0, 'no Edge after the save');
+    assert.ok(!(await paneText(page)).includes('[[Helper]]'), 'and no Ref left to rebuild it');
+});
+
+// The x was its 8x13px glyph. It takes a press 11px from its middle now, and none on its title.
+test("the chip's x takes a press around it, and never one on its title", async () => {
+    await paneEdges('## Alpha\nSee [[Beta]] and [[Gamma]].\n\n## Beta\nb\n\n## Gamma\ng\n', 2);
+    const out = await page.evaluate(() => {
+        const alpha = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Alpha');
+        const chip = alpha.view.div.querySelector('.link-chip');
+        const cut = chip.querySelector('.link-chip-cut'), label = chip.querySelector('.link-chip-label');
+        const r = cut.getBoundingClientRect();
+        const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+        const lr = label.getBoundingClientRect();
+        let stolen = 0;
+        for (let y = lr.top + 1; y < lr.bottom - 1; y += 2) {
+            for (let x = lr.left + 1; x < lr.right - 1; x += 2) {
+                if (document.elementFromPoint(x, y) === cut) stolen++;
+            }
+        }
+        return { right: document.elementFromPoint(cx + 11, cy) === cut,
+                 up: document.elementFromPoint(cx, cy - 11) === cut, stolen };
+    });
+    assert.deepEqual(out, { right: true, up: true, stolen: 0 });
 });

@@ -45,11 +45,8 @@ Modal.Connect = class {
             return;
         }
 
-        if (node.isTextNode && originNode.isTextNode) {
-            removeEdgeFromAllInstances(node, originNode);
-        } else {
-            existingEdge.remove();
-        }
+        // The one removal rule, Refs and all (`Edge.removeInstance`).
+        existingEdge.removeInstance();
         li.setAttribute('class', 'disconnected');
     }
 }

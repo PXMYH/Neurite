@@ -231,8 +231,20 @@ class ZettelkastenParser {
 
         const fromRange = this.getNodeSectionRange(fromTitle);
         const refTag = tagValues.refTag;
-        let tagLineStart = null;
+        const closingBracket = bracketsMap[refTag];
 
+        // Once is enough. The check below looks only at the first line that starts with the
+        // tag, so a note that named the other in a sentence -- "See [[B]]." -- got a second
+        // `[[B]]` on a line of its own every time the Edge's direction was changed (#51).
+        const names = (line)=>(closingBracket
+            ? line.includes(refTag + toTitle + closingBracket)
+            : line.startsWith(refTag)
+              && line.slice(refTag.length).split(',').some( (title)=>(title.trim() === toTitle) ));
+        for (let i = fromRange.startLineNo + 1; i <= fromRange.endLineNo; i++) {
+            if (names(cm.getLine(i))) return;
+        }
+
+        let tagLineStart = null;
         for (let i = fromRange.startLineNo; i <= fromRange.endLineNo; i++) {
             if (!cm.getLine(i).startsWith(refTag)) continue;
 
@@ -240,7 +252,6 @@ class ZettelkastenParser {
             break;
         }
 
-        const closingBracket = bracketsMap[refTag];
         if (closingBracket) {
             appendOrCreateTag(fromRange, tagLineStart, refTag + toTitle + closingBracket);
         } else {
@@ -542,12 +553,6 @@ function getEdgeInfo(startTitle, endTitle) {
     }
 }
 
-function removeEdgeFromAllInstances(startNode, endNode) {
-    const startTitle = startNode.getTitle();
-    const endTitle = endNode.getTitle();
-    removeEdgeFromZettelkasten(startTitle, endTitle);
-    removeEdgeFromZettelkasten(endTitle, startTitle);
-}
 
 
 

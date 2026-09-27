@@ -99,7 +99,9 @@ _Avoid_: link syntax, wikilink, bracket, delimiter
 A mention of another Node's Title inside a Node Section. A Ref is how an Edge
 is written down in a Pane, so it can name only a Node with a Title line there:
 a text Node, or an AI Node written as an `AI:` line. An Edge to any other Node
-is kept by the Saved Graph alone.
+is kept by the Saved Graph alone. Between two text Nodes a Ref also gives the
+Edge its direction: the arrow points at the Node the Ref names, and at neither
+when each names the other.
 _Avoid_: link, backlink, mention, citation, pointer
 
 ### Models

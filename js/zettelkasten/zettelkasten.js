@@ -531,7 +531,6 @@ class ZettelkastenProcessor {
         const wrap = this.wrapPerTitle[currentNodeTitle];
         if (!wrap?.node) return;
 
-        const currentNodeIsRef = (ref)=>(ref === currentNodeTitle) ;
         const thisNode = wrap.node;
 
         // Get all nodes from all CodeMirror instances
@@ -543,13 +542,7 @@ class ZettelkastenProcessor {
 
         // Check if connected nodes contain a reference to the current node in any CodeMirror instance
         thisNode.forEachConnectedNode( (node)=>{
-            const nodeInfo = getZetNodeCMInstance(node.getTitle());
-            if (!nodeInfo) return;
-
-            const { startLineNo, endLineNo } = nodeInfo.parser.getNodeSectionRange(node.getTitle());
-            const nodeLines = nodeInfo.cm.getValue().split('\n');
-            const isRef = this.forEachReferenceInRange(startLineNo + 1, endLineNo, nodeLines, currentNodeIsRef);
-            if (isRef) allReferenceUUIDs.add(node.uuid);
+            if (this.sectionNames(node, currentNodeTitle)) allReferenceUUIDs.add(node.uuid);
         });
 
         // Process edges
@@ -567,15 +560,8 @@ class ZettelkastenProcessor {
             const otherNode = edge.pts.find(hasUuidThis, uuid);
             if (!thisNode.isTextNode || !otherNode?.isTextNode) return;
 
-            // Check if there is a reference to the other node in any CodeMirror instance
-            const otherTitle = otherNode.getTitle();
-            const otherNodeInfo = getZetNodeCMInstance(otherTitle);
-            if (!otherNodeInfo) return;
-
-            const { startLineNo, endLineNo } = otherNodeInfo.parser.getNodeSectionRange(otherTitle);
-            const lines = otherNodeInfo.cm.getValue().split('\n');
-            const isRef = this.forEachReferenceInRange(startLineNo + 1, endLineNo, lines, currentNodeIsRef);
-            if (isRef) return;
+            // Kept unless the other Node's section is in a Pane and does not name this one.
+            if (this.sectionNames(otherNode, currentNodeTitle) !== false) return;
 
             edge.remove();
             currentEdges.delete(uuid);
@@ -587,41 +573,59 @@ class ZettelkastenProcessor {
         // of its nodes, so thisNode.edges grows from the call itself -- pushing it
         // again here listed every new edge on this node twice.
         let unresolved = false;
+        const named = new Set();
         references.forEach(reference => {
-            const refUUID = wrapPerTitle[reference]?.node?.uuid;
-            if (!refUUID) {
+            const target = wrapPerTitle[reference]?.node;
+            if (!target?.uuid) {
                 unresolved = true;
                 return;
             }
-            if (currentEdges.has(refUUID)) return;
+            named.add(target.uuid);
+            if (currentEdges.has(target.uuid)) return;
 
-            const target = wrapPerTitle[reference].node;
-            const edge = connectDistance(thisNode, target);
-            currentEdges.set(refUUID, edge);
+            currentEdges.set(target.uuid, connectDistance(thisNode, target));
+        });
 
-            // A reference has a direction, so the edge it makes should show one.
-            //
-            // `[[X]]` written inside a note means this note points at X; that is the
-            // whole relation a Zettelkasten is built out of. Every edge the sync made was
-            // undirected, and EdgeView.draw hides the arrowhead outright when
-            // `directionality.start && directionality.end` is false (edgeclass.js:191) --
-            // measured with 15 edges live: 15 arrow elements, 0 displayed. A directed
-            // graph was drawing no direction at all, and the arrowhead's colour was
-            // being adjusted on an element with `display: none`.
-            //
-            // Only when the edge has no direction recorded yet. `Graph.edgeDirectionalities`
-            // is keyed by edge and persists, and clicking an edge cycles it through
-            // A-to-B, B-to-A and none (edgeclass.js:66), so a reader who has set or
-            // cleared a direction keeps it -- including deliberately clearing it.
-            // Guarded on the field, not just on the edge: connectDistance can hand back an
-            // edge that already existed, or nothing at all when the two notes cannot be
-            // joined, and neither is a reason to throw inside a parse pass.
-            if (edge?.directionality && !Graph.edgeDirectionalities[edge.edgeKey]) {
-                edge.directionality.start = thisNode;
-                edge.directionality.end = target;
-            }
+        // Which way each Edge to another note points (#51). `[[X]]` written in a note means
+        // this note points at X, so the arrow points at the Node a Ref names, and between
+        // two text Nodes the Refs decide the direction as they decide the Edge: named one
+        // way, it points that way; named both ways, it points neither. Derived on every
+        // pass, not set once: the parser used to record `start` as the note holding the
+        // Ref, and `start` is where the arrowhead is drawn (see `Edge.toggleDirection`), so
+        // every Ref drew its arrow pointing back at its own note -- and a direction set
+        // that way stayed wrong for good. A click cycles the direction by rewriting the
+        // Refs, so a reader's choice is what the Refs say, and this reads it back.
+        //
+        // An Edge to any other Node keeps what the reader set with a click. An AI Node
+        // reads as context the Edges its arrows leave by, so a Ref drawn as an arrow into it
+        // would have taken the note out of what it reads.
+        if (thisNode.isTextNode) currentEdges.forEach( (edge, uuid)=>{
+            const other = edge?.pts?.find(hasUuidThis, uuid);
+            const direction = edge?.directionality;
+            if (!other?.isTextNode || !direction) return;
+
+            const outward = named.has(uuid);
+            const inward = (this.sectionNames(other, currentNodeTitle) === true);
+            if (!outward && !inward) return;
+
+            const one = (outward !== inward);
+            direction.start = !one ? null : outward ? other : thisNode;
+            direction.end = !one ? null : outward ? thisNode : other;
         });
         if (unresolved) this.deferRefTags(references, currentNodeTitle);
+    }
+
+    // Whether `node`'s section, in whichever Pane holds it, has a Ref to `title`; null
+    // when no Pane holds a section for it, which is not the same as not naming it.
+    sectionNames(node, title){
+        const nodeTitle = node.getTitle();
+        const info = getZetNodeCMInstance(nodeTitle);
+        if (!info) return null;
+
+        const { startLineNo, endLineNo } = info.parser.getNodeSectionRange(nodeTitle);
+        const lines = info.cm.getValue().split('\n');
+        const isTitle = (ref)=>(ref === title) ;
+        return Boolean(this.forEachReferenceInRange(startLineNo + 1, endLineNo, lines, isTitle));
     }
 
     // A ref can name a node whose section appears further down the text. The pass

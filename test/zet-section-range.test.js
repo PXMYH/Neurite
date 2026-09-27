@@ -34,7 +34,8 @@ function makeParser(text){
         getValue: ()=>lines.join('\n'),
         eachLine(cb){ lines.forEach((text, i)=>cb({text, lineNo: ()=>i})) }
     };
-    const sandbox = {Tag: {node: '##', ref: '[['}, LLM_TAG: 'AI:'};
+    const sandbox = {Tag: {node: '##', ref: '[['}, LLM_TAG: 'AI:', tagValues: {refTag: '[['}, bracketsMap: {'[[': ']]'},
+        Logger: {err(){}, warn(){}, info(){}, debug(){}}};
     vm.runInNewContext([
         // Node 22 has no `RegExp.escape`, which a static field in the class calls.
         "if (!RegExp.escape) RegExp.escape = (s)=>s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')",
@@ -47,7 +48,7 @@ function makeParser(text){
     parser.updateNodeTitleToLineMap();
     // Spread into this realm, or deepEqual compares against the sandbox's Object.
     const range = (title)=>({...parser.getNodeSectionRange(title)});
-    return {parser, range};
+    return {parser, range, cm, lines};
 }
 
 const PANE = [
@@ -77,4 +78,15 @@ test('a note below an AI section keeps its whole section', ()=>{
     const {range} = makeParser(PANE);
 
     assert.deepEqual(range('Next'), {startLineNo: 5, endLineNo: 6});
+});
+
+// A note that already names the other -- in a sentence, not on a line of Refs -- is named
+// once. Changing an Edge's direction wrote a second `[[B]]` on a line of its own, because
+// the check looked only at the first line that starts with the Ref Tag (#51).
+test('adding a Ref a note already has, inside a sentence, writes nothing', ()=>{
+    const {parser, cm, lines} = makeParser(['## A', 'See [[B]] for more.', '', '## B', 'b'].join('\n'));
+    const before = lines.join('\n');
+    cm.replaceRange = ()=>{ throw new Error('nothing should be written') };
+    parser.addEdge('A', 'B', cm);
+    assert.equal(lines.join('\n'), before);
 });
