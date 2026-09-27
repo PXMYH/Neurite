@@ -859,6 +859,7 @@ View.Graphs = class {
             const paneName = decodeURIComponent(elem.dataset.paneName);
             App.zetPanes.restorePane(paneName, paneContent);
         });
+        App.zetPanes.reportRenames();
 
         return this;
     }

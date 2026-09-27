@@ -78,7 +78,10 @@ function createNodeFromWindow(title = null, content = null, followMouse = false)
     return addNodeTagToZettelkasten(title || getDefaultTitle(), content);
 }
 
+// With a Title no Pane holds (#64): a taken Title makes no Node, and a dropped file named
+// like a note, or a pasted page, is no reason for the new card not to appear.
 function addNodeTagToZettelkasten(title, content = null) {
+    title = getUniqueNodeTitle(title);
     const curMirror = window.currentActiveZettelkastenMirror;
 
     const curValue = curMirror.getValue();
@@ -124,8 +127,10 @@ function spawnZettelkastenNode(spawningNode, offsetDistance = 0.6, theta = null,
     const newPositionY = spawningNode.pos.y + offsetDistance * Math.sin(theta) * spawningNode.scale;
     const newScale = spawningNode.scale * scaleFactor;
 
-    // Create a new node at the calculated position and scale
-    const newNode = createTextNodeWithPosAndScale(title, text, newScale, newPositionX, newPositionY);
+    // Create a new node at the calculated position and scale, under a Title no Pane holds:
+    // the pass binds the appended Title line to it, and a taken one binds nothing (#64).
+    const newNode = createTextNodeWithPosAndScale(getUniqueNodeTitle(title || getDefaultTitle()), text,
+                                                  newScale, newPositionX, newPositionY);
     newNode.draw();
 
     // The node exists already, so the pass must bind the new title to it instead

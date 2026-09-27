@@ -3593,6 +3593,13 @@ input[type=range] {
         color: #e16363;
     }
 
+/* A Title line whose Title another section already holds, here or in another Archive: it
+   makes no note (#64). The Notes panel says which Archive holds it. */
+.CodeMirror .zet-title-taken {
+    background-color: rgba(224, 139, 132, 0.12);
+    box-shadow: inset 3px 0 0 var(--ui-danger);
+}
+
 /* The [[ ]] markers, and the dimmest token the note highlighter emits, so this is
    what sets the ceiling on how light `--ui-note-surface` can go. At #4F8EB7 it
    measured 4.43:1 on the old note body -- already the one thing in a card below
@@ -5387,6 +5394,11 @@ body.ai-disabled .node-add-item.ai-icon {
     max-width: 400px;
     display: flex;
     flex-direction: column;
+}
+
+/* A notice can list what it is about, one line each (`ZetPanes.reportRenames`). */
+.alert-message {
+    white-space: pre-line;
 }
 
 .modal-ok:hover {

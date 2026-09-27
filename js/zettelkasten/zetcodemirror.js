@@ -6,13 +6,30 @@
     return wrapPerTitle;
 }
 
-let nodeTitles = new Set(); // Use a Set for global titles to avoid duplicates
-function getUniqueNodeTitle(baseTitle){
-    if (!nodeTitles.has(baseTitle)) return baseTitle;
+// Every Pane's Title lines, for the highlighters. Not the register of which Titles are
+// taken: that is the Panes' own (`paneHoldingTitle`).
+const nodeTitles = new Set();
 
-    const arr = [baseTitle, '(', 2, ')'];
-    while (nodeTitles.has(arr.join(''))) arr[2] += 1;
-    return arr.join('');
+// The Pane whose section a Title is, in any case and across every Pane (#64). A Title
+// names one Node in the whole Graph (CONTEXT.md, **Title**), so a second section with it,
+// in another Archive or further down the same one, makes no Node: the pass marks it as
+// taken. `except` leaves out the Pane asking, which checks its own pass itself.
+function paneHoldingTitle(title, except = null){
+    const key = title.toLowerCase();
+    return window.zetPaneList.find( (pane)=>(pane.processor !== except && pane.processor.holdsTitle(key)) ) ?? null;
+}
+// A Title no Pane holds: the base, or the base with the lowest free count after it. It
+// asked `nodeTitles`, which matched case exactly and forgot a Title one Pane dropped while
+// another still held it. `exceptWrap` is a Node being renamed, which does not block itself;
+// `given` holds lower-case Titles handed out in the same batch and not yet written.
+function getUniqueNodeTitle(baseTitle, exceptWrap = null, given = null){
+    const held = (title)=>(given?.has(title.toLowerCase())
+        || window.zetPaneList.some( (pane)=>pane.processor.holdsTitle(title.toLowerCase(), exceptWrap) ));
+    if (!held(baseTitle)) return baseTitle;
+
+    let count = 2;
+    while (held(`${baseTitle} (${count})`)) count += 1;
+    return `${baseTitle} (${count})`;
 }
 
 RegExp.forNodeTitle = function(tag){
@@ -65,68 +82,52 @@ class ZettelkastenParser {
         this.updateGlobalTitles(newTitles);
     }
 
+    // The union of every Pane's Title lines. It was kept by difference, one Pane at a time,
+    // so a Title one Pane dropped left the set while another Pane still wrote it, and its
+    // highlight went out in both.
     updateGlobalTitles(newTitles) {
-        this.internalParserInstanceTitles.forEach(title => {
-            if (!newTitles.has(title)) nodeTitles.delete(title)
-        });
-
-        newTitles.forEach(title => {
-            if (!this.internalParserInstanceTitles.has(title)) nodeTitles.add(title)
-        });
-
         this.internalParserInstanceTitles = newTitles;
+
+        nodeTitles.clear();
+        for (const parser of new Set([this, ...window.zetPaneList.map( (pane)=>pane.parser )])) {
+            parser.internalParserInstanceTitles.forEach(nodeTitles.add, nodeTitles);
+        }
     }
 
+    // A Title's first line, as the pass reads the Pane: a later line with the same Title is
+    // taken, and makes no Node (#64). The last one used to win here, while the pass bound
+    // the Node to the first, so an edit on the card went into the other section.
     updateNodeTitleToLineMap() {
         this.nodeTitleToLineMap.clear();
 
-        let currentNodeTitleLineNo = null;
         this.cm.eachLine((line) => {
             if (!line.text.startsWith(Tag.node)) return;
 
             const title = line.text.split(Tag.node)[1].trim();
-            currentNodeTitleLineNo = line.lineNo();
-            this.nodeTitleToLineMap.set(title, currentNodeTitleLineNo);
+            if (!this.nodeTitleToLineMap.has(title)) this.nodeTitleToLineMap.set(title, line.lineNo());
         });
     }
 
+    // From a Title's first line to the line before the next Title line of either kind --
+    // `##` or `AI:`, a taken one included -- which is how the pass reads the Pane. The end
+    // came from the other Titles in the map, so an AI section below a note ran on as its
+    // body (one keystroke put `AI: Helper` and its prompt on the note's card), and a taken
+    // Title, which the map holds once, would have too.
     getNodeSectionRange(title) {
-        const lowerCaseTitle = title.toLowerCase();
-        let nodeLineNo;
-        let nextNodeLineNo = this.cm.lineCount();
+        const lineCount = this.cm.lineCount();
+        const nodeLineNo = this.getNodeTitleLine(title);
 
-        let foundCurrentNode = false;
-
-        for (const [mapTitle, mapLineNo] of Array.from(this.nodeTitleToLineMap).sort((a, b) => a[1] - b[1])) {
-            if (mapTitle.toLowerCase() === lowerCaseTitle) {
-                nodeLineNo = mapLineNo;
-                foundCurrentNode = true;
-                continue;
-            }
-            if (foundCurrentNode) {
-                nextNodeLineNo = mapLineNo;
-                break;
-            }
-        }
-        // An AI section ends a note's section too, as deleteNodeByTitle says below. The
-        // title map holds Tag.node lines only, so a note written above an AI Node took
-        // the AI section in as its body: one keystroke in the note put `AI: Helper` and
-        // its prompt on the note's card, and typing on that card wrote the note's words
-        // into the prompt.
+        let nextNodeLineNo = lineCount;
         if (nodeLineNo !== undefined) {
-            for (let i = nodeLineNo + 1; i < nextNodeLineNo; i++) {
-                if (!this.cm.getLine(i).startsWith(LLM_TAG)) continue;
+            for (let i = nodeLineNo + 1; i < lineCount; i++) {
+                const text = this.cm.getLine(i);
+                if (!text.startsWith(Tag.node) && !text.startsWith(LLM_TAG)) continue;
 
                 nextNodeLineNo = i;
                 break;
             }
         }
-
-        const lineCount = this.cm.lineCount();
-        return {
-            startLineNo: nodeLineNo,
-            endLineNo: (nextNodeLineNo === lineCount ? lineCount : nextNodeLineNo) - 1
-        };
+        return {startLineNo: nodeLineNo, endLineNo: nextNodeLineNo - 1};
     }
 
     retrieveNodeSectionText(title) {
@@ -489,11 +490,16 @@ function getActiveZetCMInstanceInfo() {
     return null;
 }
 
+// The Pane that holds the Title first: another Pane can carry a heading with it that is
+// marked as taken, and the first Pane with the heading in its map was the answer -- a
+// rename on the Graph then rewrote the taken copy's Pane instead (#64).
 function getZetNodeCMInstance(nodeOrTitle) {
     let title = typeof nodeOrTitle === 'string' ? nodeOrTitle : nodeOrTitle.getTitle();
-    for (const pane of window.zetPaneList) {
-        const lineNumber = pane.parser.nodeTitleToLineMap.get(title);
-        if (lineNumber === undefined) continue;
+    const holder = paneHoldingTitle(title);
+    const panes = (holder ? [holder] : window.zetPaneList);
+    for (const pane of panes) {
+        const lineNumber = pane.parser.nodeTitleToLineMap.get(title) ?? (holder && pane.parser.getNodeTitleLine(title));
+        if (lineNumber === undefined || lineNumber === null) continue;
 
         return {
             ui: pane.ui,
@@ -517,12 +523,16 @@ function getZetNodeCMInstance(nodeOrTitle) {
 // getZetNodeCMInstance cannot be used to find the pane: it looks the title up in the
 // Tag.node title map, so it answers null for an AI note. deleteNodeByTitle reports
 // whether the section was in that pane, which is what picks the pane here.
+//
+// The Pane holding the Title goes first, before `node.remove()` lets it go: a Pane before
+// it can carry the same heading as a taken copy, whose section is not this Node's (#64).
 function deleteNodeAndItsZetText(node){
     const title = node.getTitle?.();
+    const holder = title && paneHoldingTitle(title);
     node.remove();
     if (!title) return;
 
-    for (const pane of window.zetPaneList) {
+    for (const pane of (holder ? [holder, ...window.zetPaneList] : window.zetPaneList)) {
         if (pane.parser.deleteNodeByTitle(title)) return;
     }
 }

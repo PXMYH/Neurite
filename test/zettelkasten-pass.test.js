@@ -281,8 +281,12 @@ function makeGraph(text){
             constructor(objects, options){ this.nodeObjects = objects; this.options = options }
             calculatePositionAndScale(title){ return makeNode(title) }
         },
-        // One pane, so every wrap the pass knows about is this processor's.
+        // One pane, so every wrap the pass knows about is this processor's, and no other Pane
+        // holds a Title (test/zettelkasten-unique-titles.test.js has several).
         getAllInternalZetNodeWraps: ()=>processor.wrapPerTitle,
+        paneHoldingTitle: ()=>null,
+        window: {zetPaneList: []},
+        Graph: {edgeDirectionalities: {}, filterNodes: (cb)=>[...nodes.values()].filter(cb)},
         getZetNodeCMInstance: (title)=>(nodes.has(title) ? {cm: noteInput, parser, zettelkastenProcessor: processor} : null)
     });
     const processor = new Processor(noteInput, parser);

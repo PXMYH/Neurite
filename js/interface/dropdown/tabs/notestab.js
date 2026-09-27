@@ -270,6 +270,7 @@ class ZetPanes {
             this.removePane(pane.id)
         });
         this.paneCounter = 1; // Reset pane counter
+        this.renamedOnLoad = [];
     }
 
     restorePane(paneName, paneContent) {
@@ -284,8 +285,23 @@ class ZetPanes {
         const restored = window.zetPaneList.at(-1);
         restored.processor.writeAs(ZettelkastenProcessor.Pass.restore,
             ()=>restored.cm.setValue(paneContent));
+        // A Saved Graph from before #64 can give one Title to two sections, with a Node for
+        // each: the later is renamed, and the load says so (`reportRenames`).
+        for (const renamed of restored.processor.applyRenames()) {
+            this.renamedOnLoad.push({...renamed, archive: paneName});
+        }
 
         this.paneCounter += 1;
+    }
+
+    // One notice for a load that renamed anything, since the next autosave keeps the new
+    // Titles: a rename nobody was told of is a note the reader cannot find by its name.
+    reportRenames(){
+        const renamed = (this.renamedOnLoad ?? []).splice(0);
+        if (!renamed.length) return;
+
+        const lines = renamed.map( (r)=>`“${r.from}” in ${r.archive} is now “${r.to}”.` );
+        window.alert(['A Title names one note, and this graph had some Titles in two places, so one of each was renamed as it opened:', ...lines].join('\n'));
     }
 
     getActiveTextarea() {
