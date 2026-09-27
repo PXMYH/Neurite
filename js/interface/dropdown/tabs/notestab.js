@@ -63,6 +63,10 @@ On.mousedown(zetHorizDragHandle, (e)=>{
     zetIsHorizResizing = true;
     initialX = e.clientX;
     initialWidth = App.zetPanes.container.offsetWidth;
+    // The stylesheet's limit (`.zet-pane-container`), so the drag and the CSS agree on
+    // how wide the pane may go. At 1000px they did not -- 926px against 900px -- and a
+    // pane the CSS had clamped to 926px refused every narrowing drag short of 26px.
+    maxWidth = parseFloat(getComputedStyle(App.zetPanes.container).maxWidth) || maxWidth;
 
     // Prevent text selection while resizing
     document.body.style.userSelect = 'none';
@@ -88,12 +92,10 @@ function zetHandleHorizMouseMove(event) {
     requestAnimationFrame(() => {
         // Calculate the difference in the x position
         const dx = event.clientX - initialX;
-        const newWidth = initialWidth + dx;
-
-        // Update the width if within the boundaries
-        if (newWidth > 50 && newWidth <= maxWidth) {
-            App.zetPanes.container.style.width = newWidth + 'px';
-        }
+        // Clamped, not refused: a move past either limit used to leave the pane where the
+        // last move inside them had put it, however far the pointer went.
+        const newWidth = Math.min(Math.max(initialWidth + dx, 50), maxWidth);
+        App.zetPanes.container.style.width = newWidth + 'px';
     });
 }
 
@@ -180,17 +182,16 @@ class ZetPanes {
         pane.appendChild(textarea);
 
         // No `placeholder`: the editor opens empty. It used to hold a four-line
-        // sample of the syntax, which is in the ? tab now -- see `zetcodemirror.js`.
+        // sample of the syntax, which is in the Help panel now -- see `zetcodemirror.js`.
         const cm = CodeMirror.fromTextArea(textarea, {
             lineWrapping: true,
             scrollbarStyle: 'simple',
             theme: 'default',
             mode: 'custom',
             virtualRendering: true,
-            // Escape is the way out of the editor, as it is out of every panel. The
-            // default keymap answers every Escape itself, and Tab types a tab, so no key
-            // got the caret out. An open completion list still takes the first Escape:
-            // its keymap is asked before this one.
+            // Escape is the way out of the editor, as it is out of every panel (the Help
+            // panel says so). The default keymap answers every Escape itself, and Tab
+            // types a tab, so no key got the caret out.
             extraKeys: {Esc: false}
         });
 

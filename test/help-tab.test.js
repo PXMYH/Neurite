@@ -111,6 +111,10 @@ const CLAIMS = [
     {row: /<code>## Title<\/code>/, says: /Notes panel/,
      file: 'resources/html/tabs/dropdown.html', code: /openTab\('tab1', this\)/,
      why: 'the Notes row is gone, so the help sends the reader to a panel they cannot open'},
+    // The only way out of the editor by keyboard, so it has to be written down somewhere.
+    {row: /<kbd>Esc<\/kbd> in the notes/, says: /way out/,
+     file: 'js/interface/dropdown/tabs/notestab.js', code: /extraKeys: \{Esc: false\}/,
+     why: 'the notes editor answers Escape itself again, so the row promises a way out that is gone'},
 ];
 
 // "Any character" tempered to stop at the row's own end. `[\s\S]*?` is lazy but

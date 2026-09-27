@@ -4,7 +4,7 @@ class TextNode {
     // reference tag: the link strip above the body lists this note's links and its +
     // control is titled "Link this note to another", so a card that also spelled out
     // `[[Title]]` put the mechanism into the space meant for the writing. The syntax is
-    // still taught in the ? tab, for the notes pane, where a tag really is typed.
+    // still taught in the Help panel, for the notes pane, where a tag really is typed.
     // `.editable-div::placeholder` gives this a colour of its own -- the textarea's own
     // text colour is near-invisible by design.
     static PLACEHOLDER = 'Write here.';

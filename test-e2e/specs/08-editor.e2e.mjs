@@ -218,10 +218,16 @@ test('the notes pane handle stays on screen when the window shrinks', async () =
     h = await handle();
     assert.ok(h.onScreen, 'the handle can still be reached');
 
-    await page.mouse.move(h.x, h.y);
-    await page.mouse.down();
-    await page.mouse.move(h.x - 300, h.y, { steps: 6 });
-    await page.mouse.up();
-    await page.waitForTimeout(200);
-    assert.ok(Math.abs((await handle()).pane - (h.pane - 300)) <= 2, 'and a drag narrows the pane');
+    // A short drag first: the drag's own limit sat 26px under the stylesheet's, and a
+    // narrowing drag that stayed above it was refused outright.
+    for (const dx of [-20, -300]) {
+        h = await handle();
+        await page.mouse.move(h.x, h.y);
+        await page.mouse.down();
+        await page.mouse.move(h.x + dx, h.y, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(200);
+        const pane = (await handle()).pane;
+        assert.ok(Math.abs(pane - (h.pane + dx)) <= 2, `a ${dx}px drag took the pane from ${h.pane} to ${pane}`);
+    }
 });

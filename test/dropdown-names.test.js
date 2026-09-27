@@ -76,16 +76,63 @@ test('a select with no name leaves the replacer unnamed rather than inventing on
 });
 
 // An AI Node's own dropdown takes its name from the global one it mirrors, found by its id
-// with the Node's index taken off (`AiNode.setupCustomSelect`, where new and restored AI
-// Nodes both pass -- test-e2e/specs/04-node-controls.e2e.mjs drives both). That lookup is
-// only as good as this id.
+// with the Node's index taken off. That lookup is only as good as this id.
 test("an AI Node's own dropdown id is the global one's plus the Node's index", ()=>{
     const {createSelectWithWrapper} = load();
     const wrapper = createSelectWithWrapper('anthropic-select', 'anthropic', 3);
     const select = wrapper.children[0].children[0];
 
     assert.equal(select.id, 'anthropic-select-3');
-    assert.equal(select.id.replace(/-\d+$/, ''), 'anthropic-select');
+});
+
+// `AiNode.setupCustomSelect` is where every AI Node's dropdowns pass, new or restored from
+// a Saved Graph -- and restored is the case naming at build time missed: an AI Node saved
+// before the names came back with 14 of 14 unnamed. The real function, run over a select
+// with its replacer already in place (restored) and one without (new).
+function setupCustomSelect(){
+    const src = readFileSync('js/nodes/nodetypes/ainodes/ainode.js', 'utf8');
+    const start = src.indexOf('AiNode.setupCustomSelect = function(dropdown){');
+    assert.notEqual(start, -1, 'AiNode.setupCustomSelect should still be defined in ainode.js');
+    const body = src.slice(start, src.indexOf('\n}\n', start) + 2);
+
+    const globalTwin = labelled('Claude');
+    const {CustomDropdown} = load( (id)=> (id === 'anthropic-select') ? globalTwin : null );
+    const replacer = makeElement('div'), listbox = makeElement('div');
+    replacer.querySelector = (sel)=> (sel === '.options-replacer') ? listbox
+                                   : (sel === '.selected-text') ? {textContent: ''} : null;
+    // Building the replacer is `CustomDropdown.setup`'s job, and naming it from the
+    // select is the part of it these tests are about.
+    CustomDropdown.setup = (select)=> CustomDropdown.carryAccessibility(select, replacer, listbox);
+    CustomDropdown.addEventListeners = ()=>{};
+    const ctx = createContext({
+        AiNode: {refreshOptions(){}}, CustomDropdown, Elem: {byId: (id)=> (id === 'anthropic-select') ? globalTwin : null},
+        On: new Proxy({}, {get: ()=> ()=>{}}),
+    });
+    runInContext(body + ';globalThis.run = AiNode.setupCustomSelect;', ctx);
+
+    const select = makeElement('select');
+    select.id = 'anthropic-select-3';
+    select.dataset = {};
+    select.options = [];
+    select.parentNode = {querySelector: (sel)=> (sel === '.select-replacer') ? replacer : null};
+    select.closest = ()=> null;
+    return {run: (s)=> ctx.run.call({}, s), select, replacer, listbox};
+}
+
+test("a new AI Node's dropdown is named after the global one it mirrors", ()=>{
+    const h = setupCustomSelect();
+    h.run(h.select);
+    assert.equal(h.select.getAttribute('aria-label'), 'Claude');
+    assert.equal(h.replacer.getAttribute('aria-label'), 'Claude');
+    assert.equal(h.listbox.getAttribute('aria-label'), 'Claude');
+});
+
+test("a restored AI Node's dropdown is named too", ()=>{
+    const h = setupCustomSelect();
+    h.select.dataset.initialized = 'true';
+    h.run(h.select);
+    assert.equal(h.replacer.getAttribute('aria-label'), 'Claude', 'the replacer the save brought back');
+    assert.equal(h.listbox.getAttribute('aria-label'), 'Claude', 'and its listbox');
 });
 
 // The markup side: every <select> the app loads either carries its own aria-label or has a

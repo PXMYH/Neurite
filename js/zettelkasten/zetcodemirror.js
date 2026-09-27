@@ -360,7 +360,7 @@ function updateAllZettelkastenProcessors() {
 // notes... / ## Title Header / Plain Text / [[Reference]]" -- and an
 // `updateAllCodeMirrorPlaceholders` re-ran it through a `parser.updatePlaceholder`
 // whenever the tag inputs changed, so the sample always used the current tags.
-// All three are gone. The syntax it taught is in the ? tab now, where it can say
+// All three are gone. The syntax it taught is in the Help panel now, where it can say
 // what a Title and a Reference *do* instead of only how they are spelled, and the
 // editor opens empty.
 //

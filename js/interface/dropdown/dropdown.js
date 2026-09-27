@@ -288,11 +288,10 @@ On.click(menuButton, (e)=>{
 // clears it. The other two Escape consumers need no guard -- `CustomDropdown` calls
 // `stopPropagation` while its list is open, so this never sees that key, and
 // `NodeMode`'s Escape only stops nodes following the mouse.
-// An Escape that something inside already answered is theirs, not the menu's: in the
-// notes editor or the function console, an open completion list closes on the first
-// Escape and the menu steps on the second. Both editors leave a bare Escape to this
-// handler (`extraKeys: {Esc: false}`). CodeMirror's default keymap answers every
-// Escape, and with this guard that left no key that got the caret out of either one.
+// An Escape that something inside already answered is theirs, not the menu's. The two
+// editors in the menu leave a bare Escape to this handler (`extraKeys: {Esc: false}`):
+// CodeMirror's default keymap answers every Escape, and with this guard that left no
+// key that got the caret out of either one.
 On.keydown(document, (e)=>{
     if (e.key !== 'Escape' || !dropdownContent.classList.contains('open')) return;
     if (Modal.current) return;
