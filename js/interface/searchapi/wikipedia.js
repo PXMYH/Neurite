@@ -67,7 +67,10 @@ Wikipedia.getSummaries = async function(keywords, top_n_links = 3){
     const summaries = [].concat(...allSummaries); // Flatten the array of summaries
     // Sort the summaries by relevance score in descending order
     summaries.sort((a, b) => b.relevanceScore - a.relevanceScore);
-    const combinedSummaries = [summaries[0]]; // Include the top matched summary
+    // The top matched summary -- when there is one. With the wiki server unreachable
+    // `getSummary` gives `[]`, and `[summaries[0]]` was `[undefined]`, so `displayResult`
+    // read `undefined.title` and the throw aborted the AI send it was feeding (#10).
+    const combinedSummaries = summaries.slice(0, 1);
     // Check if the novelty checkbox is checked
     if (isNoveltyEnabled()) {
         // randomly pick two of the remaining summaries

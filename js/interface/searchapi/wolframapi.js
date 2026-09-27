@@ -66,16 +66,27 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
     // Call Wolfram Alpha API with the reformulated query
     const apiKey = Elem.byId('wolframApiKey').value;
 
-    const response = await fetch(Host.urlForPath('/wolframalpha'), {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            query: reformulatedQuery,
-            apiKey: apiKey
-        }),
-    });
+    // A gateway that is not running rejects the fetch outright, which is a different
+    // failure from a gateway answering with an error below -- and the bare `await` let it
+    // propagate and abort the AI send, after the reformulation round trip had already been
+    // paid for (#10). Both now end the same way: say what to check, and send without it.
+    let response;
+    try {
+        response = await fetch(Host.urlForPath('/wolframalpha'), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                query: reformulatedQuery,
+                apiKey: apiKey
+            }),
+        });
+    } catch (err) {
+        Logger.err("Wolfram Alpha request failed:", err);
+        alert("Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai tab. Localhosts can be found at the Github link in the ? tab.");
+        return;
+    }
 
     if (!response.ok) {
         const errorData = await response.json();

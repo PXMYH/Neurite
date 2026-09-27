@@ -176,7 +176,11 @@ Keys.getVisible = function(keys){
 }
 
 Keys.getRelevant = async function(userInput, recentContext = null, searchQuery, filteredKeys){
-    const visibleKeys = filteredKeys;
+    // `isEmbedEnabled` answers `true`, not a list, when the checkbox is on and no key is
+    // visible -- which is always the case with no local gateway to list them. `true` has
+    // no `length`, so it fell past the guard below into `true.forEach` and threw, taking
+    // the whole AI send with it (#10). No keys means nothing to rank.
+    const visibleKeys = Array.isArray(filteredKeys) ? filteredKeys : [];
     if (visibleKeys.length <= 3) return visibleKeys;
 
     // Use recent context or fetch the last prompts and responses if not provided
