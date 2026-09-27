@@ -1,0 +1,21 @@
+{
+  "name": "neurite-desktop",
+  "productName": "Neurite",
+  "version": "1.0.0",
+  "description": "Neurite as a macOS app",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "build:web": "npm --prefix .. run build",
+    "start": "npm run build:web && electron .",
+    "package": "npm run build:web && electron-packager . Neurite --platform=darwin --arch=arm64 --out=out --overwrite --extra-resource=../dist --icon=icon.icns --app-bundle-id=network.neurite.desktop --app-category-type=public.app-category.productivity --ignore=^/out --ignore=^/node_modules --ignore=^/icon\\.icns$ --ignore=\\.e2e\\.mjs$ && codesign --force --deep --sign - out/Neurite-darwin-arm64/Neurite.app",
+    "dmg": "npm run package && rm -rf out/dmg && mkdir -p out/dmg && ditto out/Neurite-darwin-arm64/Neurite.app out/dmg/Neurite.app && ln -s /Applications out/dmg/Applications && hdiutil create -volname Neurite -srcfolder out/dmg -ov -format UDZO out/Neurite-$npm_package_version-arm64.dmg",
+    "test": "npm run build:web && node --test --test-concurrency=1 smoke.e2e.mjs"
+  },
+  "author": "satellitecomponent",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.4.5"
+  }
+}

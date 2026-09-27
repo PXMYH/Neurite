@@ -131,3 +131,26 @@ Deliberately not attempted, and why:
 ## Review
 
 (filled in as phases land)
+
+# macOS app, and the freeze it found (2026-09-26)
+
+Asked: "pack this up as a macOS app". Then: release a DMG for Apple Silicon (M1+) whenever
+a feature lands.
+
+- [x] `desktop/` -- Electron 44, its own `package.json` so the root install stays Electron-free.
+      `main.cjs` serves the built `dist/` from a privileged `app://neurite` scheme (not file://,
+      which breaks `fetch('/resources/...')`; not a port, which collides with 8999). Measured
+      first that `dist/` is faithful to the dev server: 53/53 e2e against it, and 0 differing
+      computed values over 1,233 elements x 21 properties with the notes pane open.
+- [x] Offline after the first launch: the 23 CDN scripts are redirected to a cache-first disk
+      copy, but only for requests the app itself makes (`initiatorOrigin`).
+- [x] Quit keeps the work: the window waits for `App.viewGraphs.saveNow()` (savenet.js).
+      Without it a 100-note graph quit 300ms after its last note came back empty, 3 of 3.
+- [x] The smoke test that drove that out found a worse bug of my own: 100 notes arriving at
+      once froze the page for **89 seconds**. Two causes, both fixed, both measured by CPU
+      profile rather than guessed: `relaxOverlaps` resolved one pair per pass with a 4000-pass
+      cap and `settlePlacement` ran it six times per arriving note; and every card's editor
+      forced a whole-page layout as its text arrived. Now 572ms worst stall at 100 notes,
+      186ms at 50, 60fps steady at 200, and 0 overlapping pairs after bursts of 5 to 100.
+- [x] Packaged arm64 `.app` (ad-hoc signed, valid) and `.dmg`; the smoke test passes against
+      the app inside the mounted DMG.

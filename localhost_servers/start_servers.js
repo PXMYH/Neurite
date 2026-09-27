@@ -20,7 +20,10 @@ const corsOptions = {
   // Tracks vite.config.js `server.port`. A stale entry here does not fail
   // loudly: the gateway answers, the browser drops the response, and every
   // proxied AI call reports a CORS error that names no port.
-  origin: ['https://neurite.network', 'http://localhost:8999'],
+  //
+  // `app://neurite` is the macOS app (desktop/main.cjs), which serves the same
+  // frontend from its own scheme rather than from a port.
+  origin: ['https://neurite.network', 'http://localhost:8999', 'app://neurite'],
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   optionsSuccessStatus: 204

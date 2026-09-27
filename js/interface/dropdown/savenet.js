@@ -318,6 +318,9 @@ View.Graphs = class {
     // unit of ownership, the session is. A tab that cannot get it still shows the graph
     // and still saves -- it just saves to a record of its own.
     #isWriter = true;
+    // Settles true once the previous session's graph is back on screen, false if it
+    // could not be; `init` replaces it.
+    #whenRestored = Promise.resolve(false);
     #maxBlobId = 0;
     #maxGraphId = 0;
     #saver = new View.Graphs.Saver(this);
@@ -389,6 +392,23 @@ View.Graphs = class {
 
         return this.#autosave().then(this.#import.bind(this, file));
     }
+
+    // For a host that is about to close the page and can wait for it: the macOS app
+    // (desktop/main.cjs) calls this on quit. The save `visibilitychange` starts as a
+    // window closes has as long as the unload lasts, which is enough for a small graph
+    // and not for a big one. Measured in Electron: 100 notes quit 300ms after the last
+    // one, before any autosave tick, came back as an empty graph 3 runs of 3; with the
+    // quit waiting on this, all 101 notes came back 3 of 3.
+    //
+    // Never before the saved graph is back on screen, so an early call waits for it.
+    // Until then the canvas is empty or half-built and `#maxGraphId` is still 0, so a
+    // save opens `1.graph` again -- the id of the reader's first graph -- and writes the
+    // empty canvas over it. A review measured exactly that: a close in the few
+    // milliseconds after `App` exists replaced a 5-note graph with an empty one. Waiting
+    // rather than declining, because the restore can finish after notes are already on
+    // screen: a burst of them at startup pushed it 700ms past `appReady`, and a quit in
+    // that window would otherwise have saved nothing at all.
+    saveNow(){ return this.#whenRestored.then( (restored)=>restored && this.#autosave() ) }
     #import(file){
         const importer = new GraphImporter();
         const afterImport = this.#afterImport.bind(this, importer, file);
@@ -1107,11 +1127,20 @@ View.Graphs = class {
         }
 
         const stored = this.#stored;
-        return this.#claimWriterLock()
+        this.#whenRestored = this.#claimWriterLock()
             .then(stored.forEachMetaAndGraphId.bind(stored, this.#processMeta))
             .then(stored.forEachBlobMetaAndGraphId
                     .bind(stored, this.#processBlobMeta))
-            .then(this.#loadState.bind(this));
+            .then(this.#loadState.bind(this))
+            .then(()=>true, this.#onRestoreFailed);
+        return this.#whenRestored;
+    }
+    // Autosave never starts when the restore fails, on purpose: the record the page
+    // selected is still the reader's, and the empty canvas must not be written over it.
+    // This used to surface only as an unhandled rejection.
+    #onRestoreFailed = (err)=>{
+        Logger.err("Could not restore the last graph; autosave is off for this session:", err);
+        return false;
     }
     #processMeta = (meta, graphId)=>{
         if (meta.graphId !== graphId){

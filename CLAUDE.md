@@ -259,9 +259,17 @@ sequences over pan/zoom.
 
 ### Desktop build
 
-The Electron wrapper is **not on this branch** — `.github/workflows/electron-release.yml` checks out a
-separate `electron` branch. `window.startedViaElectron` / `window.electronAPI` guards in `globals.js`,
-`main.js` (`App.signalReady`) and the link nodes are the only traces here.
+Upstream's Electron wrapper is **not on this branch** — `.github/workflows/electron-release.yml` checks
+out a separate `electron` branch, which this fork does not have. `window.startedViaElectron` /
+`window.electronAPI` guards in `globals.js`, `main.js` (`App.signalReady`) and the link nodes are its
+traces here.
+
+This fork's own macOS app is `desktop/` (see `docs/desktop.md`): `main.cjs` serves `dist/` from a
+privileged `app://neurite` scheme, and deliberately exposes no `electronAPI`, so the page runs as in a
+browser tab. Its own `package.json` keeps Electron out of the root install. `npm run dmg` there
+builds `dist/`, packs an arm64 `.app` (ad-hoc signed) and a `.dmg`; `npm test` there is a smoke test in
+real Electron (`smoke.e2e.mjs`, named so the root `npm test` never finds it). On quit it awaits
+`App.viewGraphs.saveNow()` (savenet.js) before the window closes.
 
 ## Conventions
 

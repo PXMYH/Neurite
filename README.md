@@ -106,7 +106,9 @@ There is no linter. Anything visual is verified in the browser at `http://localh
 ### Or don't install anything
 
 Use the hosted build at **[neurite.network](https://neurite.network/)**, or download **Neurite
-Desktop** for Windows, Linux or macOS — see [`docs/desktop.md`](docs/desktop.md).
+Desktop** for Windows, Linux or macOS — see [`docs/desktop.md`](docs/desktop.md). This
+repository's own macOS app (Apple Silicon) is the `.dmg` on its
+[latest release](https://github.com/PXMYH/Neurite/releases/latest), built from `desktop/`.
 
 ## Features, in depth
 
