@@ -32,6 +32,7 @@ function slice(src, start){
 
 const cosineSrc = slice(read('js/interface/searchapi/embeddingsdb.js'), 'function cosineSimilarity(');
 const searchSrc = slice(read('js/interface/searchapi/search.js'), 'Embeddings.search = async function');
+const escapeSrc = slice(read('js/zettelkasten/zetcodemirror.js'), 'function escapeRegExp(');
 
 function cosine(){
     const ctx = vm.createContext({Math});
@@ -84,6 +85,7 @@ function searchHarness(vectors){
         Math, RegExp, Promise, Object,
     });
     vm.runInContext(cosineSrc, ctx);
+    vm.runInContext(escapeSrc, ctx);
     vm.runInContext(searchSrc + ';', ctx);
     return {search: (term)=> ctx.Embeddings.search(term), calls, texts: node.texts};
 }
@@ -98,11 +100,23 @@ test('Node search embeds text Nodes only, and ranks by the cosine', async ()=>{
 });
 
 // With embeddings down every vector is `[]`. The relevant notes sent to the model have to be
-// the keyword matches alone, not every Node padded in behind them with a cosine of 0.
+// the keyword matches alone, not every Node padded in behind them with a cosine of 0 -- and
+// searched by what a send really passes: three keywords, joined as the search splits them.
 test('with embeddings down, only a keyword match is relevant', async ()=>{
+    const join = read('js/ai/aimessage.js').match(/const strKeywords = arrKeywords\.join\((['"])(.*?)\1\)/);
+    assert.ok(join, "the send's keyword join should still be in aimessage.js");
+    const term = ['zeta', 'beta', 'omega'].join(join[2]);
+
     const h = searchHarness( ()=> [] );
-    const found = await h.search('beta');
-    assert.deepEqual(Array.from(found, (n)=> n.uuid), ['b']);
+    assert.deepEqual(Array.from(await h.search(term), (n)=> n.uuid), ['b']);
+    assert.deepEqual(Array.from(await h.search(''), (n)=> n.uuid), [], 'and an empty term matches nothing');
+});
+
+// A title holding one of the keywords earns the x10 -- the whole term never was in one.
+test('a title match on any keyword ranks that Node first', async ()=>{
+    const h = searchHarness( ()=> [1, 0] );
+    const found = await h.search('zeta, c, omega');
+    assert.equal(found[0].uuid, 'c');
 });
 
 test('an edited Node is embedded again, and a failed embedding is not kept', async ()=>{
@@ -127,8 +141,9 @@ test('an edited Node is embedded again, and a failed embedding is not kept', asy
 // The Worker, with its library swapped for a fake through `Model.load`. The fake keeps a
 // module map the way a Worker does, failures included: an `import()` of a URL that failed
 // once fails again without going back to the network (measured in Chromium). So `loads`
-// counts real fetches, and a retry under the same URL cannot pass.
-function workerHarness({loadFailures = 0, failCalls = [], noDataCalls = []} = {}){
+// counts real fetches of the library, and a retry under the same URL cannot pass.
+// `pipelines` counts model loads -- the download a failed `pipeline()` costs again.
+function workerHarness({loadFailures = 0, pipelineFailures = 0, failCalls = [], noDataCalls = []} = {}){
     const posted = [];
     const ctx = vm.createContext({
         self: {postMessage: (m)=> posted.push(m)},
@@ -136,15 +151,19 @@ function workerHarness({loadFailures = 0, failCalls = [], noDataCalls = []} = {}
         Array, Promise,
     });
     vm.runInContext(read('public/embeddings.js') + ';globalThis.M = Model; globalThis.models = models;', ctx);
-    let loads = 0, extractions = 0;
+    let loads = 0, pipelines = 0, extractions = 0;
     const urls = [];
     const library = {
         env: {},
-        pipeline: async ()=> async (text)=> {
-            extractions++;
-            if (failCalls.includes(extractions)) throw new Error('extraction failed');
-            if (noDataCalls.includes(extractions)) return undefined;
-            return {data: [text.length]};
+        pipeline: async ()=> {
+            pipelines++;
+            if (pipelines <= pipelineFailures) throw new Error('model download failed');
+            return async (text)=> {
+                extractions++;
+                if (failCalls.includes(extractions)) throw new Error('extraction failed');
+                if (noDataCalls.includes(extractions)) return undefined;
+                return {data: [text.length]};
+            };
         },
     };
     const moduleMap = new Map();
@@ -158,7 +177,7 @@ function workerHarness({loadFailures = 0, failCalls = [], noDataCalls = []} = {}
         return moduleMap.get(url);
     };
     const model = ctx.models['local-embeddings-gte-small'];
-    return {model, posted, loads: ()=> loads, urls};
+    return {model, posted, loads: ()=> loads, pipelines: ()=> pipelines, urls};
 }
 
 const repliesOf = (posted)=> posted.filter( (m)=> m.id !== undefined ).map( (m)=> `${m.id}:${m.type}` );
@@ -179,16 +198,19 @@ test('a pipeline that failed to load is loaded again on the next request', async
     assert.notEqual(h.urls[1], h.urls[0], 'the retry has to ask under a URL the module map has not seen');
 });
 
-// A search queues one request per text Node. Forgetting the failed load at once made one
-// attempt per queued request, each a download or a network timeout.
-test('one failed load answers every request queued behind it, and is tried once', async ()=>{
-    const h = workerHarness({loadFailures: 1});
+// A search queues one request per text Node. Forgetting a failed model load at once made
+// each queued request start the download again. And a retry of the model must not fetch
+// the library again: it had arrived.
+test('one failed model load answers every request queued behind it, and is tried once', async ()=>{
+    const h = workerHarness({pipelineFailures: 1});
     await Promise.all(['a', 'bb', 'ccc'].map( (t, i)=> h.model.generate(t, i + 1) ));
     assert.deepEqual(repliesOf(h.posted), ['1:error', '2:error', '3:error']);
-    assert.equal(h.loads(), 1, 'one attempt between the three');
+    assert.equal(h.pipelines(), 1, 'one model load between the three');
 
     await h.model.generate('later', 4);
     assert.deepEqual(repliesOf(h.posted).slice(3), ['4:result'], 'the next request after them tries again');
+    assert.equal(h.pipelines(), 2);
+    assert.equal(h.loads(), 1, 'with the library it already had');
 });
 
 // A reply that throws rejects its own link. Kept as the queue, that rejection skipped every

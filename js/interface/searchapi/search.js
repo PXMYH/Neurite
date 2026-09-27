@@ -176,7 +176,8 @@ const nodeCache = new LRUCache(MAX_CACHE_SIZE);
 Embeddings.search = async function(searchTerm, maxNodesOverride){
     const searchTermLowered = searchTerm.toLowerCase();
     const maxNodes = maxNodesOverride ?? Elem.byId('node-count-slider').value;
-    const keywords = searchTermLowered.split(/,\s*/);
+    // No empty keyword: its pattern, `\b\b`, matches every note that has a word in it.
+    const keywords = searchTermLowered.split(/,\s*/).filter(Boolean);
 
     // Text Nodes only, filtered before anything is embedded. Every Node used to be
     // embedded and the others skipped afterwards, so an image, link or AI Node cost a
@@ -209,13 +210,15 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
 
-        // Updated to use new property names
+        // A title that holds any keyword, not the whole comma-separated term: with the
+        // three keywords a send searches by, the whole term was never in a title, so the
+        // x10 below could not apply. One keyword is the same test as before.
         const titleLowered = node.view.titleInput.value.toLowerCase();
-        const titleMatchScore = titleLowered.includes(searchTermLowered) ? 1 : 0;
+        const titleMatchScore = keywords.some( (keyword)=>titleLowered.includes(keyword) ) ? 1 : 0;
 
-        // Updated to use new property names
+        // Escaped: a keyword like "c++" was a pattern that threw.
         const contentMatchScore = keywords.filter(keyword => {
-            const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+            const regex = new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'gi');
             return node.getText().match(regex);
         }).length;
 

@@ -22,27 +22,36 @@ class Model {
     // request in the session failed. A pipeline that failed to load was never retried
     // either. Now a failed load is tried again once the requests queued behind it have
     // had its failure, and the queue never stays rejected, whatever a request did.
+    #library = null;
     #extractor = null;
     #queue = Promise.resolve();
-    #loads = 0;
+    #imports = 0;
     constructor(apiName, pipelineName){
         this.apiName = apiName;
         this.pipelineName = pipelineName;
     }
 
     initialize(){
-        this.#extractor ??= Model.load(this.#libraryUrl())
+        this.#extractor ??= this.#loadLibrary()
             .then(this.#getExtractor.bind(this))
             .then(this.#postReady.bind(this))
             .catch(this.#onInitError);
         return this.#extractor;
     }
-    // A retry cannot ask for the library by the same URL. A Worker keeps a failed module
-    // fetch in its module map: measured in Chromium, three `import()`s of one URL after a
-    // failure made one request between them, and all three failed. So each retry asks
-    // under a URL the map has not seen; the CDN serves the same file for it.
+    // The library is kept once it has arrived, so a retry after a failed model download
+    // does not fetch its 743,652 bytes again. Only a failed import is asked for again,
+    // and not by the same URL: a Worker keeps a failed module fetch in its module map --
+    // measured in Chromium, three `import()`s of one URL after a failure made one request
+    // between them, and all three failed. The CDN serves the same file under `?attempt=`.
+    #loadLibrary(){
+        this.#library ??= Model.load(this.#libraryUrl()).catch( (err)=>{
+            this.#library = null;
+            throw err;
+        });
+        return this.#library;
+    }
     #libraryUrl(){
-        const n = this.#loads++;
+        const n = this.#imports++;
         return n === 0 ? this.urlTransformers : `${this.urlTransformers}?attempt=${n + 1}`;
     }
     #getExtractor(transformers){
@@ -64,8 +73,10 @@ class Model {
         return extractor;
     }
     // Forgotten once the requests already queued have had it, so they share this one
-    // failed attempt. Forgetting it at once made an attempt per queued request -- a
-    // search over 50 notes queues 50, each a download or a network timeout. The first
+    // failed attempt. Forgetting it at once made an attempt per queued request: a search
+    // over 50 notes queues 50, and after a failed model download each of them started
+    // the download again. (After a failed import each was free -- the module map answered
+    // -- which is the other reason a same-URL retry could never recover.) The first
     // request queued after them tries again.
     #onInitError = (err)=>{
         console.error("Error initializing embeddings:", err);
