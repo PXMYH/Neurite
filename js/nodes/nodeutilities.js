@@ -563,14 +563,14 @@ class SelectedNodes {
     }
 
     scale(scaleFactor, centralPoint){
+        // Spacing scales with size, pinned Nodes and their pins too (f and d): they kept
+        // their places while growing, so a group scaled up ran into itself.
         this.forEach(node => {
             node.scale *= scaleFactor;
 
-            // Adjust position to maintain relative spacing only if the node is not anchored
-            if (node.anchorForce !== 1) {
-                const directionToCentroid = node.pos.minus(centralPoint);
-                node.pos = centralPoint.plus(directionToCentroid.scale(scaleFactor));
-            }
+            const directionToCentroid = node.pos.minus(centralPoint);
+            node.pos = centralPoint.plus(directionToCentroid.scale(scaleFactor));
+            if (node.anchorForce) node.anchor = node.pos;
 
             updateNodeEdgesLength(node);
         });

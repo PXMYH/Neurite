@@ -1,6 +1,13 @@
 // Global object to track the state of movement keys
+//
+// Not a key typed into a field, which is text: measured, "fd" typed into the notes pane grew
+// the selected Node twice over. Nor a chord, which is the browser's -- Ctrl+F and Cmd+F are
+// Find, and they scaled the selection while the find bar opened.
 const keyState = {};
-On.keydown(window, (e)=>{ keyState[e.key] = true } );
+On.keydown(window, (e)=>{
+    if (Hud.isTyping() || e.ctrlKey || e.metaKey || e.altKey) return;
+    keyState[e.key] = true;
+});
 On.keyup(window, (e)=>{ keyState[e.key] = false } );
 
 const directionMap = {
@@ -56,4 +63,15 @@ function processScalingKeys() {
     });
 }
 
-Node.moveAtThisAngle = function(node){ node.moveNode(this.valueOf()) }
+// The arrows move the selection across the screen, every Node in it by the same step, pinned
+// or not. They pushed each Node with a force, and a pinned Node has no velocity to push
+// (`Node.updatePosition` zeroes it) -- every note arrives pinned, so the arrows moved none.
+// The step is in screen pixels through `toDZ`, so it is the same at any zoom and follows a
+// rotated view; a pinned Node's pin goes with it.
+const ARROW_STEP_PX = 3;
+Node.moveAtThisAngle = function(node){
+    const angle = this.valueOf();
+    const step = toDZ(new vec2(Math.cos(angle), Math.sin(angle)).scale(ARROW_STEP_PX));
+    node.pos = node.pos.plus(step);
+    if (node.anchorForce) node.anchor = node.pos;
+}

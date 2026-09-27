@@ -131,6 +131,106 @@ test("Delete in a selected Node's menu asks first, and says how many", async () 
     assert.deepEqual(await page.evaluate(() => Object.values(Graph.nodes).map((n) => n.getTitle())), ['Gamma']);
 });
 
+// Where a card is on screen, and whether its pin is where it is.
+const place = (page, uuid) => page.evaluate((id) => {
+    const n = Graph.nodes[id];
+    const r = n.view.div.getBoundingClientRect();
+    return { x: r.x, y: r.y, w: r.width, cx: r.x + r.width / 2, cy: r.y + r.height / 2,
+        pinned: n.anchorForce === 1, pinHere: n.anchor.minus(n.pos).mag() < 1e-9 };
+}, uuid);
+const hold = async (page, key, ms) => {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(ms);
+    await page.keyboard.up(key);
+    await page.waitForTimeout(300);
+};
+const near = (a, b, tolerance = 2) => Math.abs(a - b) <= tolerance;
+
+test('a group drag, the arrows and f move a selection of pinned Nodes as one', async () => {
+    // Every note arrives pinned, and each of these skipped pinned Nodes: a group drag moved
+    // only the Node under the pointer, the arrows moved nothing, and f grew cards in place.
+    ({ context, page } = await openNeurite(browser));
+    const [a, b] = await threeNotes(page);
+    assert.ok((await place(page, a)).pinned && (await place(page, b)).pinned, 'the notes did not arrive pinned');
+    const key = await modKey(page);
+    await clickCard(page, a, key);
+    await clickCard(page, b, key);
+
+    const a0 = await place(page, a), b0 = await place(page, b);
+    await page.mouse.move(a0.cx, a0.y + 3);
+    await page.mouse.down();
+    await page.mouse.move(a0.cx + 150, a0.y + 3 - 40, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    const a1 = await place(page, a), b1 = await place(page, b);
+    assert.ok(near(b1.x - b0.x, a1.x - a0.x) && near(b1.y - b0.y, a1.y - a0.y),
+        `the group drag left a pinned Node behind: ${JSON.stringify({ a0, a1, b0, b1 })}`);
+    assert.ok(b1.pinHere, 'the pin stayed behind its Node');
+
+    await hold(page, 'ArrowRight', 400);
+    const a2 = await place(page, a), b2 = await place(page, b);
+    assert.ok(a2.x - a1.x > 30, `the arrows moved nothing: ${a2.x - a1.x}px`);
+    assert.ok(near(b2.x - b1.x, a2.x - a1.x) && near(b2.y, b1.y), 'the arrows moved the two apart');
+
+    const gap = (p, q) => Math.hypot(q.cx - p.cx, q.cy - p.cy);
+    await hold(page, 'f', 150);
+    const a3 = await place(page, a), b3 = await place(page, b);
+    const grew = a3.w / a2.w;
+    assert.ok(grew > 1.1, 'f did not grow the selection');
+    assert.ok(Math.abs(gap(a3, b3) / gap(a2, b2) - grew) < 0.05, 'the cards grew in place, into each other');
+    assert.ok(a3.pinHere && b3.pinHere, 'a pin stayed behind when f moved its Node');
+});
+
+test('Shift + scroll over a selected card scales the whole selection about the pointer', async () => {
+    ({ context, page } = await openNeurite(browser));
+    const [a, b] = await threeNotes(page);
+    const key = await modKey(page);
+    await clickCard(page, a, key);
+    await clickCard(page, b, key);
+    const a0 = await place(page, a), b0 = await place(page, b);
+    await page.mouse.move(a0.cx, a0.cy);
+    await page.keyboard.down('Shift');
+    for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, -100); await page.waitForTimeout(40); }
+    await page.keyboard.up('Shift');
+    await page.waitForTimeout(300);
+    const a1 = await place(page, a), b1 = await place(page, b);
+    const grew = a1.w / a0.w;
+    assert.ok(grew > 1.1, 'Shift + scroll did not grow the selection');
+    assert.ok(near(b1.w / b0.w, grew, 0.02), 'the rest of the selection did not grow with it');
+    // About the pointer: the other card moves away from it, in proportion.
+    const from = (p) => Math.hypot(p.cx - a0.cx, p.cy - a0.cy);
+    assert.ok(Math.abs(from(b1) / from(b0) - grew) < 0.08, 'a pinned card grew in place');
+    assert.ok(a1.pinHere && b1.pinHere, 'a pin stayed behind');
+});
+
+test('f, d and the arrows leave the selection alone while typing, or with Cmd or Ctrl', async () => {
+    // Measured: "fd" typed into the notes pane grew the selected Node twice over.
+    ({ context, page } = await openNeurite(browser));
+    const [a] = await threeNotes(page);
+    await clickCard(page, a, await modKey(page));
+    await page.click('.menu-button');
+    await page.click(".menu-row.tablink:has-text('Notes')");
+    await page.click('#zetPaneContainer .CodeMirror-lines');
+    const t0 = await place(page, a);
+    await hold(page, 'f', 150);
+    await hold(page, 'd', 150);
+    await hold(page, 'ArrowRight', 300);
+    const t1 = await place(page, a);
+    assert.ok(near(t1.w, t0.w, 0.5) && near(t1.x, t0.x, 0.5), 'typing moved or scaled the selection');
+    assert.match(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), /fd/);
+
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await clickCard(page, a, await modKey(page));
+    const k0 = await place(page, a);
+    for (const chord of ['Meta', 'Control']) {
+        await page.keyboard.down(chord);
+        await hold(page, 'f', 150);
+        await page.keyboard.up(chord);
+    }
+    assert.ok(near((await place(page, a)).w, k0.w, 0.5), 'Cmd+F or Ctrl+F scaled the selection');
+});
+
 for (const [platform, key, other, label] of [['MacIntel', 'Meta', 'Control', 'Cmd'], ['Win32', 'Control', 'Meta', 'Ctrl']]) {
     test(`on ${platform}, ${label} + click and ${label} + drag select, and the Help says ${label}`, async () => {
         // On a Mac, Control and a click is the secondary click: Blink and WebKit fire

@@ -398,10 +398,7 @@ class Hud {
     // node mode, Alt is the overlay reveal, the arrows and f/d move the selection,
     // and Ctrl with +/-/= is suppressed to block the browser's own zoom.
     //
-    // Guarded on where the caret is, which the existing global handlers are not: f,
-    // d and the arrows are read straight out of keyState every frame with no focus
-    // check, so typing "f" in any field still scales the selected notes. Not
-    // changing that here, but not repeating it either.
+    // Guarded on where the caret is, as the selection's keys are (movenodes.js).
     static bindKeys(){
         On.keydown(window, (e)=>{
             if (e.ctrlKey || e.metaKey || e.altKey) return;

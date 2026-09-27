@@ -208,7 +208,8 @@ class Node {
         if (!this.followingMouse) return;
 
         const p = Graph.vecToZ().minus(this.mouseAnchor);
-        const velocity = p.minus(this.pos).unscale(App.nodeMode ? 1 : dt);
+        const delta = p.minus(this.pos);
+        const velocity = delta.unscale(App.nodeMode ? 1 : dt);
 
         this.vel = velocity;
         this.pos = p;
@@ -218,10 +219,18 @@ class Node {
 
         if (!App.selectedNodes.uuids.has(this.uuid)) return;
 
+        // The rest of the selection comes along. A pinned Node was left where it was, and
+        // every note arrives pinned, so a group drag moved only the Node under the pointer;
+        // it moves by the same step now, its pin with it.
         App.selectedNodes.forEach(node => {
-            if (node.uuid === this.uuid || node.anchorForce === 1) return;
+            if (node.uuid === this.uuid) return;
 
-            node.vel = velocity;
+            if (node.anchorForce) {
+                node.pos = node.pos.plus(delta);
+                node.anchor = node.pos;
+            } else {
+                node.vel = velocity;
+            }
             if (App.nodeMode === 1) updateNodeEdgesLength(node);
         });
     }
@@ -394,15 +403,14 @@ class Node {
             Autopilot.targetZoom_scaleBy(1 / amount);
         } else {
             // Scale selected nodes or individual node
+            // A selection scales about the pointer, pinned Nodes with their pins: they were
+            // left in place while growing, so a scaled group ran into itself.
             const targetWindow = e.target.closest('.window');
             if (targetWindow && targetWindow.classList.contains('selected')) {
                 App.selectedNodes.forEach((node) => {
                     node.scale *= amount;
-
-                    // Only update position if the node is not anchored
-                    if (node.anchorForce !== 1) {
-                        node.pos = node.pos.lerpto(Graph.vecToZ(), 1 - amount);
-                    }
+                    node.pos = node.pos.lerpto(Graph.vecToZ(), 1 - amount);
+                    if (node.anchorForce) node.anchor = node.pos;
 
                     updateNodeEdgesLength(node);
                 });
