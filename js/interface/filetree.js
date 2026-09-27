@@ -112,9 +112,12 @@ class FileTree {
                 The Localhost servers for Neurite are not enabled.<br><br>
             `;
 
-            const releaseUrl = 'https://github.com/satellitecomponent/Neurite/releases/latest?tag=electron';
-            const linkElement = Html.make.a(releaseUrl);
-            linkElement.textContent = 'Download Neurite Desktop';
+            // The file tree is read by the direct-access server. The link went to the
+            // upstream project's desktop app, which bundles its servers; this fork's does
+            // not, so the way in is to start them.
+            const serversUrl = 'https://github.com/PXMYH/Neurite/tree/main/localhost_servers';
+            const linkElement = Html.make.a(serversUrl);
+            linkElement.textContent = 'How to start the Localhost Servers';
 
             linkElement.target = '_blank';
             linkElement.rel = 'noopener noreferrer';

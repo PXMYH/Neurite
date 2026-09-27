@@ -257,8 +257,12 @@ Host.provideAPIKeys.ct = class {
 // endpoint carrying the OpenAI key.
 //
 // - proxyOnly    the message to show when the direct route does not exist
+// - directUrl    where the direct route posts. Ollama's is read from the reader's own
+//                base URL, as the proxy and every other Ollama call read it: a fixed
+//                127.0.0.1 sent an iPad's calls to the iPad
 // - keyless      needs no key from the user, so the missing-key alert is skipped
-// - bearer       the direct route wants `Authorization: Bearer <key>`
+// - bearer       the direct route sends its key as `Authorization: Bearer <key>` --
+//                a keyless route only when it has one, as the proxy does for Custom
 // - fromModelData the endpoint and key come off the selected option's dataset
 // - requestId    the body carries a request id, so the call can be cancelled
 // - managed      neither route applies; handled before either one is chosen
@@ -266,9 +270,9 @@ const ProviderRoutes = {
     anthropic: {proxyPath: '/aiproxy/anthropic',
                 proxyOnly: "Claude model can only be used with the AI proxy server. Please enable the proxy server and refresh the page."},
     GROQ:      {proxyPath: '/aiproxy/groq',        directUrl: 'https://api.groq.com/openai/v1/chat/completions', keyInputId: 'GROQ-api-key-input', bearer: true},
-    ollama:    {proxyPath: '/aiproxy/ollama/chat', directUrl: 'http://127.0.0.1:11434/api/chat', keyless: true, requestId: true},
+    ollama:    {proxyPath: '/aiproxy/ollama/chat', get directUrl(){ return Ollama.userBaseUrl() + 'chat' }, keyless: true, requestId: true},
     OpenAi:    {proxyPath: '/aiproxy/openai',      directUrl: 'https://api.openai.com/v1/chat/completions', keyInputId: 'api-key-input', bearer: true},
-    custom:    {proxyPath: '/aiproxy/custom',      fromModelData: true, keyless: true, requestId: true},
+    custom:    {proxyPath: '/aiproxy/custom',      fromModelData: true, keyless: true, bearer: true, requestId: true},
     neurite:   {managed: true, keyless: true}
 }
 
@@ -312,22 +316,22 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
         };
     }
 
+    // A Custom model is its own endpoint and key, so with none chosen -- Custom left on
+    // "none" -- there is nowhere to send to. The direct route read the null and threw
+    // before the caller's try, so the send died with no error shown (measured: the call
+    // rejected with "Cannot read properties of null"); the proxy route posted anyway.
+    const modelData = route.fromModelData ? fetchCustomModelData(model) : null;
+    if (route.fromModelData && !modelData) {
+        alert("Add a Custom model first: + Custom, in the Ai panel.");
+        return null;
+    }
+
     if (useProxy) {
         // Use the AI proxy server
-        if (route.fromModelData) {
-            const apiDetails = fetchCustomModelData(model);
-            // On failure API_URL is deliberately left unset, so the request is not
-            // sent to a half-built target. Same as the old switch, which `break`ed
-            // before assigning it.
-            if (!apiDetails) {
-                Logger.err("Failed to fetch API details for the model:", model);
-            } else {
-                API_URL = Host.urlForPath(route.proxyPath);
-                apiEndpoint = apiDetails.apiEndpoint;
-                API_KEY = apiDetails.apiKey;
-            }
-        } else {
-            API_URL = Host.urlForPath(route.proxyPath);
+        API_URL = Host.urlForPath(route.proxyPath);
+        if (modelData) {
+            apiEndpoint = modelData.apiEndpoint;
+            API_KEY = modelData.apiKey;
         }
         Host.provideAPIKeys();
     } else {
@@ -336,10 +340,9 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
             alert(route.proxyOnly);
             return null;
         }
-        if (route.fromModelData) {
-            const apiDetails = fetchCustomModelData(model);
-            API_URL = apiDetails.apiEndpoint;
-            API_KEY = apiDetails.apiKey;
+        if (modelData) {
+            API_URL = modelData.apiEndpoint;
+            API_KEY = modelData.apiKey;
         } else {
             API_URL = route.directUrl;
             if (route.keyInputId) API_KEY = Elem.byId(route.keyInputId).value;
@@ -353,7 +356,7 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
 
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
-    if (!useProxy && route.bearer) {
+    if (!useProxy && route.bearer && API_KEY) {
         headers.append("Authorization", `Bearer ${API_KEY}`);
     }
 

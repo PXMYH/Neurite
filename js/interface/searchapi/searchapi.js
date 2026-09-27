@@ -2,14 +2,14 @@ async function generateKeywords(message, count, specificContext = null, node = n
     const lastPromptsAndResponses = specificContext || getLastPromptsAndResponses(2, 150);
     const isEmpty = !lastPromptsAndResponses || !/\S/.test(lastPromptsAndResponses);
 
-    if (isEmpty) {
-        return message
-            .split(' ')
-            .filter(word => word.trim().length > 0)
-            .sort((a, b) => b.length - a.length)
-            .slice(0, count)
-            .map(String.trim);
-    }
+    const longestWords = ()=>message
+        .split(' ')
+        .filter(word => word.trim().length > 0)
+        .sort((a, b) => b.length - a.length)
+        .slice(0, count)
+        .map(String.trim);
+
+    if (isEmpty) return longestWords();
 
     const aiCall = AiCall.single(node)
         .addSystemPrompt("Recent conversation:" + lastPromptsAndResponses)
@@ -17,19 +17,24 @@ async function generateKeywords(message, count, specificContext = null, node = n
         .addUserPrompt(message);
     aiCall.customTemperature = 0;
 
-    const response = aiCall.exec();
+    // Awaited. It was not, so the regex below read "[object Promise]", found no keyword,
+    // and from the second exchange on every send searched the notes for '' and Wikipedia
+    // for "undefined".
+    const response = await aiCall.exec();
 
     Logger.info("Generate Keywords Ai Response:", response);
 
     const regex = /"(.*?)"/g;
     const keywords = [];
     let match;
-    while (match = regex.exec(response)) {
+    while (match = regex.exec(response ?? '')) {
         keywords.push(match[1].trim());
     }
 
     Logger.info("Keywords:", keywords);
-    return keywords;
+    // No quoted keyword -- a call that failed, or answered in another shape -- falls back
+    // to the message's own longest words, as a first exchange does.
+    return keywords.length ? keywords : longestWords();
 }
 
 function isGoogleSearchEnabled(nodeIndex = null) {

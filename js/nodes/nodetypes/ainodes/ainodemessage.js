@@ -107,7 +107,10 @@
     const truncatedRecentContext = getLastPromptsAndResponses(2, 1500, node.aiResponseTextArea);
 
     if (Wikipedia.isEnabled(nodeIndex)) {
-        const arrKeywords = await generateKeywords(latestUserMessage, 3, node);
+        // The Node's own recent talk is the context, and the Node makes the call. `node` was
+        // passed as the context: the prompt read "Recent conversation:[object Object]" and
+        // the call went out under the global model.
+        const arrKeywords = await generateKeywords(latestUserMessage, 3, truncatedRecentContext, node);
         const strKeywords = arrKeywords.join(' ');
         const summaries = await Wikipedia.getSummaries([arrKeywords[0]]);
         aiCall.addSystemPrompt(Prompt.wikipedia(strKeywords, summaries));

@@ -46,18 +46,22 @@ test('a Wikipedia search that finds nothing returns nothing instead of throwing'
     assert.equal(shown.length, 0, 'nothing to display, and nothing displayed');
 });
 
-test('Wolfram with no gateway says so and lets the send go on', async ()=>{
+// `fetchWolfram` in a sandbox: `useProxy` is whether the gateway answered its health check,
+// and `fetch` is what the Wolfram route then does.
+function wolfram({useProxy, fetch}){
     const src = slice(read('js/interface/searchapi/wolframapi.js'), 'async function fetchWolfram(');
     const alerts = [];
+    let reformulations = 0;
     const ctx = vm.createContext({
+        useProxy, fetch,
+        wolframUnreachable: 'unreachable',
         Logger: logger,
         alert: (m)=> alerts.push(m),
-        fetch: ()=> Promise.reject(new TypeError('Failed to fetch')),
         Host: {urlForPath: (p)=> 'http://localhost:7070' + p},
         Elem: {byId: ()=> ({value: ''})},
         AiCall: {stream: ()=> {
             const call = {messages: [], addSystemPrompt(){ return call }, addUserPrompt(){ return call },
-                          exec: async ()=> 'Reformulated: "integral of x"'};
+                          exec: async ()=> { reformulations++; return 'Reformulated: "integral of x"' }};
             return call;
         }},
         Message: {system: (t)=> t},
@@ -67,7 +71,65 @@ test('Wolfram with no gateway says so and lets the send go on', async ()=>{
     });
     vm.runInContext(src + ';globalThis.fetchWolfram = fetchWolfram;', ctx);
     const node = {aiResponseDiv: {innerHTML: ''}};
-    const result = await ctx.fetchWolfram('integrate x', true, node, 'earlier talk');
-    assert.equal(result, undefined, 'no Wolfram data, and no throw');
-    assert.equal(alerts.length, 1, 'the reader is told what to check');
+    return {
+        call: ()=> ctx.fetchWolfram('integrate x', true, node, 'earlier talk'),
+        alerts, reformulations: ()=> reformulations,
+    };
+}
+
+// With no gateway the Wolfram query can never be sent, so the AI round trip that
+// reformulates it was paid for nothing -- on every send, and every pass of auto mode.
+test('Wolfram with no gateway says so, spends no AI call, and lets the send go on', async ()=>{
+    const w = wolfram({useProxy: false, fetch: ()=> assert.fail('nothing to fetch from')});
+    assert.equal(await w.call(), undefined, 'no Wolfram data, and no throw');
+    assert.equal(w.alerts.length, 1, 'the reader is told what to check');
+    assert.equal(w.reformulations(), 0, 'no reformulation for a query nobody can send');
+});
+
+test('Wolfram with the gateway gone mid-session says so and lets the send go on', async ()=>{
+    const w = wolfram({useProxy: true, fetch: ()=> Promise.reject(new TypeError('Failed to fetch'))});
+    assert.equal(await w.call(), undefined);
+    assert.equal(w.alerts.length, 1);
+});
+
+// A gateway without the Wolfram route answers with an HTML 404, and `response.json()` on
+// that threw out of the AI send.
+test('Wolfram answered with a page that is not JSON lets the send go on', async ()=>{
+    const html = async ()=> { throw new SyntaxError('Unexpected token <') };
+    for (const ok of [false, true]) {
+        const w = wolfram({useProxy: true, fetch: async ()=> ({ok, json: html})});
+        assert.equal(await w.call(), undefined, `ok=${ok}: no data, and no throw`);
+    }
+});
+
+// The keywords every send searches the notes with, and Wikipedia when it is on. The AI
+// call was not awaited, so from the second exchange on the regex read "[object Promise]":
+// the notes were searched for '' and Wikipedia for "undefined".
+function keywords(answer, context = 'earlier talk'){
+    const src = slice(read('js/interface/searchapi/searchapi.js'), 'async function generateKeywords(');
+    const ctx = vm.createContext({
+        Logger: logger,
+        getLastPromptsAndResponses: ()=> context,
+        AiCall: {single: ()=> {
+            const call = {addSystemPrompt(){ return call }, addUserPrompt(){ return call },
+                          exec: ()=> new Promise( (resolve)=> setTimeout(resolve, 5, answer) )};
+            return call;
+        }},
+        setTimeout,
+    });
+    vm.runInContext('String.trim = (s)=> s.trim();' + src + ';globalThis.generateKeywords = generateKeywords;', ctx);
+    return ctx.generateKeywords('how deep does the mandelbrot zoom go', 3);
+}
+
+test('keywords come from the AI answer once there is a conversation', async ()=>{
+    assert.deepEqual(Array.from(await keywords('"fractal", "zoom", "depth"')), ['fractal', 'zoom', 'depth']);
+});
+
+test('keywords fall back to the longest words when the AI gives none', async ()=>{
+    // A failed call answers undefined; so does one with no quotes in it.
+    for (const answer of [undefined, 'no quotes here']) {
+        assert.deepEqual(Array.from(await keywords(answer)), ['mandelbrot', 'deep', 'does']);
+    }
+    assert.deepEqual(Array.from(await keywords('unused', '')), ['mandelbrot', 'deep', 'does'],
+        'and a first exchange, with no conversation yet, never asks');
 });

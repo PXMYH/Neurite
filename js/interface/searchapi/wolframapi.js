@@ -6,7 +6,17 @@ const wolframMessage = `Based off the user message, arrive at a valid query to W
 
 let wolframCallCounter = 0;
 
+const wolframUnreachable = "Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai tab. Localhosts can be found at the Github link in the ? tab.";
+
 async function fetchWolfram(message, isAINode = false, node = null, wolframContext = "") {
+    // Only the localhost gateway answers Wolfram. Without it, the reformulation below is
+    // an AI round trip for a query nobody can send -- paid on every send, and on every
+    // pass of auto mode, before the fetch failed anyway.
+    if (!useProxy) {
+        alert(wolframUnreachable);
+        return;
+    }
+
     let wolframAlphaResult = "not-enabled";
     let wolframAlphaTextResult = "";
 
@@ -84,21 +94,23 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
         });
     } catch (err) {
         Logger.err("Wolfram Alpha request failed:", err);
-        alert("Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai tab. Localhosts can be found at the Github link in the ? tab.");
+        alert(wolframUnreachable);
         return;
     }
 
+    // Either body can be something other than JSON -- a gateway without the Wolfram
+    // route answers with an HTML 404 -- and a throw here aborted the AI send.
     if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch( ()=>({}) );
         Logger.err("With Wolfram Alpha API call:", errorData.error);
         Logger.err("Full error object:", errorData);
         alert("An error occurred when making a request the Wolfram Alpha. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai tab. Localhosts can be found at the Github link in the ? tab.");
         return;
     }
 
-    const data = await response.json();
+    const data = await response.json().catch( ()=>null );
     Logger.info("Wolfram Alpha data:", data); // Debugging data object
-    if (!data.pods) return;
+    if (!data?.pods) return;
 
     const table = Html.new.table();
     table.style = "width: 100%; border-collapse: collapse;";

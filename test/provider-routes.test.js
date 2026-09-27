@@ -27,6 +27,11 @@ const INPUT_VALUES = {
 };
 
 const CUSTOM_MODEL = 'my-custom-model';
+// A Custom model the reader added with no key: a local server that wants none.
+const KEYLESS_MODEL = 'my-keyless-model';
+// The reader's own Ollama, set in the Ollama manager. Not 127.0.0.1, so a route that
+// ignores it and posts to a fixed loopback cannot pass.
+const OLLAMA_BASE = 'http://ollama.lan:11434/api/';
 
 // Loads handleapikeys.js and returns its getAPIParams plus whatever it tried to
 // tell the user. `useProxy` is a module-level `let` in globals.js, so the sandbox
@@ -41,7 +46,8 @@ function loadRouting(useProxy){
             id: id || 'inference-select-0',
             value: INPUT_VALUES[id] ?? 'OpenAi',
             options: id === 'custom-model-select'
-                ? [{text: CUSTOM_MODEL, dataset: {endpoint: 'https://custom.example/v1', key: 'CUSTOM-KEY'}}]
+                ? [{text: CUSTOM_MODEL, dataset: {endpoint: 'https://custom.example/v1', key: 'CUSTOM-KEY'}},
+                   {text: KEYLESS_MODEL, dataset: {endpoint: 'http://keyless.example/v1'}}]
                 : [],
             style: {}, dataset: {}, classList: {add(){}, remove(){}, contains: ()=> false},
             addEventListener(){}, appendChild(){}, querySelectorAll: ()=> [],
@@ -65,8 +71,9 @@ function loadRouting(useProxy){
         Host: {urlForPath: (path)=> 'https://proxy.test' + path, checkServer: {ct: class {}}},
         Ai: {determineModel: ()=> ({providerId: 'OpenAi', model: 'gpt-4'})},
         Providers: {},
-        // The file replaces Host.provideAPIKeys with the real one, which reads this.
-        Ollama: {userBaseUrl: ()=> 'http://127.0.0.1:11434'},
+        // Read by the direct Ollama route, and by the real Host.provideAPIKeys the file
+        // puts in place of this stub's.
+        Ollama: {userBaseUrl: ()=> OLLAMA_BASE},
         localStorage: {getItem: ()=> null, setItem(){}},
         document: {getElementById: ()=> element('model-temperature'), body: {style: {}}}
     });
@@ -127,7 +134,8 @@ test('the direct route sends each provider to its own host', ()=>{
 
     assert.equal(route('OpenAi').API_URL, 'https://api.openai.com/v1/chat/completions');
     assert.equal(route('GROQ').API_URL, 'https://api.groq.com/openai/v1/chat/completions');
-    assert.equal(route('ollama').API_URL, 'http://127.0.0.1:11434/api/chat');
+    // The reader's own Ollama, not a loopback: on an iPad, 127.0.0.1 is the iPad.
+    assert.equal(route('ollama').API_URL, OLLAMA_BASE + 'chat');
     assert.equal(route('custom', CUSTOM_MODEL).API_URL, 'https://custom.example/v1');
 
     // Anthropic has no direct route. It must say so and send nothing, rather than
@@ -163,8 +171,33 @@ test('a Bearer header goes only to the providers whose key was read', ()=>{
             assert.equal(auth, null, `${providerId} attached a Bearer header it has no key for`);
             continue;
         }
-        assert.equal(auth, `Bearer ${INPUT_VALUES[descriptor.keyInputId]}`,
+        // Its own key: the input a provider owns, or the Custom model's own option.
+        const own = descriptor.fromModelData ? 'CUSTOM-KEY' : INPUT_VALUES[descriptor.keyInputId];
+        assert.equal(auth, `Bearer ${own}`,
             `${providerId} sent a key that is not the one its own input holds`);
+    }
+});
+
+// The direct Custom route dropped the Custom model's key from the headers and the body
+// both, so an endpoint that wants one answered 401. The proxy sends it as a Bearer, so the
+// direct route now does the same -- and only when the reader gave one.
+test("a Custom model's key reaches its endpoint directly, and a keyless one sends none", ()=>{
+    const { route } = loadRouting(false);
+
+    assert.equal(route('custom', CUSTOM_MODEL).headers.get('Authorization'), 'Bearer CUSTOM-KEY');
+    const keyless = route('custom', KEYLESS_MODEL);
+    assert.equal(keyless.API_URL, 'http://keyless.example/v1');
+    assert.equal(keyless.headers.get('Authorization'), null, 'no key, no header -- not "Bearer undefined"');
+});
+
+// Custom left on "none" names no model with an endpoint. The direct route read the null
+// lookup and threw before the caller's try, so the send died with no error shown.
+test('Custom with no model is refused with a reason, on both routes', ()=>{
+    for (const useProxy of [true, false]) {
+        const { route, alerts } = loadRouting(useProxy);
+        assert.equal(route('custom', 'none'), null, `useProxy=${useProxy}: nothing to send to`);
+        assert.ok(alerts.some( (a)=> a.includes('+ Custom') ),
+            `useProxy=${useProxy}: the reader has to be told how to add one`);
     }
 });
 
