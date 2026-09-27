@@ -89,6 +89,44 @@ test('a new note stays where it was placed', async () => {
     assert.ok(moved < 1e-9, `drifted ${moved.toExponential(2)} plane units in 2.5s`);
 });
 
+// #45 ruled snapping out, and this is the escape hatch it asked for instead: a reader places
+// a Node exactly where they want it, and it stays -- after the release, while the Fractal
+// pulls at everything unpinned, and after a reload.
+test('a dragged note stays where it was dropped, and there after a reload', async () => {
+    const uuid = await addNote(page, 'Dropped', 'body');
+    await page.waitForTimeout(600);
+    const r = await page.evaluate((id) => {
+        const b = Graph.nodes[id].view.div.getBoundingClientRect();
+        return { x: b.x + b.width / 2, y: b.y + 3 };
+    }, uuid);
+    await page.mouse.move(r.x, r.y);
+    await page.mouse.down();
+    await page.mouse.move(r.x + 180, r.y + 90, { steps: 12 });
+    await page.mouse.up();
+    const pos = () => page.evaluate((id) => {
+        const n = Graph.nodes[id];
+        return { x: n.pos.x, y: n.pos.y, pinned: n.anchorForce === 1, pinHere: n.anchor.minus(n.pos).mag() < 1e-12 };
+    }, uuid);
+    const dropped = await pos();
+    assert.ok(dropped.pinned && dropped.pinHere, 'the drop left the note unpinned, or its pin behind');
+
+    await page.waitForTimeout(2000);
+    const later = await pos();
+    assert.ok(Math.hypot(later.x - dropped.x, later.y - dropped.y) < 1e-9, 'the note moved after it was dropped');
+
+    await page.evaluate(() => App.viewGraphs.saveNow());
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
+    await page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.getTitle() === 'Dropped'), undefined, { timeout: 15000 });
+    await page.waitForTimeout(800);
+    const restored = await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).find((x) => x.getTitle() === 'Dropped');
+        return { x: n.pos.x, y: n.pos.y };
+    });
+    assert.ok(Math.hypot(restored.x - dropped.x, restored.y - dropped.y) < 1e-9,
+        `the note came back somewhere else: ${JSON.stringify({ dropped, restored })}`);
+});
+
 // The legibility assertion, written against what reaches the screen rather than
 // against the stylesheet: a card is drawn through `transform: scale()`, so a 15px
 // declaration rendered at 7.5px while the multiplier was 0.5 and the CSS looked
