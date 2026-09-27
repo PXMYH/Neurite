@@ -2658,7 +2658,7 @@ input[type="checkbox"] {
     /* The same for the height and the bottom handle: 124px from the window's top to the
        pane, 37px from the pane to the menu's bottom edge, and 16px to spare. A pane made
        700px tall kept its height in a 600px window, its handle at y=814. */
-    max-height: calc(100vh - 177px);
+    max-height: calc(100dvh - 177px);
     height: 60vh;
     width: 270px;
 }
