@@ -235,3 +235,15 @@ test('the gateway is asked again at most once in 5 s, and found up it stays up',
     assert.equal(await sandbox.Host.recheck(), true);
     assert.equal(asked, 2, 'found up, it is not asked again');
 });
+
+// Wolfram and the file tree can ask at once. The second used to get `false` while the first
+// look was still out; it waits for that look instead.
+test('two callers at once share one look at the gateway', async ()=>{
+    const { sandbox } = loadRouting(false);
+    let asked = 0;
+    sandbox.Request.send = async ()=> { asked++; return {ok: true} };
+
+    const answers = await Promise.all([sandbox.Host.recheck(), sandbox.Host.recheck()]);
+    assert.deepEqual(answers, [true, true]);
+    assert.equal(asked, 1);
+});

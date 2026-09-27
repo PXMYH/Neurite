@@ -104,7 +104,8 @@ class FileTree {
 
     // Load the directory contents and display them
     async loadDirectory(path, parentElement) {
-        if (!useProxy) {
+        // Asked again, not read from boot: servers started since are found (Host.recheck).
+        if (!(await Host.recheck())) {
             const errorElement = Html.new.p();
 
             // Set innerHTML so we can use <br> for line breaks

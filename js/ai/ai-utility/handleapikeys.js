@@ -225,18 +225,26 @@ Host.checkServer.ct = class {
     onSuccess(){ return "Connected to Localhost Servers" }
     onFailure(){ return "Not connected to Localhost Servers" }
 }
-// `useProxy` is the gateway as `checkServer` found it at boot. A feature that needs the
-// gateway asks again through this before it says the gateway is not there -- at most once
-// in 5 s, since with no gateway each look is a refused request and two console errors.
-// Found up, it is up for everything: every reader of `useProxy` reads it when it runs.
-Host.recheck = async function(){
-    if (useProxy || Date.now() - Host.recheck.at < 5000) return useProxy;
+// `useProxy` is the gateway as `checkServer` found it at boot. Wolfram and the file tree,
+// which cannot work without the gateway, ask again through this before they say it is not
+// there -- at most once in 5 s, since with no gateway each look is a refused request and
+// two console errors, and a caller that arrives while a look is out waits for it. Found
+// up, it is up for everything: every reader of `useProxy` reads it when it runs.
+Host.recheck = function(){
+    if (useProxy) return Promise.resolve(true);
+    if (Host.recheck.pending) return Host.recheck.pending;
+    if (Date.now() - Host.recheck.at < 5000) return Promise.resolve(false);
 
     Host.recheck.at = Date.now();
-    if (await Request.send(new Host.checkServer.ct())) useProxy = true;
-    return useProxy;
+    return Host.recheck.pending = Request.send(new Host.checkServer.ct())
+        .then( (res)=>{
+            if (res) useProxy = true;
+            return Boolean(useProxy);
+        })
+        .finally( ()=>{ Host.recheck.pending = null } );
 }
 Host.recheck.at = -Infinity;
+Host.recheck.pending = null;
 
 Host.provideAPIKeys = async function(){
     await Request.send(new Host.provideAPIKeys.ct())
