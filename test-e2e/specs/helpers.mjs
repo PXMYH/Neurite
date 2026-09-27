@@ -104,8 +104,12 @@ export async function deleteViaCard(page, uuid) {
 // Delete through the context menu's Delete entry, via the same NodeActions
 // instance the menu builds. The class is chosen per node type, which is the point
 // of covering this path separately from the card button.
+// The menu's Delete asks first, as the card's does, so it is answered here too.
 export async function deleteViaMenu(page, uuid) {
-    await page.evaluate((id) => { NodeActions.forNode(Graph.nodes[id]).delete(); }, uuid);
+    await page.evaluate((id) => {
+        window.confirm = async () => true;
+        NodeActions.forNode(Graph.nodes[id]).delete();
+    }, uuid);
     await page.waitForFunction((id) => !(id in Graph.nodes), uuid, { timeout: 5000 });
 }
 

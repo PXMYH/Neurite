@@ -54,7 +54,7 @@ class NodeMode {
     }
     // Escape is the outermost layer: an open modal or menu takes it first. Past them it
     // drops an armed link, which otherwise waited for any later click on a Node with no
-    // time limit, and turns off a Connect tool that was clicked on.
+    // time limit, turns off a Connect tool that was clicked on, and clears the selection.
     onEscape = (e)=>{
         if (e.key !== 'Escape') return;
 
@@ -63,6 +63,7 @@ class NodeMode {
 
         Node.prev = null;
         if (this.locked) this.setLocked(false);
+        App.selectedNodes.clear();
     }
     onKeyUp = (e)=>{
         if (!this.skipCapsLockState(e)) return;

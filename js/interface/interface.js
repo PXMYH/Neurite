@@ -232,6 +232,7 @@ class Interface {
             Autopilot.stop();
             Graph.mouseDownPos_setXY();
             this.isMousePanning = true;
+            this.panFrom = {x: e.clientX, y: e.clientY};
             e.preventDefault();
         }
 
@@ -255,6 +256,12 @@ class Interface {
         }
         if (e.button === this.mousePanButton && this.isMousePanning) {
             this.isMousePanning = false;
+            // A press and a release in one place on bare canvas -- a click, not a pan --
+            // clears the selection, as the Help panel said it did. `Mod` and a drag is the
+            // box, which clears its own.
+            const from = this.panFrom;
+            const still = from && Math.hypot(e.clientX - from.x, e.clientY - from.y) <= EdgeView.clickSlop;
+            if (still && !Mod.isHeld(e)) App.selectedNodes.clear();
         }
 
         // Handle context menu opening

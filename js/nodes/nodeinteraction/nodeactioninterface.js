@@ -158,9 +158,17 @@ NodeActions.base = class BaseNodeActions {
         this.applyActionToSelectedNodes(Node.toggleCollapse)
     }
     toggleAutomata(){ App.cellularAutomata.toggle() }
-    delete() {
-        this.applyActionToSelectedNodes(deleteNodeAndItsZetText);
+    // Asked first, as the card's own × asks: there is no undo, and on a selected Node this
+    // deletes the whole selection -- measured, two Nodes gone from one click, unasked.
+    async delete() {
         App.menuContext.hide();
+        const count = (App.selectedNodes.hasNode(this.node) ? App.selectedNodes.uuids.size : 1);
+        const named = this.node.getTitle()?.trim();
+        const question = (count > 1) ? `Delete the ${count} selected nodes?`
+                       : `Delete ${named ? `"${named}"` : 'this note'}?`;
+        if (!await window.confirm(question)) return;
+
+        this.applyActionToSelectedNodes(deleteNodeAndItsZetText);
     }
     spawnNode(){ spawnZettelkastenNode(this.node) }
     moveNode(directionOrAngle, forceMagnitude = 0.01) {

@@ -49,6 +49,88 @@ async function boxAll(page, key) {
     await page.keyboard.up(key);
 }
 
+// The key this page selects with.
+const modKey = (page) => page.evaluate(() => (Mod.isCommand ? 'Meta' : 'Control'));
+
+// A point on bare canvas, found rather than assumed.
+async function bareCanvas(page) {
+    const p = await page.evaluate(() => {
+        for (let y = 140; y < innerHeight - 140; y += 40) {
+            for (let x = 140; x < innerWidth - 140; x += 40) {
+                if (document.elementFromPoint(x, y)?.id === 'svg_bg') return { x, y };
+            }
+        }
+        return null;
+    });
+    assert.ok(p, 'no bare canvas to press on');
+    return p;
+}
+
+test('a click on bare canvas and Escape each clear the selection, and a pan does not', async () => {
+    // The Help panel said a click on empty space cleared it; nothing did, and nor did
+    // Escape, while the arrows, f and d, and the menu's Delete act on all of it.
+    ({ context, page } = await openNeurite(browser));
+    const [a, b] = await threeNotes(page);
+    const key = await modKey(page);
+    const selectTwo = async () => { await clickCard(page, a, key); await clickCard(page, b, key); };
+
+    await selectTwo();
+    assert.deepEqual(await selected(page), ['Alpha', 'Beta']);
+    const p = await bareCanvas(page);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.mouse.move(p.x + 120, p.y + 40, { steps: 6 });
+    await page.mouse.up();
+    assert.deepEqual(await selected(page), ['Alpha', 'Beta'], 'a pan cleared the selection');
+
+    const q = await bareCanvas(page);
+    await page.mouse.click(q.x, q.y);
+    assert.deepEqual(await selected(page), [], 'a click on bare canvas left the selection');
+
+    await selectTwo();
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await selected(page), [], 'Escape left the selection');
+});
+
+test('the panel at the bottom left counts the selection', async () => {
+    ({ context, page } = await openNeurite(browser));
+    const [a, b] = await threeNotes(page);
+    const key = await modKey(page);
+    const count = () => page.evaluate(() => document.querySelector('.hud-count').textContent);
+    await page.waitForFunction(() => document.querySelector('.hud-count').textContent === '3 notes');
+    await clickCard(page, a, key);
+    await clickCard(page, b, key);
+    await page.waitForFunction(() => document.querySelector('.hud-count').textContent !== '3 notes');
+    assert.equal(await count(), '2 of 3 selected');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('.hud-count').textContent === '3 notes');
+});
+
+test("Delete in a selected Node's menu asks first, and says how many", async () => {
+    // It deleted every Node in the selection at one click, unasked, with no undo.
+    ({ context, page } = await openNeurite(browser));
+    const [a, b] = await threeNotes(page);
+    const key = await modKey(page);
+    await clickCard(page, a, key);
+    await clickCard(page, b, key);
+
+    // Not awaited in the page: the action waits on the question this test answers.
+    const askDelete = async () => {
+        await page.evaluate((id) => { App.menuContext.runAction('delete', NodeActions.forNode(Graph.nodes[id])); }, a);
+        await page.waitForFunction(() => Modal.current?.id === 'confirmModal');
+        return page.evaluate(() => document.querySelector('.modal-content .confirm-message').textContent);
+    };
+    assert.equal(await askDelete(), 'Delete the 2 selected nodes?');
+    await page.click('.modal-content .modal-cancel');
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => Object.keys(Graph.nodes).length), 3, 'No deleted something');
+
+    await askDelete();
+    await page.click('.modal-content .modal-ok');
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 1, undefined, { timeout: 5000 });
+    assert.deepEqual(await page.evaluate(() => Object.values(Graph.nodes).map((n) => n.getTitle())), ['Gamma']);
+});
+
 for (const [platform, key, other, label] of [['MacIntel', 'Meta', 'Control', 'Cmd'], ['Win32', 'Control', 'Meta', 'Ctrl']]) {
     test(`on ${platform}, ${label} + click and ${label} + drag select, and the Help says ${label}`, async () => {
         // On a Mac, Control and a click is the secondary click: Blink and WebKit fire

@@ -148,7 +148,12 @@ class Hud {
         // of the view: smaller view, bigger number.
         const mag = 1 / Math.max(Graph.zoom.mag(), Number.MIN_VALUE);
         Hud.elemScale.innerHTML = '&times;' + Hud.formatMag(mag);
-        Hud.elemCount.textContent = frame.count === 1 ? '1 note' : frame.count + ' notes';
+        // A selection says it is there. Nothing did, and the arrows, f and d, a group drag and
+        // the menu's Delete all act on every Node in it.
+        const selected = App.selectedNodes.uuids.size;
+        Hud.elemCount.textContent = selected ? `${selected} of ${frame.count} selected`
+                                  : (frame.count === 1 ? '1 note' : frame.count + ' notes');
+        Hud.elemCount.title = selected ? 'Esc, or a click on bare canvas, clears the selection' : '';
 
         if (Hud.hint) Hud.hint.classList.toggle('is-hidden', frame.count > 0);
     }
