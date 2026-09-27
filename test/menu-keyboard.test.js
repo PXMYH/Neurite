@@ -231,40 +231,81 @@ test('Escape leaves by the same two steps it came in', ()=>{
         'Escape pulls focus to the hamburger unconditionally, so it takes the caret out '
         + 'of whatever the reader was typing in');
 
-    // The whole condition, compared as one string rather than matched as a prefix.
-    // `assert.match` on the opening clauses cannot tell this expression from the same
-    // expression widened by `|| true`, and that mutation makes the refocus unconditional
-    // -- byte-for-byte the caret theft above. Measured: it passed all 121 tests. This is
-    // the third time a substring match has lied in this file, after `Modal.current` and
-    // `button:focus-visible`, so the shape here is an equality that runs to the `;`.
-    //
-    // Every clause is load-bearing and each names a measured state:
-    // `!active` and `documentElement` -- no element holds focus, so none is lost.
-    // `document.body` -- a click on the canvas or on the panel's own chrome parks focus
-    // there; treating it as a caret leaves a keyboard reader seven Tabs from the
-    // hamburger, or eight from inside the panel.
-    // `contains(active)` -- focus in the menu is about to be made inert.
+    // The condition is one shared predicate, `MainMenu.noFocusToLose()`, asked by both
+    // ways out of a view (#67: the panel branch had none, and stepping back from a panel
+    // took the caret out of a note's title). Here the handler must ask it, once, as one
+    // declaration: `indexOf` finds the first, so a decoy declaration later in the handler
+    // would decide the refocus while this read the other one -- measured, a byte-identical
+    // decoy in an `if (0) {}` plus `const noFocusToLose = true;` passed every test.
     const iDecl = body.indexOf('const noFocusToLose =');
     assert.notEqual(iDecl, -1,
         'the refocus is no longer decided by a `noFocusToLose` declaration, so the '
-        + 'assertion below reads nothing');
+        + 'assertions below read nothing');
+    assert.equal((body.match(/const noFocusToLose =/g) || []).length, 1,
+        'more than one `noFocusToLose` is declared in the Escape handler');
     const decl = body.slice(iDecl, body.indexOf(';', iDecl) + 1).replace(/\s+/g, ' ');
-    assert.equal(decl,
-        'const noFocusToLose = !active || active === document.body '
+    assert.equal(decl, 'const noFocusToLose = MainMenu.noFocusToLose();',
+        'the close path decides the refocus with something other than the shared predicate');
+
+    // Read before the click, or the answer is always `false`: by then the panel is inert
+    // and the browser has already moved focus out of it.
+    assert.ok(iDecl < iClose,
+        'the focus test is read after `menuButton.click()`, where the panel is already '
+        + 'inert and focus has already left it, so it answers false every time and the '
+        + 'refocus never happens at all');
+
+    // An Escape something inside already answered is theirs: CodeMirror handles Escape in
+    // the notes editor, which lives in this menu, and stepping the menu on top of that
+    // took the caret out of the editor. Before the panel branch, or the panel still steps.
+    const iHandled = body.search(/if \(e\.defaultPrevented\) return/);
+    assert.notEqual(iHandled, -1,
+        'Escape steps the menu even when the notes editor already handled it');
+    assert.ok(iHandled < iDetail,
+        'the handled-Escape guard sits after the panel branch, so Escape in the notes '
+        + 'editor still steps the panel back to the list');
+});
+
+// The predicate itself: the whole condition, compared as one string rather than matched
+// as a prefix. `assert.match` on the opening clauses cannot tell this expression from the
+// same expression widened by `|| true`, and that mutation makes the refocus unconditional
+// -- byte-for-byte the caret theft. Measured: it passed all 121 tests. This is the third
+// time a substring match has lied in this file, after `Modal.current` and
+// `button:focus-visible`, so the shape here is an equality that runs to the `;`.
+//
+// Every clause is load-bearing and each names a measured state:
+// `!active` and `documentElement` -- no element holds focus, so none is lost.
+// `document.body` -- a click on the canvas or on the panel's own chrome parks focus there;
+// treating it as a caret leaves a keyboard reader seven Tabs from the hamburger, or eight
+// from inside the panel.
+// `contains(active)` -- focus in the menu is about to be made inert.
+test('both ways out of a view ask one focus predicate', ()=>{
+    assert.equal((jsCode.match(/\n    noFocusToLose\(\)\{/g) || []).length, 1,
+        '`MainMenu.noFocusToLose` is not defined exactly once');
+    const iMethod = jsCode.indexOf('\n    noFocusToLose(){');
+    const iShowList = jsCode.indexOf('\n    showList(');
+    assert.ok(iMethod < iShowList,
+        'the predicate sits below `showList`, inside the slice other tests read as its body');
+
+    const method = jsCode.slice(iMethod, jsCode.indexOf('\n    },', iMethod));
+    assert.match(method, /const active = document\.activeElement;/,
+        '`active` is not read from `document.activeElement`, so the condition may be asking '
+        + 'about something else entirely');
+    const iReturn = method.indexOf('return ');
+    const ret = method.slice(iReturn, method.indexOf(';', iReturn) + 1).replace(/\s+/g, ' ');
+    assert.equal(ret,
+        'return !active || active === document.body '
         + '|| active === document.documentElement || dropdownContent.contains(active);',
         'the focus condition is not the four clauses it was measured as. A dropped clause '
         + 'and an added one both land here: `|| true` makes the refocus unconditional, '
         + 'and dropping `document.body` strands a reader who clicked the canvas');
 
-    // Read before the click, or the answer is always `false`: by then the panel is inert
-    // and the browser has already moved focus out of it.
-    assert.match(body, /const active = document\.activeElement;/,
-        '`active` is not read from `document.activeElement`, so the condition above may '
-        + 'be asking about something else entirely');
-    assert.ok(iDecl < iClose,
-        'the focus test is read after `menuButton.click()`, where the panel is already '
-        + 'inert and focus has already left it, so it answers false every time and the '
-        + 'refocus never happens at all');
+    // And the panel path asks it, after the guard that the menu-open path returns at.
+    const showList = jsCode.slice(iShowList, jsCode.indexOf('\n    showDetail(', iShowList));
+    const iGuard = showList.indexOf('if (!e) return');
+    const iAsk = showList.indexOf('if (MainMenu.noFocusToLose())');
+    assert.ok(iGuard !== -1 && iAsk > iGuard,
+        'stepping back from a panel moves focus to the row without asking whether a caret '
+        + 'outside the menu would be lost');
 });
 
 test('every menu row is a button that says what it does', ()=>{

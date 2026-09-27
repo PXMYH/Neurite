@@ -100,6 +100,46 @@ const MainMenu = {
     // menu-open path, where taking focus off the menu button on every click would be
     // wrong, and the AI-features toggle, where focus is on a checkbox outside the
     // menu that is not going anywhere.
+    // Whether moving focus onto the menu costs the reader nothing, which is two cases and
+    // not one. Asked by both ways out of a view -- the panel stepping back to the list,
+    // and the list closing -- because a caret outside the menu is an edit in progress
+    // either way. It lived in the close path only, so stepping back from a panel took
+    // the caret out of a note's title (#67): measured, caret at offset 3 in a
+    // `.title-input`, and Escape from the Ai panel left focus on `#tablink-ai`.
+    //
+    // Focus inside the menu is the obvious case: it is about to be made inert, so it has
+    // to go somewhere and the menu is where it came from. Focus *outside* the menu is a
+    // caret, and pulling it here destroys an edit in progress. Measured with an
+    // unconditional `menuButton.focus()`: caret at offset 3 in a note's `.title-input`,
+    // a real 198x20 field, and Escape moved focus to the hamburger. The text survived;
+    // the caret did not, and the reader has to click back into the node.
+    //
+    // `<body>` is neither, and it is the ordinary state rather than a corner: any click
+    // that lands on something taking no focus parks focus there. That includes the
+    // canvas, which is the whole reason the menu stays open -- measured, a real click at
+    // (900,500) hits `svg#svg_bg` and leaves `document.activeElement` at `BODY#body` --
+    // and the panel's own chrome, where the nav's 4px padding is not focusable. Reading
+    // `<body>` as a caret to protect reinstates exactly the exile the refocus exists to
+    // prevent: Tab from a clean `<body>` reaches the hamburger on press seven, and eight
+    // from a click inside the panel, because that click set the sequential-focus start
+    // point inside a subtree Escape has just made inert and the first Tab is swallowed.
+    // A focused field is never `document.body`, so this cannot bring the caret theft
+    // back. `documentElement` and a null `activeElement` are the same argument.
+    //
+    // The hamburger itself is the panel's sibling rather than its descendant, so a
+    // reader who opened the menu with Enter and never left the button reads `false` on
+    // the `contains` clause. That looks like the defect this exists to fix and is not
+    // one: focus never went anywhere. Measured -- Enter, then Escape: menu closed,
+    // `aria-expanded="false"`, `inert` true, focus still on the hamburger.
+    //
+    // It reads `dropdownContent`, a `const` declared further down this file: safe, since
+    // nothing asks this before the page has loaded.
+    noFocusToLose(){
+        const active = document.activeElement;
+        return !active || active === document.body
+            || active === document.documentElement || dropdownContent.contains(active);
+    },
+
     showList(e){
         // Above the guard, never below it: this line is the only one every caller
         // needs. Below it, opening the menu leaves `detail-open` set and the menu
@@ -115,7 +155,12 @@ const MainMenu = {
         // `activeTab`, so the fallback could only ever fire if it were wrong, and
         // what it resolved to was `#open-file-button`, where Space opens a file
         // dialog. Deleted rather than corrected.
-        MainMenu.div.querySelector('.menu-row.activeTab')?.focus();
+        //
+        // Read after the class change and still right: focus inside the panel either
+        // still names the old element, because the browser's reset is async, or has
+        // fallen to `<body>` -- both answer true, and moving to the row is right for
+        // both. Only a caret outside the menu answers false.
+        if (MainMenu.noFocusToLose()) MainMenu.div.querySelector('.menu-row.activeTab')?.focus();
     },
 
     // The heading is the row's own label, so a row and the panel it opens cannot
@@ -200,11 +245,11 @@ On.click(menuButton, (e)=>{
 
     if (isOpen) {
         // The list, every time. Opening straight into a panel meant choosing one that
-        // is visible, and there is no longer a row that always is: Notes was, and has
-        // none any more (issue #65), while `body.ai-disabled` hides Ai and `#tab4`
-        // with `!important` for as long as AI features are off -- which is until
-        // someone switches them on. That opened the menu as an empty 214x48 box. The
-        // list is the answer rather than a better guess: it holds no panel to hide.
+        // is visible, and `body.ai-disabled` hides Ai and `#tab4` with `!important`
+        // for as long as AI features are off -- which is until someone switches them
+        // on. That opened the menu as an empty 214x48 box, back when Notes had no row
+        // to fall back on. The list is the answer rather than a better guess: it holds
+        // no panel to hide.
         //
         // The loop that stood here removed a class nobody adds (`active`, where `openTab`
         // writes `activeTab`) and hid `tabcontent[i]` for as many i as there are
@@ -243,46 +288,22 @@ On.click(menuButton, (e)=>{
 // clears it. The other two Escape consumers need no guard -- `CustomDropdown` calls
 // `stopPropagation` while its list is open, so this never sees that key, and
 // `NodeMode`'s Escape only stops nodes following the mouse.
+// An Escape that something inside already answered is theirs, not the menu's. The
+// notes editor lives in this menu now, and CodeMirror handles Escape itself -- its
+// keymap clears a multiple selection and closes its own dialogs -- marking the event
+// handled on the way. Stepping the menu on top of that took the caret out of the editor.
 On.keydown(document, (e)=>{
     if (e.key !== 'Escape' || !dropdownContent.classList.contains('open')) return;
     if (Modal.current) return;
+    if (e.defaultPrevented) return;
 
     if (MainMenu.div.classList.contains('detail-open')) return MainMenu.showList(e);
 
-    // Take the hamburger only when the reader loses nothing by it, which is two cases
-    // and not one.
-    //
-    // Focus inside the menu is the obvious one: it is about to be made inert, so it has
-    // to go somewhere and the hamburger is where the menu came from. Focus *outside* the
-    // menu is a caret, and pulling it here destroys an edit in progress. Measured with
-    // an unconditional `menuButton.focus()`: caret at offset 3 in a note's
-    // `.title-input`, a real 198x20 field, and Escape moved focus to the hamburger. The
-    // text survived; the caret did not, and the reader has to click back into the node.
-    //
-    // `<body>` is neither, and it is the ordinary state rather than a corner: any click
-    // that lands on something taking no focus parks focus there. That includes the
-    // canvas, which is the whole reason the menu stays open -- measured, a real click at
-    // (900,500) hits `svg#svg_bg` and leaves `document.activeElement` at `BODY#body` --
-    // and the panel's own chrome, where the nav's 4px padding is not focusable. Reading
-    // `<body>` as a caret to protect reinstates exactly the exile the refocus exists to
-    // prevent: Tab from a clean `<body>` reaches the hamburger on press seven, and eight
-    // from a click inside the panel, because that click set the sequential-focus start
-    // point inside a subtree Escape has just made inert and the first Tab is swallowed.
-    // A focused field is never `document.body`, so this cannot bring the caret theft
-    // back. `documentElement` and a null `activeElement` are the same argument.
-    //
+    // Take the hamburger only when the reader loses nothing by it (`noFocusToLose`).
     // Read before the click, not after: by then the panel is inert and the browser has
     // already blurred out of it, so `contains` answers `false` every time and the
     // refocus never happens at all.
-    //
-    // The hamburger itself is the panel's sibling rather than its descendant, so a
-    // reader who opened the menu with Enter and never left the button reads `false` on
-    // the `contains` clause. That looks like the defect this line exists to fix and is
-    // not one: focus never went anywhere. Measured -- Enter, then Escape: menu closed,
-    // `aria-expanded="false"`, `inert` true, focus still on the hamburger.
-    const active = document.activeElement;
-    const noFocusToLose = !active || active === document.body
-        || active === document.documentElement || dropdownContent.contains(active);
+    const noFocusToLose = MainMenu.noFocusToLose();
     menuButton.click();
     if (noFocusToLose) menuButton.focus();
 });

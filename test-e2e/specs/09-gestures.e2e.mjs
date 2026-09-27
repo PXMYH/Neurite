@@ -347,6 +347,57 @@ test('Escape closes a modal', async () => {
     assert.equal(shown, 'none', 'the modal is hidden');
 });
 
+// Escape from a menu panel steps back to the list, and leaves a caret outside the menu
+// where it was (#67). The panel branch moved focus to the row unconditionally: measured,
+// caret at offset 3 in a note's title, and Escape from the Ai panel left focus on
+// `#tablink-ai`. No test entered panel view before pressing Escape, so the suite stayed
+// green over it.
+test('Escape from a menu panel keeps the caret in a note', async () => {
+    const uuid = await addNote(page, 'Caret note', 'body');
+    await page.waitForTimeout(500);
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    await page.click('#tablink-ai');
+    await page.waitForTimeout(300);
+
+    const title = page.locator(`[data-uuid="${uuid}"] .title-input, .window .title-input`).first();
+    await title.click();
+    await page.evaluate(() => document.activeElement.setSelectionRange(3, 3));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(100);
+
+    const state = await page.evaluate(() => ({
+        inTitle: document.activeElement?.classList.contains('title-input'),
+        caret: document.activeElement?.selectionStart,
+        panel: document.querySelector('.menu-panel').classList.contains('detail-open'),
+        open: document.querySelector('.dropdown-content').classList.contains('open'),
+    }));
+    assert.ok(state.inTitle, 'the caret left the note');
+    assert.equal(state.caret, 3, 'the caret moved');
+    assert.equal(state.panel, false, 'Escape still steps the panel back to the list');
+    assert.equal(state.open, true, 'one Escape is one step, not a close');
+});
+
+// The notes editor lives in the menu, and CodeMirror answers Escape itself. The menu took
+// it anyway and stepped the Notes panel back to the list, out from under the caret.
+test('Escape in the notes editor leaves the editor and the panel alone', async () => {
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    await page.click("button.menu-row.tablink:has-text('Notes')");
+    await page.waitForTimeout(400);
+    await page.click('#tab1 .CodeMirror');
+    await page.keyboard.type('x');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(100);
+
+    const state = await page.evaluate(() => ({
+        editorFocused: window.currentActiveZettelkastenMirror.hasFocus(),
+        panel: document.querySelector('.menu-panel').classList.contains('detail-open'),
+    }));
+    assert.ok(state.editorFocused, 'the editor lost the caret');
+    assert.ok(state.panel, 'the Notes panel stepped back to the list');
+});
+
 // A card whose rendered box cannot be read must not vanish from the things that operate on
 // the graph. `planeHalfExtent` returned null for one, and every caller skips a null: Fit left
 // it out of the bounding box it covers and Tidy left it out of the separation, while the HUD
