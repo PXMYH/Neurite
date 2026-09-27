@@ -3,8 +3,37 @@
 // `node --test` (see CLAUDE.md), and the automation server already depends on
 // `playwright`, so nothing new is added here.
 import { chromium, webkit, devices } from 'playwright';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const BASE_URL = process.env.NEURITE_E2E_URL || 'http://127.0.0.1:9123/';
+
+// The CDN libraries `index.html` loads -- CodeMirror, localforage, Prism, pdf.js -- served
+// from a cache on disk after the first fetch. A run of the suite loads them some 2,800
+// times, and on a bad minute the CDN answered some with nothing: three boots in one run
+// came up with no CodeMirror and no localforage, and failed as timeouts on `appReady`.
+const CDN = /^https:\/\/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com)\//;
+const CDN_CACHE = join(tmpdir(), 'neurite-e2e-cdn');
+async function fromCdnCache(route) {
+    const file = join(CDN_CACHE, createHash('sha1').update(route.request().url()).digest('hex'));
+    if (existsSync(file + '.json')) {
+        const { headers } = JSON.parse(readFileSync(file + '.json', 'utf8'));
+        return route.fulfill({ status: 200, headers, body: readFileSync(file) });
+    }
+    const response = await route.fetch();
+    const body = await response.body();
+    if (response.ok()) {
+        mkdirSync(CDN_CACHE, { recursive: true });
+        writeFileSync(file, body);
+        writeFileSync(file + '.json', JSON.stringify({ headers: {
+            'content-type': response.headers()['content-type'] ?? 'application/octet-stream',
+            'access-control-allow-origin': '*',
+        } }));
+    }
+    return route.fulfill({ response, body });
+}
 
 // `NEURITE_E2E_BROWSER=webkit-ipad` runs a spec in WebKit as an iPad in landscape --
 // Safari's engine, a touch screen, a 1194x834 window -- so a pointer decision meets the
@@ -35,6 +64,7 @@ export function launchBrowser() {
 export async function openNeurite(browser, { setup } = {}) {
     const context = await browser.newContext(IPAD ? devices['iPad Pro 11 landscape']
                                                   : { viewport: { width: 1600, height: 1000 } });
+    await context.route(CDN, fromCdnCache);
     if (setup) await setup(context);
     const page = await context.newPage();
     const errors = [];
