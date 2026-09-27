@@ -223,6 +223,20 @@ async function rightClick(page, uuid) {
     await page.mouse.click(p.x, p.y, { button: 'right' });
     await page.waitForFunction(() => getComputedStyle(document.getElementById('customContextMenu')).display !== 'none');
 }
+// A press on bare canvas, which closes a menu. Found rather than assumed: on an iPad's
+// smaller window a fixed point landed on the open list and ran one of its actions.
+async function clickEmpty(page) {
+    const p = await page.evaluate(() => {
+        for (let y = 120; y < innerHeight - 120; y += 40) {
+            for (let x = 120; x < innerWidth - 120; x += 40) {
+                if (document.elementFromPoint(x, y)?.id === 'svg_bg') return { x, y };
+            }
+        }
+        return null;
+    });
+    assert.ok(p, 'no bare canvas to press on');
+    await page.mouse.click(p.x, p.y);
+}
 async function clickIn(page, selector, text) {
     const p = await page.evaluate(([s, t]) => {
         const el = [...document.querySelectorAll(s)].find((e) => e.textContent.trim() === t);
@@ -255,7 +269,7 @@ test('the pin keeps an action in the menu without running it', async () => {
     await page.click(pin);
     assert.equal(await page.evaluate(() => App.selectedNodes.uuids.size), 0, 'pinning ran the action');
     assert.equal(await page.getAttribute(pin, 'aria-pressed'), 'true');
-    await page.mouse.click(800, 500);
+    await clickEmpty(page);
 
     // Opened again, the pinned action is in the menu, named for what it will do now.
     await rightClick(page, c);
@@ -329,7 +343,7 @@ test("a Node's menu opened at the bottom of the window stays on it, every action
     assert.ok(onScreen(pinned.listTop, pinned.listBottom), 'the list runs off the window: ' + JSON.stringify(pinned));
     assert.equal(pinned.rows, 9);
     assert.equal(pinned.clipped, false, 'the list hides some of its actions');
-    await page.mouse.click(800, 300);
+    await clickEmpty(page);
 
     // Just enough room below: it opens downward, where the margin would push it out.
     await page.evaluate(() => App.pinnedItems.removeItem('zoomTo'));

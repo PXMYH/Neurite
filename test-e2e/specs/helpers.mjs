@@ -2,13 +2,18 @@
 // (not @playwright/test) on purpose -- the repo keeps a single test runner,
 // `node --test` (see CLAUDE.md), and the automation server already depends on
 // `playwright`, so nothing new is added here.
-import { chromium } from 'playwright';
+import { chromium, webkit, devices } from 'playwright';
 
 const BASE_URL = process.env.NEURITE_E2E_URL || 'http://127.0.0.1:9123/';
 
+// `NEURITE_E2E_BROWSER=webkit-ipad` runs a spec in WebKit as an iPad in landscape --
+// Safari's engine, a touch screen, a 1194x834 window -- so a pointer decision meets the
+// tablet before the tablet work builds on it. It needs `npx playwright install webkit`.
+const IPAD = process.env.NEURITE_E2E_BROWSER === 'webkit-ipad';
+
 export function launchBrowser() {
     // Headless is the point: this runs unattended as an eval, not for watching.
-    return chromium.launch({ headless: true });
+    return (IPAD ? webkit : chromium).launch({ headless: true });
 }
 
 // A fresh, storage-isolated page sitting at the ready signal. Isolation is not
@@ -25,7 +30,8 @@ export function launchBrowser() {
 // `setup(context)` runs before the first navigation: a route the page needs at boot -- to
 // hide a running gateway, say -- has to exist before the page asks.
 export async function openNeurite(browser, { setup } = {}) {
-    const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+    const context = await browser.newContext(IPAD ? devices['iPad Pro 11 landscape']
+                                                  : { viewport: { width: 1600, height: 1000 } });
     if (setup) await setup(context);
     const page = await context.newPage();
     const errors = [];
