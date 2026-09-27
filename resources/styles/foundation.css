@@ -422,21 +422,36 @@ body.connect-mode .window textarea {
 /* Where new notes go, once there are two Archives or more (#64): a line of text, and the
    way to the Notes panel where it is chosen. As wide as the overview above it. */
 .hud-archive {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     max-width: calc(176px + 2px);
     min-height: var(--hit-min);
-    padding: 0 var(--space-2);
-    overflow: hidden;
-    font-size: var(--text-xs);
+    padding: 4px var(--space-2);
     text-align: left;
-    white-space: nowrap;
-    text-overflow: ellipsis;
     color: var(--ui-chrome-text);
     background: transparent;
-    border: 1px solid var(--ui-chrome-rule);
+    /* Not boxed like a field: it is a line of text that opens the Notes panel. */
+    border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background-color var(--ui-transition), color var(--ui-transition);
 }
+
+    .hud-archive-caption {
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+    }
+
+    /* The name on a line of its own, so the caption never pushes it out of sight. */
+    .hud-archive-name {
+        max-width: 100%;
+        overflow: hidden;
+        font-size: var(--text-sm);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: var(--ui-chrome-text-strong);
+    }
 
 .hud-archive:hover {
     background: var(--ui-chrome-hover);
@@ -452,6 +467,11 @@ body.connect-mode .window textarea {
     display: none;
 }
 
+/* `Hud.updateUnderMenu`: kept in the layout, so it can be measured again. */
+.hud-panel.is-under-menu {
+    visibility: hidden;
+}
+
 /* The empty canvas says what to do, and then stops saying it.
 
    Centred on the viewport rather than on the graph's origin, because it is addressed
@@ -462,7 +482,11 @@ body.connect-mode .window textarea {
     left: 50%;
     top: 46%;
     transform: translate(-50%, -50%);
-    z-index: var(--z-hud);
+    /* Under the menu, as the HUD panel is: at the HUD's 950 it drew over the open menu
+       wherever the two met, which with the menu at one 480px width was every panel in
+       any window narrower than about 1376px -- and only ever on an empty canvas, which
+       is exactly first use (#32). */
+    z-index: var(--z-canvas);
     pointer-events: none;
     text-align: center;
     max-width: 44ch;

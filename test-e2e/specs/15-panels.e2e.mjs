@@ -117,3 +117,100 @@ test('no label of one or two words wraps in the panels', async () => {
     }
     assert.deepEqual(wrapped, []);
 });
+
+// ---- found by the Phase 3 UX review ----
+
+// The empty canvas's hint was drawn over the menu, and at 480px every panel meets it below
+// about 1376px of window.
+test('a panel over the empty canvas\'s hint is drawn over it', async () => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openMenu(page);
+    await openPanel(page, 'Ai');
+    const top = await page.evaluate(() => {
+        const elem = document.querySelector('.canvas-hint');
+        const hint = elem.getBoundingClientRect();
+        const menu = document.querySelector('.dropdown-content').getBoundingClientRect();
+        const x = Math.max(hint.left, menu.left) + 4, y = Math.max(hint.top, menu.top) + 4;
+        if (x >= Math.min(hint.right, menu.right) || y >= Math.min(hint.bottom, menu.bottom)) return 'apart';
+        // The hint takes no pointer, so hit testing passes through it; for the one probe
+        // it does, and the hit is whichever of the two is drawn on top.
+        elem.style.pointerEvents = 'auto';
+        const hit = document.elementFromPoint(x, y);
+        elem.style.pointerEvents = '';
+        return hit.closest('.dropdown-content') ? 'menu' : hit.closest('.canvas-hint') ? 'hint' : hit.className;
+    });
+    assert.equal(top, 'menu');
+});
+
+// The side handle sets every panel's width, and a bare `1fr` column grew to the widest
+// thing that would not wrap: one long model name made the Ai panel wider than the menu.
+test('at the side handle\'s narrowest the Ai panel keeps its right-hand column, with a long model name', async () => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openMenu(page);
+    await openPanel(page, 'Ai');
+    await page.click('#tab4 .dropdown-container:has(#inference-select) .select-replacer');
+    await page.click("#tab4 .dropdown-container:has(#inference-select) .dropdown-option:has-text('Groq')");
+    await page.click('#tab4 .dropdown-container:has(#groq-select) .select-replacer');
+    await page.click("#tab4 .dropdown-container:has(#groq-select) .dropdown-option:has-text('Deepseek R1 distill Llama 70b')");
+    await page.click('#menuBackButton');
+    await openPanel(page, 'Notes');
+    const handle = await page.evaluate(() => {
+        const r = document.getElementById('zetHorizDragHandle').getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    await page.mouse.move(handle.x, handle.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(handle.x - 80 * i, handle.y);
+    await page.mouse.up();
+    await page.click('#menuBackButton');
+    await openPanel(page, 'Ai');
+    const box = await menuBox(page);
+    assert.ok(box.width < 400, `the drag left the menu ${box.width}px wide`);
+    assert.equal(box.spill, 0, `the Ai panel spills ${box.spill}px past a ${box.width}px menu`);
+});
+
+test('a Saved View is reached and chosen with the keyboard',
+     { skip: isIPad && 'WebKit Tab skips buttons by default' }, async () => {
+    await openMenu(page);
+    await openPanel(page, 'Views');
+    let on = null;
+    for (let i = 0; i < 6 && on !== 'saved-coordinate-item'; i++) {
+        await page.keyboard.press('Tab');
+        on = await page.evaluate(() => document.activeElement.className);
+    }
+    assert.equal(on, 'saved-coordinate-item', 'Tab never reached a Saved View');
+    const zoom = await page.evaluate(() => Graph.zoom.mag());
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(1500);
+    assert.deepEqual(await page.evaluate((before) => [document.activeElement.getAttribute('aria-pressed'), Graph.zoom.mag() !== before], zoom),
+        ['true', true], 'Enter did not go to the view, or did not select it');
+});
+
+// Opening grows the console above its strip, and pushed the strip, which has the focus,
+// 460px below the foot of the menu.
+test('the console opened from the keyboard keeps its strip in view', async () => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openMenu(page);
+    await openPanel(page, 'Ai');
+    await page.focus('.function-call-container > .toggle-panel');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(900);
+    const [strip, menu] = await page.evaluate(() => ['.function-call-container > .toggle-panel', '.dropdown-content']
+        .map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)]; }));
+    assert.ok(strip[0] >= menu[0] && strip[1] <= menu[1], `the strip is at ${strip}, the menu at ${menu}`);
+});
+
+// The panels are drawn over the overview, and one that ended just short of its foot left
+// Fit, Tidy and Home showing under it as if they were its own.
+test('the overview is out of sight under a panel that reaches it, and back when the menu closes',
+     { skip: isIPad && 'the iPad window is its own size' }, async () => {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await openMenu(page);
+    await openPanel(page, 'Fractal');
+    await page.waitForTimeout(300);
+    const seen = () => page.evaluate(() => getComputedStyle(document.querySelector('.hud-panel')).visibility);
+    assert.equal(await seen(), 'hidden');
+    await page.click('.menu-button');
+    await page.waitForTimeout(400);
+    assert.equal(await seen(), 'visible');
+});

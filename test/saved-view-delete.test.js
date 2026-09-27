@@ -49,7 +49,9 @@ function makeSandbox(fractalType){
             mouseleave(){}
         },
         Elem: {byId: (id)=> elems[id] ?? null},
-        Html: {make: {div: ()=>({classList: {add(){}, remove(){}}, style: {}, textContent: '', onClick: null})}},
+        // A chip is a button, which says whether it is the selected one (`aria-pressed`).
+        Html: {make: {button: ()=>({classList: {add(){}, remove(){}}, style: {}, textContent: '', onClick: null,
+                                    setAttribute(name, value){ this[name] = value }})}},
         localStorage: {
             getItem: (k)=> store[k] ?? null,
             setItem: (k, v)=>{ store[k] = v }

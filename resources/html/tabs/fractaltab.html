@@ -46,7 +46,7 @@
                     </div>
                     <div class="number-input-wrapper" style="width: 30%" title="Add idleness to save energy">
                         <div id="frames_delay_value">Delay:</div>
-                        <input id="frames_delay_value_number" class="number-input" type="number" min="0" max="9" value="0" step="1">
+                        <input id="frames_delay_value_number" class="number-input" type="number" min="0" max="9" value="0" step="1" aria-label="Delay">
                     </div>
                     <div id="fps" style="text-align: right; width: 20%">?? fps (Is javascript enabled?)</div>
                 </div>
@@ -59,7 +59,7 @@
                 <div class="settingsSlider" title="Adjusts length of fractal lines. Lower to reduce lag">
                     <div class="number-input-wrapper">
                         <label for="length">Length:</label>
-                        <input id="length_value" class="number-input" type="number" min="0" max="100" value="50" step="1">
+                        <input id="length_value" class="number-input" type="number" min="0" max="100" value="50" step="1" aria-label="Length">
                     </div>
                     <input id="length" type="range" min="0" max="100" value="50">
                 </div>
@@ -67,7 +67,7 @@
                 <div class="settingsSlider" title="Adjusts width of fractal lines">
                     <div class="number-input-wrapper">
                         <label for="renderWidthMultSlider">Width:</label>
-                        <input id="renderWidthMultValue" class="number-input" type="number" min="0" max="12" value="0.5" step="0.01">
+                        <input id="renderWidthMultValue" class="number-input" type="number" min="0" max="12" value="0.5" step="0.01" aria-label="Width">
                     </div>
                     <input type="range" id="renderWidthMultSlider" min="0" max="12" value="0.5" step="0.01">
                 </div>
@@ -75,7 +75,7 @@
                 <div class="settingsSlider" title="Adjusts amount of fractal lines. Lower to reduce lag">
                     <div class="number-input-wrapper">
                         <label for="maxLinesSlider">Lines:</label>
-                        <input id="maxLinesValue" class="number-input" type="number" min="0" max="2048" value="128" step="32">
+                        <input id="maxLinesValue" class="number-input" type="number" min="0" max="2048" value="128" step="32" aria-label="Lines">
                     </div>
                     <input type="range" id="maxLinesSlider" min="0" max="2048" value="128" step="1">
                 </div>
@@ -83,7 +83,7 @@
                 <div class="settingsSlider" title="Adjusts fractal line generation speed. Lower to reduce lag">
                     <div class="number-input-wrapper">
                         <label for="regenDebtSlider">Speed:</label>
-                        <input id="regenDebtValue" class="number-input" type="number" min="0" max="4" value="1" step="0.01">
+                        <input id="regenDebtValue" class="number-input" type="number" min="0" max="4" value="1" step="0.01" aria-label="Speed">
                     </div>
                     <input type="range" id="regenDebtSlider" min="0" max="4" value="1" step="0.01">
                 </div>
@@ -103,7 +103,7 @@
                 <div class="settingsSlider" title="Adjusts radius of line generation around cursor">
                     <div class="number-input-wrapper">
                         <label for="flashlightRadius">Radius:</label>
-                        <input id="flashlightRadius_value" class="number-input" type="number" min="0" max="100" value="0" step="1">
+                        <input id="flashlightRadius_value" class="number-input" type="number" min="0" max="100" value="0" step="1" aria-label="Radius">
                     </div>
                     <input type="range" id="flashlightRadius" min="0" max="100" value="0" step="1">
                 </div>
@@ -111,7 +111,7 @@
                 <div class="settingsSlider" title="Delay between segment reveals">
                     <div class="number-input-wrapper" style="flex-direction: column;">
                         <label for="renderDelaySlider">Draw Speed:</label>
-                        <input id="draw_speed_value" class="number-input" type="number" min="0" max="300" value="0" step="1">
+                        <input id="draw_speed_value" class="number-input" type="number" min="0" max="300" value="0" step="1" aria-label="Draw Speed">
                     </div>
                     <input type="range" id="renderDelaySlider" min="0" max="300" value="0" step="1">
                 </div>
@@ -119,7 +119,7 @@
                 <div class="settingsSlider" title="Adjust zoom sensitivity for mouse wheel and drag zooming">
                     <div class="number-input-wrapper" style="flex-direction: column;">
                         <label for="zoomSpeedSlider">Zoom Speed:</label>
-                        <input id="zoom_speed_value" class="number-input" type="number" min="0.1" max="5" value="1" step="0.1">
+                        <input id="zoom_speed_value" class="number-input" type="number" min="0.1" max="5" value="1" step="0.1" aria-label="Zoom Speed">
                     </div>
                     <input type="range" id="zoomSpeedSlider" min="0.1" max="5" step="0.1" value="1.0">
                 </div>
@@ -159,7 +159,7 @@
                         <div class="settingsSlider" title="Adjusts fractal line brightness">
                             <div class="number-input-wrapper" style="flex-direction: column;">
                                 <label for="cSlider">Brightness:</label>
-                                <input id="c_value" class="number-input" type="number" min="0" max="255" value="128" step="1">
+                                <input id="c_value" class="number-input" type="number" min="0" max="255" value="128" step="1" aria-label="Brightness">
                             </div>
                             <input type="range" min="0" max="255" id="cSlider" value="128">
                         </div>
@@ -167,7 +167,7 @@
                         <div class="settingsSlider" title="Adjusts fractal line vibrance">
                             <div class="number-input-wrapper" style="flex-direction: column;">
                                 <label for="sSlider">Saturation:</label>
-                                <input id="s_value" class="number-input" type="number" min="0" max="255" value="127" step="1">
+                                <input id="s_value" class="number-input" type="number" min="0" max="255" value="127" step="1" aria-label="Saturation">
                             </div>
                             <input type="range" min="0" max="255" id="sSlider" value="127">
                         </div>
@@ -175,7 +175,7 @@
                         <div class="settingsSlider" title="Adjusts opacity of fractal lines">
                             <div class="number-input-wrapper" style="flex-direction: column;">
                                 <label for="outer_opacity">Outer Opacity:</label>
-                                <input id="outer_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1">
+                                <input id="outer_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Outer Opacity">
                             </div>
                             <input id="outer_opacity" type="range" min="0" max="100" value="100">
                         </div>
@@ -183,7 +183,7 @@
                         <div class="settingsSlider" title="Adjusts opacity of fractal line's interior">
                             <div class="number-input-wrapper" style="flex-direction: column;">
                                 <label for="inner_opacity">Inner Opacity:</label>
-                                <input id="inner_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1">
+                                <input id="inner_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Inner Opacity">
                             </div>
                             <input id="inner_opacity" type="range" min="0" max="100" value="100">
                         </div>

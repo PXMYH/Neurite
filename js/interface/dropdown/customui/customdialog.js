@@ -1,5 +1,7 @@
-window.prompt = async (message, defaultValue = '') => {
+// `title` names the dialog after what it asks for; it read "Prompt" whatever it asked.
+window.prompt = async (message, defaultValue = '', title = null) => {
     Modal.open('promptModal'); // Load content into modal body
+    if (title) Modal.div.querySelector('.modal-title').textContent = title;
 
     const modalBody = Modal.div.querySelector('.modal-body');
     if (!modalBody) {
@@ -20,6 +22,9 @@ window.prompt = async (message, defaultValue = '') => {
     messageEl.textContent = message;
     inputEl.value = defaultValue;
     inputEl.focus(); // Auto-focus textarea
+    // The answer offered is selected, so typing replaces it, as a native prompt's does: with
+    // the caret at its end, a rename to "Learning" gave "Archive 2Learning".
+    inputEl.select();
 
     return new Promise((resolve) => {
         const handleOk = () => {
@@ -40,6 +45,9 @@ window.prompt = async (message, defaultValue = '') => {
                 e.preventDefault(); // Prevent new line in textarea
                 handleOk();
             } else if (e.key === 'Escape') {
+                // Only the dialog: the menu's own Escape, reached next, took the panel the
+                // dialog was opened from back to the list.
+                e.stopPropagation();
                 handleCancel();
             }
             // If Shift+Enter is pressed, allow new lines (default behavior)

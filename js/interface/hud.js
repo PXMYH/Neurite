@@ -38,7 +38,10 @@ class Hud {
                  the Note tool writes into the Archive the Notes panel shows. A door to
                  that panel, so the answer and the way to change it are one click apart. -->
             <button type="button" class="hud-archive" hidden
-                    data-tooltip="New notes are written into this Archive. Open the Notes panel to choose another."></button>
+                    data-tooltip="New notes are written into this Archive. Open the Notes panel to choose another.">
+                <span class="hud-archive-caption">New notes go to</span>
+                <span class="hud-archive-name"></span>
+            </button>
             <div class="hud-row hud-actions">
                 <button type="button" class="hud-btn" data-act="fit"
                         data-tooltip="Fit the selection on screen, or every note when nothing is selected (0)">Fit</button>
@@ -55,6 +58,7 @@ class Hud {
         this.elemScale = panel.querySelector('.hud-scale');
         this.elemCount = panel.querySelector('.hud-count');
         this.elemArchive = panel.querySelector('.hud-archive');
+        this.elemArchiveName = panel.querySelector('.hud-archive-name');
         On.click(this.elemArchive, Hud.openNotes);
 
         On.click(panel.querySelector('[data-act="fit"]'), ()=>Hud.fitAll());
@@ -165,15 +169,33 @@ class Hud {
 
         if (Hud.hint) Hud.hint.classList.toggle('is-hidden', frame.count > 0);
         Hud.updateArchive();
+        Hud.updateUnderMenu();
+    }
+    // Under an open menu that reaches down to it, the overview is hidden: the menu is drawn
+    // over it, and at 1600 x 1000 the Fractal panel ended 29px short of its foot, which
+    // left Fit, Tidy and Home showing under the panel as if they were part of it.
+    static updateUnderMenu(){
+        let under = false;
+        // Measured only while the menu is open: this runs eight times a second.
+        if (dropdownContent.classList.contains('open')) {
+            const menu = dropdownContent.getBoundingClientRect();
+            const hud = Hud.panel.getBoundingClientRect();
+            under = (menu.bottom > hud.top && menu.left < hud.right && menu.right > hud.left);
+        }
+        Hud.panel.classList.toggle('is-under-menu', under);
     }
 
     static updateArchive(){
         const panes = window.zetPaneList ?? [];
         const active = App.zetPanes?.activePane();
         const name = (active ? App.zetPanes.getPaneName(active.paneId) : '');
-        const text = 'New notes go to ' + name;
         Hud.elemArchive.hidden = (panes.length < 2 || !name);
-        if (Hud.elemArchive.textContent !== text) Hud.elemArchive.textContent = text;
+        if (Hud.elemArchiveName.textContent === name) return;
+
+        Hud.elemArchiveName.textContent = name;
+        // The whole name, where a long one is cut short on the line.
+        Hud.elemArchive.setAttribute('aria-label', 'New notes go to ' + name + '. Open the Notes panel');
+        Hud.elemArchive.dataset.tooltip = `New notes are written into “${name}”. Open the Notes panel to choose another.`;
     }
     // The menu opened, then the Notes panel in it, as its row does.
     static openNotes(){

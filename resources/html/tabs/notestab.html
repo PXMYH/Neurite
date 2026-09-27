@@ -13,9 +13,13 @@
          more than one. The settings are in the Settings tab and Search is in the tool
          bar. `ZetPanes` wires this subtree. -->
     <div class="archive-bar">
-        <div class="dropdown-container archive-choice"
-             title="The Archive shown here, which is where new notes are written.">
-            <select id="archiveSelect" class="model-selector custom-select ignoreSetup" aria-label="Archive"></select>
+        <!-- The tooltip on the select, not its wrapper: `CustomDropdown.carryAccessibility`
+             copies a select's `title` and `aria-describedby` to the control that stands in
+             for it, and nothing reads a wrapper's. -->
+        <div class="dropdown-container archive-choice">
+            <select id="archiveSelect" class="model-selector custom-select ignoreSetup" aria-label="Archive"
+                    title="The Archive shown here, which is where new notes are written."
+                    aria-describedby="archiveAbout"></select>
         </div>
         <div class="archive-actions">
             <button type="button" class="key-button" id="archiveNew"
@@ -25,11 +29,16 @@
             <button type="button" class="key-button" id="archiveDelete"
                     title="Delete the Archive shown here, and the notes written in it.">Delete Archive…</button>
         </div>
+        <!-- What an Archive is, on screen: elsewhere the word means put away, and a new,
+             empty one still shows every note on the canvas. -->
+        <p class="archive-about" id="archiveAbout">Each Archive is a separate text for the same canvas. A Title names one note across all of them.</p>
     </div>
     <div id="zetPaneContainer" class="zet-pane-container">
         <div id="zetPaneContent" class="zet-pane-content"></div>
-        <!-- Why a Title line in the shown Archive makes no note: its Title is taken. -->
-        <p class="archive-status" id="archiveStatus" role="status" hidden></p>
+        <!-- Why a Title line in the shown Archive makes no note: its Title is taken. In the
+             page from the start and empty when there is nothing to say, not `hidden`: a
+             screen reader can pass over a live region that appears with its text. -->
+        <p class="archive-status" id="archiveStatus" role="status"></p>
     </div>
 
     <!-- The prompt form was here, under the editor, and it is in the Ai tab now, next

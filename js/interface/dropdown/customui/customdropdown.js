@@ -267,6 +267,15 @@ CustomDropdown.addKeyListeners = function(select, selectReplacer, optionsReplace
         e.preventDefault();
         e.stopPropagation();
     });
+    // Focus moving on closes the list, as a native select's does: opened with Enter, it
+    // stayed open over the next control once Tab had moved to it. A click on an option
+    // keeps focus here, the options being inside and not focusable.
+    On.blur(selectReplacer, ()=>{
+        if (!optionsReplacer.classList.contains('show')) return;
+
+        CustomDropdown.close(selectReplacer, optionsReplacer);
+        container.style.zIndex = "20";
+    });
 }
 
 // Moves the selection one option, as a focused select does with its list closed.

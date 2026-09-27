@@ -1,8 +1,10 @@
     <!-- Default Modal Structure -->
-<div id="customModal" class="modal" style="display: none;">
+<!-- A dialog to a screen reader, named by its title. `aria-modal` is set per dialog in
+     `Modal.open`: only the three that wait for an answer hold the keyboard. -->
+<div id="customModal" class="modal" style="display: none;" role="dialog" aria-labelledby="modal-title">
     <div class="modal-content">
         <div class="modal-header" id="modal-header">
-            <h2 class="modal-title"></h2>
+            <h2 class="modal-title" id="modal-title"></h2>
             <span class="close">&times;</span>
         </div>
         <div class="modal-body"></div>

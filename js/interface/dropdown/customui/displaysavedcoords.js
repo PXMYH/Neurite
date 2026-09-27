@@ -319,6 +319,7 @@ Coordinate.deselect = function () {
     if (!this.selectedDiv) return;
 
     this.selectedDiv.classList.remove('selected-coordinate');
+    this.selectedDiv.setAttribute('aria-pressed', 'false');
     this.resetSelected();
 }
 Coordinate.resetSelected = function () {
@@ -331,7 +332,11 @@ function appendViewsToContainer(views, containerId) {
     container.innerHTML = '';
 
     views.forEach((view) => {
-        const coordElement = Html.make.div('saved-coordinate-item');
+        // A button, so Tab reaches it and Enter or Space goes there. As a div it took a
+        // click and nothing else. Pressed is selected: the one Delete View removes.
+        const coordElement = Html.make.button('saved-coordinate-item');
+        coordElement.type = 'button';
+        coordElement.setAttribute('aria-pressed', 'false');
         coordElement.textContent = view.title;
 
         On.click(coordElement, (e) => {
@@ -340,10 +345,12 @@ function appendViewsToContainer(views, containerId) {
             // Update selected state
             document.querySelectorAll('.saved-coordinate-item').forEach(div => {
                 div.classList.remove('selected-coordinate');
+                div.setAttribute('aria-pressed', 'false');
                 div.style.transform = '';
             });
 
             coordElement.classList.add('selected-coordinate');
+            coordElement.setAttribute('aria-pressed', 'true');
             coordElement.style.transform = 'scale(0.95)'; // Scale down for selected
             Coordinate.selectedDiv = coordElement;
             Coordinate.selectedView = view;

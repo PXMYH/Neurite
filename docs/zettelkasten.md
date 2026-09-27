@@ -45,3 +45,12 @@ The Mind Map and the Zettelkasten are two views of one thing, and each edits the
 </table>
 
 Build your Zettelkasten through UI interactions in the Mind Map, and reciprocally shape the Mind Map through text-based note-taking in the Zettelkasten. This navigational fluidity offers unprecedented control over both the granular and macroscopic perspectives of your information.
+
+## Archives
+
+The Notes panel can hold several texts for one graph, each called an Archive. The list at the top of the panel says which Archive is shown and how many notes each holds; **New Archive**, **Rename Archive…** and **Delete Archive…** are under it.
+
+- Every Archive's notes are on the same canvas. A new note, from the tool bar or from an AI answer with no card to go to, is written into the Archive the panel shows. With two Archives or more, the panel at the bottom left of the canvas says which one that is.
+- A Title names one note across all the Archives, in any case. A Title line written a second time, in the same Archive or another, makes no second note: the line is dimmed, the Title is underlined in red, and the panel says which Archive has the note. Click the line number in that message to select the Title and rename it. When the first note is renamed or deleted, the second line becomes a note.
+- A graph saved with one Title in two Archives opens with the later line renamed "Title (2)", both notes kept where they were, and a notice that lists each rename.
+- Delete Archive says how many notes go with the Archive. The last Archive cannot be deleted, because new notes need an Archive to go into.

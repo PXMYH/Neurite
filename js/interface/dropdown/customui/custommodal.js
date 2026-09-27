@@ -19,9 +19,11 @@ const Modals = {
     // button that opens it is in the tool bar for the same reason.
     zetSearchModal: new Modal('zetSearchModal', "Search Nodes"),
     'neurite-modal': new Modal('neurite-modal', "Neurite"),
-    alertModal: Object.assign(new Modal('alertModal', 'Alert'), { customClass: 'alert-modal' }),
-    confirmModal: new Modal('confirmModal', 'Confirm'),
-    promptModal: new Modal('promptModal', 'Prompt')
+    // The three that wait for an answer, where the keyboard stays until it is given
+    // (`Modal.holdTab`). The others are tools used beside the Graph, which stays in reach.
+    alertModal: Object.assign(new Modal('alertModal', 'Alert'), { customClass: 'alert-modal', asks: true }),
+    confirmModal: Object.assign(new Modal('confirmModal', 'Confirm'), { asks: true }),
+    promptModal: Object.assign(new Modal('promptModal', 'Prompt'), { asks: true })
 }
 
 Modal.btnClose = Modal.div.querySelector('.close');
@@ -66,6 +68,11 @@ Modal.open = function (contentId) {
     const modalTitle = Modal.div.querySelector('.modal-title');
     modalTitle.textContent = modal?.title || '';
     if (modal.init) modal.init();
+
+    // Where the keyboard was, to go back to: after a Rename it was left on `body`, twelve
+    // Tabs from the button. A dialog opened from inside another keeps the first one's.
+    if (!Modal.div.contains(document.activeElement)) Modal.returnFocus = document.activeElement;
+    Modal.div.setAttribute('aria-modal', String(Boolean(modal?.asks)));
 
     Modal.current = modal;
     Modal.div.style.display = 'flex';
@@ -149,9 +156,33 @@ Modal.close = function () {
     Modal.div.style.display = 'none';
     Modal.closeOverlay;
     Modal.current = null;
+
+    // Only when the dialog had the keyboard: a click on the Graph behind moved it on.
+    const back = Modal.returnFocus;
+    Modal.returnFocus = null;
+    const lost = (document.activeElement === document.body || Modal.div.contains(document.activeElement));
+    if (lost && back?.isConnected && back !== document.body) back.focus({preventScroll: true});
 }
 
 On.click(Modal.btnClose, Modal.close);
+
+// Tab goes round the dialog's own controls while it waits for an answer. It went on into
+// the tool bar and the page behind, where nothing answers it. Every step is taken here, not
+// only the wrap: WebKit's Tab passes over buttons, so from the text box it left the dialog.
+Modal.holdTab = function (e) {
+    if (e.key !== 'Tab' || !Modal.current?.asks) return;
+
+    const stops = [...Modal.div.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter( (el)=>(!el.disabled && el.getClientRects().length > 0) );
+    if (!stops.length) return;
+
+    e.preventDefault();
+    const at = stops.indexOf(document.activeElement);
+    const step = (e.shiftKey ? -1 : 1);
+    const next = (at < 0) ? (e.shiftKey ? stops.length - 1 : 0) : (at + step + stops.length) % stops.length;
+    stops[next].focus();
+}
+On.keydown(window, Modal.holdTab);
 
 // Escape closes a modal, and the nested explanation overlay first.
 //

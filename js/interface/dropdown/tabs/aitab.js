@@ -11,7 +11,7 @@ class AiTab {
     initNodeCountSlider() {
         const slider = Elem.byId('node-count-slider');
         On.input(slider, (e)=>{
-            Elem.byId('node-slider-label').innerText = 'Top ' + slider.value + '\nnodes';
+            Elem.byId('node-slider-label').innerText = 'Top ' + slider.value + ' nodes';
         });
     }
 

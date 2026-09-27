@@ -137,8 +137,8 @@ test('one name for the thing, and the code agrees with the button', ()=>{
     // to be the same string. They were not: the markup said "Store Coordinates" and
     // `saveCurrentView` restored "Save Coordinates", so one click renamed the button for
     // the rest of the session -- a rename nothing would catch, since no handler reads it.
-    const label = views.match(/<a id="saveCoordinatesBtn">([^<]+)<\/a>/);
-    assert.ok(label, 'the Store button is gone or no longer an <a>');
+    const label = views.match(/<button [^>]*id="saveCoordinatesBtn"[^>]*>([^<]+)<\/button>/);
+    assert.ok(label, 'the Store button is gone or no longer a <button>');
     assert.ok(coords.includes('saveButton.textContent = "' + label[1] + '"'),
         'the code puts back a different label than the markup carries: markup says "'
         + label[1] + '"');

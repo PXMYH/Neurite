@@ -174,7 +174,26 @@ class ZetPanes {
         On.click(Elem.byId('archiveNew'), this.onNew);
         On.click(Elem.byId('archiveRename'), this.onRename);
         On.click(Elem.byId('archiveDelete'), this.onDelete);
+        On.click(this.status, this.onStatusClick);
+        this.trackBarHeight();
         this.addPane();
+    }
+
+    // The pane's `max-height` leaves room for the Archive controls above it
+    // (`--archive-bar-space`), and they are not one height: the line that says what an
+    // Archive is takes one line, two or three with the panel's width. Taller by that line
+    // than the constant it replaced, the bar put the pane's bottom handle under the foot of
+    // the menu in a 600px window.
+    trackBarHeight(){
+        const bar = this.select?.closest('.archive-bar');
+        if (!bar || !window.ResizeObserver) return;
+
+        new ResizeObserver( ()=>{
+            if (!bar.offsetHeight) return;   // the Notes panel is closed
+
+            const space = bar.offsetHeight + parseFloat(getComputedStyle(bar).marginBottom);
+            this.container.style.setProperty('--archive-bar-space', space + 'px');
+        }).observe(bar);
     }
 
     addPane() {
@@ -186,13 +205,16 @@ class ZetPanes {
 
         this.paneCounter += 1;
     }
-    // The lowest "Archive n" no Archive is called. The counter only rose, so deleting
-    // Archive 2 made the next one Archive 3; it still gives each Pane its own id.
+    // One past the highest "Archive n", from the names there are now: the list is in the
+    // order the Archives were made, and the lowest free name read "Archive 2, Archive 1"
+    // once the first had been deleted. The counter still gives each Pane its own id.
     nextName(){
-        const names = new Set(window.zetPaneList.map( (pane)=>this.getPaneName(pane.paneId).toLowerCase() ));
-        let n = 1;
-        while (names.has('archive ' + n)) n += 1;
-        return 'Archive ' + n;
+        let highest = 0;
+        for (const pane of window.zetPaneList) {
+            const n = /^archive (\d+)$/i.exec(this.getPaneName(pane.paneId))?.[1];
+            if (n) highest = Math.max(highest, Number(n));
+        }
+        return 'Archive ' + (highest + 1);
     }
 
     activePane(){
@@ -227,24 +249,56 @@ class ZetPanes {
         this.renderStatus(active);
     }
     onTaken(){ this.render() }
+    // A line is a button that selects its Title: the editor numbers no lines, and in a long
+    // Archive "line 40" was out of sight under the words that named it.
     renderStatus(pane){
         if (!this.status) return;
 
         const taken = pane?.processor.taken ?? [];
-        this.status.hidden = (taken.length === 0);
-        if (!taken.length) return (this.status.textContent = '');
-
         const where = (entry)=>{
             const holder = window.zetPaneList.find( (p)=>(p.processor === entry.holder) );
             return (holder === pane ? 'elsewhere in this Archive'
                   : holder ? 'in ' + this.getPaneName(holder.paneId) : 'in another Archive');
         };
+        const line = (entry)=>({entry, text: 'line ' + (entry.lineNo + 1)});
         const first = taken[0];
-        this.status.textContent = (taken.length === 1)
-            ? `“${first.title}” is already a note ${where(first)}, so line ${first.lineNo + 1} makes no note. Rename one of them to keep both.`
-            : `${taken.length} Title lines make no note, because their Titles are already notes: `
-              + taken.slice(0, 3).map( (t)=>`“${t.title}” (line ${t.lineNo + 1}, ${where(t)})` ).join(', ')
-              + (taken.length > 3 ? ', and more.' : '.');
+        const parts = (taken.length === 0) ? []
+            : (taken.length === 1)
+            ? [`“${first.title}” is already a note ${where(first)}, so `, line(first),
+               ' makes no note. Rename one of them to keep both.']
+            : [`${taken.length} Title lines make no note, because their Titles are already notes: `,
+               ...taken.slice(0, 3).flatMap( (t, i)=>[(i ? ', ' : '') + `“${t.title}” (`, line(t), `, ${where(t)})`] ),
+               (taken.length > 3 ? ', and more.' : '.')];
+
+        // A live region is read out whenever it is written, and a pass runs at every
+        // keystroke: it said the same sentence again for each letter typed on another line.
+        const text = parts.map( (part)=>(part.text ?? part) ).join('');
+        if (text === this.status.textContent) return;
+
+        this.status.replaceChildren(...parts.map( (part)=>{
+            if (typeof part === 'string') return part;
+
+            const button = Html.make.button('archive-status-line');
+            button.type = 'button';
+            button.textContent = part.text;
+            button.title = 'Select this Title in the text.';
+            button.dataset.line = part.entry.lineNo;
+            button.dataset.title = part.entry.title;
+            return button;
+        }) );
+    }
+    onStatusClick = (e)=>{
+        const button = e.target.closest?.('.archive-status-line');
+        const cm = window.currentActiveZettelkastenMirror;
+        if (!button || !cm) return;
+
+        const lineNo = Number(button.dataset.line);
+        const text = cm.getLine(lineNo) ?? '';
+        const at = text.toLowerCase().lastIndexOf(button.dataset.title.toLowerCase());
+        cm.focus();
+        if (at < 0) return cm.setCursor({line: lineNo, ch: text.length});
+
+        cm.setSelection({line: lineNo, ch: at}, {line: lineNo, ch: at + button.dataset.title.length});
     }
 
     onNew = ()=>{
@@ -256,7 +310,10 @@ class ZetPanes {
         if (!pane) return;
 
         const current = this.getPaneName(pane.paneId);
-        const name = (await window.prompt(`Rename the Archive “${current}” to:`, current))?.trim();
+        // One line: the dialog's box takes Shift + Enter, and a name with a line break in it
+        // is one the select cannot show.
+        const answer = await window.prompt(`Rename the Archive “${current}” to:`, current, 'Rename Archive');
+        const name = answer?.replace(/\s+/g, ' ').trim();
         if (!name || name === current) return;
 
         const clash = window.zetPaneList.find( (other)=>(other !== pane
@@ -264,6 +321,7 @@ class ZetPanes {
         if (clash) return window.alert(`“${name}” is already the name of an Archive.`);
 
         this.paneContent.querySelector('#' + pane.paneId).dataset.paneName = name;
+        pane.cm.setOption('screenReaderLabel', name);
         this.render();
     }
     // It says what goes with the Archive before it goes, and the last one explains itself:
@@ -309,7 +367,9 @@ class ZetPanes {
             // Escape is the way out of the editor, as it is out of every panel (the Help
             // panel says so). The default keymap answers every Escape itself, and Tab
             // types a tab, so no key got the caret out.
-            extraKeys: {Esc: false}
+            extraKeys: {Esc: false},
+            // The editor's name to a screen reader, which had none: the Archive's.
+            screenReaderLabel: paneName
         });
 
         const zettelkastenParser = new ZettelkastenParser(cm);

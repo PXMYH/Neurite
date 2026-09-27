@@ -1661,9 +1661,12 @@ textarea.title-input.title-input-stowed {
     box-shadow: var(--ui-chrome-shadow);
     /* One column for the one child. It asked for two equal ones, and `1fr`
        equalises them, so the panel measured 650px to hold 325px of tabs and
-       325px of nothing. */
+       325px of nothing. `minmax(0, 1fr)`, not `1fr`: a bare `1fr` grows to the
+       widest thing its content will not wrap, so one long model name in a select
+       made the Ai panel 31px wider than a 372px menu, and the menu cut off its
+       right-hand column. */
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 1fr;
     grid-column-gap: 0px;
     grid-row-gap: 0px;
@@ -1878,6 +1881,26 @@ textarea.title-input.title-input-stowed {
                 width: auto;
                 margin-left: 0;
                 margin-right: 0;
+            }
+
+            /* A slider's box fills its cell: at 90% of it, each stopped 12px short of
+               the rules above. And each checkbox fills its third of the row, which left
+               70px bare at the right. */
+            .menu-detail .gridLayout .settingsSlider {
+                width: auto;
+                /* The slider at the foot of the box, so two in a row sit level when one
+                   label takes two lines: "Top 3 nodes" beside "Context: 26% (1560
+                   tokens)". */
+                justify-content: space-between;
+            }
+
+            /* "Vector-DB" broke at its hyphen in a narrow menu. */
+            .menu-detail #openVectorDbButton {
+                white-space: nowrap;
+            }
+
+            .menu-detail .checkboxarray input[type="checkbox"] + label {
+                display: block;
             }
 
             /* The rows of a group span it, label at the left and control at the right,
@@ -2450,7 +2473,7 @@ textarea#prompt {
     margin-bottom: 3px;
 }
 
-    .coordinate-field span {
+    .coordinate-field label {
         margin-right: 10px; /* Adds space between the label and the input field */
     }
 
@@ -2819,14 +2842,18 @@ input[type="checkbox"] {
        narrow it. 54px: 27px from the window's left edge to the pane, 11px from the pane
        to the menu's right edge, and the menu's 16px left margin kept on the right -- the
        same limit the menu has (`.dropdown-content`), or a drag between the two moved
-       nothing. The narrowest is what the drag stops at, too (`zetHandleHorizMouseMove`). */
+       nothing. The narrowest is what the drag stops at, too (`zetHandleHorizMouseMove`):
+       it sets every panel's width, and at a 292px menu the Ai panel's rows were cut off
+       at its right edge -- the regenerate button, the selects' chevrons, a column of
+       checkboxes and one of sliders. They fit from a 372px menu. */
     max-width: calc(100vw - 54px);
-    min-width: min(270px, calc(100vw - 54px));
-    /* The same for the height and the bottom handle: 201px from the window's top to the
-       pane (the Archive controls take 77px above it), 37px from the pane to the menu's
-       bottom edge, and 16px to spare. A pane made 700px tall kept its height in a 600px
-       window, its handle at y=814. */
-    max-height: calc(100dvh - 254px);
+    min-width: min(350px, calc(100vw - 54px));
+    /* The same for the height and the bottom handle: 124px from the window's top to the
+       Archive controls, the controls themselves (`--archive-bar-space`, measured by
+       `ZetPanes.trackBarHeight`, as they wrap with the panel's width), 37px from the pane
+       to the menu's bottom edge, and 16px to spare. A pane made 700px tall kept its height
+       in a 600px window, its handle at y=814. */
+    max-height: calc(100dvh - 177px - var(--archive-bar-space, 77px));
     height: 60vh;
     /* The panel's width (#32), which the side handle sets for every panel. */
     width: 100%;
@@ -2858,6 +2885,13 @@ input[type="checkbox"] {
             white-space: nowrap;
         }
 
+    .archive-about {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #aaa;
+    }
+
 /* Under the text, inside the pane's own height, so a Title line taken while typing does
    not move the panel. */
 .archive-status {
@@ -2870,9 +2904,26 @@ input[type="checkbox"] {
     box-shadow: inset 3px 0 0 var(--ui-danger);
 }
 
-    .archive-status[hidden] {
-        display: none;
+    .archive-status:empty {
+        padding: 0;
+        background: none;
+        box-shadow: none;
     }
+
+    .archive-status-line {
+        padding: 0;
+        border: none;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
+    }
+
+        .archive-status-line:hover {
+            color: var(--ui-chrome-text-strong);
+        }
 
 .zet-pane-close {
     position: absolute;
@@ -2952,10 +3003,13 @@ td {
 }
 
     .select-replacer .selected-text {
-        padding: 2px 10px;
+        /* Clear of the chevron, 10px to 23px from the right edge. A block, not a flex
+           box, so a long choice ends in an ellipsis before it: "Deepseek R1 distill
+           Llama 70b" ran on under it. */
+        padding: 2px 30px 2px 10px;
         height: 25px; /* Consistent height */
-        display: flex;
-        align-items: center;
+        line-height: 25px;
+        display: block;
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
@@ -3201,6 +3255,9 @@ td {
            the menu's own scroll it scrolled again, in a 500px box of its own. */
         #howto {
             width: auto;
+            /* The inset every other panel has from its `.submenu`, which Help is not in:
+               its text ran 1px from the menu's edges. */
+            padding: 0 10px;
         }
 
             #howto .howto-intro {
@@ -3417,7 +3474,11 @@ td {
 }
 
 .saved-coordinate-item {
-    /* Styling for each saved view element */
+    /* Styling for each saved view element: a button, which brings a border, a font and
+       a text colour of its own. */
+    border: none;
+    color: inherit;
+    font-family: inherit;
     background-color: #282828;
     margin-right: 6px;
     padding: 3px;
@@ -3739,11 +3800,23 @@ input[type=range] {
     }
 
 /* A Title line whose Title another section already holds, here or in another Archive: it
-   makes no note (#64). The Notes panel says which Archive holds it. */
+   makes no note (#64). The Notes panel says which Archive holds it. Its "##" and its name are
+   dimmed, and the name underlined in the danger colour instead of the link cyan: under the
+   wash alone it looked like every Title that works. */
 .CodeMirror .zet-title-taken {
     background-color: rgba(224, 139, 132, 0.12);
     box-shadow: inset 3px 0 0 var(--ui-danger);
 }
+
+    .CodeMirror .zet-title-taken .cm-node,
+    .CodeMirror .zet-title-taken .node-title {
+        color: #a39b93;
+    }
+
+    .CodeMirror .zet-title-taken .node-title {
+        text-decoration: underline wavy var(--ui-danger);
+        text-decoration-skip-ink: none;
+    }
 
 /* The [[ ]] markers, and the dimmest token the note highlighter emits, so this is
    what sets the ceiling on how light `--ui-note-surface` can go. At #4F8EB7 it
@@ -4762,7 +4835,17 @@ code.language-markdown {
        itself, which five other collapsible sections also use. */
     .function-call-container .toggle-panel {
         box-sizing: border-box;
+        gap: 8px;
     }
+
+        /* A rule across the panel with the chevron in it, drawn as the headings' rules
+           are (`.button-label`). Two faint 2px stubs, a fifth of the width each, sat
+           under 1px rules that run the full width (#32). */
+        .function-call-container .toggle-panel .bar {
+            max-width: none;
+            height: 1px;
+            background-color: var(--ui-panel-rule);
+        }
 
 
 
@@ -5691,6 +5774,8 @@ textarea:focus-visible,
    (`CustomDropdown.carryAccessibility`), so it needs a ring like the select it
    replaced -- it is the only control here that is not a real form element. */
 .select-replacer:focus-visible,
+/* The console's strip, a div with `role=button` for the same reason. */
+.function-call-container > .toggle-panel:focus-visible,
 textarea#rawTextArea:focus-visible,
 textarea#prompt:focus-visible,
 textarea[id^='custom-instructions-textarea-']:focus-visible,

@@ -16,8 +16,9 @@ afterEach(async () => { await context?.close(); });
 const state = (page) => page.evaluate(() => ({
     shown: document.querySelector('.archive-choice .selected-text')?.textContent,
     archives: [...document.getElementById('archiveSelect').options].map((o) => o.text),
-    hud: document.querySelector('.hud-archive').hidden ? null : document.querySelector('.hud-archive').textContent,
-    status: document.getElementById('archiveStatus').hidden ? null : document.getElementById('archiveStatus').textContent,
+    hud: document.querySelector('.hud-archive').hidden ? null
+        : document.querySelector('.hud-archive').textContent.replace(/\s+/g, ' ').trim(),
+    status: document.getElementById('archiveStatus').textContent || null,
     notes: Object.values(Graph.nodes).filter((n) => !n.removed).map((n) => n.getTitle()).sort(),
 }));
 // What the app's own dialog says, when one is open.
@@ -90,9 +91,9 @@ test('delete says how many notes go with the Archive, and the last one says why 
     await answer(page, '.modal-ok');
     assert.deepEqual((await state(page)).archives, ['Archive 2 · 1 note']);
 
-    // The next one takes the lowest free name, not the next number.
+    // The next one is numbered after the highest there is, so the list reads in order.
     await page.click('#archiveNew');
-    assert.equal((await state(page)).shown, 'Archive 1 · 0 notes');
+    assert.deepEqual((await state(page)).archives, ['Archive 2 · 1 note', 'Archive 3 · 0 notes']);
 });
 
 test('a renamed Archive keeps its name and its place through a save and a reload', async () => {
@@ -244,6 +245,9 @@ test('typing a space after a Title another Archive holds, on a card, keeps the s
     await page.click('#archiveNew');
     await page.keyboard.type('## Rust\nr\n');
     await page.waitForTimeout(300);
+    // The menu closed: in the iPad's smaller window the card can land under the panel.
+    await page.click('.menu-button');
+    await page.waitForTimeout(400);
     const title = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta').view.titleInput);
     await title.asElement().click();
     await page.keyboard.press('ControlOrMeta+A');
@@ -274,4 +278,85 @@ test('Delete says an Archive of text will go, when none of it is a note', async 
     await page.waitForTimeout(300);
     await page.click('#archiveDelete');
     assert.equal(await dialog(page), 'Delete the Archive “Archive 2” and its text? None of it is a note yet.');
+});
+
+// ---- found by the Phase 3 UX review ----
+
+// The status line is a live region: it was `hidden` until it had something to say, which a
+// screen reader can pass over, and a pass at every keystroke wrote the same sentence again.
+// It names a line the editor does not number, so the line is a button to it.
+test('the status line says why once, and its line selects the taken Title', async () => {
+    await openNotes(page);
+    assert.deepEqual(await page.evaluate(() => {
+        const s = document.getElementById('archiveStatus');
+        return [s.hidden, s.getAttribute('role'), s.textContent];
+    }), [false, 'status', ''], 'the empty status line is not in the page');
+    await type(page, '## Alpha\na\n');
+    await page.click('#archiveNew');
+    await page.keyboard.type('Prose.\n\n## Alpha\nagain\n');
+    await page.waitForTimeout(400);
+
+    await page.evaluate(() => {
+        window.statusWrites = 0;
+        new MutationObserver((changes) => { window.statusWrites += changes.length; })
+            .observe(document.getElementById('archiveStatus'), { childList: true, characterData: true, subtree: true });
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.focus();
+        cm.setCursor({ line: 0, ch: 6 });
+    });
+    await page.keyboard.type(' More of it.');
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate(() => window.statusWrites), 0, 'the status was written again at each keystroke');
+
+    await page.click('#archiveStatus .archive-status-line');
+    assert.deepEqual(await page.evaluate(() => {
+        const cm = window.currentActiveZettelkastenMirror;
+        return [cm.getSelection(), cm.getCursor().line];
+    }), ['Alpha', 2]);
+});
+
+// The dialog offered the name with the caret after it, so "Learning" made "Archive 1Learning";
+// its Escape also took the menu back to the list; it gave the keyboard to `body` when it
+// closed; and Tab went on out of it into the page behind.
+test('Rename offers the name selected, keeps it to one line, and Escape closes only the dialog', async () => {
+    await openNotes(page);
+    await page.focus('#archiveRename');
+    await page.keyboard.press('Enter');
+    assert.deepEqual(await page.evaluate(() => [document.getElementById('modal-title').textContent,
+        document.getElementById('customModal').getAttribute('role'), document.getElementById('customModal').getAttribute('aria-modal')]),
+        ['Rename Archive', 'dialog', 'true']);
+    for (let i = 0; i < 4; i++) {
+        await page.keyboard.press('Tab');
+        assert.equal(await page.evaluate(() => document.getElementById('customModal').contains(document.activeElement)), true,
+            'Tab left the dialog');
+    }
+    await page.focus('#customModal .modal-prompt-textarea');
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await page.evaluate(() => [Modal.current, getComputedStyle(document.getElementById('tab1')).display,
+        document.activeElement.id]), [null, 'block', 'archiveRename'], 'Escape left the panel, or the keyboard was not given back');
+
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Learning');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('notes');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    assert.deepEqual((await state(page)).archives, ['Learning notes · 0 notes']);
+    assert.equal(await page.evaluate(() => window.currentActiveZettelkastenMirror.getInputField().getAttribute('aria-label')),
+        'Learning notes', 'the editor is not named for its Archive');
+});
+
+// Only a choice closed the list: opened with Enter, it stayed open over the next control
+// once Tab had moved there.
+test('the Archive list opened from the keyboard closes when the focus moves on', async () => {
+    await openNotes(page);
+    await page.click('#archiveNew');
+    await page.focus('.archive-choice .select-replacer');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ArrowUp');
+    const open = () => page.evaluate(() => document.querySelector('.archive-choice .options-replacer').classList.contains('show'));
+    assert.equal(await open(), true);
+    await page.keyboard.press('Tab');
+    assert.equal(await open(), false, 'the list stayed open over the next control');
+    assert.equal((await state(page)).shown, 'Archive 1 · 0 notes');
 });

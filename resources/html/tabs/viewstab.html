@@ -27,10 +27,11 @@
     <!-- Store reads the current pan and zoom and asks for a name; Delete removes the one
          last clicked, which is the only thing that marks a Saved View as selected. The two
          ids still say Coordinates: they are what `displaysavedcoords.js` binds by, and
-         renaming an id changes no word a reader ever sees. -->
+         renaming an id changes no word a reader ever sees. Buttons, as the Saved Views
+         are: links with no target, they were out of reach of the keyboard. -->
     <div class="view-buttons">
-        <a id="saveCoordinatesBtn">Store View</a>
-        <a id="deleteCoordinatesBtn">Delete View</a>
+        <button type="button" class="key-button" id="saveCoordinatesBtn">Store View</button>
+        <button type="button" class="key-button" id="deleteCoordinatesBtn">Delete View</button>
     </div>
 
     <!-- Not a readout: both boxes are inputs, and typing in one moves the view. That is the
@@ -40,11 +41,11 @@
          overwriting the digits mid-word. -->
     <div id="coordinates" class="coordinates-container">
         <div class="coordinate-field">
-            <span>pan</span>
+            <label for="pan">pan</label>
             <input id="pan" type="text" value="0+0i" style="background:none; border:none;" size="28" />
         </div>
         <div class="coordinate-field">
-            <span>zoom</span>
+            <label for="zoom">zoom</label>
             <input id="zoom" type="text" value="1" style="background:none; border:none;" size="25" />
         </div>
     </div>
