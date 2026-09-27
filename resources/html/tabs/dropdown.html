@@ -124,8 +124,8 @@
 
          The tooltip names the commands first, in the order the rows are in. It named
          only the panels, which was the whole menu when it was a strip of tabs; four
-         commands sit above them now. It does not name notes either: that tab has no
-         tablink any more, and a hover that promises one is a hover that lies.
+         commands sit above them now. It names every panel, notes and help included:
+         it left notes out while that tab had no row, and it is first again (#65).
 
          A `<button>`, because a div was the whole keyboard surface of the menu and
          there was none. Measured before: Tab from the top of the document made six
@@ -142,7 +142,7 @@
          open, and the two `classList.toggle`s in `dropdown.js` are the only writes to
          that state in the tree. -->
     <button type="button" class="menu-button" aria-label="Menu" aria-expanded="false"
-            data-tooltip="Menu: open and save a graph to disk, screenshot, record, and the AI, fractal, views and settings panels">
+            data-tooltip="Menu: open and save a graph to disk, screenshot, record, and the notes, AI, fractal, views, settings and help panels">
         <!-- A span, not the div it was: a `<button>` takes phrasing content, and the
              three bars are `position: absolute`, so the box is identical either way. -->
         <span class="menu-icon" id="menu-icon"></span>
@@ -289,13 +289,6 @@
                      `aitab.html` does contain a `<form>`, so the day this nav lands
                      inside one, clicking a panel row reloads the page. -->
 
-                <button type="button" class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
-                        title="Prompt the AI, choose the model, and hold the API keys.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
-                    <span class="menu-row-label">Ai</span>
-                    <span class="visually-hidden"> panel</span>
-                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
-                </button>
                 <!-- First, because it is the graph itself.
 
                      `tab1` had no tablink at all, so the notes pane -- the CodeMirror
@@ -308,11 +301,19 @@
 
                      Above Ai and Fractal because a note is content and those are
                      tools, and a file-text glyph because this is where the prose
-                     lives. -->
+                     lives. It first landed second, under Ai, while this comment, its
+                     commit and its test all said first; it is first now. -->
                 <button type="button" class="menu-row tablink" onclick="openTab('tab1', this)"
                         title="The notes pane: every note as text, and the [[links]] between them. Editing here edits the map.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-text-icon"></use></svg>
                     <span class="menu-row-label">Notes</span>
+                    <span class="visually-hidden"> panel</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
+                </button>
+                <button type="button" class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
+                        title="Prompt the AI, choose the model, and hold the API keys.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
+                    <span class="menu-row-label">Ai</span>
                     <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
@@ -323,8 +324,7 @@
                     <span class="visually-hidden"> panel</span>
                     <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
-                <!-- Beside Saves, because the two were one panel until now and the reader
-                     who looked there for a place will look next to it. Not inside the
+                <!-- Views were split out of the old Saves panel, which is gone. Not inside the
                      Fractal panel, though `fractal-select` is what filters the list: the
                      equation being drawn is why a place is in the list, but coming back to
                      a place is not an adjustment to how anything is drawn.
@@ -380,17 +380,14 @@
 
                 <!-- Tab content placeholders -->
 
-                <!-- No tablink points here any more: the Notes tab is gone. The div and
-                     its `PageLoad.tabs` entry stay because the app reads what loads into
-                     it and would throw without it -- `App.init` builds `ZetPanes` from
-                     `#zetPaneContainer`, and `openTab` refreshes
-                     `currentActiveZettelkastenMirror` on every tab switch. It also keeps
-                     text-to-graph sync alive: an AI answer with no target node is
-                     streamed into that editor, and the sync pass turns it into nodes.
-
-                     So this is invisible, not dead. Issue #65 records the 14 mirror sites
-                     and the 18 `zetPaneList` sites, and holds the choice between giving
-                     the editor a designed home and deleting it outright. -->
+                <!-- The Notes row opens this: the editor's designed home (issue #65).
+                     The div and its `PageLoad.tabs` entry would be load-bearing even with
+                     no row, because the app reads what loads into it and would throw
+                     without it -- `App.init` builds `ZetPanes` from `#zetPaneContainer`,
+                     and `openTab` refreshes `currentActiveZettelkastenMirror` on every
+                     tab switch. It also keeps text-to-graph sync alive: an AI answer with
+                     no target node is streamed into that editor, and the sync pass turns
+                     it into nodes. -->
                 <div id="tab1" class="tabcontent">
                     <!-- Tab 1 content will be loaded here -->
                 </div>

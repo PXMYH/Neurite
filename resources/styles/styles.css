@@ -1537,8 +1537,8 @@ textarea.title-input.title-input-stowed {
    backing textarea CodeMirror always hides: that is `display: none` and 0x0 in every
    state, so it cannot tell the working case from the broken one. The proof that the
    broken case is real is one element away -- the editor in `#zet-pane-1` measures 0x0
-   here too, because `#tab1` has no menu row, so `openTab` never shows it and it is
-   still `display: none` (issue #65).
+   here too whenever the Notes panel is not the one open, because an unopened
+   `.tabcontent` is `display: none`.
 
    `visibility` is the third state between those two, and it is why the transform is
    not hiding this on its own. A transformed box is still a rendered box, so every
@@ -2627,7 +2627,8 @@ input[type="checkbox"] {
     cursor: ew-resize;
     background-color: transparent; /* Make it transparent */
     position: absolute;
-    left: 0;
+    /* The right edge, the one that moves: see notestab.js. It was `left: 0`. */
+    right: 0;
     z-index: 1;
 }
 

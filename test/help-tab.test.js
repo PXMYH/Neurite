@@ -107,6 +107,10 @@ const CLAIMS = [
     {row: /instructions-checkbox/, says: /instructions/,
      file: 'js/ai/aimessage.js', code: /Elem\.byId\('instructions-checkbox'\)\.checked/,
      why: 'the How-To checkbox is read nowhere, so ticking it changes nothing'},
+    // It said "there is no editor to type it into" for weeks after the Notes row existed.
+    {row: /<code>## Title<\/code>/, says: /Notes panel/,
+     file: 'resources/html/tabs/dropdown.html', code: /openTab\('tab1', this\)/,
+     why: 'the Notes row is gone, so the help sends the reader to a panel they cannot open'},
 ];
 
 // "Any character" tempered to stop at the row's own end. `[\s\S]*?` is lazy but

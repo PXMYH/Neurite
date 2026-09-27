@@ -49,7 +49,10 @@ function updateMaxDimensions() {
 updateMaxDimensions();
 On.resize(window, updateMaxDimensions);
 
-// Horizontal drag handle
+// Horizontal drag handle -- on the pane's right edge, which is the one that moves: the
+// menu is anchored at the left of the screen, so the pane grows rightwards. It sat on the
+// left edge and subtracted the drag, so it pulled the wrong way on an edge that cannot
+// move; measured, a drag of +120px left the pane at 270px wide (#65).
 let zetHorizDragHandle = Elem.byId('zetHorizDragHandle');
 let zetIsHorizResizing = false;
 let initialX;
@@ -64,13 +67,20 @@ On.mousedown(zetHorizDragHandle, (e)=>{
     // Prevent text selection while resizing
     document.body.style.userSelect = 'none';
     On.mousemove(document, zetHandleHorizMouseMove);
-    On.mouseup(document, (e)=>{
-        zetIsHorizResizing = false;
-        // Enable text selection again after resizing
-        document.body.style.userSelect = '';
-        Off.mousemove(document, zetHandleHorizMouseMove);
-    });
+    // Once: a listener added per drag and never removed piled up one more per drag.
+    On.mouseup(document, zetEndResize.bind(null, zetHandleHorizMouseMove), {once: true});
 });
+
+// The end of either drag. CodeMirror measures its width when it lays text out and not
+// when its box changes, so it is told to look again, or lines stay wrapped to the old one.
+function zetEndResize(onMove){
+    zetIsHorizResizing = false;
+    zetIsVertResizing = false;
+    // Enable text selection again after resizing
+    document.body.style.userSelect = '';
+    Off.mousemove(document, onMove);
+    window.currentActiveZettelkastenMirror?.refresh();
+}
 
 function zetHandleHorizMouseMove(event) {
     if (!zetIsHorizResizing) return;
@@ -78,7 +88,7 @@ function zetHandleHorizMouseMove(event) {
     requestAnimationFrame(() => {
         // Calculate the difference in the x position
         const dx = event.clientX - initialX;
-        const newWidth = initialWidth - dx;
+        const newWidth = initialWidth + dx;
 
         // Update the width if within the boundaries
         if (newWidth > 50 && newWidth <= maxWidth) {
@@ -102,12 +112,7 @@ On.mousedown(zetVertDragHandle, (e)=>{
     // Prevent text selection while resizing
     document.body.style.userSelect = 'none';
     On.mousemove(document, zetHandleVertMouseMove);
-    On.mouseup(document, (e)=>{
-        zetIsVertResizing = false;
-        // Enable text selection again after resizing
-        document.body.style.userSelect = '';
-        Off.mousemove(document, zetHandleVertMouseMove);
-    });
+    On.mouseup(document, zetEndResize.bind(null, zetHandleVertMouseMove), {once: true});
 });
 
 function zetHandleVertMouseMove(event) {

@@ -162,3 +162,31 @@ test('the notes pane can be opened from the menu', async () => {
     assert.ok(state.text.includes(heading), `the pane holds "${heading}"`);
     assert.ok(state.text.includes('[[Knowledge Graphs]]'), 'and holds the link between the notes');
 });
+
+// The pane's side handle is on the edge that moves, and pulls the way the pointer goes. It
+// sat on the left edge -- which is anchored, the menu hangs from the left of the screen --
+// and subtracted the drag: measured, a drag of +120px left the pane at 270px wide (#65).
+test('the notes pane widens when its side handle is dragged right', async () => {
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    await page.click("button.menu-row.tablink:has-text('Notes')");
+    await page.waitForTimeout(500);
+
+    const box = (id) => page.evaluate((id) => {
+        const r = document.getElementById(id).getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2, right: r.right, width: r.width };
+    }, id);
+    const pane0 = await box('zetPaneContainer');
+    const handle = await box('zetHorizDragHandle');
+    assert.ok(handle.x > pane0.x, 'the handle sits on the right-hand edge');
+
+    await page.mouse.move(handle.x, handle.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(handle.x + i * 15, handle.y);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    const pane1 = await box('zetPaneContainer');
+    assert.ok(Math.abs(pane1.width - pane0.width - 120) <= 2,
+        `a 120px drag widened the pane by ${Math.round(pane1.width - pane0.width)}px`);
+});

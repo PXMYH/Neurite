@@ -69,10 +69,11 @@ const tablinks = [...dropdownHtml.matchAll(/onclick="openTab\('(\w+)', this\)"[\
     .map( (m)=> [m[1], m[2].trim()] );
 
 test('a menu row opens the Notes tab, and the rows are in a known order', ()=>{
-    // Notes first: it is the graph itself, and the rows under it are tools for it.
+    // Notes first: it is the graph itself, and the rows under it are tools for it. This
+    // list once pinned Notes second, under Ai -- the accident this comment contradicted.
     assert.deepEqual(tablinks, [
-        ['tab4', 'Ai'],
         ['tab1', 'Notes'],
+        ['tab4', 'Ai'],
         ['tab2', 'Fractal'],
         ['tab7', 'Views'],
         ['tab5', 'Settings'],

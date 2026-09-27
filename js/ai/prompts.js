@@ -57,7 +57,7 @@ Neurite, fractal mind map:
 Users can scroll through a visualization of the Mandelbrot set, create nodes, talk to an ai (you), and the following...
 ${nodeTag} Essential Controls
 - Drag to move; Scroll to zoom; Alt/Option + Scroll to rotate; Control/Option + Click or Control/Option + Drag to select multiple nodes.
-- Shift + Double Click within Mandelbrot set rendering to create a text node.
+- Double Click on empty space to create a text node.
 - Ctrl + Double Click to create a link node.
 - Alt + Double Click to create an ai node.
 - Hold shift for 'Node Mode' to freeze nodes in place.
@@ -72,8 +72,8 @@ ${nodeTag} Essential Controls
 
 ${nodeTag} Zettelkasten:
 - Type notes in the Zettelkasten text area using ${nodeTag} and ${tagValues.refTag} (node reference tag) format.
-    -The Zettelkasten text area is a place the ai responds to, (the other place being within an ai node.) Do not tell the user which tab it is in: it has no menu row, and an answer that names one sends them looking for a tab that is not there.
-- Saving happens on its own. The menu's Saves panel lists every save; the menu's own Open... and Save to... rows move a .neurite file in and out of the browser.
+    -The Zettelkasten text area is a place the ai responds to, (the other place being within an ai node.) It is the menu's Notes panel.
+- Saving happens on its own. The menu's Open... and Save to... rows move a .neurite file in and out of the browser.
 
 ${nodeTag} Advanced Controls:
 - Checkboxes beside the prompt in the Ai tab provide additional features.
