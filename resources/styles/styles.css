@@ -4491,8 +4491,9 @@ code.language-markdown {
        Neurite had no way to show, because a tool fired and immediately looked idle
        again even though the node it made was still following the mouse waiting to be
        placed. The behaviour was already "arm, then click to place"; only the signal
-       was missing. */
-    .tool-bar .node-add-item[aria-pressed="true"] {
+       was missing. Connect is lit the same way while its mode is on (#50). */
+    .tool-bar .node-add-item[aria-pressed="true"],
+    .tool-bar .tool-bar-action[aria-pressed="true"] {
         background-color: var(--ui-chrome-active);
         color: var(--ui-chrome-on-active);
     }
@@ -4947,10 +4948,6 @@ code.language-markdown {
     .panel-icon.activeIcon {
         background-color: #929292;
         cursor: grab;
-    }
-
-    .panel-icon.edges-active {
-        background-color: #929292;
     }
 
     .panel-icon.edges-icon:hover {

@@ -92,7 +92,20 @@
              make it draggable and drop a Node type that does not exist.
 
              After the creators, not before them, because the digit shortcuts 1-4
-             are the creators' positions in the pill and the tooltips promise it. -->
+             are the creators' positions in the pill and the tooltips promise it.
+
+             Connect is the Shift gesture made visible (#50): holding Shift lights
+             it, and a click keeps the mode on without the key -- which is also the
+             only way to connect two Nodes on a screen with no keyboard. Shift used
+             to light the File tree tool, whose glyph was a three-node graph until
+             #52 made it a folder, so the mode's one tell pointed at the wrong tool.
+             `aria-pressed` is the mode itself, written by `NodeMode.switch`. -->
+        <button id="connectTool" class="tool-bar-action" aria-label="Connect Nodes" aria-pressed="false"
+                data-tooltip="Connect Nodes (hold Shift): click one Node, then another, to join them. Click here to keep it on; Esc turns it off.">
+            <svg aria-hidden="true">
+                <use xlink:href="#connect-icon-symbol"></use>
+            </svg>
+        </button>
         <button id="nodeSearchButton" class="tool-bar-action" aria-label="Search Nodes"
                 data-tooltip="Search Nodes: highlights every match on the canvas.">
             <svg aria-hidden="true">

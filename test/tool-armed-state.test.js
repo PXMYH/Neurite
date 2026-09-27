@@ -69,20 +69,24 @@ test('the badge is decoration for a screen reader, and never a click target', ()
         'the badge can take a click, so pressing the corner of a tool does nothing');
 });
 
-test('search carries no digit, because no key is bound to it', ()=>{
-    // A badge on a tool with no shortcut would be a label for nothing. Search is the
-    // only control in the pill that has none.
+test('Connect and Search carry no digit, because no digit is bound to them', ()=>{
+    // A badge on a tool with no shortcut would be a label for nothing. Connect and
+    // Search are the two controls in the pill with none: Connect's key is Shift, which
+    // its tooltip says.
     const pill = toolPill();
-    const search = pill.slice(pill.indexOf('tool-bar-action'));
-    assert.doesNotMatch(search, /tool-key/,
-        'the search button grew a shortcut badge. If a key was bound to it, add it to '
+    const actions = pill.slice(pill.indexOf('<button id="connectTool"'));
+    assert.match(actions, /^<button id="connectTool"[\s\S]*<button id="nodeSearchButton"/,
+        'Connect and Search are not the two actions after the creators');
+    assert.doesNotMatch(actions, /tool-key/,
+        'Connect or Search grew a shortcut badge. If a key was bound to one, add it to '
         + 'toolShortcuts in dropdown.js so the digit means something');
 });
 
 test('the lit pill is its own colour, not the selection accent', ()=>{
-    const lit = css.match(/\.tool-bar \.node-add-item\[aria-pressed="true"\] \{([^}]*)\}/);
-    assert.ok(lit, 'nothing paints the armed tool any more, so the pill went back to '
-                   + 'looking idle while the Node it made is still following the mouse');
+    // One rule for an armed creator and for Connect while its mode is on (#50).
+    const lit = css.match(/\.tool-bar \.node-add-item\[aria-pressed="true"\],\s*\.tool-bar \.tool-bar-action\[aria-pressed="true"\] \{([^}]*)\}/);
+    assert.ok(lit, 'the armed creators and the Connect tool no longer share the lit rule, '
+                   + 'so one of them looks idle while it is on');
     assert.match(lit[1], /background-color:\s*var\(--ui-chrome-active\)/,
         'the armed tool no longer reads --ui-chrome-active');
     // An armed tool is a mode; a selected card is a selection. Sharing the accent

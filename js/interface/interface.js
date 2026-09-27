@@ -147,13 +147,16 @@ class Interface {
             this.autoToggleAllOverlays();
         }
     }
+    // A message that says nothing about the mode leaves it alone. `data.nodeMode ?? 0`
+    // turned the mode off on every message the window got -- from any page embedded in
+    // a Link Node -- while the tool stayed lit (#50).
     onMessage = (e)=>{
         const data = e.data;
-        if (data.altHeld !== undefined) {
+        if (data?.altHeld !== undefined) {
             this.altHeld = data.altHeld;
             this.autoToggleAllOverlays();
         }
-        this.nodeMode.val = data.nodeMode ?? 0;
+        if (data?.nodeMode !== undefined) this.nodeMode.switch(data.nodeMode ? 1 : 0);
     }
 
     onMouseMove = (e)=>{

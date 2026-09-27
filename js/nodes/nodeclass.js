@@ -293,10 +293,12 @@ class Node {
         Graph.draggedNode = this;
         Graph.movingNode = this;
 
+        // Shift itself as well as the mode: a Shift pressed while the caret was in a
+        // text field never turned the mode on (`NodeMode.isHeldFor`).
         if (Node.prev) {
             connectNodes(this, Node.prev);
             Node.prev = null;
-        } else if (App.nodeMode) {
+        } else if (App.nodeMode || App.interface.nodeMode.isHeldFor(e)) {
             Node.prev = this;
         }
 
