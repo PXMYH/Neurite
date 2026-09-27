@@ -210,6 +210,11 @@ Corpus measured: 95 concept Notes (not 140), 240 Refs inside them making 72 Edge
 
 ## Phase 5 — iPad: #55, #57, #58, #56, #9, #59, #11, #60, #61, #62, #6, then #7 #8 #1 #54 → v1.5.0
 
+- **Carried in from Phase 2's WebKit runs:** a hundred notes arriving at once stall the page for
+  1.6 s in WebKit (the placement spec's budget is 1.5 s, which Chromium meets); there is no touch
+  route to the Node menu (no long press) and so none to select; and the two wheel gestures cannot
+  be driven in mobile WebKit, so they are skipped there.
+
 - **Paperwork first.** #54 reversed #1's scope (the iPad authors), so #1 folds into #54; #7 and #8
   close as superseded, each with a comment mapping its questions to the tickets that answer them.
 - **#55** Fact sheet on the ticket (both pinch paths executed: the touch path zooms the wrong way

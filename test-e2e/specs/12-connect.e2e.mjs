@@ -524,6 +524,145 @@ test('Shift + scroll over a card resizes it with the caret in the notes pane', {
     assert.ok(await scale() > before * 1.05, 'Shift + scroll over the card did not resize it');
 });
 
+// ---- found by the review of those fixes ----
+
+test('a right-click neither arms nor finishes a link, and a plain click on a body finishes one', async () => {
+    // The right button armed and finished links as the left did, and wrote Refs.
+    const [a, b, c] = await fourNotes(page);
+    await page.click('#connectTool');
+    const body = await bodySpot(page, a);
+    await page.mouse.click(body.x, body.y, { button: 'right' });
+    assert.equal(await armed(page), null, 'a right-click armed a link');
+    await page.keyboard.press('Escape');
+    await page.click('#connectTool');
+
+    await page.keyboard.down('Shift');
+    await press(page, a);
+    await page.keyboard.up('Shift');
+    assert.equal(await armed(page), a);
+    const bb = await bodySpot(page, b);
+    await page.mouse.click(bb.x, bb.y, { button: 'right' });
+    await page.keyboard.press('Escape');
+    assert.equal(await joined(page, a, b), false, 'a right-click finished the link');
+    // The first Escape closed the menu; the link is still armed, from Alpha.
+    assert.equal(await armed(page), a);
+
+    // A link armed, then a plain click on another note's body: finished, as on its header.
+    await pressAt(page, await bodySpot(page, c));
+    assert.ok(await joined(page, a, c), 'a plain click on a body left the link armed');
+});
+
+test('an Escape during the press that would finish a link cancels it', async () => {
+    const [a, b] = await fourNotes(page);
+    await page.keyboard.down('Shift');
+    await press(page, a);
+    await page.keyboard.up('Shift');
+    const p = await cardSpot(page, b);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    assert.equal(await joined(page, a, b), false, 'the release linked a link Escape had dropped');
+});
+
+test('a connect key rebound to a letter still connects', async () => {
+    // A press read the key as up and turned the mode off, so nothing armed.
+    // As the Controls modal records it: the control, and the setting it writes.
+    await page.evaluate(() => {
+        controls.shiftKey.value = 'z';
+        localStorage.setItem('controls', JSON.stringify(controls));
+        settings.nodeModeKey = 'z';
+    });
+    await page.waitForTimeout(500);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
+    assert.equal(await page.evaluate(() => App.interface.nodeMode.key), 'z');
+    const [a, b] = await fourNotes(page);
+    await page.mouse.move(10, 500);
+    await page.keyboard.down('z');
+    await press(page, a);
+    await press(page, b);
+    await page.keyboard.up('z');
+    assert.ok(await joined(page, a, b), 'holding the rebound key and clicking two Nodes made no Edge');
+});
+
+test('a select list left open in a closed modal does not keep Escape from the Plane', async () => {
+    const [a] = await fourNotes(page);
+    await page.evaluate(() => openControlsModal());
+    await page.click('#customModal .modal-body .select-replacer');
+    await page.click('#customModal .close');
+    await page.click('#connectTool');
+    await page.keyboard.press('Escape');
+    assert.equal(await tool(page), 'false', 'the open list kept Escape from turning the tool off');
+    assert.ok(a);
+});
+
+test('Escape closes the right-click menu before the menu panel it opened over', async () => {
+    const [a] = await fourNotes(page);
+    await page.click('.menu-button');
+    await page.click(".menu-row.tablink:has-text('Help')");
+    const panelOpen = () => page.evaluate(() => document.querySelector('.dropdown-content').classList.contains('open'));
+    assert.equal(await panelOpen(), true);
+    // Opened from the card itself: in a small window the panel can lie over the card.
+    await page.evaluate((id) => {
+        const r = Graph.nodes[id].view.div.getBoundingClientRect();
+        App.menuContext.open(r.right - 20, r.bottom - 20, Graph.nodes[id].view.div);
+    }, a);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('customContextMenu')).display !== 'none');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('customContextMenu')).display), 'none');
+    assert.equal(await panelOpen(), true, 'one Escape closed both the right-click menu and the panel');
+});
+
+test("in a short window the action list goes beside the menu, over neither it nor the pointer", async () => {
+    // Where it fitted neither below nor above, it was put at the top of the window, on the menu
+    // and its focused search; flipped above near the right edge, it ended under the pointer.
+    await page.setViewportSize({ width: 1440, height: 650 });
+    const [a] = await fourNotes(page);
+    for (const at of [{ x: 700, y: 300 }, { x: 1300, y: 500 }]) {
+        const r = await page.evaluate((id) => {
+            const b = Graph.nodes[id].view.div.getBoundingClientRect();
+            return { x: b.x, y: b.y, w: b.width, h: b.height };
+        }, a);
+        await page.evaluate(([id, at]) => App.menuContext.open(at.x, at.y, Graph.nodes[id].view.div), [a, at]);
+        await page.waitForFunction(() => document.getElementById('suggestions-container').style.display === 'block');
+        const g = await page.evaluate((at) => {
+            const m = document.getElementById('customContextMenu').getBoundingClientRect();
+            const s = document.getElementById('suggestions-container').getBoundingClientRect();
+            const overlap = s.left < m.right && s.right > m.left && s.top < m.bottom && s.bottom > m.top;
+            const under = at.x >= s.left && at.x <= s.right && at.y >= s.top && at.y <= s.bottom;
+            return { overlap, under, inside: s.left >= 0 && s.top >= 0 && s.right <= innerWidth && s.bottom <= innerHeight };
+        }, at);
+        assert.deepEqual(g, { overlap: false, under: false, inside: true }, `menu at ${JSON.stringify(at)}`);
+        await page.keyboard.press('Escape');
+        assert.ok(r.w > 0);
+    }
+});
+
+test('"+ link" takes a finger-sized press on a touch screen', { skip: !isIPad && 'a coarse pointer only' }, async () => {
+    // Its 44px target was clipped by the strip to 24px.
+    const [a] = await fourNotes(page);
+    const hit = await page.evaluate((id) => {
+        const add = Graph.nodes[id].view.div.querySelector('.link-add');
+        const r = add.getBoundingClientRect();
+        const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+        const reach = (dy) => document.elementFromPoint(cx, cy + dy) === add;
+        return { up: reach(-20), down: reach(20) };
+    }, a);
+    assert.deepEqual(hit, { up: true, down: true });
+});
+
+test('"+ link": ArrowUp with no row chosen goes to the last row', async () => {
+    const [a] = await fourNotes(page);
+    await openPicker(page, a);
+    await page.keyboard.press('ArrowUp');
+    const [last, active] = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('#nodeList li[data-node-id]')];
+        return [rows[rows.length - 1].textContent, document.querySelector('#nodeList li.active')?.textContent];
+    });
+    assert.equal(active, last);
+});
+
 test('one keystroke asks each linked note once whether it names the note typed in', async () => {
     // Each ask splits the whole Pane, and the three loops that decide a note's Edges asked
     // again each: measured, 3200 asks for 40 answers on one keystroke, 26 ms where it was 16.

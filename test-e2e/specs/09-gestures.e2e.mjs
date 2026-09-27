@@ -153,11 +153,11 @@ test('Tidy separates a pile', async () => {
     assert.ok(held >= 1, `still clear a second later; worst ratio ${held.toFixed(3)}`);
 });
 
-// Shift and mousedown arms a link that the next mousedown anywhere completes, with no
+// A Shift + press arms a link that the next click on another note finishes, with no
 // time limit. The state was real and had nothing on screen saying so, in an app with no
 // undo -- arm one, forget, click a note later, and an edge appears that was never asked
-// for. `Node.prev` is an accessor now so the marker survives all five of its assignment
-// sites, including the two that clear it for reasons other than completing the link.
+// for. `Node.prev` is an accessor now so the marker survives every one of its assignment
+// sites, including the ones that clear it for reasons other than finishing the link.
 test('a note with a link armed from it is marked', async () => {
     const a = await addNote(page, 'A', 'first');
     const b = await addNote(page, 'B', 'second');

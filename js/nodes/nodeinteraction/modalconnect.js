@@ -77,8 +77,10 @@ Modal.Connect = class {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
             if (!rows.length) return;
-            const step = (e.key === 'ArrowDown' ? 1 : -1);
-            this.setActive(rows[(at + step + rows.length) % rows.length]);
+            const down = (e.key === 'ArrowDown');
+            const next = (at < 0) ? (down ? 0 : rows.length - 1)
+                       : (at + (down ? 1 : -1) + rows.length) % rows.length;
+            this.setActive(rows[next]);
             return;
         }
         if (e.key !== 'Enter') return;

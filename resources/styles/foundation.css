@@ -237,9 +237,9 @@ body.connect-mode .window textarea {
 
 /* A note with a link armed from it.
 
-   Shift and mousedown arms a link and the next mousedown on any note completes it, with
-   no time limit -- so this state could sit there unmarked while a reader did something
-   else, and then turn an ordinary click into an edge they never asked for. It reads as
+   A Shift + press arms a link and the next click on another note finishes it, with no
+   time limit -- so this state can sit there while a reader does something else, and then
+   turn an ordinary click into an edge they never asked for (Escape drops it). It reads as
    pending rather than as selected: a dashed accent edge, which is the one border
    treatment nothing else in the app uses. */
 .window.link-pending {

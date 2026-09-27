@@ -39,11 +39,20 @@ export async function openNeurite(browser, { setup } = {}) {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
+    const failed = [];
+    page.on('requestfailed', (r) => failed.push(r.url() + ' ' + (r.failure()?.errorText ?? '')));
     await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
     // `window.appReady` (globals.js) flips true on the last line of App.init.
     // Graph / App / NodeView are lexical globals, NOT window properties -- reach
     // them by bare name inside evaluate(), never as `window.Graph`.
-    await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
+    //
+    // A boot that never gets there says why, rather than only that it timed out: the
+    // page errors, the requests that failed, and the last script the loader had added.
+    await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 }).catch(async (e) => {
+        const last = await page.evaluate(() => [...document.scripts].pop()?.src ?? null).catch(() => null);
+        const local = failed.filter((u) => u.includes(new URL(BASE_URL).host));
+        throw new Error(`${e.message}\n  page errors: ${JSON.stringify(errors)}\n  failed requests: ${JSON.stringify(local)}\n  last script: ${last}`);
+    });
     return { context, page, errors };
 }
 

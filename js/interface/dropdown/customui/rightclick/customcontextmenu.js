@@ -52,7 +52,7 @@ Menu.Context = class {
         this.targetModel = view.model;
         this[view.funcPopulate](x, y);
         this.position(x, y);
-        App.menuSuggestions.repositionIfDisplayed(this.menu);
+        App.menuSuggestions.repositionIfDisplayed(this.menu, {x, y});
         this.inputField?.isConnected && this.focusSearch();
     }
     // The search takes the keys while the menu is open: they went to the canvas, where f and

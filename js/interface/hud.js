@@ -77,10 +77,10 @@ class Hud {
             <p class="canvas-hint-lead">Double-click anywhere to write a note</p>
             <!-- What the app actually does, checked against the handlers rather than
                  written from memory. This said "Shift + drag a note onto another to link
-                 them", which is not a gesture Neurite has: Shift and mousedown on the
-                 first note arms a link (nodeclass.js:276) and the next mousedown on any
-                 note completes it -- dragging one card onto another moves it and makes no
-                 edge at all. An instruction on an empty canvas is the one piece of text a
+                 them", which is not a gesture Neurite has: a Shift + press on the first
+                 note arms a link and a click on another finishes it (Node.onMouseDown,
+                 Node.stopFollowingMouse) -- dragging one card onto another moves it and
+                 makes no edge at all. An instruction on an empty canvas is the one piece of text a
                  reader has no way to check, so it has to be the true one.
 
                  Typing the link is the better thing to teach anyway: it is the same act

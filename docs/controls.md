@@ -27,7 +27,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <!-- Node Management -->
   <tr>
-    <td rowspan="7"><strong>Node Essentials</strong></td>
+    <td rowspan="9"><strong>Node Essentials</strong></td>
     <td><code>Shift + double click</code></td>
     <td>Create text node</td>
   </tr>

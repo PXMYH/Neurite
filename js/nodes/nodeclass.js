@@ -1,16 +1,16 @@
 class Node {
     // The note a pending link starts from, behind an accessor so the card can show it.
     //
-    // Shift and mousedown on a note arms a link, and the *next* mousedown on any note
-    // completes it -- with nothing on screen saying so, and no time limit. Arm one,
-    // forget, click a note three seconds later, and an edge appears that was never
-    // asked for, in an app with no undo. The state was real and invisible; now the card
-    // it started from is marked while it lasts.
+    // A Shift + press on a note arms a link, and the next click on another note finishes
+    // it -- with no time limit. Arm one, forget, click a note a minute later, and an edge
+    // appears that was never asked for, in an app with no undo. The state was real and
+    // invisible; now the card it started from is marked while it lasts (and Escape drops
+    // it).
     //
-    // An accessor rather than a call at each of the five assignment sites, because the
-    // marker has to survive every one of them, including `interface.js:207` clearing it
-    // on a canvas drag and `window.js:475` clearing it because the armed card was
-    // deleted.
+    // An accessor rather than a call at each assignment site, because the marker has to
+    // survive every one of them, including a press on the Plane clearing it
+    // (`Interface.onMouseDown`) and a delete clearing it because the armed card went
+    // (`window.js`).
     static #prev = null;
 
     static get prev(){ return Node.#prev }
@@ -327,13 +327,15 @@ class Node {
         // not a press: a drag that began on the second Node finished the link and moved the
         // Node as well. Shift itself counts as well as the mode, since a Shift pressed while
         // the caret was in a text field never turned the mode on (`NodeMode.isOnFor`).
-        const armed = Node.prev;
+        // The primary button only: a right-click armed and finished links too, and wrote Refs.
+        const primary = (e.button === 0);
+        const armed = (primary ? Node.prev : null);
         this.#linkOnClick = armed;
-        if (!armed && App.interface.nodeMode.isOnFor(e)) Node.prev = this;
+        if (primary && !armed && App.interface.nodeMode.isOnFor(e)) Node.prev = this;
 
         // A gesture on the card keeps the caret out of its text, or the title took the next
         // keys -- measured, typing "X" in the connect mode renamed a note.
-        if (armed || Node.prev === this || Mod.isHeld(e)) e.preventDefault();
+        if (primary && (armed || Node.prev === this || Mod.isHeld(e))) e.preventDefault();
 
         clearTextSelections();
 
@@ -366,9 +368,10 @@ class Node {
 
         // The release that makes a press a click finishes an armed link; a drag dropped it
         // already (`_maybeAddGrabbing`). A click on the armed Node itself only disarms it.
+        // And only if the link is still armed: an Escape during the press dropped it.
         const armed = this.#linkOnClick;
         this.#linkOnClick = null;
-        if (armed && !this._hasAddedGrabbing) {
+        if (armed && armed === Node.prev && !this._hasAddedGrabbing) {
             if (armed !== this) connectNodes(this, armed);
             Node.prev = null;
         }

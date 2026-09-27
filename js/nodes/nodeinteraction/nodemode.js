@@ -63,32 +63,44 @@ class NodeMode {
             this.switch(1 - this.val); // Toggle between 0 and 1
         }
     }
-    // Escape, one layer at a time, from the inside out. An open modal or the menu takes it
-    // first; so does an open select list, and the right-click menu, which it closes. Then
-    // the text of a card: the first Escape leaves it, as it leaves the Notes panel. Past all
-    // of them it drops an armed link, which otherwise waited for any later click on a Node
-    // with no time limit, turns the connect mode off, and clears the selection.
+    // Escape, one layer at a time, from the top down: the right-click menu, which it closes;
+    // an open modal or the menu panel; an open select list; then the text of a card, which
+    // the first Escape leaves, as it leaves the Notes panel. Past all of them it drops an
+    // armed link, which otherwise waits for a click on another Node with no time limit,
+    // turns the connect mode off, and clears the selection.
     onEscape = (e)=>{
         if (e.key !== 'Escape') return;
 
         Graph.forEachNode(Node.stopFollowingMouse);
+        // The right-click menu is on top of everything when it is open, the menu panel and a
+        // modal included, so it goes first and the key goes no further.
+        if (App.menuContext.menu.style.display === 'block') {
+            e.stopPropagation();
+            return App.menuContext.hide();
+        }
         if (Modal.current || dropdownContent.classList.contains('open')) return;
-        if (document.querySelector('.options-replacer.show')) return;
-        if (App.menuContext.menu.style.display === 'block') return App.menuContext.hide();
+        // A select list that is open and has the focus, which is the one its own Escape
+        // closes; a list left open in a closed modal is not, and it kept the key from here.
+        if (document.activeElement?.closest?.('.select-replacer:not(.closed)')) return;
         const field = document.activeElement;
         if (field?.closest?.('.window') && Hud.isTyping()) return field.blur();
 
         this.setLocked(false);
         App.selectedNodes.clear();
     }
+    // Only a mode the key holds on, and only when the key is a modifier a press can report:
+    // a key rebound to a letter reads as up on every press, and a CapsLock or a toggle mode
+    // is on while it is on.
+    static modifiers = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph']);
+    get isHeldByKey(){ return (this.trigger === "down" && NodeMode.modifiers.has(this.key)) }
     onBlur = ()=>{
-        if (this.locked || !this.val) return;
+        if (this.locked || !this.val || !this.isHeldByKey) return;
 
         this.switch(0);
         this.autoToggleAllOverlays();
     }
     onPress = (e)=>{
-        if (this.trigger !== "down" || e.getModifierState(this.key)) return;
+        if (!this.isHeldByKey || e.getModifierState(this.key)) return;
         this.onBlur();
     }
     onKeyUp = (e)=>{

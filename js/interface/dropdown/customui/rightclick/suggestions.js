@@ -20,21 +20,36 @@
 
         document.body.appendChild(this.container);
     }
-    // Under the menu it belongs to and aligned with it, or above the menu where there is no
-    // room below, and never off the screen. It was anchored to the pointer instead -- above
-    // and to its left, with its last row under it, so the click that dismissed the menu ran
-    // that row, and near the left edge its labels began at x -215.
-    placeBeside(menu) {
+    // Beside the menu it belongs to, on the screen, and never over the pointer or the menu.
+    // It was anchored to the pointer -- above and to its left, with its last row under it,
+    // so the click that dismissed the menu ran that row -- and near the left edge its labels
+    // began at x -215. So: below the menu, else above it and the pointer, else to the side
+    // away from the pointer, else the other side; the first that fits and covers neither.
+    placeBeside(menu, pointer) {
         const style = this.container.style;
         style.transform = '';
         style.display = 'block';
 
         const m = menu.getBoundingClientRect();
         const w = this.container.offsetWidth, h = this.container.offsetHeight;
-        const below = m.bottom + 4;
-        const y = (below + h <= innerHeight - 8) ? below : Math.max(8, m.top - 4 - h);
-        style.left = Math.max(8, Math.min(m.left, innerWidth - w - 8)) + 'px';
-        style.top = y + 'px';
+        const gap = 4, edge = 8, W = innerWidth, H = innerHeight;
+        const clampX = (x)=>Math.max(edge, Math.min(x, W - w - edge));
+        const clampY = (y)=>Math.max(edge, Math.min(y, H - h - edge));
+        const leftOfMenu = (pointer.x >= m.right);   // the menu flipped to the pointer's left
+        const side = (left)=>({x: (left ? m.left - gap - w : m.right + gap), y: clampY(m.top)});
+        const candidates = [
+            {x: clampX(m.left), y: m.bottom + gap},
+            {x: clampX(m.left), y: Math.min(m.top, pointer.y) - gap - h},
+            side(leftOfMenu),
+            side(!leftOfMenu)
+        ];
+        const fits = (c)=>(c.x >= edge && c.x + w <= W - edge && c.y >= edge && c.y + h <= H - edge);
+        const covers = (c, r)=>(c.x < r.right && c.x + w > r.left && c.y < r.bottom && c.y + h > r.top);
+        const dot = {left: pointer.x, right: pointer.x + 1, top: pointer.y, bottom: pointer.y + 1};
+        const at = candidates.find( (c)=>fits(c) && !covers(c, m) && !covers(c, dot) )
+                ?? {x: clampX(candidates[2].x), y: candidates[2].y};
+        style.left = at.x + 'px';
+        style.top = at.y + 'px';
     }
     clear() {
         this.container.innerHTML = '';
@@ -44,8 +59,8 @@
         item.init();
         this.container.appendChild(item.divItem);
     }
-    repositionIfDisplayed(menu){
-        if (this.container.style.display === 'block') this.placeBeside(menu)
+    repositionIfDisplayed(menu, pointer){
+        if (this.container.style.display === 'block') this.placeBeside(menu, pointer)
     }
     hide() {
         this.container.style.display = 'none';
@@ -253,7 +268,7 @@ Menu.Context.prototype.setupSuggestions = function(pageX, pageY){
             );
         });
 
-        menu.placeBeside(App.menuContext.menu);
+        menu.placeBeside(App.menuContext.menu, {x: pageX, y: pageY});
     }
     requestAnimationFrame(() => {
         const items = [...this.menu.children];
