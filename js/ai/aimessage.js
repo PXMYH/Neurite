@@ -74,9 +74,11 @@ async function sendMessage(event, autoModeMessage) {
     // Until the answer's own call began it read "not responding", and a click while the
     // keywords or the note search ran regenerated instead: `removeLastResponse` deleted
     // the last exchange from the notes. The AI Node's send does the same at its start.
+    // The loading icon too: the keywords are a round trip before the answer's call shows it.
     Ai.isResponding = true;
     Ai.shouldContinue = true;
     Ai.mainPrompt.setPause();
+    Elem.byId('aiLoadingIcon').style.display = 'block';
 
     // Check if the last character in the note-input is not a newline, and add one if needed
     if (noteInput.value.length > 0 && noteInput.value[noteInput.value.length - 1] !== '\n') {
@@ -174,7 +176,7 @@ async function sendMessage(event, autoModeMessage) {
     aiCall.addUserPrompt(prompt);
 
     // Stopped while the helpers ran: nothing is written and nothing more is asked for.
-    if (!Ai.shouldContinue) return;
+    if (!Ai.shouldContinue) return Elem.hideById('aiLoadingIcon');
 
     const lineBeforeAppend = cm.lastLine();
 
@@ -194,7 +196,7 @@ async function sendMessage(event, autoModeMessage) {
     if (wolframData) aiCall.addSystemPrompt(Prompt.wolfram(wolframData));
 
     // And stopped during Wolfram, whose reformulation streams like an answer.
-    if (!Ai.shouldContinue) return;
+    if (!Ai.shouldContinue) return Elem.hideById('aiLoadingIcon');
 
     await aiCall.exec();
 

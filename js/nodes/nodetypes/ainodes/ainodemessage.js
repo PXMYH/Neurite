@@ -6,6 +6,11 @@
     node.aiResponding = true;
     node.aiResponseHalted = false;
     node.shouldContinue = true;
+    // Shown from the start, with the stop button: the helpers below, the keywords above
+    // all, are a round trip before the answer's own call would show either.
+    const nodeLoadingIcon = node.content.querySelector('#aiLoadingIcon-' + node.index);
+    if (nodeLoadingIcon) nodeLoadingIcon.style.display = 'block';
+    if (node.regenerateButton) node.regenerateButton.innerHTML = Svg.pause;
 
     const nodeIndex = node.index;
 
@@ -260,7 +265,10 @@ ${autoModePrompt}`;
 
     // Stopped while the helpers above ran: the answer is not asked for. It was, and
     // arrived to be thrown away -- a request paid for after the reader said stop.
-    if (!node.shouldContinue) return;
+    if (!node.shouldContinue) {
+        if (nodeLoadingIcon) nodeLoadingIcon.style.display = 'none';
+        return;
+    }
 
     aiCall.exec()
     .then( ()=>{
