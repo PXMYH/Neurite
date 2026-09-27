@@ -104,6 +104,14 @@ class Node {
         });
     }
     updateNodeData() {
+        // The Title as it is now, in the markup a Saved Graph keeps. A textarea's text is its
+        // default value, written once when the card was built, and a rename changes `.value`
+        // only. So a note typed into the Pane -- made at "##" under a timestamp and named as
+        // the Title was typed -- came back from a reload under the timestamp: the pass found
+        // no Node with its Title, made a second one, and left the first as an empty card.
+        const title = this.view?.titleInput;
+        if (title && title.textContent !== title.value) title.textContent = title.value;
+
         const saveExtras = [];
         for (const extra of this.save_extras) {
             saveExtras.push(typeof extra === "function" ? extra(this) : extra);

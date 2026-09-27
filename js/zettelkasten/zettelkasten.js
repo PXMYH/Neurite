@@ -238,9 +238,10 @@ class ZettelkastenProcessor {
     // Title, in any case (#64). A taken line makes no Node and its section is no Node's -- it
     // stays text, marked -- until the Title is free (`retake`).
     //
-    // While a reader types, the Node already on the line waits there under its last free
-    // Title: typing "## Alpha 2" goes through "## Alpha", and the Node was deleted on the way
-    // and made again somewhere else. A full pass, which every save runs, lets it go.
+    // While a reader types on the line, the Node already on it waits there under its last
+    // free Title: typing "## Alpha 2" goes through "## Alpha", and the Node was deleted on
+    // the way and made again somewhere else. An edit anywhere else, or a full pass (every
+    // save runs one), lets it go, so a Title left taken leaves no card behind.
     //
     // A Saved Graph from before this can hold one Title twice, with a Node for each. On load
     // the later line is renamed, so its Node keeps its place (`applyRenames`), and the
@@ -258,7 +259,8 @@ class ZettelkastenProcessor {
         else this.taken.push({title, lineNo, holder});
 
         const waiting = this.wrapPerLine[lineNo];
-        if (!this.mode.full && waiting && !waiting.node.removed) waiting.live = true;
+        const typedOn = (this.noteInputLines[lineNo] !== this.prevNoteInputLines[lineNo]);
+        if (!this.mode.full && typedOn && waiting && !waiting.node.removed) waiting.live = true;
         return true;
     }
 

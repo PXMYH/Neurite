@@ -297,3 +297,15 @@ test('a rename rewrites the Node\'s own Title line and the Refs, not a taken cop
     assert.equal(sandbox.renameNode('Alpha', 'Alpha one', false)('## Alpha\ncopy [[Alpha]]\n'),
         '## Alpha\ncopy [[Alpha one]]\n', 'in another Pane only the Refs change');
 });
+
+test('an edit on another line lets go of a Node left on a taken Title line', ()=>{
+    const world = makeWorld();
+    const pane = world.addPane('Archive 1');
+    pane.cm.setValue('## Alpha\na\n\n## Alph');
+    const writing = world.titled('Alph')[0];
+    pane.cm.setValue('## Alpha\na\n\n## Alpha');
+    assert.equal(writing.removed, false, 'the line is still being typed');
+
+    pane.cm.setValue('## Alpha\na\n\n## Alpha\nand now its body');
+    assert.equal(writing.removed, true, 'a card for a Title no line names was left on the Graph');
+});

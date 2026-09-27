@@ -146,27 +146,130 @@ window.currentActiveZettelkastenMirror = null;
 class ZetPanes {
     paneContent = document.querySelector('.zet-pane-content');
     paneCounter = 1;
+    // The Archive controls in `notestab.html` (#64).
+    select = Elem.byId('archiveSelect');
+    status = Elem.byId('archiveStatus');
     // `window.zetPaneList` is the register of Panes. It used to be two registers:
     // that array, and the Archive dropdown's option list, which also held which Pane
-    // was active. The dropdown is gone (issue #64), so the array is the only one, and
-    // the methods below read it instead of reading the DOM back.
+    // was active. The select that came back reads the register and writes nothing to
+    // it, so the array is still the only one.
     constructor(container) {
         this.container = container;
     }
 
     init(){
+        CustomDropdown.setup(this.select);
+        On.change(this.select, ()=>this.switchPane(this.select.value));
+        On.click(Elem.byId('archiveNew'), this.onNew);
+        On.click(Elem.byId('archiveRename'), this.onRename);
+        On.click(Elem.byId('archiveDelete'), this.onDelete);
         this.addPane();
     }
 
     addPane() {
         const paneId = 'zet-pane-' + this.paneCounter;
-        const paneName = 'Archive ' + this.paneCounter;
-        const pane = this.createPane(paneId, paneName);
+        const pane = this.createPane(paneId, this.nextName());
 
         this.paneContent.appendChild(pane);
         this.switchPane(paneId);
 
         this.paneCounter += 1;
+    }
+    // The lowest "Archive n" no Archive is called. The counter only rose, so deleting
+    // Archive 2 made the next one Archive 3; it still gives each Pane its own id.
+    nextName(){
+        const names = new Set(window.zetPaneList.map( (pane)=>this.getPaneName(pane.paneId).toLowerCase() ));
+        let n = 1;
+        while (names.has('archive ' + n)) n += 1;
+        return 'Archive ' + n;
+    }
+
+    activePane(){
+        return window.zetPaneList.find( (pane)=>(pane.cm === window.currentActiveZettelkastenMirror) );
+    }
+    // The Nodes an Archive's text makes: its notes and its AI Nodes. An image or a link
+    // belongs to no Archive.
+    static noteCount(pane){
+        let count = 0;
+        pane.processor.forEachNodeWrap( (wrap)=>{ if (!wrap.node.removed) count += 1 } );
+        return count;
+    }
+    static notes(count){ return (count === 1 ? '1 note' : count + ' notes') }
+
+    // The select lists every Archive with how many notes it holds, on the one shown, and
+    // the status line under the text says why a Title line there makes no note. Every
+    // pass calls this (`markTaken`), one per keystroke, so the list is rebuilt only when
+    // what it says has changed.
+    render = ()=>{
+        const panes = window.zetPaneList;
+        const active = this.activePane();
+        const options = panes.map( (pane)=>[pane.paneId,
+            this.getPaneName(pane.paneId) + ' · ' + ZetPanes.notes(ZetPanes.noteCount(pane))] );
+        const said = JSON.stringify([options, active?.paneId]);
+        if (said !== this.said && this.select) {
+            this.said = said;
+            this.select.replaceChildren(...options.map( ([value, text])=>new Option(text, value) ));
+            if (active) this.select.value = active.paneId;
+            CustomDropdown.refreshDisplay(this.select);
+            Select.updateSelectedOption(this.select);
+        }
+        this.renderStatus(active);
+    }
+    onTaken(){ this.render() }
+    renderStatus(pane){
+        if (!this.status) return;
+
+        const taken = pane?.processor.taken ?? [];
+        this.status.hidden = (taken.length === 0);
+        if (!taken.length) return (this.status.textContent = '');
+
+        const where = (entry)=>{
+            const holder = window.zetPaneList.find( (p)=>(p.processor === entry.holder) );
+            return (holder === pane ? 'higher up in this Archive' : 'in ' + this.getPaneName(holder?.paneId));
+        };
+        const first = taken[0];
+        this.status.textContent = (taken.length === 1)
+            ? `“${first.title}” is already a note ${where(first)}, so line ${first.lineNo + 1} makes no note. Rename one of them to keep both.`
+            : `${taken.length} Title lines make no note, because their Titles are already notes: `
+              + taken.slice(0, 3).map( (t)=>`“${t.title}” (line ${t.lineNo + 1}, ${where(t)})` ).join(', ')
+              + (taken.length > 3 ? ', and more.' : '.');
+    }
+
+    onNew = ()=>{
+        this.addPane();
+        window.currentActiveZettelkastenMirror?.focus();
+    }
+    onRename = async ()=>{
+        const pane = this.activePane();
+        if (!pane) return;
+
+        const current = this.getPaneName(pane.paneId);
+        const name = (await window.prompt(`Rename the Archive “${current}” to:`, current))?.trim();
+        if (!name || name === current) return;
+
+        const clash = window.zetPaneList.find( (other)=>(other !== pane
+            && this.getPaneName(other.paneId).toLowerCase() === name.toLowerCase()) );
+        if (clash) return window.alert(`“${name}” is already the name of an Archive.`);
+
+        this.paneContent.querySelector('#' + pane.paneId).dataset.paneName = name;
+        this.render();
+    }
+    // It says what goes with the Archive before it goes, and the last one explains itself:
+    // the button returned without a word when one was left, which read as broken.
+    onDelete = async ()=>{
+        const pane = this.activePane();
+        if (!pane) return;
+
+        const name = this.getPaneName(pane.paneId);
+        if (window.zetPaneList.length === 1) {
+            return window.alert(`“${name}” is the only Archive, and new notes are written into the one shown, so it cannot be deleted. Make another first.`);
+        }
+        const count = ZetPanes.noteCount(pane);
+        const question = (count === 0) ? `Delete the Archive “${name}”? It holds no notes.`
+            : `Delete the Archive “${name}” and the ${count === 1 ? 'note' : count + ' notes'} written in it?`;
+        if (!await window.confirm(question)) return;
+
+        this.removePane(pane.paneId);
     }
 
     createPane(paneId, paneName) {
@@ -233,6 +336,7 @@ class ZetPanes {
                 pane.classList.remove('active');
             }
         });
+        this.render();
     }
 
     getPaneName(paneId) {
@@ -262,6 +366,7 @@ class ZetPanes {
         // Pane, so the register does empty, and then there is nothing to switch to.
         const next = window.zetPaneList[index] || window.zetPaneList.at(-1);
         if (next) this.switchPane(next.paneId);
+        else this.render();
     }
 
     resetAllPanes() {

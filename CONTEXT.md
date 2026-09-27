@@ -74,7 +74,9 @@ _Avoid_: notes, note text, editor, markdown, outline, source
 
 **Pane**:
 One independent Zettelkasten document. A reader can keep several open, each
-holding a different text for the same Graph.
+holding a different text for the same Graph. Shown to the reader as an
+Archive; the one shown is where new Nodes are written. A Pane partitions the
+text, not the Titles: a Ref in one names a Node in any other.
 _Avoid_: tab, instance, buffer, document, editor, sheet
 
 **Node Section**:
@@ -84,7 +86,10 @@ _Avoid_: block, chunk, entry, note, paragraph, stanza
 
 **Title**:
 The text on the first line of a Node Section. It is the Node's identity in the
-text, so renaming it renames the Node and every Ref that pointed at it.
+text, so renaming it renames the Node and every Ref that pointed at it. It
+names one Node in the whole Graph, in any case: a later Title line with a Title
+already held, in any Pane, is taken — it makes no Node, and its section stays
+text until the Title is free.
 _Avoid_: name, label, heading, header, id, key
 
 **Node Tag**:

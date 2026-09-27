@@ -419,6 +419,39 @@ body.connect-mode .window textarea {
     outline-offset: -2px;
 }
 
+/* Where new notes go, once there are two Archives or more (#64): a line of text, and the
+   way to the Notes panel where it is chosen. As wide as the overview above it. */
+.hud-archive {
+    max-width: calc(176px + 2px);
+    min-height: var(--hit-min);
+    padding: 0 var(--space-2);
+    overflow: hidden;
+    font-size: var(--text-xs);
+    text-align: left;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--ui-chrome-text);
+    background: transparent;
+    border: 1px solid var(--ui-chrome-rule);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color var(--ui-transition), color var(--ui-transition);
+}
+
+.hud-archive:hover {
+    background: var(--ui-chrome-hover);
+    color: var(--ui-chrome-text-strong);
+}
+
+.hud-archive:focus-visible {
+    outline: 2px solid var(--ui-accent);
+    outline-offset: -2px;
+}
+
+.hud-archive[hidden] {
+    display: none;
+}
+
 /* The empty canvas says what to do, and then stops saying it.
 
    Centred on the viewport rather than on the graph's origin, because it is addressed

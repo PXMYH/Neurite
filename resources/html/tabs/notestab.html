@@ -1,20 +1,35 @@
 <div class="submenu">
     <div id="zetHorizDragHandle" class="zet-drag-handle-horiz"></div>
     <div id="zetVertDragHandle" class="zet-drag-handle-vert"></div>
-    <!-- The editor and nothing above it. There was a strip of five icons here: a
-         dropdown to switch Archive, `+` to create one, trash to delete one, a gear
-         for the Zettelkasten settings, and Search. As bare icons directly above a
-         text editor they all read as note-level -- a `+` beside an editor looks like
-         "add a note", which is what the tool bar's Note icon does instead.
+    <!-- The Archive controls (#64), above the text they act on. There was a strip of
+         five bare icons here -- an Archive dropdown, `+`, trash, a gear, and Search --
+         and directly above a text editor they read as acts on a note: a `+` beside an
+         editor looks like "add a note", which is the tool bar's Note icon. So every
+         control here is text, and every one names the Archive: the select, which says
+         which Archive is shown and how many notes it holds, and the three buttons.
 
-         The settings are in the Settings tab and Search is in the tool bar, where a
-         control over every Node on the canvas belongs. The Archive controls are gone
-         until they come back designed -- see issue #64, which also records what an
-         Archive is. `switchPane` still runs when a Node in another Archive is
-         clicked, so a saved graph with several of them stays usable; there is just
-         no way to add or delete one by hand. -->
+         The shown Archive is where new notes are written (the tool bar's Note, an AI
+         answer with no node to go to), which is why the HUD names it too when there is
+         more than one. The settings are in the Settings tab and Search is in the tool
+         bar. `ZetPanes` wires this subtree. -->
+    <div class="archive-bar">
+        <div class="dropdown-container archive-choice"
+             title="The Archive shown here, which is where new notes are written.">
+            <select id="archiveSelect" class="model-selector custom-select ignoreSetup" aria-label="Archive"></select>
+        </div>
+        <div class="archive-actions">
+            <button type="button" class="key-button" id="archiveNew"
+                    title="Start an empty Archive, and show it here.">New Archive</button>
+            <button type="button" class="key-button" id="archiveRename"
+                    title="Give the Archive shown here another name.">Rename Archive…</button>
+            <button type="button" class="key-button" id="archiveDelete"
+                    title="Delete the Archive shown here, and the notes written in it.">Delete Archive…</button>
+        </div>
+    </div>
     <div id="zetPaneContainer" class="zet-pane-container">
         <div id="zetPaneContent" class="zet-pane-content"></div>
+        <!-- Why a Title line in the shown Archive makes no note: its Title is taken. -->
+        <p class="archive-status" id="archiveStatus" role="status" hidden></p>
     </div>
 
     <!-- The prompt form was here, under the editor, and it is in the Ai tab now, next

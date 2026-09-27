@@ -2717,13 +2717,56 @@ input[type="checkbox"] {
        to the menu's right edge, and the menu's 16px left margin kept on the right. */
     max-width: calc(100vw - 74px);
     min-width: min(270px, calc(100vw - 74px));
-    /* The same for the height and the bottom handle: 124px from the window's top to the
-       pane, 37px from the pane to the menu's bottom edge, and 16px to spare. A pane made
-       700px tall kept its height in a 600px window, its handle at y=814. */
-    max-height: calc(100dvh - 177px);
+    /* The same for the height and the bottom handle: 201px from the window's top to the
+       pane (the Archive controls take 77px above it), 37px from the pane to the menu's
+       bottom edge, and 16px to spare. A pane made 700px tall kept its height in a 600px
+       window, its handle at y=814. */
+    max-height: calc(100dvh - 254px);
     height: 60vh;
     width: 270px;
 }
+
+/* The Archive controls above the text (#64): the select across the full width, the three
+   acts under it, one row wherever they fit. */
+.archive-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+    .archive-choice .select-container {
+        width: 100%;
+    }
+
+    .archive-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+        .archive-actions .key-button {
+            flex: 1 1 auto;
+            padding: 3px 8px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+/* Under the text, inside the pane's own height, so a Title line taken while typing does
+   not move the panel. */
+.archive-status {
+    margin: 0;
+    padding: 6px 8px;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--ui-chrome-text);
+    background-color: rgba(224, 139, 132, 0.12);
+    box-shadow: inset 3px 0 0 var(--ui-danger);
+}
+
+    .archive-status[hidden] {
+        display: none;
+    }
 
 .zet-pane-close {
     position: absolute;

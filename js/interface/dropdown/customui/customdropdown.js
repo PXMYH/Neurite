@@ -145,12 +145,23 @@ CustomDropdown.createOptionDiv = function(select, optionsReplacer, selectedDiv, 
         optionDiv.setAttribute('aria-selected', 'true');
         select.value = option.value;
         selectedDiv.innerText = option.innerText;
+        CustomDropdown.closeAfterChoice(optionsReplacer);
 
         // Dispatch a change event to the original select element
         select.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
     });
 
     optionsReplacer.appendChild(optionDiv);
+}
+// A choice closes the list, as a native select's does. The option's click stops where it
+// is, so the list stayed open over whatever lay under it -- measured, every custom select
+// in the panels -- until a click somewhere else.
+CustomDropdown.closeAfterChoice = function(optionsReplacer){
+    const selectReplacer = optionsReplacer.closest('.select-replacer');
+    if (!selectReplacer) return;
+
+    CustomDropdown.close(selectReplacer, optionsReplacer);
+    selectReplacer.parentElement.style.zIndex = "20";
 }
 
 CustomDropdown.addOption = function(select, text, value, key){
@@ -500,6 +511,7 @@ CustomDropdown.createHtmlOptionDiv = function(select, optionsReplacer, selectedD
 
     On.click(optionDiv, (e)=>{
         e.stopPropagation();
+        CustomDropdown.closeAfterChoice(optionsReplacer);
         Select.selectOption(select, option);
     });
 
@@ -509,9 +521,8 @@ CustomDropdown.createHtmlOptionDiv = function(select, optionsReplacer, selectedD
 // `createZetContainerDropdown` was here. It rendered one Archive dropdown option as a
 // contentEditable div, so typing in it renamed the Archive -- the only rename this app
 // ever had, reachable only by noticing that an option in a dropdown took a caret. The
-// dropdown is gone with the rest of the Notes pane header, so this had no caller left.
-// Issue #64 covers a rename with a name on it; the version removed here is in the
-// history if it is wanted as a starting point.
+// Archive controls came back designed (#64): "Rename Archive…" is a button with its name
+// on it (`ZetPanes.onRename`).
 
 function refreshHtmlDropdownDisplay(select, createOptionContent) {
     const optionsReplacer = select.parentNode.querySelector('.options-replacer');
