@@ -22,15 +22,15 @@
     }
     position(x, y) {
         const style = this.container.style;
-        // keeps the bottom-right corner aligned
-        style.transform = `translate(calc(${x}px - 100%  + 5px), calc(${y}px - 100% + 6px))`;
+        // keeps the bottom-right corner aligned, and the top on screen
+        style.transform = `translate(calc(${x}px - 100%  + 5px), max(8px, calc(${y}px - 100% + 6px)))`;
         style.display = 'block';
     }
     clear() {
         this.container.innerHTML = '';
     }
-    addSuggestion(text, onSelect, onPin, isPinned){
-        const item = new MenuItem.Suggestion(text, onSelect, onPin, isPinned);
+    addSuggestion(id, text, onSelect, onPin, isPinned){
+        const item = new MenuItem.Suggestion(id, text, onSelect, onPin, isPinned);
         item.init();
         this.container.appendChild(item.divItem);
     }
@@ -45,28 +45,31 @@
         this.container.style.display = 'none';
     }
 }
+// One action in a Node's menu: a click on the row runs it, and the pin beside it keeps it
+// in the menu itself. The whole row was the pin (#50) -- a click on "delete" deleted
+// nothing and pinned "delete" -- and the pin drew nothing, because its two icons were
+// retired with the old sprite.
 MenuItem.Suggestion = class {
-    constructor(text, onSelect, onPin, isPinned){
+    constructor(id, text, onSelect, onPin, isPinned){
+        this.id = id;
         this.isPinned = isPinned;
         this.onSelect = onSelect;
         this.onPin = onPin;
         this.text = text;
-        this.svgMinus = this.makeSvgIcon('minus');
-        this.svgPlus = this.makeSvgIcon('plus');
         this.btnPin = this.makeBtnPin();
         this.spanText = this.makeSpanText();
         this.divItem = this.makeDivItem();
     }
     init(){
-        this.updateSvgs();
-        On.click(this.divItem, this.togglePin);
+        this.updatePin();
+        On.click(this.divItem, this.onSelect);
+        On.click(this.btnPin, this.togglePin);
     }
 
     makeBtnPin(){
         const button = Html.make.button('pin-button');
-        if (this.isPinned) button.classList.add('pinned');
-
-        button.append(this.svgPlus, this.svgMinus);
+        button.setAttribute('aria-label', "Pin " + this.text);
+        button.append(this.makeSvgIcon('pin-icon'));
         return button;
     }
     makeDivItem(){
@@ -79,14 +82,15 @@ MenuItem.Suggestion = class {
         span.textContent = this.text;
         return span;
     }
-    makeSvgIcon(key){
+    makeSvgIcon(id){
         const svg = Svg.new.svg();
-        svg.setAttribute('class', 'icon icon-' + key);
+        svg.setAttribute('class', 'icon ' + id);
         svg.setAttribute('viewBox', '0 0 24 24');
         svg.setAttribute('width', '1em');
         svg.setAttribute('height', '1em');
+        svg.setAttribute('aria-hidden', 'true');
         const use = Svg.new.use();
-        use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#icon-' + key);
+        use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + id);
         svg.appendChild(use);
         return svg;
     }
@@ -96,15 +100,14 @@ MenuItem.Suggestion = class {
         e.stopPropagation();
 
         this.isPinned = !this.isPinned;
-        this.btnPin.classList.toggle('pinned', this.isPinned);
-        this.updateSvgs();
+        this.updatePin();
 
-        this.onPin(this.text, this.isPinned);
-        this.onSelect();
+        this.onPin(this.id, this.isPinned);
     }
-    updateSvgs(){
-        this.svgPlus.style.display = (this.isPinned ? 'none' : 'inline');
-        this.svgMinus.style.display = (this.isPinned ? 'inline' : 'none');
+    updatePin(){
+        this.btnPin.classList.toggle('pinned', this.isPinned);
+        this.btnPin.setAttribute('aria-pressed', String(this.isPinned));
+        this.btnPin.title = (this.isPinned ? "Unpin from this menu" : "Pin to this menu");
     }
 }
 
@@ -168,24 +171,22 @@ Manager.PinnedItems = class {
 Menu.Context.prototype.pinSuggestion = function(id){
     if (this.itemById(id)) return;
 
-    const { displayText, executeAction } = getDynamicActionDetails(id, this.targetModel);
-    const menuItem = App.menuContext.option(displayText, executeAction, false);
+    const nodeActions = NodeActions.forNode(this.targetModel);
+    const menuItem = this.option(nodeActions.label(id), ()=>this.runAction(id, nodeActions), false);
     menuItem.dataset.id = id;
-    On.click(menuItem, (e)=>{
-        App.menuSuggestions.hide();
-        App.recentSuggestions.add(id);
-    });
 
     this.menu.appendChild(menuItem);
     App.pinnedItems.addItem(id);
 }
 
-function getDynamicActionDetails(uniqueIdentifier, node) {
-    const nodeActions = NodeActions.forNode(node);
-    return {
-        displayText: uniqueIdentifier,
-        executeAction: () => nodeActions[uniqueIdentifier] ? nodeActions[uniqueIdentifier]() : Logger.err("Invalid action")
-    };
+// One of a Node's actions, run from its menu, which closes first: `delete` asks before it
+// deletes, and the question should not sit under the menu that asked it.
+Menu.Context.prototype.runAction = function(id, nodeActions){
+    this.hide();
+    if (typeof nodeActions[id] !== 'function') return Logger.err("Invalid action:", id);
+
+    App.recentSuggestions.add(id);
+    return nodeActions[id]();
 }
 
 Menu.Context.prototype.loadPinnedItems = function(){
@@ -205,13 +206,19 @@ Menu.Context.prototype.setupSuggestions = function(pageX, pageY){
         if (inputField.value === '') displaySuggestions('');
     });
 
+    // Enter runs the first action the text finds, as the list shows it. A method called by
+    // name with its arguments, `moveNode(0, 0.05)`, is still run as it is written.
     On.keypress(inputField, (e)=>{
-        if (e.key === 'Enter') {
-            App.menuSuggestions.hide();
-            executeNodeMethod(NodeActions.forNode(node), e.target.value);
-            e.target.value = '';
-            App.menuSuggestions.hide();
-        }
+        if (e.key !== 'Enter') return;
+
+        const value = e.target.value;
+        e.target.value = '';
+        const first = (value.trim() && !value.includes('('))
+                    ? getNodeMethodSuggestions(value, node)[0] : undefined;
+        if (first) return this.runAction(first, NodeActions.forNode(node));
+
+        App.menuSuggestions.hide();
+        executeNodeMethod(NodeActions.forNode(node), value);
     });
 
     function displaySuggestions(value) {
@@ -222,11 +229,12 @@ Menu.Context.prototype.setupSuggestions = function(pageX, pageY){
         const nodeActions = NodeActions.forNode(node);
         getNodeMethodSuggestions(value, node).forEach( (suggestion)=>{
             menu.addSuggestion(
-                getDynamicActionDetails(suggestion, node).displayText,
-                Function.nop,
-                (executeAction, pinState) => {
+                suggestion,
+                nodeActions.label(suggestion),
+                ()=>App.menuContext.runAction(suggestion, nodeActions),
+                (id, pinState) => {
                     const funcName = (pinState ? 'pinSuggestion' : 'unpinSuggestion');
-                    App.menuContext[funcName](executeAction);
+                    App.menuContext[funcName](id);
                 },
                 App.pinnedItems.isItemPinned(suggestion)
             );

@@ -44,21 +44,24 @@ function executeNodeMethod(nodeActions, methodName) {
     }
 }
 
-function getSuggestionsFromMethods(input, methodsWithKeywords) {
-    const lowerCaseInput = input.toLowerCase();
+// By what the menu calls an action as well as by its method name and keywords.
+function getSuggestionsFromMethods(input, methodsWithKeywords, nodeActions) {
+    const lowerCaseInput = input.trim().toLowerCase();
     const matches = [];
+    const label = (method)=>nodeActions.label(method).toLowerCase();
 
     // Iterate over each action and its keywords
     for (const [method, keywords] of Object.entries(methodsWithKeywords)) {
-        if (method.toLowerCase().includes(lowerCaseInput) || keywords.some(keyword => keyword.toLowerCase().includes(lowerCaseInput))) {
+        if (method.toLowerCase().includes(lowerCaseInput) || label(method).includes(lowerCaseInput)
+            || keywords.some(keyword => keyword.toLowerCase().includes(lowerCaseInput))) {
             matches.push(method);
         }
     }
 
     // Sort matches by relevance (exact matches first)
     matches.sort((a, b) => {
-        const aExactMatch = a.toLowerCase().startsWith(lowerCaseInput);
-        const bExactMatch = b.toLowerCase().startsWith(lowerCaseInput);
+        const aExactMatch = label(a).startsWith(lowerCaseInput) || a.toLowerCase().startsWith(lowerCaseInput);
+        const bExactMatch = label(b).startsWith(lowerCaseInput) || b.toLowerCase().startsWith(lowerCaseInput);
         return bExactMatch - aExactMatch;
     });
 
@@ -66,18 +69,40 @@ function getSuggestionsFromMethods(input, methodsWithKeywords) {
 }
 
 function getNodeMethodSuggestions(value, node) {
-    const validActionsWithKeywords = NodeActions.forNode(node).getActions();
+    const nodeActions = NodeActions.forNode(node);
+    const validActionsWithKeywords = nodeActions.getActions();
 
     if (value.trim() !== '') {
-        return getSuggestionsFromMethods(value, validActionsWithKeywords);
+        return getSuggestionsFromMethods(value, validActionsWithKeywords, nodeActions);
     }
 
-    // show recent suggestions and all valid actions
-    const recentSuggestions = App.recentSuggestions.get();
+    // The recent ones first, and only those this Node has: the list is shared by every
+    // Node Type, so an AI Node's `sendMessage` was offered on a note, where it did nothing.
+    const recentSuggestions = App.recentSuggestions.get()
+        .filter(action => action in validActionsWithKeywords);
     const allValidActions = Object.keys(validActionsWithKeywords);
     const allValidActionsExcludingRecent = allValidActions.filter(action => !recentSuggestions.includes(action));
     return [...recentSuggestions, ...allValidActionsExcludingRecent];
 }
+
+// What the menu calls each action (#50). It showed the method names -- `toggleSelect`,
+// `spawnNode`, `zoomTo` -- as they are written in code. A toggle is named for what it
+// will do now, in `label` below.
+NodeActions.labels = {
+    zoomTo: "Zoom to it",
+    follow: "Follow it",
+    delete: "Delete",
+    toggleAutomata: "Start or stop cellular automata",
+    spawnNode: "New note beside it",
+    connect: "Link to another node…",
+    sendMessage: "Send the prompt",
+    settings: "Settings",
+    halt: "Stop the answer",
+    refreshResponse: "Answer again",
+    toggleLink: "Show or hide the page",
+    extractText: "Add the page to the vector database",
+    importText: "Import the page text into the notes"
+};
 
 NodeActions.base = class BaseNodeActions {
     applyActionToSelectedNodes(action){
@@ -103,12 +128,15 @@ NodeActions.base = class BaseNodeActions {
         };
     }
 
-    getSelectActionName() {
-        return (App.selectedNodes.hasNode(this.node) ? 'deselect' : 'select')
-    }
-
-    getCollapseActionName() {
-        return (this.node.view.div.collapsed ? 'expand' : 'collapse')
+    label(action) {
+        switch (action) {
+            case 'toggleSelect':
+                return (App.selectedNodes.hasNode(this.node) ? "Deselect" : "Select");
+            case 'toggleCollapse':
+                return (this.node.view.div.classList.contains('collapsed') ? "Expand" : "Collapse");
+            default:
+                return NodeActions.labels[action] ?? action;
+        }
     }
 
     // Common methods for all nodes
@@ -151,6 +179,11 @@ NodeActions.text = class TextNodeActions extends NodeActions.base {
             'toggleCode': ["show code", "hide code", "run code", "toggle script", "show text", "display text", "display code", "view text"],
             //'testNodeText': ["test text", "check text", "text testing"]
         };
+    }
+
+    label(action) {
+        if (action !== 'toggleCode') return super.label(action);
+        return (this.node.codeEditingState === 'code' ? "Show its text" : "Run its code");
     }
 
     toggleCode() { handleCodeExecution(this.node) }

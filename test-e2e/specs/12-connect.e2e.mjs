@@ -208,3 +208,132 @@ test('a message to the window leaves the connect mode as it was', async () => {
     assert.equal(mode, 1, 'a message turned the mode off while Shift was held');
     assert.deepEqual(errors, []);
 });
+
+// The right-click menus, which named each action by its method: `toggleSelect`,
+// `spawnNode`, "toggle direction".
+const rows = (page) => page.evaluate(() => [...document.querySelectorAll('#suggestions-container .suggestion-item')]
+    .map((d) => d.textContent.trim()));
+const menuItems = (page) => page.evaluate(() => [...document.querySelectorAll('#customContextMenu > li.dynamic-option')]
+    .map((li) => li.textContent.trim()));
+async function rightClick(page, uuid) {
+    const p = await page.evaluate((id) => {
+        const r = Graph.nodes[id].view.div.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height - 20 };
+    }, uuid);
+    await page.mouse.click(p.x, p.y, { button: 'right' });
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('customContextMenu')).display !== 'none');
+}
+async function clickIn(page, selector, text) {
+    const p = await page.evaluate(([s, t]) => {
+        const el = [...document.querySelectorAll(s)].find((e) => e.textContent.trim() === t);
+        const r = el.getBoundingClientRect();
+        return { x: r.x + 12, y: r.y + r.height / 2 };
+    }, [selector, text]);
+    await page.mouse.click(p.x, p.y);
+}
+
+test("a Node's menu names its actions, and a click on one runs it", async () => {
+    const [, b] = await fourNotes(page);
+    await page.evaluate(() => { window.confirm = async () => true; });
+    await rightClick(page, b);
+    await page.waitForFunction(() => document.querySelectorAll('#suggestions-container .suggestion-item').length > 0);
+    const named = await rows(page);
+    assert.ok(named.includes('Delete') && named.includes('Zoom to it'), 'the menu lost its actions: ' + named);
+    assert.deepEqual(named.filter((r) => /[a-z][A-Z]/.test(r)), [], 'the menu shows a method name');
+
+    // Measured before: a click on "delete" deleted nothing, and pinned "delete".
+    await clickIn(page, '#suggestions-container .suggestion-item', 'Delete');
+    await page.waitForFunction((id) => !(id in Graph.nodes), b, { timeout: 5000 });
+    assert.equal(await page.evaluate(() => localStorage.getItem('pinnedContextMenuItems')), null);
+});
+
+test('the pin keeps an action in the menu without running it', async () => {
+    const [, , c] = await fourNotes(page);
+    const pin = '#suggestions-container .pin-button[aria-label="Pin Select"]';
+    await rightClick(page, c);
+    await page.waitForSelector(pin);
+    await page.click(pin);
+    assert.equal(await page.evaluate(() => App.selectedNodes.uuids.size), 0, 'pinning ran the action');
+    assert.equal(await page.getAttribute(pin, 'aria-pressed'), 'true');
+    await page.mouse.click(800, 500);
+
+    // Opened again, the pinned action is in the menu, named for what it will do now.
+    await rightClick(page, c);
+    assert.deepEqual(await menuItems(page), ['Select']);
+    await clickIn(page, '#customContextMenu > li.dynamic-option', 'Select');
+    assert.deepEqual(await page.evaluate(() => [...App.selectedNodes.uuids]), [c]);
+    await rightClick(page, c);
+    assert.deepEqual(await menuItems(page), ['Deselect']);
+});
+
+test("Enter in a Node's menu runs the first action its search finds", async () => {
+    const [a] = await fourNotes(page);
+    await page.evaluate(() => { window.confirm = async () => true; });
+    await rightClick(page, a);
+    await page.click('#customContextMenu .custom-node-method-input');
+    await page.keyboard.type('del');
+    assert.deepEqual(await rows(page), ['Delete']);
+    await page.keyboard.press('Enter');
+    await page.waitForFunction((id) => !(id in Graph.nodes), a, { timeout: 5000 });
+});
+
+test('the Edge menu says what its items do', async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\na\n\n## Beta\nb [[Alpha]]\n'));
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 1, undefined, { timeout: 5000 });
+    await page.waitForTimeout(800);
+    const mid = await page.evaluate(() => {
+        const [p, q] = Object.values(Graph.edges)[0].pts.map((n) => {
+            const r = n.view.div.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        });
+        return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+    });
+    await page.mouse.click(mid.x, mid.y, { button: 'right' });
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('customContextMenu')).display !== 'none');
+    assert.deepEqual(await menuItems(page), ['Turn the arrow', 'Delete edge']);
+    await clickIn(page, '#customContextMenu > li.dynamic-option', 'Delete edge');
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 0, undefined, { timeout: 5000 });
+});
+
+test("a Node's menu opened at the bottom of the window stays on it, every action shown", async () => {
+    // The menu was placed before it was filled, and a <ul>'s margin moved it 16px more: a
+    // pinned action came out at y 908 in a 900px window. The list cut the first two of a
+    // note's nine actions off, in a box whose scrollbar is hidden.
+    const [a] = await fourNotes(page);
+    const height = await page.evaluate(() => innerHeight);
+    const onScreen = (top, bottom) => top >= 0 && bottom <= height;
+    const measure = () => page.evaluate(() => {
+        const m = document.getElementById('customContextMenu').getBoundingClientRect();
+        const c = document.getElementById('suggestions-container');
+        const s = c.getBoundingClientRect();
+        return { menuTop: m.top, menuBottom: m.bottom, listTop: s.top, listBottom: s.bottom,
+            clipped: c.scrollHeight > c.clientHeight + 1, rows: c.querySelectorAll('.suggestion-item').length };
+    });
+    // Put the point the menu opens from `above` pixels over the bottom of the window.
+    const openAbove = async (above) => {
+        const y = await page.evaluate((id) => {
+            const r = Graph.nodes[id].view.div.getBoundingClientRect();
+            return r.y + r.height - 20;
+        }, a);
+        await page.evaluate((dy) => Graph.pan_incBy(toDZ(new vec2(0, dy))), y - (height - above));
+        await page.waitForTimeout(400);
+        await rightClick(page, a);
+    };
+
+    // Too little room below for the menu: it has to open upward, and measure itself to.
+    await page.evaluate(() => App.pinnedItems.addItem('zoomTo'));
+    await openAbove(25);
+    await page.click('#customContextMenu .custom-node-method-input');
+    const pinned = await measure();
+    assert.ok(onScreen(pinned.menuTop, pinned.menuBottom), 'the menu runs off the window: ' + JSON.stringify(pinned));
+    assert.ok(onScreen(pinned.listTop, pinned.listBottom), 'the list runs off the window: ' + JSON.stringify(pinned));
+    assert.equal(pinned.rows, 9);
+    assert.equal(pinned.clipped, false, 'the list hides some of its actions');
+    await page.mouse.click(800, 300);
+
+    // Just enough room below: it opens downward, where the margin would push it out.
+    await page.evaluate(() => App.pinnedItems.removeItem('zoomTo'));
+    await openAbove(50);
+    const bare = await measure();
+    assert.ok(onScreen(bare.menuTop, bare.menuBottom), 'the menu runs off the window: ' + JSON.stringify(bare));
+});

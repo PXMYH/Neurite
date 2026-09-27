@@ -12,12 +12,18 @@ Menu.Context = class {
         On.mousedown(document, this.onMousedown);
     }
 
+    // Measured with its contents in it and shown, or the flip away from the edge reads a
+    // height of 0: the menu was placed before it was filled, and while it was hidden, so a
+    // Node's menu opened near the bottom ran off the screen -- measured, a pinned action at
+    // y 908 in a 900px window, where no click could reach it.
     position(x, y){
         const menu = this.menu;
+        menu.style.display = 'block';
 
-        // offset slightly from the cursor
+        // offset slightly from the cursor. 6px down is where the menu was drawn while
+        // the <ul>'s own 16px margin moved it, which `margin: 0` now removes.
         const offsetX = 5;
-        const offsetY = -10;
+        const offsetY = 6;
 
         const menuWidth = menu.offsetWidth;
         if (x + menuWidth + offsetX > window.innerWidth) { // off the right side
@@ -35,17 +41,18 @@ Menu.Context = class {
 
         menu.style.left = x + 'px';
         menu.style.top = y + 'px';
-        menu.style.display = 'block';
     }
     open(x, y, target){
-        this.position(x, y);
-        App.menuSuggestions.repositionIfDisplayed(x, y);
         this.menu.innerHTML = ''; // clear options
         const view = Graph.viewForElem(target);
-        if (!view) return this.populateForGeneric(target);
-
-        this.targetModel = view.model;
-        this[view.funcPopulate](x, y);
+        if (!view) {
+            this.populateForGeneric(target);
+        } else {
+            this.targetModel = view.model;
+            this[view.funcPopulate](x, y);
+        }
+        this.position(x, y);
+        App.menuSuggestions.repositionIfDisplayed(x, y);
     }
     option(text, onClick, closing = true){
         const handler = (!closing) ? onClick
@@ -60,7 +67,7 @@ Menu.Context = class {
     makeInputField(){
         const input = Html.make.input('dynamic-input custom-node-method-input');
         input.type = 'text';
-        input.placeholder = "Enter method";
+        input.placeholder = "Search actions";
         return input;
     }
     populateForNode(x, y){
@@ -73,9 +80,10 @@ Menu.Context = class {
         const edge = this.targetModel;
         const onDirection = edge.toggleDirection.bind(edge);
         const onDelete = edge.removeInstance.bind(edge);
+        // Named for what they do, as the Help panel names them (#50).
         this.menu.append(
-            this.option("toggle direction", onDirection, false),
-            this.option("delete", onDelete)
+            this.option("Turn the arrow", onDirection, false),
+            this.option("Delete edge", onDelete)
         );
     }
     populateForBackground(x, y){

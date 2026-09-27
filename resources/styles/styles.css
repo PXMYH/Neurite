@@ -4992,6 +4992,10 @@ body.ai-disabled .node-add-item.ai-icon {
     backdrop-filter: blur(7px); /* Frosted glass effect */
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
     padding: 0px; /* Padding around the menu */
+    /* A <ul> brings a 16px top margin from the browser, which `position()` in
+       customcontextmenu.js could not see: the menu sat 16px lower than it was placed, and
+       ran past the bottom of the window by that much. */
+    margin: 0;
     z-index: 1000; /* High z-index to overlay other elements */
     position: absolute; /* Required for positioning */
     display: none; /* Initially hidden */
@@ -5068,7 +5072,10 @@ body.ai-disabled .node-add-item.ai-icon {
     position: absolute;
     background: rgb(117 119 146 / 39%);
     backdrop-filter: blur(17px);
-    max-height: 250px; /* Maximum height before scrolling */
+    /* Tall enough for every action an AI Node has (13, 34px each), and never taller than
+       the window. At 250px it cut the first two of a note's nine actions off, in a list
+       whose scrollbar is hidden (#50). */
+    max-height: min(460px, calc(100dvh - 16px));
     overflow-y: auto; /* Enables vertical scroll */
     scrollbar-width: none; /* Hides the scrollbar for Firefox */
     -ms-overflow-style: none; /* Hides the scrollbar for IE/Edge */
@@ -5123,6 +5130,21 @@ body.ai-disabled .node-add-item.ai-icon {
 
     .pin-button:hover {
         transform: scale(1.4); /* Scale up on hover */
+    }
+
+    /* A button takes its colour from the browser, not from the row, and the pin's
+       stroke is `currentColor` -- so the pin is given one, and a pinned action wears
+       the accent (#50). */
+    .pin-button {
+        color: var(--text-muted);
+    }
+
+    .pin-button:hover {
+        color: var(--text-primary);
+    }
+
+    .pin-button.pinned {
+        color: var(--ui-accent);
     }
 
 /* File tree styles */

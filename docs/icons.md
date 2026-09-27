@@ -59,6 +59,7 @@ file types.
 | `chevron-down-icon` | `chevron-down` |
 | `copy-icon-template` | `copy` |
 | `download-icon` | `download` |
+| `pin-icon` | `pin` |
 | `aiNodeSettingsIcon` | `sliders-horizontal` |
 | `funcErrorIcon` | `circle-alert` |
 | `expand-icon` | `maximize-2` |
