@@ -45,8 +45,20 @@ class AiCall {
         return (this.node) ? this.#callchatLLMnode() : this.#callchatAPI();
     }
 
+    // A single, non-streamed call is always a helper inside a send -- the keywords, a
+    // search query, a vector-database query, what to forget -- never the answer. So it
+    // leaves the conversation's state to the call that streams the answer. Driving it
+    // too, its start and end flipped the conversation to "not responding" between the
+    // helper and the answer, so the stop button regenerated instead of stopping; and
+    // its failure halted the Node, so the answer asked for after it was dropped
+    // (measured with a 429 on the keyword call: the answer arrived and was thrown away).
+    get #isHelper(){ return !this.stream }
+    static #helperFailed(errorMsg){ Logger.warn("An AI helper call failed:", errorMsg) }
+
     async #callchatAPI(){
-        Ai.shouldContinue = true;
+        // Not for a helper: a stop pressed while one helper ran must still hold when the
+        // next one starts.
+        if (!this.#isHelper) Ai.shouldContinue = true;
         const requestId = generateRequestId();
         let streamedResponse = ""; // Local streamedResponse for this request
 
@@ -102,15 +114,16 @@ class AiCall {
         const controller = new AbortController();
         activeRequests.set(requestId, { type: 'zettelkasten', controller });
 
+        const helper = this.#isHelper;
         try {
             const responseData = await callAiApi({
                 messages: this.messages,
                 stream: this.stream,
                 customTemperature: this.customTemperature,
-                onBeforeCall,
-                onAfterCall,
+                onBeforeCall: helper ? Function.nop : onBeforeCall,
+                onAfterCall: helper ? Function.nop : onAfterCall,
                 onStreamingResponse,
-                onError,
+                onError: helper ? AiCall.#helperFailed : onError,
                 inferenceOverride: null, // Assuming no override for global calls
                 controller, // Pass the controller
                 requestId // Pass the unique requestId
@@ -158,14 +171,17 @@ class AiCall {
         // Track the node-specific request
         activeRequests.set(requestId, { type: 'node', controller, node });
 
+        const helper = this.#isHelper;
+        const nodeTemperature = parseFloat(node.content.querySelector('#node-temperature-' + node.index).value);
         return callAiApi({
             messages: this.messages,
             stream: this.stream,
-            customTemperature: parseFloat(node.content.querySelector('#node-temperature-' + node.index).value),
-            onBeforeCall,
-            onAfterCall,
+            // A helper's own temperature (0, for the keywords) wins over the Node's.
+            customTemperature: (helper && this.customTemperature !== null) ? this.customTemperature : nodeTemperature,
+            onBeforeCall: helper ? Function.nop : onBeforeCall,
+            onAfterCall: helper ? Function.nop : onAfterCall,
             onStreamingResponse,
-            onError,
+            onError: helper ? AiCall.#helperFailed : onError,
             inferenceOverride: this.inferenceOverride || Ai.determineModel(node),
             controller, // node-specific controller
             requestId

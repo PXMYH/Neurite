@@ -70,13 +70,23 @@ async function sendMessage(event, autoModeMessage) {
         Ai.originalUserMessage = message;
     }
 
+    // The send is under way from here, helpers and all, so the prompt's button stops it.
+    // Until the answer's own call began it read "not responding", and a click while the
+    // keywords or the note search ran regenerated instead: `removeLastResponse` deleted
+    // the last exchange from the notes. The AI Node's send does the same at its start.
+    Ai.isResponding = true;
+    Ai.shouldContinue = true;
+    Ai.mainPrompt.setPause();
+
     // Check if the last character in the note-input is not a newline, and add one if needed
     if (noteInput.value.length > 0 && noteInput.value[noteInput.value.length - 1] !== '\n') {
         cm.replaceRange('\n', CodeMirror.Pos(cm.lastLine()));
     }
 
     const arrKeywords = await generateKeywords(message, 3); // number of desired keywords
-    const strKeywords = arrKeywords.join(' ');
+    // Comma-separated: `Embeddings.search` splits on commas, so a space-joined list was
+    // one phrase no note contains -- with embeddings down, no note was ever relevant.
+    const strKeywords = arrKeywords.join(', ');
 
     let wikipediaPrompt;
     if (Wikipedia.isEnabled()) {
@@ -163,6 +173,9 @@ async function sendMessage(event, autoModeMessage) {
     ${autoModePrompt}`;
     aiCall.addUserPrompt(prompt);
 
+    // Stopped while the helpers ran: nothing is written and nothing more is asked for.
+    if (!Ai.shouldContinue) return;
+
     const lineBeforeAppend = cm.lastLine();
 
     if (!autoModeMessage) {
@@ -179,6 +192,9 @@ async function sendMessage(event, autoModeMessage) {
     const wolframData = (!Elem.byId('enable-wolfram-alpha').checked) ? ''
                       : await fetchWolfram(message);
     if (wolframData) aiCall.addSystemPrompt(Prompt.wolfram(wolframData));
+
+    // And stopped during Wolfram, whose reformulation streams like an answer.
+    if (!Ai.shouldContinue) return;
 
     await aiCall.exec();
 

@@ -6,13 +6,15 @@ const wolframMessage = `Based off the user message, arrive at a valid query to W
 
 let wolframCallCounter = 0;
 
-const wolframUnreachable = "Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai tab. Localhosts can be found at the Github link in the ? tab.";
+const wolframUnreachable = "Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai panel. Localhosts can be found at the Github link in the Help panel.";
 
 async function fetchWolfram(message, isAINode = false, node = null, wolframContext = "") {
     // Only the localhost gateway answers Wolfram. Without it, the reformulation below is
     // an AI round trip for a query nobody can send -- paid on every send, and on every
-    // pass of auto mode, before the fetch failed anyway.
-    if (!useProxy) {
+    // pass of auto mode, before the fetch failed anyway. `useProxy` is the gateway as it
+    // was at boot, so it is asked once more before the answer is no: a gateway started
+    // after the page was refused for the rest of the session.
+    if (!useProxy && !(await Request.send(new Host.checkServer.ct()))) {
         alert(wolframUnreachable);
         return;
     }
@@ -104,7 +106,7 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
         const errorData = await response.json().catch( ()=>({}) );
         Logger.err("With Wolfram Alpha API call:", errorData.error);
         Logger.err("Full error object:", errorData);
-        alert("An error occurred when making a request the Wolfram Alpha. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai tab. Localhosts can be found at the Github link in the ? tab.");
+        alert("An error occurred when making a request the Wolfram Alpha. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai panel. Localhosts can be found at the Github link in the Help panel.");
         return;
     }
 

@@ -48,7 +48,7 @@ test('a Wikipedia search that finds nothing returns nothing instead of throwing'
 
 // `fetchWolfram` in a sandbox: `useProxy` is whether the gateway answered its health check,
 // and `fetch` is what the Wolfram route then does.
-function wolfram({useProxy, fetch}){
+function wolfram({useProxy, fetch, gatewayUp = false}){
     const src = slice(read('js/interface/searchapi/wolframapi.js'), 'async function fetchWolfram(');
     const alerts = [];
     let reformulations = 0;
@@ -57,7 +57,9 @@ function wolfram({useProxy, fetch}){
         wolframUnreachable: 'unreachable',
         Logger: logger,
         alert: (m)=> alerts.push(m),
-        Host: {urlForPath: (p)=> 'http://localhost:7070' + p},
+        // `Request.send` answers the response, or undefined when the request failed.
+        Request: {send: async ()=> (gatewayUp ? {ok: true} : undefined)},
+        Host: {urlForPath: (p)=> 'http://localhost:7070' + p, checkServer: {ct: class {}}},
         Elem: {byId: ()=> ({value: ''})},
         AiCall: {stream: ()=> {
             const call = {messages: [], addSystemPrompt(){ return call }, addUserPrompt(){ return call },
@@ -84,6 +86,18 @@ test('Wolfram with no gateway says so, spends no AI call, and lets the send go o
     assert.equal(await w.call(), undefined, 'no Wolfram data, and no throw');
     assert.equal(w.alerts.length, 1, 'the reader is told what to check');
     assert.equal(w.reformulations(), 0, 'no reformulation for a query nobody can send');
+});
+
+// `useProxy` is the gateway as it was at boot. One started later has to be found, or
+// Wolfram refuses it for the rest of the session.
+test('Wolfram finds a gateway started after the page loaded', async ()=>{
+    let fetched = 0;
+    const w = wolfram({useProxy: false, gatewayUp: true,
+                       fetch: async ()=> { fetched++; return {ok: true, json: async ()=> ({})} }});
+    await w.call();
+    assert.equal(w.alerts.length, 0, 'no refusal');
+    assert.equal(w.reformulations(), 1);
+    assert.equal(fetched, 1, 'the query went to the gateway');
 });
 
 test('Wolfram with the gateway gone mid-session says so and lets the send go on', async ()=>{

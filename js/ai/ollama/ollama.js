@@ -12,6 +12,10 @@ Ollama.getBaseUrl = function(){
     return (useProxy) ? Host.urlForPath('/aiproxy/ollama/')
          : Ollama.userBaseUrl()
 }
+// Read when used, not copied at boot. The copy `Host.checkServer` took was what the model
+// list, pulls, deletes and embeddings used, so after the reader changed the URL in the
+// Ollama manager they went on asking the old host while chat asked the new one.
+Object.defineProperty(Ollama, 'baseUrl', {get: Ollama.getBaseUrl});
 
 
 Ollama.selectOnPageLoad = async function(){

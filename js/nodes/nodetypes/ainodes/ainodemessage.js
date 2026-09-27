@@ -258,6 +258,10 @@ ${autoModePrompt}`;
         node.aiNodeMessageLoop = new AiNode.MessageLoop(node);
     }
 
+    // Stopped while the helpers above ran: the answer is not asked for. It was, and
+    // arrived to be thrown away -- a request paid for after the reader said stop.
+    if (!node.shouldContinue) return;
+
     aiCall.exec()
     .then( ()=>{
         aiLoadingIcon.style.display = 'none';

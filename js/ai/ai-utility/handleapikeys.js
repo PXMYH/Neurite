@@ -218,7 +218,6 @@ Host.checkServer = async function(){
     if (useProxy) {
         Ollama.library = await getOllamaLibrary();
     }
-    Ollama.baseUrl = Ollama.getBaseUrl();
     await Ollama.selectOnPageLoad();
 }
 Host.checkServer.ct = class {
@@ -258,11 +257,14 @@ Host.provideAPIKeys.ct = class {
 //
 // - proxyOnly    the message to show when the direct route does not exist
 // - directUrl    where the direct route posts. Ollama's is read from the reader's own
-//                base URL, as the proxy and every other Ollama call read it: a fixed
-//                127.0.0.1 sent an iPad's calls to the iPad
+//                base URL when the call is made, as `Ollama.baseUrl` is for every other
+//                Ollama call: a fixed 127.0.0.1 sent an iPad's calls to the iPad
 // - keyless      needs no key from the user, so the missing-key alert is skipped
-// - bearer       the direct route sends its key as `Authorization: Bearer <key>` --
-//                a keyless route only when it has one, as the proxy does for Custom
+// - bearer       the direct route sends its key as `Authorization: Bearer <key>`, as
+//                the proxy does for Custom -- and a keyless route only when it has one:
+//                under the Fetch spec an `Access-Control-Allow-Headers: *` does not
+//                cover Authorization, so a local server that wants no key could refuse
+//                the preflight of a header nobody needed
 // - fromModelData the endpoint and key come off the selected option's dataset
 // - requestId    the body carries a request id, so the call can be cancelled
 // - managed      neither route applies; handled before either one is chosen

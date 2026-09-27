@@ -53,7 +53,7 @@ Wikipedia.ctGetSummary = class {
     onData = (data)=>Embeddings.fetch(this.keyword)
                      .then(calculateRelevanceScores.bind(null, data))
     onFailure(){
-        alert("Failed to fetch Wikipedia summaries. Please ensure your Wikipedia server is running. Localhosts can be found at the Github link in the ? tab.");
+        alert("Failed to fetch Wikipedia summaries. Please ensure your Wikipedia server is running. Localhosts can be found at the Github link in the Help panel.");
         return "Failed to fetch Wikipedia summaries:";
     }
 }
