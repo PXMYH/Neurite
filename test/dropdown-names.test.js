@@ -75,14 +75,17 @@ test('a select with no name leaves the replacer unnamed rather than inventing on
     assert.equal(replacer.getAttribute('aria-label'), null);
 });
 
-test("an AI Node's own dropdown is named after the global one it mirrors", ()=>{
-    const globalTwin = labelled('Claude');
-    const {createSelectWithWrapper} = load( (id)=> (id === 'anthropic-select') ? globalTwin : null );
+// An AI Node's own dropdown takes its name from the global one it mirrors, found by its id
+// with the Node's index taken off (`AiNode.setupCustomSelect`, where new and restored AI
+// Nodes both pass -- test-e2e/specs/04-node-controls.e2e.mjs drives both). That lookup is
+// only as good as this id.
+test("an AI Node's own dropdown id is the global one's plus the Node's index", ()=>{
+    const {createSelectWithWrapper} = load();
     const wrapper = createSelectWithWrapper('anthropic-select', 'anthropic', 3);
     const select = wrapper.children[0].children[0];
 
     assert.equal(select.id, 'anthropic-select-3');
-    assert.equal(select.getAttribute('aria-label'), 'Claude');
+    assert.equal(select.id.replace(/-\d+$/, ''), 'anthropic-select');
 });
 
 // The markup side: every <select> the app loads either carries its own aria-label or has a

@@ -537,12 +537,23 @@ AiNode.setupLocalLLMDropdownListeners = function(node){
 AiNode.setupCustomSelect = function(dropdown){
     const node = this;
 
+    // Named after the global dropdown it mirrors (its id without the Node's index), here
+    // where a new and a restored AI Node both pass. Naming it where it is built missed
+    // every AI Node in a Saved Graph: measured, one saved before the names came back with
+    // 14 of 14 dropdown parts unnamed.
+    const name = CustomDropdown.nameOf(Elem.byId(dropdown.id.replace(/-\d+$/, '')));
+    if (name) dropdown.setAttribute('aria-label', name);
+
     if (!dropdown.dataset.initialized) {
         AiNode.refreshOptions(node, true);
         CustomDropdown.setup(dropdown, true);
         dropdown.dataset.initialized = 'true';
     } else {
         CustomDropdown.restoreState(dropdown);
+        const replacer = dropdown.parentNode.querySelector('.select-replacer');
+        if (replacer) {
+            CustomDropdown.carryAccessibility(dropdown, replacer, replacer.querySelector('.options-replacer'));
+        }
     }
     CustomDropdown.addEventListeners(dropdown);
 

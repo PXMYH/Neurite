@@ -27,9 +27,6 @@ Select.selectOption = function(select, option){
 function createSelectWithWrapper(selectId, wrapperName, nodeIndex) {
     const select = Html.make.select('model-selector custom-select ignoreSetup');
     select.id = selectId + '-' + nodeIndex;
-    // Named after the global dropdown it mirrors, which has the label this one lacks.
-    const name = CustomDropdown.nameOf(Elem.byId(selectId));
-    if (name) select.setAttribute('aria-label', name);
 
     const container = Html.make.div('dropdown-container');
     container.appendChild(select);
