@@ -140,6 +140,21 @@ var controls = {
     }
 };
 
+// The key a pointer gesture holds where a PC holds Control -- to select a Node, draw a box
+// round several, or make a Link Node -- which on a Mac is Command, as CodeMirror's "Mod" is.
+// Control and a click is the Mac's secondary click: Blink and WebKit both fire `contextmenu`
+// for it (measured, on this Mac), and `Interface.onContextMenu` lets the browser's own menu
+// open for a Control+click. iPadOS reports "MacIntel" and takes Control+click the same way.
+// A Control key the reader rebound in the controls is theirs on every platform.
+const Mod = {
+    isMac: /Mac|iPhone|iPad/.test(navigator.platform),
+    get isCommand(){ return Mod.isMac && controls.controlKey.value === 'Control' },
+    isHeld(e){ return Mod.isCommand ? e.metaKey : e.getModifierState(controls.controlKey.value) }
+};
+// The Help panel names that key as the platform does. Its tab is in the page before any
+// script runs (`PageLoad.mainLoad`).
+if (Mod.isMac) document.querySelectorAll('kbd.mod-key').forEach( (kbd)=>{ kbd.textContent = 'Cmd' } );
+
 class Settings {
     #stored = new Stored('settings');
     constructor(){

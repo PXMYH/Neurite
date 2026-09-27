@@ -36,7 +36,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
     <td>Create Ai node</td>
   </tr>
   <tr>
-    <td><code>Control + double click</code></td>
+    <td><code>Control + double click</code> (<code>Command</code> on a Mac)</td>
     <td>Create Link node</td>
   </tr>
   <tr>
@@ -45,7 +45,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Hold Shift + Click</code></td>
-    <td>Connect two nodes</td>
+    <td>Connect two nodes. The Connect tool in the bar at the top does the same without the key; Esc turns it off.</td>
   </tr>
   <tr>
     <td><code>Double Click</code></td>
@@ -61,7 +61,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
     <tr>
     <td><code>Right Click</code></td>
-    <td>List and run node methods. (delete, connect, extractText, zoomTo, and more.)</td>
+    <td>The node's menu: zoom to it, delete it, link it, and more. Click an action to run it, or its pin to keep it in the menu.</td>
   </tr>
   <!-- Node Selection & Arrangement -->
   <tr>
@@ -70,11 +70,11 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
     <td>Allows node selection, connection, dragging, and anchoring to pass through textareas.</td>
   </tr>
   <tr>
-    <td><code>Control + Click</code></td>
-    <td>Select nodes</td>
+    <td><code>Control + Click</code> (<code>Command</code> on a Mac)</td>
+    <td>Select nodes. On a Mac, Control + Click is the right-click.</td>
   </tr>
   <tr>
-    <td><code>Control + Drag Canvas</code></td>
+    <td><code>Control + Drag Canvas</code> (<code>Command</code> on a Mac)</td>
     <td>Select multiple nodes</td>
   </tr>
   <tr>

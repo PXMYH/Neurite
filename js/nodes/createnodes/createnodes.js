@@ -23,8 +23,8 @@
         // falling through and quietly making a text note.
         e.preventDefault();
         if (AiFeatures.enabled) createLlmNode('', undefined, undefined, e.clientX, e.clientY).draw();
-    } else if (e.getModifierState(controls.controlKey.value)) {
-        // Control + double click => Create Link node
+    } else if (Mod.isHeld(e)) {
+        // Control + double click => Create Link node (Command on a Mac, globals.js)
         e.preventDefault();
         const node = returnLinkNodes();
         node.followingMouse = 0;

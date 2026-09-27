@@ -381,16 +381,16 @@ class NodeView {
 
         let clickStartX, clickStartY;
 
+        // Selecting is `Mod` and a click: Command on a Mac (globals.js).
         On.mousedown(windowDiv, (e)=>{
-            if (e.getModifierState(controls.controlKey.value)) {
-                // Record the starting position of the mouse only if the Alt key is held
+            if (Mod.isHeld(e)) {
                 clickStartX = e.clientX;
                 clickStartY = e.clientY;
             }
         });
 
         On.mouseup(windowDiv, (e) => {
-            if (e.getModifierState(controls.controlKey.value) && e.button !== 2) {
+            if (Mod.isHeld(e) && e.button !== 2) {
                 const distanceMoved = Math.sqrt(
                     Math.pow(e.clientX - clickStartX, 2) + Math.pow(e.clientY - clickStartY, 2)
                 );
