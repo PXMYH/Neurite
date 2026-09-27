@@ -1920,7 +1920,7 @@ textarea.title-input.title-input-stowed {
                 /* The control takes the right-hand end of the row, whatever sits before
                    it -- a label, or the embeddings row's two buttons. */
                 .menu-detail .dropdown-wrapper > .dropdown-container {
-                    width: min(250px, 60%);
+                    width: min(270px, 60%);
                     margin-left: auto;
                 }
 
@@ -2911,6 +2911,7 @@ input[type="checkbox"] {
     }
 
     .archive-status-line {
+        position: relative;
         padding: 0;
         border: none;
         background: none;
@@ -2919,6 +2920,18 @@ input[type="checkbox"] {
         text-decoration: underline;
         text-underline-offset: 2px;
         cursor: pointer;
+    }
+
+        /* The target past the words, to the app's 24px, without making the line taller:
+           the words alone were 32 x 18px. */
+        .archive-status-line::after {
+            content: "";
+            position: absolute;
+            inset: -4px -4px;
+        }
+
+    .archive-status-entry {
+        white-space: nowrap;
     }
 
         .archive-status-line:hover {
@@ -2990,6 +3003,14 @@ td {
     z-index: 20;
 }
 
+/* The menu's and the modals' selects, 10px wider: with the text clear of the chevron, 130px
+   left 88px for a choice, and "Burning Ship", "Middle Click" and "Scroll Wheel" are 89 to
+   93px. `:where` keeps this as weak as the rule above, so every select that sets its own
+   width -- the Archive select, the model rows -- still does. The AI Node's are not these. */
+:where(.menu-detail, #customModal) .select-container {
+    width: 140px;
+}
+
 .select-replacer {
     position: relative;
     border: inset #8882;
@@ -3005,11 +3026,13 @@ td {
     .select-replacer .selected-text {
         /* Clear of the chevron, 10px to 23px from the right edge. A block, not a flex
            box, so a long choice ends in an ellipsis before it: "Deepseek R1 distill
-           Llama 70b" ran on under it. */
-        padding: 2px 30px 2px 10px;
+           Llama 70b" ran on under it. At the start of the box whatever aligns the text
+           around it: in the Adjust Controls table the three values sat centred. */
+        padding: 2px 26px 2px 10px;
         height: 25px; /* Consistent height */
         line-height: 25px;
         display: block;
+        text-align: start;
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
@@ -3021,7 +3044,9 @@ td {
             top: 0;
             bottom: 0;
             right: 0;
-            width: 46px; /* Match the padding-right value */
+            /* Over the chevron's room and no further: 46px of fade dimmed the end of
+               every choice that fits now, not only the ones that ran under it. */
+            width: 26px;
             background: linear-gradient(to left, #222226, transparent);
             pointer-events: none;
         }
@@ -4836,6 +4861,9 @@ code.language-markdown {
     .function-call-container .toggle-panel {
         box-sizing: border-box;
         gap: 8px;
+        /* Room for its focus ring, 2px out and 2px wide, when it is scrolled into view
+           at the menu's foot (`toggleFunctionCallPanel`): the ring's lower half was cut. */
+        scroll-margin-bottom: 8px;
     }
 
         /* A rule across the panel with the chevron in it, drawn as the headings' rules

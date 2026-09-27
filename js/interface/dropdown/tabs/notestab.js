@@ -260,14 +260,16 @@ class ZetPanes {
             return (holder === pane ? 'elsewhere in this Archive'
                   : holder ? 'in ' + this.getPaneName(holder.paneId) : 'in another Archive');
         };
-        const line = (entry)=>({entry, text: 'line ' + (entry.lineNo + 1)});
+        // `before` is kept on the line with its button: "(" ended one line and "line 3"
+        // began the next.
+        const line = (entry, before = '')=>({entry, before, text: before + 'line ' + (entry.lineNo + 1)});
         const first = taken[0];
         const parts = (taken.length === 0) ? []
             : (taken.length === 1)
             ? [`“${first.title}” is already a note ${where(first)}, so `, line(first),
                ' makes no note. Rename one of them to keep both.']
             : [`${taken.length} Title lines make no note, because their Titles are already notes: `,
-               ...taken.slice(0, 3).flatMap( (t, i)=>[(i ? ', ' : '') + `“${t.title}” (`, line(t), `, ${where(t)})`] ),
+               ...taken.slice(0, 3).flatMap( (t, i)=>[(i ? ', ' : '') + `“${t.title}” `, line(t, '('), `, ${where(t)})`] ),
                (taken.length > 3 ? ', and more.' : '.')];
 
         // A live region is read out whenever it is written, and a pass runs at every
@@ -280,11 +282,15 @@ class ZetPanes {
 
             const button = Html.make.button('archive-status-line');
             button.type = 'button';
-            button.textContent = part.text;
+            button.textContent = part.text.slice(part.before.length);
             button.title = 'Select this Title in the text.';
             button.dataset.line = part.entry.lineNo;
             button.dataset.title = part.entry.title;
-            return button;
+            if (!part.before) return button;
+
+            const entry = Html.make.span('archive-status-entry');
+            entry.append(part.before, button);
+            return entry;
         }) );
     }
     onStatusClick = (e)=>{

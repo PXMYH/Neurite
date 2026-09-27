@@ -20,6 +20,8 @@ window.prompt = async (message, defaultValue = '', title = null) => {
     }
 
     messageEl.textContent = message;
+    // The box is named by the question it answers: it had no name at all.
+    inputEl.setAttribute('aria-label', message);
     inputEl.value = defaultValue;
     inputEl.focus(); // Auto-focus textarea
     // The answer offered is selected, so typing replaces it, as a native prompt's does: with
@@ -70,6 +72,7 @@ window.alert = async (message) => {
     const messageEl = modalBody.querySelector('.alert-message');
     const okBtn = modalBody.querySelector('.modal-ok');
     messageEl.textContent = message;
+    Modal.describeBy(messageEl);
 
     return new Promise((resolve) => {
         okBtn.addEventListener('click', () => {
@@ -86,6 +89,7 @@ window.confirm = async (message) => {
     const okBtn = modalBody.querySelector('.modal-ok');
     const cancelBtn = modalBody.querySelector('.modal-cancel');
     messageEl.textContent = message;
+    Modal.describeBy(messageEl);
 
     return new Promise((resolve) => {
         const cleanup = (result) => {
@@ -98,4 +102,11 @@ window.confirm = async (message) => {
         // on the page behind it, where Enter did nothing and no Tab led into the dialog.
         cancelBtn.focus();
     });
+}
+
+// The message is what an alert or a confirm says, so it describes the dialog: read out with
+// its title when it opens. The copy in the body gets the id, not the template it came from.
+Modal.describeBy = function (messageEl) {
+    messageEl.id = 'modal-message';
+    Modal.div.setAttribute('aria-describedby', messageEl.id);
 }

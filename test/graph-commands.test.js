@@ -77,7 +77,8 @@ test('Save to… asks what to call the file when the browser will not', ()=>{
 
     const ask = savenet.match(/#askNameThenDownload = \(\)=>\{[\s\S]*?\n {4}\}/);
     assert.ok(ask, '#askNameThenDownload is gone or no longer a field at that indent');
-    assert.match(ask[0], /window\.prompt\("Save this graph as:", this\.#suggestedSaveName\(meta\)\)/,
+    // The third argument is the dialog's title, which says nothing about the name.
+    assert.match(ask[0], /window\.prompt\("Save this graph as:", this\.#suggestedSaveName\(meta\)(, '[^']*')?\)/,
         'the prompt no longer offers a name, so keeping one is not one keypress');
 
     // What it offers for a graph nobody has named: `Graph.neurite`. The number in

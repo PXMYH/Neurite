@@ -21,9 +21,13 @@ const Modals = {
     'neurite-modal': new Modal('neurite-modal', "Neurite"),
     // The three that wait for an answer, where the keyboard stays until it is given
     // (`Modal.holdTab`). The others are tools used beside the Graph, which stays in reach.
-    alertModal: Object.assign(new Modal('alertModal', 'Alert'), { customClass: 'alert-modal', asks: true }),
-    confirmModal: Object.assign(new Modal('confirmModal', 'Confirm'), { asks: true }),
-    promptModal: Object.assign(new Modal('promptModal', 'Prompt'), { asks: true })
+    // An alert or a confirm is an `alertdialog`, described by its message
+    // (`customdialog.js`); a prompt names its box with the message instead.
+    alertModal: Object.assign(new Modal('alertModal', 'Alert'), { customClass: 'alert-modal', asks: true, role: 'alertdialog' }),
+    confirmModal: Object.assign(new Modal('confirmModal', 'Confirm'), { asks: true, role: 'alertdialog' }),
+    // "Question", not "Prompt": a caller that names it nothing is asking the reader
+    // something, and in this app a prompt is what is sent to a model.
+    promptModal: Object.assign(new Modal('promptModal', 'Question'), { asks: true })
 }
 
 Modal.btnClose = Modal.div.querySelector('.close');
@@ -45,6 +49,13 @@ Modal.currentCustomClass = null;
 Modal.open = function (contentId) {
     App.menuContext.hide();
     Logger.debug("Opened Modal:", contentId);
+
+    // Where the keyboard was, to go back to: after a Rename it was left on `body`, twelve
+    // Tabs from the button. Read before the body is replaced, which takes the focused
+    // control with it, and kept when one dialog opens another: an alert from inside
+    // Custom Endpoint goes back to the button that opened Custom Endpoint.
+    if (!Modal.current) Modal.returnFocus = document.activeElement;
+    Modal.div.removeAttribute('aria-describedby');
 
     // Clear filepath input from header.
     const existingInput = document.querySelector('.modal-filepath-input');
@@ -69,9 +80,7 @@ Modal.open = function (contentId) {
     modalTitle.textContent = modal?.title || '';
     if (modal.init) modal.init();
 
-    // Where the keyboard was, to go back to: after a Rename it was left on `body`, twelve
-    // Tabs from the button. A dialog opened from inside another keeps the first one's.
-    if (!Modal.div.contains(document.activeElement)) Modal.returnFocus = document.activeElement;
+    Modal.div.setAttribute('role', modal?.role ?? 'dialog');
     Modal.div.setAttribute('aria-modal', String(Boolean(modal?.asks)));
 
     Modal.current = modal;
@@ -176,13 +185,18 @@ Modal.holdTab = function (e) {
         .filter( (el)=>(!el.disabled && el.getClientRects().length > 0) );
     if (!stops.length) return;
 
+    // Stopped here as well: CodeMirror, reached next when the key began in the editor,
+    // notes where the focus is and puts it back in the editor when its handler is done.
     e.preventDefault();
+    e.stopPropagation();
     const at = stops.indexOf(document.activeElement);
     const step = (e.shiftKey ? -1 : 1);
     const next = (at < 0) ? (e.shiftKey ? stops.length - 1 : 0) : (at + step + stops.length) % stops.length;
     stops[next].focus();
 }
-On.keydown(window, Modal.holdTab);
+// Captured, so it comes first: CodeMirror answers Tab itself, and a Tab in the editor behind
+// the dialog typed a tab into the note before it reached this.
+On.keydown(window, Modal.holdTab, true);
 
 // Escape closes a modal, and the nested explanation overlay first.
 //

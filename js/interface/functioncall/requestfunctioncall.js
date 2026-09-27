@@ -41,7 +41,7 @@ View.Code.prototype.getPromptMessage = function(){
     }
 
     return new Promise((resolve) => {
-        window.prompt("Enter message:")
+        window.prompt("Enter message:", '', 'Function Console')
             .then((dialogueMessage) => {
                 const trimmedMessage = dialogueMessage && dialogueMessage.trim();
                 if (trimmedMessage !== '') {

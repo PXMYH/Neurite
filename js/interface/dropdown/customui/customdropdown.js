@@ -80,6 +80,10 @@ CustomDropdown.carryAccessibility = function(select, selectReplacer, optionsRepl
     selectReplacer.setAttribute('aria-expanded', 'false');
     selectReplacer.setAttribute('tabindex', '0');
     optionsReplacer.setAttribute('role', 'listbox');
+    // Out of the Tab order: Chromium makes a list that scrolls a Tab stop of its own, so
+    // Tab from the control went into the list, which closed on it and dropped the focus on
+    // `body`. The keys that move through the options are the control's (`addKeyListeners`).
+    optionsReplacer.tabIndex = -1;
 
     if (select.id) {
         optionsReplacer.id = select.id + '-options';
@@ -160,8 +164,12 @@ CustomDropdown.closeAfterChoice = function(optionsReplacer){
     const selectReplacer = optionsReplacer.closest('.select-replacer');
     if (!selectReplacer) return;
 
+    // A click on an option focuses the list, which the choice is about to hide; the
+    // keyboard goes back to the control rather than to `body`.
+    const inList = optionsReplacer.contains(document.activeElement);
     CustomDropdown.close(selectReplacer, optionsReplacer);
     selectReplacer.parentElement.style.zIndex = "20";
+    if (inList) selectReplacer.focus({preventScroll: true});
 }
 
 CustomDropdown.addOption = function(select, text, value, key){
@@ -189,6 +197,11 @@ CustomDropdown.addEventListeners = function(select){
 
     let isPendingFrame = false;
     On.click(selectReplacer, (e)=>{
+        // Not a click on the list itself: an option stops its own click, so what reaches
+        // here from inside is a drag on the list's scrollbar, which closed the list it was
+        // scrolling.
+        if (optionsReplacer.contains(e.target)) return;
+
         if (optionsReplacer.classList.contains('show')) {
             // Dropdown is open, so close it
             window.requestAnimationFrame(() => {
@@ -268,14 +281,15 @@ CustomDropdown.addKeyListeners = function(select, selectReplacer, optionsReplace
         e.stopPropagation();
     });
     // Focus moving on closes the list, as a native select's does: opened with Enter, it
-    // stayed open over the next control once Tab had moved to it. A click on an option
-    // keeps focus here, the options being inside and not focusable.
-    On.blur(selectReplacer, ()=>{
+    // stayed open over the next control once Tab had moved to it. Captured, and only when
+    // the focus goes somewhere outside: a click on an option moves it into the list first.
+    On.blur(selectReplacer, (e)=>{
+        if (selectReplacer.contains(e.relatedTarget)) return;
         if (!optionsReplacer.classList.contains('show')) return;
 
         CustomDropdown.close(selectReplacer, optionsReplacer);
         container.style.zIndex = "20";
-    });
+    }, true);
 }
 
 // Moves the selection one option, as a focused select does with its list closed.

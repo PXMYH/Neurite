@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -80,6 +80,10 @@ test('delete says how many notes go with the Archive, and the last one says why 
 
     await page.click('#archiveDelete');
     assert.equal(await dialog(page), 'Delete the Archive “Archive 1” and the 2 notes written in it?');
+    assert.deepEqual(await page.evaluate(() => {
+        const m = document.getElementById('customModal');
+        return [m.getAttribute('role'), document.getElementById(m.getAttribute('aria-describedby'))?.textContent];
+    }), ['alertdialog', 'Delete the Archive “Archive 1” and the 2 notes written in it?'], 'the question is not what describes the dialog');
     await answer(page, '.modal-ok');
     await page.waitForTimeout(500);
     const s = await state(page);
@@ -122,6 +126,10 @@ test('with two Archives the HUD says where new notes go, and opens the Notes pan
     // The HUD redraws on its own interval.
     await page.waitForFunction(() => !document.querySelector('.hud-archive').hidden, undefined, { timeout: 2000 });
     assert.equal((await state(page)).hud, 'New notes go to Archive 2');
+    // Set 8px in from everything else in the overview by the padding its hover needs.
+    const lefts = await page.evaluate(() => ['.hud-archive-caption', '.hud-scale', '.hud-map']
+        .map((s) => document.querySelector(s).getBoundingClientRect().left));
+    assert.ok(Math.max(...lefts) - Math.min(...lefts) <= 1, `the line is not aligned with the rest of the overview: ${lefts}`);
 
     await page.click('.menu-button');   // the menu closed
     await page.click('.hud-archive');
@@ -313,6 +321,57 @@ test('the status line says why once, and its line selects the taken Title', asyn
         const cm = window.currentActiveZettelkastenMirror;
         return [cm.getSelection(), cm.getCursor().line];
     }), ['Alpha', 2]);
+
+    // Three more taken, in a narrow window: "(" ended one line and "line 3" began the next,
+    // and each button was a 32 x 18px target.
+    await page.setViewportSize({ width: 400, height: 700 });
+    await page.evaluate(() => window.zetPaneList[0].processor.writeAs(ZettelkastenProcessor.Pass.edit,
+        () => window.zetPaneList[0].cm.replaceRange('\n## Beta\nb\n\n## Gamma\ng\n', { line: 99 })));
+    await type(page, '\n## Beta\nagain\n\n## Gamma\nagain\n');
+    const entries = await page.evaluate(() => [...document.querySelectorAll('#archiveStatus .archive-status-entry')].map((entry) => {
+        const button = entry.querySelector('button').getBoundingClientRect();
+        const x = button.left + button.width / 2;
+        const edge = (y) => document.elementFromPoint(x, y)?.closest('.archive-status-line') !== null;
+        return { lines: entry.getClientRects().length, target: edge(button.top - 2) && edge(button.bottom + 2) };
+    }));
+    assert.match((await state(page)).status ?? '', /^3 Title lines make no note.*“Alpha”.*“Beta”.*“Gamma”/);
+    assert.equal(entries.length, 3, 'a line button is not kept with its "("');
+    assert.deepEqual(entries, entries.map(() => ({ lines: 1, target: true })));
+});
+
+// Tab went through a dialog's text box and on into the page behind -- and a Tab typed into
+// the note behind it went in as a tab: CodeMirror answered it before the dialog could.
+test('a Tab in the note behind an open dialog types nothing and goes into the dialog', async () => {
+    await openNotes(page);
+    await type(page, '## Alpha\nbody\n');
+    await page.focus('#archiveRename');
+    await page.keyboard.press('Enter');
+    await page.click('#zetPaneContainer .zet-pane.active .CodeMirror-lines');
+    await page.keyboard.press('Tab');
+    assert.deepEqual(await page.evaluate(() => [window.currentActiveZettelkastenMirror.getValue(),
+        document.getElementById('customModal').contains(document.activeElement)]), ['## Alpha\nbody\n', true]);
+});
+
+// Chromium makes a list that scrolls a Tab stop of its own: from a list of fifteen Archives,
+// Tab went into the list, which closed on it, and left the focus on `body`.
+test('Tab from a long open list goes on to the next control', async () => {
+    await openNotes(page);
+    for (let i = 0; i < 14; i++) await page.click('#archiveNew');
+    await page.focus('.archive-choice .select-replacer');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(() => {
+        const list = document.querySelector('.archive-choice .options-replacer');
+        return list.scrollHeight > list.clientHeight;
+    }), true, 'the list of fifteen does not scroll, so this proves nothing');
+    await page.keyboard.press('Tab');
+    const after = await page.evaluate(() => ({
+        focus: document.activeElement === document.body ? 'body' : document.activeElement.id,
+        open: document.querySelector('.archive-choice .options-replacer').classList.contains('show'),
+    }));
+    // WebKit's Tab passes over buttons, so there it lands further on; never on `body`.
+    assert.equal(after.open, false, 'the list stayed open');
+    if (isIPad) assert.notEqual(after.focus, 'body');
+    else assert.equal(after.focus, 'archiveNew');
 });
 
 // The dialog offered the name with the caret after it, so "Learning" made "Archive 1Learning";
@@ -323,8 +382,9 @@ test('Rename offers the name selected, keeps it to one line, and Escape closes o
     await page.focus('#archiveRename');
     await page.keyboard.press('Enter');
     assert.deepEqual(await page.evaluate(() => [document.getElementById('modal-title').textContent,
-        document.getElementById('customModal').getAttribute('role'), document.getElementById('customModal').getAttribute('aria-modal')]),
-        ['Rename Archive', 'dialog', 'true']);
+        document.getElementById('customModal').getAttribute('role'), document.getElementById('customModal').getAttribute('aria-modal'),
+        document.querySelector('#customModal .modal-prompt-textarea').getAttribute('aria-label')]),
+        ['Rename Archive', 'dialog', 'true', 'Rename the Archive “Archive 1” to:']);
     for (let i = 0; i < 4; i++) {
         await page.keyboard.press('Tab');
         assert.equal(await page.evaluate(() => document.getElementById('customModal').contains(document.activeElement)), true,

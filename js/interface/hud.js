@@ -39,8 +39,11 @@ class Hud {
                  that panel, so the answer and the way to change it are one click apart. -->
             <button type="button" class="hud-archive" hidden
                     data-tooltip="New notes are written into this Archive. Open the Notes panel to choose another.">
-                <span class="hud-archive-caption">New notes go to</span>
-                <span class="hud-archive-name"></span>
+                <span class="hud-archive-text">
+                    <span class="hud-archive-caption">New notes go to</span>
+                    <span class="hud-archive-name"></span>
+                </span>
+                <svg class="hud-archive-chevron" aria-hidden="true"><use href="#caret-right-icon"></use></svg>
             </button>
             <div class="hud-row hud-actions">
                 <button type="button" class="hud-btn" data-act="fit"
@@ -171,18 +174,20 @@ class Hud {
         Hud.updateArchive();
         Hud.updateUnderMenu();
     }
-    // Under an open menu that reaches down to it, the overview is hidden: the menu is drawn
-    // over it, and at 1600 x 1000 the Fractal panel ended 29px short of its foot, which
-    // left Fit, Tidy and Home showing under the panel as if they were part of it.
+    // Under an open menu that reaches it, the overview and the empty canvas's hint are
+    // hidden: the menu is drawn over both. At 1600 x 1000 the Fractal panel ended 29px short
+    // of the overview's foot and left Fit, Tidy and Home showing under the panel as if they
+    // were part of it, and the hint read "title ]] in a note to link them" beside a panel.
     static updateUnderMenu(){
-        let under = false;
         // Measured only while the menu is open: this runs eight times a second.
-        if (dropdownContent.classList.contains('open')) {
-            const menu = dropdownContent.getBoundingClientRect();
-            const hud = Hud.panel.getBoundingClientRect();
-            under = (menu.bottom > hud.top && menu.left < hud.right && menu.right > hud.left);
+        const menu = dropdownContent.classList.contains('open') && dropdownContent.getBoundingClientRect();
+        for (const elem of [Hud.panel, Hud.hint]) {
+            if (!elem) continue;
+
+            const box = menu && elem.getBoundingClientRect();
+            elem.classList.toggle('is-under-menu', Boolean(menu) && menu.bottom > box.top
+                && menu.top < box.bottom && menu.left < box.right && menu.right > box.left);
         }
-        Hud.panel.classList.toggle('is-under-menu', under);
     }
 
     static updateArchive(){

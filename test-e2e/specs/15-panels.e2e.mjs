@@ -121,11 +121,15 @@ test('no label of one or two words wraps in the panels', async () => {
 // ---- found by the Phase 3 UX review ----
 
 // The empty canvas's hint was drawn over the menu, and at 480px every panel meets it below
-// about 1376px of window.
-test('a panel over the empty canvas\'s hint is drawn over it', async () => {
-    await page.setViewportSize({ width: 1280, height: 800 });
+// about 1376px of window. Drawn under it instead, it was cut in half, reading "title ]] in a
+// note to link them" beside the panel.
+test('the empty canvas\'s hint is under an open panel, and out of sight while the panel reaches it', async () => {
+    await page.setViewportSize({ width: 1024, height: 768 });
     await openMenu(page);
     await openPanel(page, 'Ai');
+    await page.waitForTimeout(700);   // the overview's tick, then the hint's fade
+    const opacity = () => page.evaluate(() => getComputedStyle(document.querySelector('.canvas-hint')).opacity);
+    assert.equal(await opacity(), '0', 'the hint shows beside the panel that cuts it');
     const top = await page.evaluate(() => {
         const elem = document.querySelector('.canvas-hint');
         const hint = elem.getBoundingClientRect();
@@ -140,6 +144,9 @@ test('a panel over the empty canvas\'s hint is drawn over it', async () => {
         return hit.closest('.dropdown-content') ? 'menu' : hit.closest('.canvas-hint') ? 'hint' : hit.className;
     });
     assert.equal(top, 'menu');
+    await page.click('.menu-button');
+    await page.waitForTimeout(800);
+    assert.equal(await opacity(), '1', 'the hint did not come back when the menu closed');
 });
 
 // The side handle sets every panel's width, and a bare `1fr` column grew to the widest
@@ -195,9 +202,69 @@ test('the console opened from the keyboard keeps its strip in view', async () =>
     await page.focus('.function-call-container > .toggle-panel');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(900);
-    const [strip, menu] = await page.evaluate(() => ['.function-call-container > .toggle-panel', '.dropdown-content']
-        .map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)]; }));
-    assert.ok(strip[0] >= menu[0] && strip[1] <= menu[1], `the strip is at ${strip}, the menu at ${menu}`);
+    const [strip, menu] = await page.evaluate(() => {
+        const s = document.querySelector('.function-call-container > .toggle-panel').getBoundingClientRect();
+        const m = document.querySelector('.dropdown-content');
+        const r = m.getBoundingClientRect();
+        return [[s.top, s.bottom], [r.top, r.top + m.clientTop + m.clientHeight]];
+    });
+    // Its focus ring is drawn 2px out and 2px wide, and was cut in half at the menu's foot.
+    assert.ok(strip[0] >= menu[0] && strip[1] + 4 <= menu[1], `the strip is at ${strip}, the menu's visible area at ${menu}`);
+});
+
+// With the text clear of the chevron, 130px left 88px for a choice: "Burning Ship", "Middle
+// Click" and "Scroll Wheel" ended in an ellipsis, and in the Adjust Controls table the
+// values sat centred.
+test('every choice in the panels\' and the Adjust Controls selects fits, at the start of its box', async () => {
+    await openMenu(page);
+    const cut = [];
+    const measure = () => page.evaluate(() => {
+        const out = [];
+        for (const rep of document.querySelectorAll('.select-replacer')) {
+            if (!rep.getClientRects().length || rep.closest('.node')) continue;
+            const shown = rep.querySelector('.selected-text');
+            const select = rep.parentElement.querySelector('select');
+            const box = shown.getBoundingClientRect();
+            const room = shown.clientWidth - parseFloat(getComputedStyle(shown).paddingLeft) - parseFloat(getComputedStyle(shown).paddingRight);
+            const probe = document.createElement('span');
+            probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:inherit';
+            shown.appendChild(probe);
+            for (const option of select.options) {
+                probe.textContent = option.text;
+                if (probe.getBoundingClientRect().width > room + 0.5) out.push(`${select.id}: ${option.text}`);
+            }
+            probe.remove();
+            const range = document.createRange();
+            range.selectNodeContents(shown);
+            const start = range.getClientRects()[0]?.left ?? box.left;
+            if (Math.abs(start - box.left - parseFloat(getComputedStyle(shown).paddingLeft)) > 1) out.push(`${select.id}: text starts ${Math.round(start - box.left)}px in`);
+        }
+        return out;
+    });
+    await openPanel(page, 'Fractal');
+    cut.push(...await measure());
+    await page.click('#menuBackButton');
+    await openPanel(page, 'Settings');
+    cut.push(...await measure());
+    await page.click('#controls-button');
+    await page.waitForTimeout(300);
+    cut.push(...await measure());
+    assert.deepEqual(cut, []);
+});
+
+// One dialog opened from inside another -- an alert from Custom Endpoint -- replaced the body
+// that held the focused button before the focus was read, so it went back to `body`.
+test('a dialog opened from inside another gives the focus back to what opened the first', async () => {
+    await openMenu(page);
+    await openPanel(page, 'Ai');
+    await page.click('#tab4 .dropdown-container:has(#inference-select) .select-replacer');
+    await page.click("#tab4 .dropdown-container:has(#inference-select) .dropdown-option:has-text('Custom')");
+    await page.focus('#addApiConfigBtn');
+    await page.keyboard.press('Enter');
+    await page.click('#customModal .api-modal-button');   // empty: it says what is missing
+    assert.equal(await page.evaluate(() => Modal.current?.id), 'alertModal');
+    await page.click('#customModal .modal-ok');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'addApiConfigBtn');
 });
 
 // The panels are drawn over the overview, and one that ended just short of its foot left

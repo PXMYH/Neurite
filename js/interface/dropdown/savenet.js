@@ -993,7 +993,7 @@ View.Graphs = class {
         const meta = this.#selectedGraph;
         if (!meta) return Logger.warn("No graph to save yet");
 
-        return window.prompt("Save this graph as:", this.#suggestedSaveName(meta))
+        return window.prompt("Save this graph as:", this.#suggestedSaveName(meta), 'Save Graph')
             .then(this.#downloadAs)
     }
     // `Graph.neurite`, not `Graph 4.neurite`. That number is `#maxGraphId`'s, and it exists

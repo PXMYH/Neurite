@@ -183,7 +183,7 @@ const defaultSavedViews = {
 // Write them again against the real shape if a caller ever needs them.
 
 function receiveCurrentView() {
-    return window.prompt("Enter a title for the current location:")
+    return window.prompt("Enter a title for the current location:", '', 'Store View')
         .then( (title)=>(title === null ? null : {
                             title,
                             standardCoords: Graph.getCoords(),
