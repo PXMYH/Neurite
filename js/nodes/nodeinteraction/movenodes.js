@@ -3,12 +3,20 @@
 // Not a key typed into a field, which is text: measured, "fd" typed into the notes pane grew
 // the selected Node twice over. Nor a chord, which is the browser's -- Ctrl+F and Cmd+F are
 // Find, and they scaled the selection while the find bar opened.
+//
+// And a key is let go of whatever it reads as by then: `f` released under Shift arrives as
+// `F`, and one released in another window arrives nowhere, so either left the selection
+// growing, or drifting at 3px a frame, for good.
 const keyState = {};
 On.keydown(window, (e)=>{
     if (Hud.isTyping() || e.ctrlKey || e.metaKey || e.altKey) return;
     keyState[e.key] = true;
 });
-On.keyup(window, (e)=>{ keyState[e.key] = false } );
+On.keyup(window, (e)=>{
+    keyState[e.key] = false;
+    keyState[e.key.toLowerCase()] = false;
+});
+On.blur(window, ()=>{ for (const key in keyState) keyState[key] = false });
 
 const directionMap = {
     'ArrowUp': 'up',

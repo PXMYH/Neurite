@@ -107,11 +107,17 @@ function addEventsToUserInputTextarea(userInputTextarea, textarea, node, display
         if (displayDiv) ZetSyntaxDisplay.syncAndHighlight(displayDiv, userInputTextarea);
     });
 
+    // A press in the body is text, and stays in the body -- except a press that is a gesture on
+    // the card: Alt reaches the card underneath, and so do the connect mode (the Connect tool,
+    // or Shift) and `Mod` (select). The body is most of a card, and those gestures armed nothing
+    // and selected nothing there: measured, 0 of 48 points on a card's body (#50).
     On.mousedown(userInputTextarea, (e)=>{
-        if (userInputTextarea.contains(e.target) && !e.getModifierState(controls.altKey.value)) {
-            e.stopPropagation();
-            // We still allow default behavior, so the contenteditable div remains interactable.
-        }
+        if (!userInputTextarea.contains(e.target)) return;
+        if (e.getModifierState(controls.altKey.value)) return;
+        if (App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e)) return;
+
+        e.stopPropagation();
+        // We still allow default behavior, so the contenteditable div remains interactable.
     }, true); // Use capture phase to catch the event early
 
     On.keydown(document, (e)=>{

@@ -148,7 +148,6 @@ async function paneEdges(text, count = 1) {
     await page.waitForFunction((n) => Object.keys(Graph.edges).length >= n, count, { timeout: 5000 });
     await page.waitForTimeout(1200);
 }
-const tip = () => page.evaluate(() => Object.values(Graph.edges)[0].directionality.start?.getTitle() ?? 'none');
 
 // The drawn arrowhead, read off its path: which Node its tip is on the way to.
 test('the arrow points at the note a Ref names', async () => {
@@ -165,14 +164,22 @@ test('the arrow points at the note a Ref names', async () => {
     assert.equal(drawnAt, 'Beta');
 });
 
-// A pan that starts on an Edge carries it along under the pointer, so it ended on the Edge
-// and clicked it: measured, a 170px pan reversed the direction. And the drawn ribbon was the
-// only target -- 2 px either side of its middle when zoomed out.
-test('a pan from an Edge leaves its direction, and a click near it, zoomed out, changes it', async () => {
+// A click on an Edge turned its arrow, and between two notes a turn rewrites their Refs: a
+// click inside the invisible halo, on what looks like empty Plane, edited two notes, and a
+// double-click there edited them twice and made a note on top. A pan from an Edge ended on it
+// and turned it too. None of the three touches the Edge now; its menu turns the arrow, reached
+// 12px from the line when zoomed out, and asks before a turn takes a Ref out of a note.
+test('a click, a double-click or a pan on an Edge change nothing; its menu turns the arrow', async () => {
     await paneEdges('## Alpha\nSee [[Beta]].\n\n## Beta\nb\n');
     await page.evaluate(() => { Graph.zoom = Graph.zoom.scale(4) });   // zoomed out, x0.25
     await page.waitForTimeout(600);
-    assert.equal(await tip(), 'Beta');
+    const state = () => page.evaluate(() => ({
+        tip: Object.values(Graph.edges)[0].directionality.start?.getTitle() ?? 'none',
+        text: window.currentActiveZettelkastenMirror.getValue(),
+        nodes: Object.keys(Graph.nodes).length,
+    }));
+    const start = await state();
+    assert.equal(start.tip, 'Beta');
 
     let m = await edgeMiddle();
     await page.mouse.move(m.x, m.y);
@@ -180,12 +187,42 @@ test('a pan from an Edge leaves its direction, and a click near it, zoomed out, 
     await page.mouse.move(m.x + 150, m.y + 80, { steps: 10 });
     await page.mouse.up();
     await page.waitForTimeout(300);
-    assert.equal(await tip(), 'Beta', 'the pan changed nothing');
+    assert.deepEqual(await state(), start, 'the pan changed the Edge');
 
     m = await edgeMiddle();
-    await page.mouse.click(m.x + m.nx * 12, m.y + m.ny * 12);
+    const off = { x: m.x + m.nx * 12, y: m.y + m.ny * 12 };
+    await page.mouse.click(off.x, off.y);
     await page.waitForTimeout(300);
-    assert.equal(await tip(), 'none', 'a click 12px off the middle line reaches the Edge');
+    assert.deepEqual(await state(), start, 'a click changed the Edge or its notes');
+    await page.mouse.dblclick(off.x, off.y);
+    await page.waitForTimeout(400);
+    assert.deepEqual(await state(), start, 'a double-click changed the Edge, or made a note on it');
+
+    // Turn from the menu until a turn would take a Ref out; No leaves it, Yes turns it.
+    const turn = async (answer) => {
+        await page.mouse.click(off.x, off.y, { button: 'right' });
+        await page.waitForFunction(() => getComputedStyle(document.getElementById('customContextMenu')).display !== 'none');
+        await page.evaluate(() => [...document.querySelectorAll('#customContextMenu > li')]
+            .find((li) => li.textContent.trim() === 'Turn the arrow').click());
+        await page.waitForTimeout(250);
+        const asked = await page.evaluate(() => (Modal.current?.id === 'confirmModal'
+            ? document.querySelector('.modal-content .confirm-message').textContent : null));
+        if (asked) await page.click(answer ? '.modal-content .modal-ok' : '.modal-content .modal-cancel');
+        await page.waitForTimeout(900);
+        await page.keyboard.press('Escape');
+        return asked;
+    };
+    let asked = null;
+    for (let i = 0; i < 3 && !asked; i++) {
+        const before = await state();
+        asked = await turn(false);
+        if (asked) assert.deepEqual(await state(), before, 'No turned the arrow anyway');
+        else assert.notEqual((await state()).tip, before.tip, 'a turn that only adds a Ref did not turn');
+    }
+    assert.match(asked ?? '', /^Turn the arrow\? That takes \[\[\w+\]\] out of "\w+"\.$/);
+    const before = await state();
+    assert.equal(await turn(true), asked);
+    assert.notEqual((await state()).tip, before.tip, 'Yes did not turn the arrow');
 });
 
 // One removal rule for every Node Type: the Refs that write an Edge go, then the Edge. Only

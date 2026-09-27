@@ -171,6 +171,10 @@ Corpus measured: 95 concept Notes (not 140), 240 Refs inside them making 72 Edge
   Pane highlighter rebuilt as one word-bounded regex per change (it builds ~0.31M regexes per
   keystroke in the largest area Pane; plain click places the caret, Cmd/Ctrl-click flies the view
   — at corpus scale a plain click would fly on 2,434 words). Measured on a 3.3k-line Pane.
+  Also found in Phase 2's review: an edit pass runs `handleRefTags` once per Ref line of the
+  note, each time over the whole note's Refs — 40 identical calls for one keystroke in a note
+  with 40 Ref lines. Phase 2 made each call cheap (one ask per linked note, one split of the
+  Pane: 7.6 ms at 40 links, where the base was 16.2); calling it once per note is this work.
 - **#71** One text Node per Note, one Archive per top-level folder, Title = basename (or
   `parent/basename` on a collision, the bundle's own rule). The card face starts at the content:
   the frontmatter's `description` as one line, the rest of the frontmatter and a leading H1 that

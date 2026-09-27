@@ -92,7 +92,7 @@ test('the reference overrides the grid the global table rule would draw', ()=>{
 // claim to hold. These are the rows most likely to rot, because each one names a
 // literal that lives in exactly one handler.
 const CLAIMS = [
-    {row: /<kbd>Alt<\/kbd> \+ scroll/, says: /Turn the view/,
+    {row: /<kbd[^>]*>Alt<\/kbd> \+ scroll/, says: /Turn the view/,
      file: 'js/interface/interface.js', code: /Graph\.applyRotationDelta\(angle\)/,
      why: 'Alt and the wheel no longer turn the view, so the row promises a gesture that is gone'},
     {row: /<kbd>0<\/kbd> <kbd>t<\/kbd>/, says: /Fit takes the selection/,
@@ -172,7 +172,7 @@ test('Alt+S, the export that left out every Node, is gone from the keys and the 
     assert.match(altSwitch, /case 'f':/, 'the Alt key map was not found; this test reads nothing');
     assert.doesNotMatch(altSwitch.slice(0, altSwitch.indexOf('});')), /case 's':/);
     assert.doesNotMatch(mandelbrot, /download_svg_screenshot/);
-    assert.doesNotMatch(help, /<kbd>Alt<\/kbd> \+ <kbd>s<\/kbd>/);
+    assert.doesNotMatch(help, /<kbd[^>]*>Alt<\/kbd> \+ <kbd>s<\/kbd>/);
 });
 
 test('the keys the reference does not repeat are the ones the reader can rebind', ()=>{

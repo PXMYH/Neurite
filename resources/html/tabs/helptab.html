@@ -35,7 +35,7 @@
             <td>Zoom. Zoom in before making nodes, so they have room to grow.</td>
         </tr>
         <tr>
-            <td><kbd>Alt</kbd> + scroll</td>
+            <td><kbd class="alt-key">Alt</kbd> + scroll</td>
             <td>Turn the view about the pointer.</td>
         </tr>
         <tr>
@@ -49,7 +49,8 @@
             <td><kbd>Esc</kbd></td>
             <td>
                 Drop a node that is following the pointer, a link you started, and the
-                selection. An open menu or dialog takes it first.
+                selection, and turn the Connect tool off. An open menu or dialog takes it
+                first, and so does a card you are typing in: the first press leaves it.
             </td>
         </tr>
     </table>
@@ -61,7 +62,7 @@
             <td>Text node, on empty space, with the caret already in it.</td>
         </tr>
         <tr>
-            <td><kbd>Alt</kbd> + double-click</td>
+            <td><kbd class="alt-key">Alt</kbd> + double-click</td>
             <td>Ai node. Does nothing while Ai features are off.</td>
         </tr>
         <tr>
@@ -105,23 +106,27 @@
             <td><b>+ link</b> on a card</td>
             <td>
                 Pick a node to join it to: the nearest are listed first, and typing
-                narrows the list. <kbd>Enter</kbd> takes the first. A node that is
-                already joined is marked ✓, and clicking it again unlinks it.
+                narrows the list. <kbd>Enter</kbd> links the first one not linked yet;
+                <kbd>↑</kbd> <kbd>↓</kbd> choose another. A node that is already joined
+                is marked ✓, and clicking it again unlinks it.
             </td>
         </tr>
         <tr>
-            <td>Click an edge</td>
+            <td>Right-click an edge</td>
             <td>
-                Turn the arrow: one way, the other way, then none. An arrow points at the
-                note that is named, so <code>[[B]]</code> written in A points at B. Not
-                while <kbd>Shift</kbd> is held or the Connect tool is on.
+                <b>Turn the arrow</b>: each turn moves it on to one way, the other way,
+                or neither. An arrow points at the note that is named, so
+                <code>[[B]]</code> written in A points at B, and a turn between two notes
+                rewrites their <code>[[Refs]]</code>: one that would take a Ref out of a
+                note asks first. A plain click on an edge does nothing.
             </td>
         </tr>
         <tr>
             <td><kbd>Shift</kbd> + double-click an edge</td>
             <td>
-                Delete it. So does the edge's right-click menu, or the × beside the link
-                on either card. The <code>[[Title]]</code> that wrote it goes too.
+                Delete it, as a double-click does with the Connect tool on. So does the
+                edge's right-click menu, or the × beside the link on either card. The
+                <code>[[Title]]</code> that wrote it goes too.
             </td>
         </tr>
         <tr>
@@ -157,7 +162,7 @@
             <td>
                 A note arrives pinned, and stays where you put it. Double-click releases
                 it to the fractal, which carries it along; again pins it where it is.
-                Inside a text box, hold <kbd>Alt</kbd> as well.
+                Inside a text box, hold <kbd class="alt-key">Alt</kbd> as well.
             </td>
         </tr>
         <tr>
@@ -176,7 +181,7 @@
             </td>
         </tr>
         <tr>
-            <td><kbd>Alt</kbd> + drag or click</td>
+            <td><kbd class="alt-key">Alt</kbd> + drag or click</td>
             <td>
                 Reach the node underneath a text box, instead of typing into it.
             </td>
@@ -215,11 +220,11 @@
     <div class="button-label settings-heading">Fractal lines</div>
     <table class="howto-controls">
         <tr>
-            <td><kbd>Alt</kbd> + <kbd>f</kbd></td>
+            <td><kbd class="alt-key">Alt</kbd> + <kbd>f</kbd></td>
             <td>Keep the lines on screen as the view moves.</td>
         </tr>
         <tr>
-            <td><kbd>Alt</kbd> + <kbd>c</kbd></td>
+            <td><kbd class="alt-key">Alt</kbd> + <kbd>c</kbd></td>
             <td>Release every kept line.</td>
         </tr>
         <tr>
@@ -246,7 +251,7 @@
     <p class="howto-intro">
         Shift, Alt and Control are defaults. Rebind them, and the mouse buttons, in
         the control settings. On a Mac, Command does what Control does here: Control
-        and a click is the Mac's right-click.
+        and a click is the Mac's right-click. And Alt is the key marked Option.
     </p>
 
     <table class="howto-controls">

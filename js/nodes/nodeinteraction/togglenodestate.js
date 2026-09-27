@@ -110,7 +110,7 @@ NodeView.prototype.makeCircleCollapsed = function(){
     return circle;
 }
 NodeView.prototype.onCircleDoubleClicked = function(e){
-    if (App.nodeMode === 1) this.toggleCollapse(e)
+    if (App.interface.nodeMode.isOnFor(e)) this.toggleCollapse(e)
     else e.currentTarget.classList.toggle('collapsed-anchor')
 }
 NodeView.prototype.initCollapsed = function(){

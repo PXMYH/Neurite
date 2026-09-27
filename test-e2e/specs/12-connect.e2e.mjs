@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, paneText } from './helpers.mjs';
+import { launchBrowser, openNeurite, paneText, isIPad } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -350,4 +350,202 @@ test("a Node's menu opened at the bottom of the window stays on it, every action
     await openAbove(50);
     const bare = await measure();
     assert.ok(onScreen(bare.menuTop, bare.menuBottom), 'the menu runs off the window: ' + JSON.stringify(bare));
+});
+
+// ---- found by the Phase 2 reviews ----
+
+// The middle of a card's body, which is most of the card, and is a textarea.
+const bodySpot = (page, uuid) => page.evaluate((id) => {
+    const r = Graph.nodes[id].view.div.querySelector('.editable-div').getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+}, uuid);
+async function pressAt(page, p) {
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.mouse.up();
+}
+const caretInBody = (page) => page.evaluate(() => !!document.activeElement?.classList?.contains('editable-div'));
+
+test("a press on a note's body arms and finishes a link, and selects, as its header does", async () => {
+    // The body kept every press for its text: measured, 0 of 48 points on a body armed a
+    // link, Shift + click on two bodies made no Edge, and Cmd + click selected nothing.
+    const [a, b, c, d] = await fourNotes(page);
+    await page.click('#connectTool');
+    await pressAt(page, await bodySpot(page, a));
+    assert.equal(await armed(page), a, 'a press on the body armed nothing');
+    assert.equal(await caretInBody(page), false, 'the press put the caret in the text');
+    await pressAt(page, await bodySpot(page, b));
+    assert.ok(await joined(page, a, b), 'the Connect tool made no Edge from body to body');
+    await page.click('#connectTool');
+
+    await page.keyboard.down('Shift');
+    await pressAt(page, await bodySpot(page, c));
+    await pressAt(page, await bodySpot(page, d));
+    await page.keyboard.up('Shift');
+    assert.ok(await joined(page, c, d), 'Shift + a press on two bodies made no Edge');
+
+    const mod = await page.evaluate(() => (Mod.isCommand ? 'Meta' : 'Control'));
+    await page.keyboard.down(mod);
+    await pressAt(page, await bodySpot(page, a));
+    await page.keyboard.up(mod);
+    assert.deepEqual(await page.evaluate(() => [...App.selectedNodes.uuids]), [a], 'Mod + a press on the body selected nothing');
+});
+
+test('a link is finished by a click and not by a drag, and turning the tool off drops it', async () => {
+    const [a, b, c] = await fourNotes(page);
+    await page.click('#connectTool');
+    await press(page, a);
+    // A drag from another card moves it and finishes nothing.
+    const p = await cardSpot(page, c);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.mouse.move(p.x + 120, p.y + 60, { steps: 8 });
+    await page.mouse.up();
+    assert.equal(await joined(page, a, c), false, 'a drag from another card finished the link');
+
+    await press(page, a);
+    assert.equal(await armed(page), a);
+    await page.click('#connectTool');
+    assert.equal(await armed(page), null, 'turning the tool off left the link armed');
+    await press(page, b);
+    assert.equal(await joined(page, a, b), false, 'a click after the tool went off finished the link');
+});
+
+test('Escape closes the right-click menu first, then leaves a card, then clears the selection', async () => {
+    const [a, b] = await fourNotes(page);
+    const mod = await page.evaluate(() => (Mod.isCommand ? 'Meta' : 'Control'));
+    for (const id of [a, b]) {
+        const s = await cardSpot(page, id);
+        await page.keyboard.down(mod);
+        await page.mouse.click(s.x, s.y);
+        await page.keyboard.up(mod);
+    }
+    const selected = () => page.evaluate(() => App.selectedNodes.uuids.size);
+    await rightClick(page, a);
+    assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('custom-node-method-input')), true,
+        'the menu opened without its search taking the keys');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('customContextMenu')).display), 'none',
+        'Escape left the menu open');
+    assert.equal(await selected(), 2, 'the Escape meant for the menu cleared the selection');
+
+    await page.evaluate((id) => Graph.nodes[id].view.div.querySelector('.editable-div').focus(), b);
+    await page.keyboard.press('Escape');
+    assert.equal(await caretInBody(page), false, 'Escape left the caret in the card');
+    assert.equal(await selected(), 2, 'leaving the card cleared the selection too');
+    await page.keyboard.press('Escape');
+    assert.equal(await selected(), 0);
+});
+
+test('the connect mode goes off when the window loses focus, or at the next press without Shift', async () => {
+    // A Shift released in another window sends no keyup here; the mode stayed on, lit.
+    await fourNotes(page);
+    await page.keyboard.down('Shift');
+    assert.equal(await tool(page), 'true');
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    assert.equal(await tool(page), 'false', 'a blur left the mode on');
+    await page.keyboard.up('Shift');
+
+    await page.evaluate(() => App.interface.nodeMode.switch(1));
+    const p = await page.evaluate(() => {
+        for (let y = 140; y < innerHeight - 140; y += 40) for (let x = 140; x < innerWidth - 140; x += 40) {
+            if (document.elementFromPoint(x, y)?.id === 'svg_bg') return { x, y };
+        }
+    });
+    await page.mouse.click(p.x, p.y);
+    assert.equal(await tool(page), 'false', 'a press without Shift left the mode on');
+});
+
+test('"+ link": Enter links the first Node not linked yet, and the arrows choose another', async () => {
+    // The nearest Node is often one already linked, and Enter took the first row: it unlinked it.
+    await page.evaluate(() => window.currentActiveZettelkastenMirror
+        .setValue('## Alpha\nsee [[Beta]] for the argument\n\n## Beta\nb\n\n## Gamma\ng\n\n## Delta\nd\n'));
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 1, undefined, { timeout: 5000 });
+    await page.waitForTimeout(800);
+    const id = (t) => page.evaluate((t) => Object.keys(Graph.nodes).find((k) => Graph.nodes[k].getTitle() === t), t);
+    const [a, b] = [await id('Alpha'), await id('Beta')];
+    await openPicker(page, a);
+    const rowsNow = () => page.evaluate(() => [...document.querySelectorAll('#nodeList li[data-node-id]')]
+        .map((li) => [li.textContent, li.classList.contains('connected')]));
+    const listed = await rowsNow();
+    const firstFree = listed.find(([, linked]) => !linked)[0];
+    await page.keyboard.press('Enter');
+    assert.ok(await joined(page, a, b), 'Enter unlinked a Node that was linked');
+    assert.ok(await joined(page, a, await id(firstFree)), 'Enter did not link the first Node not linked');
+    assert.match(await paneText(page), /see \[\[Beta\]\] for the argument/);
+
+    const second = (await rowsNow())[1];
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    const active = await page.evaluate(() => document.querySelector('#nodeList li.active')?.textContent);
+    assert.equal(active, second[0], 'the arrows did not move to the second row');
+    assert.equal(await page.getAttribute('#connectModalSearchBar', 'aria-activedescendant'),
+        await page.evaluate(() => document.querySelector('#nodeList li.active').id));
+    await page.keyboard.press('Enter');
+    assert.equal(await joined(page, a, await id(second[0])), !second[1], 'Enter on the chosen row did not toggle it');
+});
+
+test("the right-click menu's list opens below it, clear of the pointer", async () => {
+    // It opened above and to the left of the pointer, with its last row under it, so the
+    // click that dismissed the menu ran that row: measured, "Run its code".
+    const [a] = await fourNotes(page);
+    const p = await page.evaluate((id) => {
+        const r = Graph.nodes[id].view.div.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height - 20 };
+    }, a);
+    await page.mouse.click(p.x, p.y, { button: 'right' });
+    await page.waitForFunction(() => document.getElementById('suggestions-container').style.display === 'block');
+    const geometry = await page.evaluate(({ x, y }) => {
+        const m = document.getElementById('customContextMenu').getBoundingClientRect();
+        const s = document.getElementById('suggestions-container').getBoundingClientRect();
+        return { menuBottom: m.bottom, listTop: s.top, underPointer: !!document.elementFromPoint(x, y)?.closest('.suggestion-item') };
+    }, p);
+    assert.ok(geometry.listTop >= geometry.menuBottom, 'the list is not below the menu');
+    assert.equal(geometry.underPointer, false, 'a row of the list is under the pointer');
+    await page.mouse.click(p.x, p.y);
+    assert.equal(await page.evaluate((id) => Graph.nodes[id].codeEditingState ?? 'edit', a), 'edit',
+        'the click that dismissed the menu ran an action');
+});
+
+test('Shift + scroll over a card resizes it with the caret in the notes pane', { skip: isIPad && 'mobile WebKit takes no wheel' }, async () => {
+    // The Shift went to the pane and was not taken as the mode, so the wheel zoomed the Plane.
+    const [a] = await fourNotes(page);
+    await caretInPane(page);
+    await page.keyboard.press('Escape');
+    const p = await cardSpot(page, a);
+    const scale = () => page.evaluate((id) => Graph.nodes[id].scale, a);
+    const before = await scale();
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.focus());
+    await page.mouse.move(p.x, p.y + 60);
+    await page.keyboard.down('Shift');
+    await page.mouse.wheel(0, -100);
+    await page.keyboard.up('Shift');
+    await page.waitForTimeout(200);
+    assert.ok(await scale() > before * 1.05, 'Shift + scroll over the card did not resize it');
+});
+
+test('one keystroke asks each linked note once whether it names the note typed in', async () => {
+    // Each ask splits the whole Pane, and the three loops that decide a note's Edges asked
+    // again each: measured, 3200 asks for 40 answers on one keystroke, 26 ms where it was 16.
+    const lines = ['## Hub', 'intro'];
+    for (let i = 1; i <= 12; i++) lines.push(`[[N${i}]]`);
+    lines.push('');
+    for (let i = 1; i <= 12; i++) lines.push(`## N${i}`, `body ${i} [[Hub]]`, '');
+    await page.evaluate((t) => window.currentActiveZettelkastenMirror.setValue(t), lines.join('\n'));
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 12, undefined, { timeout: 10000 });
+    await page.waitForTimeout(800);
+    const counts = await page.evaluate(() => {
+        const P = ZettelkastenProcessor.prototype;
+        const [names, refs] = [P.sectionNames, P.handleRefTags];
+        let asks = 0, calls = 0;
+        P.sectionNames = function (...a) { asks++; return names.apply(this, a); };
+        P.handleRefTags = function (...a) { calls++; return refs.apply(this, a); };
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.replaceRange('x', { line: 1, ch: cm.getLine(1).length });
+        P.sectionNames = names;
+        P.handleRefTags = refs;
+        return { asks, calls };
+    });
+    assert.ok(counts.calls > 0, 'the keystroke ran no pass');
+    assert.ok(counts.asks <= counts.calls * 12, `${counts.asks} asks over ${counts.calls} passes of 12 links`);
 });

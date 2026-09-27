@@ -86,6 +86,16 @@ class HoverTooltip {
             }
         }
 
+        // The panel at the bottom left has no room below it, and above its buttons is its own
+        // count line -- which the Fit tooltip covered while it described it. Beside the panel.
+        const hud = HoverTooltip.target?.closest?.('.hud-panel');
+        if (hud) {
+            const h = hud.getBoundingClientRect();
+            adjustedLeft = Math.min(h.right + gap, window.innerWidth - box.width - gap);
+            top = Math.min(Math.max(gap, rect.top + (rect.height - box.height) / 2),
+                           window.innerHeight - box.height - gap);
+        }
+
         elem.style.left = Math.round(adjustedLeft) + 'px';
         elem.style.top = Math.round(top) + 'px';
     }

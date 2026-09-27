@@ -102,6 +102,16 @@ test('the panel at the bottom left counts the selection', async () => {
     await clickCard(page, b, key);
     await page.waitForFunction(() => document.querySelector('.hud-count').textContent !== '3 notes');
     assert.equal(await count(), '2 of 3 selected');
+    // Fit's tooltip sits beside the panel, not over the count it describes.
+    await page.hover('.hud-panel [data-act="fit"]');
+    await page.waitForFunction(() => document.querySelector('.ui-tooltip.ui-tooltip-visible'));
+    const clear = await page.evaluate(() => {
+        const t = document.querySelector('.ui-tooltip').getBoundingClientRect();
+        const h = document.querySelector('.hud-panel').getBoundingClientRect();
+        return t.left >= h.right || t.right <= h.left || t.top >= h.bottom || t.bottom <= h.top;
+    });
+    assert.ok(clear, "Fit's tooltip covers the panel it belongs to");
+    await page.mouse.move(800, 400);
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.querySelector('.hud-count').textContent === '3 notes');
 });
@@ -121,6 +131,9 @@ test("Delete in a selected Node's menu asks first, and says how many", async () 
         return page.evaluate(() => document.querySelector('.modal-content .confirm-message').textContent);
     };
     assert.equal(await askDelete(), 'Delete the 2 selected nodes?');
+    // The keyboard starts on the answer that changes nothing; it started on the page behind.
+    assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('modal-cancel')), true,
+        'the question opened without focus on No');
     await page.click('.modal-content .modal-cancel');
     await page.waitForTimeout(200);
     assert.equal(await page.evaluate(() => Object.keys(Graph.nodes).length), 3, 'No deleted something');
@@ -322,5 +335,44 @@ for (const [platform, key, other, label] of [['MacIntel', 'Meta', 'Control', 'Cm
         const help = await page.evaluate(() => [...document.querySelectorAll('#howto kbd.mod-key')].map((k) => k.textContent));
         assert.ok(help.length >= 3, 'the Help panel marks no keys as the selection key');
         assert.deepEqual([...new Set(help)], [label]);
+        // And the key a Mac marks Option, where the Help said Alt.
+        const alt = await page.evaluate(() => [...document.querySelectorAll('#howto kbd.alt-key')].map((k) => k.textContent));
+        assert.ok(alt.length >= 3, 'the Help panel marks no Alt keys');
+        assert.deepEqual([...new Set(alt)], [platform === 'MacIntel' ? 'Option' : 'Alt']);
     });
 }
+
+test('a click on an Edge keeps the selection', async () => {
+    // A press on an Edge counted as a press on bare Plane, which clears the selection.
+    ({ context, page } = await openNeurite(browser));
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\nsee [[Beta]]\n\n## Beta\nb\n\n## Gamma\ng\n'));
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 1, undefined, { timeout: 5000 });
+    await page.waitForTimeout(800);
+    const ids = await page.evaluate(() => ['Alpha', 'Beta'].map((t) => Object.keys(Graph.nodes).find((k) => Graph.nodes[k].getTitle() === t)));
+    const key = await modKey(page);
+    for (const id of ids) await clickCard(page, id, key);
+    const mid = await page.evaluate(() => {
+        const [p, q] = Object.values(Graph.edges)[0].pts.map((n) => {
+            const r = n.view.div.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        });
+        return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+    });
+    assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('class'), mid), 'edge-halo');
+    await page.mouse.click(mid.x, mid.y);
+    assert.deepEqual(await selected(page), ['Alpha', 'Beta'], 'a click on the Edge cleared the selection');
+});
+
+test('Mod + double-click on bare canvas asks for a link, and throws nothing', async () => {
+    // Each one threw "Cannot set properties of null (setting 'followingMouse')".
+    let errors;
+    ({ context, page, errors } = await openNeurite(browser));
+    const p = await bareCanvas(page);
+    const key = await modKey(page);
+    await page.keyboard.down(key);
+    await page.mouse.dblclick(p.x, p.y);
+    await page.keyboard.up(key);
+    await page.waitForFunction(() => Modal.current?.id === 'promptModal', undefined, { timeout: 5000 });
+    await page.keyboard.press('Escape');
+    assert.deepEqual(errors, []);
+})

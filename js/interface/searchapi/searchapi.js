@@ -201,12 +201,10 @@ function returnLinkNodes() {
         return node; // return for Electron
     } else {
         window.prompt("Enter a Link or Search Query", '')
+            // `maybePromise` was never defined, so every Link Node made this way ended in a
+            // ReferenceError logged as "Failed to get prompt input".
             .then(linkInput => {
-                if (!linkInput) return;
-                const searchResults = processLinkInput(linkInput);
-                if (maybePromise instanceof Promise) {
-                    maybePromise.then(() => {});
-                }
+                if (linkInput) processLinkInput(linkInput);
             })
             .catch(err => Logger.err("Failed to get prompt input:", err));
         return null; // nothing to return in browser mode

@@ -306,8 +306,8 @@ AiNode.setupResponseDivListeners = function(node){
         aiResponseDiv.style.userSelect = 'none'
     });
     On.wheel(aiResponseDiv, (e)=>{
-        // If the Shift key is not being held down, stop the event propagation
-        if (!App.nodeMode) e.stopPropagation();
+        // Unless the connect mode is on for it (Shift), the response scrolls and keeps the wheel.
+        if (!App.interface.nodeMode.isOnFor(e)) e.stopPropagation();
     }, { passive: false });
 
     let userHasScrolled = false;

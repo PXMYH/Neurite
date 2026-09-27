@@ -20,11 +20,21 @@
 
         document.body.appendChild(this.container);
     }
-    position(x, y) {
+    // Under the menu it belongs to and aligned with it, or above the menu where there is no
+    // room below, and never off the screen. It was anchored to the pointer instead -- above
+    // and to its left, with its last row under it, so the click that dismissed the menu ran
+    // that row, and near the left edge its labels began at x -215.
+    placeBeside(menu) {
         const style = this.container.style;
-        // keeps the bottom-right corner aligned, and the top on screen
-        style.transform = `translate(calc(${x}px - 100%  + 5px), max(8px, calc(${y}px - 100% + 6px)))`;
+        style.transform = '';
         style.display = 'block';
+
+        const m = menu.getBoundingClientRect();
+        const w = this.container.offsetWidth, h = this.container.offsetHeight;
+        const below = m.bottom + 4;
+        const y = (below + h <= innerHeight - 8) ? below : Math.max(8, m.top - 4 - h);
+        style.left = Math.max(8, Math.min(m.left, innerWidth - w - 8)) + 'px';
+        style.top = y + 'px';
     }
     clear() {
         this.container.innerHTML = '';
@@ -34,12 +44,8 @@
         item.init();
         this.container.appendChild(item.divItem);
     }
-    repositionIfDisplayed(x, y){
-        if (this.container.style.display === 'block') this.position(x, y)
-    }
-    scrollToBottom() {
-        // Scroll the container to its maximum scrollable height
-        this.container.scrollTop = this.container.scrollHeight;
+    repositionIfDisplayed(menu){
+        if (this.container.style.display === 'block') this.placeBeside(menu)
     }
     hide() {
         this.container.style.display = 'none';
@@ -202,7 +208,15 @@ Menu.Context.prototype.setupSuggestions = function(pageX, pageY){
 
     On.input(inputField, (e)=>displaySuggestions(e.target.value) );
 
+    // Focused when the menu opens (`populateForNode`), so typing searches; a focus that only
+    // puts the caret there leaves a menu of pinned actions as short as it was.
     On.focus(inputField, (e)=>{
+        const quiet = inputField.dataset.quiet;
+        delete inputField.dataset.quiet;
+        if (inputField.value === '' && !quiet) displaySuggestions('');
+    });
+    // And a click into it asks for the whole list, focused already or not.
+    On.click(inputField, (e)=>{
         if (inputField.value === '') displaySuggestions('');
     });
 
@@ -224,7 +238,6 @@ Menu.Context.prototype.setupSuggestions = function(pageX, pageY){
     function displaySuggestions(value) {
         const menu = App.menuSuggestions;
         menu.clear();
-        menu.position(pageX, pageY);
 
         const nodeActions = NodeActions.forNode(node);
         getNodeMethodSuggestions(value, node).forEach( (suggestion)=>{
@@ -240,7 +253,7 @@ Menu.Context.prototype.setupSuggestions = function(pageX, pageY){
             );
         });
 
-        menu.scrollToBottom();
+        menu.placeBeside(App.menuContext.menu);
     }
     requestAnimationFrame(() => {
         const items = [...this.menu.children];

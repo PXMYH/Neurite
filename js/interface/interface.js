@@ -103,6 +103,8 @@ function performZoom(amount, dest) {
 const DRAG_THRESHOLD = 1; // pixels
 
 class Interface {
+    // A click is a press and a release this close together (px); farther is a drag.
+    static clickSlop = 4;
     altHeld = false;
     controlDragOccurred = false;
     coordsLive = true;
@@ -232,7 +234,10 @@ class Interface {
             Autopilot.stop();
             Graph.mouseDownPos_setXY();
             this.isMousePanning = true;
-            this.panFrom = {x: e.clientX, y: e.clientY};
+            // Where a press on bare Plane began. Not a press on an Edge, which is inside the
+            // same svg: a click there left the Edge alone and cleared the selection.
+            this.panFrom = e.target.closest?.('[data-view-type="edgeViews"]') ? null
+                         : {x: e.clientX, y: e.clientY};
             e.preventDefault();
         }
 
@@ -260,7 +265,7 @@ class Interface {
             // clears the selection, as the Help panel said it did. `Mod` and a drag is the
             // box, which clears its own.
             const from = this.panFrom;
-            const still = from && Math.hypot(e.clientX - from.x, e.clientY - from.y) <= EdgeView.clickSlop;
+            const still = from && Math.hypot(e.clientX - from.x, e.clientY - from.y) <= Interface.clickSlop;
             if (still && !Mod.isHeld(e)) App.selectedNodes.clear();
         }
 
@@ -307,7 +312,7 @@ class Interface {
 
     onWheel = (e)=>{
         // Only perform rotation via Alt + scroll wheel when zoomClick is "scroll"
-        if (settings.zoomClick === "scroll" && App.nodeMode !== 1 && e.getModifierState(settings.rotateModifier)) {
+        if (settings.zoomClick === "scroll" && !this.nodeMode.isOnFor(e) && e.getModifierState(settings.rotateModifier)) {
             Autopilot.stop();
             this.coordsLive = true;
 

@@ -45,10 +45,14 @@ class Edge {
     // goes first -- a text Node's Refs to the other end -- and then the Edge. Only a pair of
     // text Nodes had its Refs removed, so an Edge from a note to an AI Node written in the
     // Pane came back at the next pass: measured, gone after the chip's x, back after a save.
+    // A Node with no Title has no Ref naming it to remove.
     removeInstance() {
         const [a, b] = this.pts;
-        if (a.isTextNode) removeEdgeFromZettelkasten(a.getTitle(), b.getTitle());
-        if (b.isTextNode) removeEdgeFromZettelkasten(b.getTitle(), a.getTitle());
+        const [ta, tb] = [a.getTitle(), b.getTitle()];
+        if (ta && tb) {
+            if (a.isTextNode) removeEdgeFromZettelkasten(ta, tb);
+            if (b.isTextNode) removeEdgeFromZettelkasten(tb, ta);
+        }
         this.remove();
     }
 
@@ -65,6 +69,27 @@ class Edge {
         return edge.scaleLength(this.valueOf())
     }
 
+    // The direction the next turn gives: toward one end, toward the other, then neither.
+    nextDirection() {
+        const [p0, p1] = this.pts;
+        const start = this.directionality.start;
+        if (start === p0) return {start: p1, end: p0};
+        if (start === p1) return {start: null, end: null};
+        return {start: p0, end: p1};
+    }
+    // The note the next turn would take a Ref out of, or null when it only adds one. Between
+    // two notes the arrow is written as their Refs, so turning it one way removes the Ref
+    // that points the other -- out of the note's own sentence, if that is where it is.
+    turnTakesRefFrom() {
+        const [p0, p1] = this.pts;
+        if (!p0.isTextNode || !p1.isTextNode) return null;
+
+        const {start, end} = this.nextDirection();
+        if (!start) return null;
+        const processor = getZetNodeCMInstance(start)?.zettelkastenProcessor;
+        return (processor?.sectionNames(start, end.getTitle()) ? start : null);
+    }
+
     // `directionality.start` is the Node the arrow points at: `EdgeView.makeSvgArrow`
     // reflects the arrowhead through its centre (`rotatePoint`), so its tip is drawn at
     // `start`, not `end`. Between two notes a direction is written as a Ref in `end`'s
@@ -73,12 +98,7 @@ class Edge {
     toggleDirection() {
         const pts = this.pts;
         const direction = this.directionality;
-        const status = (direction.start === pts[0]) ? '0-1'
-                     : (direction.start === pts[1]) ? '1-0' : 'dflt';
-        direction.start = (status === '0-1') ? pts[1]
-                        : (status === '1-0') ? null : pts[0];
-        direction.end = (status === '0-1') ? pts[0]
-                      : (status === '1-0') ? null : pts[1];
+        Object.assign(direction, this.nextDirection());
 
         // Update all instances of CodeMirror that include these nodes
         if (pts[0].isTextNode && pts[1].isTextNode) {
@@ -176,9 +196,7 @@ class EdgeView {
         On.wheel(elem, this.onWheel);
         On.mouseover(elem, this.toggleMouseOver.bind(this, true));
         On.mouseout(elem, this.toggleMouseOver.bind(this, false));
-        On.mousedown(elem, this.onMouseDown);
         On.dblclick(elem, this.onDblClick);
-        On.click(elem, this.onClick);
     }
     draw(){
         const mouseIsOver = this.mouseIsOver;
@@ -418,27 +436,20 @@ class EdgeView {
         return new vec2(2 * center.x - point.x, 2 * center.y - point.y);
     }
 
-    // A click is a press and a release in one place. A pan that starts on an Edge carries
-    // the Edge along under the pointer, so it ended on the same path and clicked it too:
-    // measured, a 170px pan from an Edge's middle reversed its direction.
-    static clickSlop = 4;
-    onMouseDown = (e)=>{ this.downAt = {x: e.clientX, y: e.clientY} }
-    onClick = (e)=>{
-        if (App.nodeMode) return;
-        const d = this.downAt;
-        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > EdgeView.clickSlop) return;
-
-        this.model.toggleDirection();
-        this.draw();
-    }
+    // A plain click does nothing to an Edge. It turned the arrow, and between two notes a turn
+    // rewrites their Refs, so a click inside the invisible halo -- on what looks like empty
+    // Plane -- edited two notes' sentences, and a double-click there edited them twice and made
+    // a note on top. The arrow turns from the Edge's menu, which asks before a turn takes a Ref
+    // out of a note (`Menu.Context.populateForEdge`).
+    //
+    // A double-click on an Edge is the Edge's: it deletes it in the connect mode, and never
+    // reaches the Plane behind to make a note there.
     onDblClick = (e)=>{
-        if (!App.nodeMode) return;
-
-        this.model.removeInstance();
         e.stopPropagation();
+        if (App.interface.nodeMode.isOnFor(e)) this.model.removeInstance();
     }
     onWheel = (e)=>{
-        if (!App.nodeMode) return;
+        if (!App.interface.nodeMode.isOnFor(e)) return;
 
         // Same convention as the fractal's zoom and a card's, so an edge lengthens on a
         // scroll up rather than shortening. `wheelDelta` is the legacy property and its

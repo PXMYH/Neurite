@@ -223,6 +223,18 @@ textarea.title-input {
     border-color: var(--ui-accent);
 }
 
+/* The band from a Node with a link armed to the pointer (`#mousePath`, `nodestep.js`), and
+   the pointer over a card while the connect mode is on: the accent, and a crosshair rather
+   than the text caret that said a click would type. */
+#mousePath.link-band {
+    stroke: var(--ui-accent);
+}
+
+body.connect-mode .window,
+body.connect-mode .window textarea {
+    cursor: crosshair;
+}
+
 /* A note with a link armed from it.
 
    Shift and mousedown arms a link and the next mousedown on any note completes it, with
@@ -489,15 +501,23 @@ textarea.title-input {
 
 /* An Edge's pointer target (`EdgeView.makeHalo`): its centre line, 30 screen px wide at
    any zoom -- `non-scaling-stroke` keeps the width out of the Plane's scale -- and seen
-   only as the pointer it gives. The drawn ribbon was the target before, 2 px either side
-   of its middle when zoomed out. */
+   only as the hover it gives and the cursor. The drawn ribbon was the target before, 2 px
+   either side of its middle when zoomed out. The cursor says a menu is there, not a click:
+   a plain click on an Edge does nothing (`EdgeView.onDblClick`). */
 .edge-halo {
     fill: none;
     stroke: transparent;
     stroke-width: 30px;
     vector-effect: non-scaling-stroke;
     pointer-events: stroke;
-    cursor: pointer;
+    cursor: context-menu;
+}
+
+/* A modal opens below the tool pill, not over it: at 50px from the top it covered the
+   pill's lower edge (the pill ends at 68px), including the Connect and Search tools. */
+.modal-content {
+    top: 84px;
+    max-height: calc(100dvh - 100px);
 }
 
 /* A light-theme leftover that was forced into the dark editor with !important at

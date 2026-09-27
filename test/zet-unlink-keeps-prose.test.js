@@ -59,6 +59,7 @@ function load(refTag = '[[' ){
         Tag: {node: '##', ref: refTag},
         tagValues: {get refTag(){ return sandbox.Tag.ref }},
         bracketsMap: {'[[': ']]', '((': '))', '{{': '}}'},
+        LLM_TAG: 'AI:',
         PROMPT_IDENTIFIER: '​',
         PROMPT_END: '‎',
         Logger: {debug(){}, info(){}, warn(){}, err(...a){ errors.push(a.join(' ')) }}
@@ -101,6 +102,18 @@ test('unlinking a mention inside a sentence keeps the words', ()=>{
 
     assert.equal(value,
         '## Zettelkasten\nA note is worth its links, and Fractal geometry is the one it leans on.\n');
+});
+
+test("a Ref in the prompt of an AI Node below the note is not the note's to lose", ()=>{
+    // A section ends at an `AI:` line (#49). The unlink scanned on to the next `##`, so
+    // taking a note's Ref out took the same Ref out of the AI Node's prompt as well.
+    const {value} = unlink(
+        '## Zettelkasten\nSee [[Fractal geometry]].\nAI: Helper\nCompare with [[Fractal geometry]].\n',
+        'Zettelkasten', 'Fractal geometry'
+    );
+
+    assert.equal(value,
+        '## Zettelkasten\nSee Fractal geometry.\nAI: Helper\nCompare with [[Fractal geometry]].\n');
 });
 
 test('unlinking an entry on a line of links removes the entry', ()=>{

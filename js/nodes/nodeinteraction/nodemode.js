@@ -16,22 +16,33 @@ class NodeMode {
         // handlers close them.
         On.keydown(window, this.onEscape, true);
         On.click(this.tool, this.onToolClick);
+        // A Shift released in another window never sends its keyup here, and the mode stayed
+        // on -- lit, and taking a double-click on an Edge as a delete. The blur says so, and
+        // where no blur came, the next press does: it reports the key up.
+        On.blur(window, this.onBlur);
+        On.mousedown(window, this.onPress, true);
     }
 
     switch(newState){
         this.val = newState;
         this.tool.setAttribute('aria-pressed', String(Boolean(newState)));
+        document.body.classList.toggle('connect-mode', Boolean(newState));
     }
+    // Turning the tool off drops a link it armed: it stayed dashed, the band still followed
+    // the pointer, and the next click on any Node finished it.
     setLocked(locked){
         this.locked = locked;
         this.switch(locked ? 1 : 0);
         this.autoToggleAllOverlays();
+        if (!locked) Node.prev = null;
     }
     onToolClick = ()=>{ this.setLocked(!this.locked) }
     // Whether a press is the mode's although the mode is off: the key is down, and its
     // keydown went to a text field and was ignored (`onKeyDown`). A press in that same
     // field is still text -- Shift + click extends a selection there.
     isHeldFor(e){ return e.getModifierState(this.key) && e.target !== document.activeElement }
+    // What every gesture the mode gates asks: the mode is on, or its key is down for this one.
+    isOnFor(e){ return Boolean(this.val) || this.isHeldFor(e) }
 
     skipCapsLockState(e){
         if (this.key !== "CapsLock") return true;
@@ -52,18 +63,33 @@ class NodeMode {
             this.switch(1 - this.val); // Toggle between 0 and 1
         }
     }
-    // Escape is the outermost layer: an open modal or menu takes it first. Past them it
-    // drops an armed link, which otherwise waited for any later click on a Node with no
-    // time limit, turns off a Connect tool that was clicked on, and clears the selection.
+    // Escape, one layer at a time, from the inside out. An open modal or the menu takes it
+    // first; so does an open select list, and the right-click menu, which it closes. Then
+    // the text of a card: the first Escape leaves it, as it leaves the Notes panel. Past all
+    // of them it drops an armed link, which otherwise waited for any later click on a Node
+    // with no time limit, turns the connect mode off, and clears the selection.
     onEscape = (e)=>{
         if (e.key !== 'Escape') return;
 
         Graph.forEachNode(Node.stopFollowingMouse);
         if (Modal.current || dropdownContent.classList.contains('open')) return;
+        if (document.querySelector('.options-replacer.show')) return;
+        if (App.menuContext.menu.style.display === 'block') return App.menuContext.hide();
+        const field = document.activeElement;
+        if (field?.closest?.('.window') && Hud.isTyping()) return field.blur();
 
-        Node.prev = null;
-        if (this.locked) this.setLocked(false);
+        this.setLocked(false);
         App.selectedNodes.clear();
+    }
+    onBlur = ()=>{
+        if (this.locked || !this.val) return;
+
+        this.switch(0);
+        this.autoToggleAllOverlays();
+    }
+    onPress = (e)=>{
+        if (this.trigger !== "down" || e.getModifierState(this.key)) return;
+        this.onBlur();
     }
     onKeyUp = (e)=>{
         if (!this.skipCapsLockState(e)) return;

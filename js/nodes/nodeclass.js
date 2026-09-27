@@ -23,6 +23,8 @@ class Node {
     // The scale last written as `--card-scale` for the selection ring (`draw`). Private, so
     // `toJSON` does not save it.
     #ringScale = null;
+    // The armed Node a press on this one would link it to, if the press ends as a click.
+    #linkOnClick = null;
 
     // How far the pointer travels before a press counts as a drag rather than a click.
     // A press under this distance keeps the pending Edge alive, so Shift plus a click
@@ -321,14 +323,17 @@ class Node {
         Graph.draggedNode = this;
         Graph.movingNode = this;
 
-        // Shift itself as well as the mode: a Shift pressed while the caret was in a
-        // text field never turned the mode on (`NodeMode.isHeldFor`).
-        if (Node.prev) {
-            connectNodes(this, Node.prev);
-            Node.prev = null;
-        } else if (App.nodeMode || App.interface.nodeMode.isHeldFor(e)) {
-            Node.prev = this;
-        }
+        // A press arms a link from this Node, and a click on another finishes it -- a click,
+        // not a press: a drag that began on the second Node finished the link and moved the
+        // Node as well. Shift itself counts as well as the mode, since a Shift pressed while
+        // the caret was in a text field never turned the mode on (`NodeMode.isOnFor`).
+        const armed = Node.prev;
+        this.#linkOnClick = armed;
+        if (!armed && App.interface.nodeMode.isOnFor(e)) Node.prev = this;
+
+        // A gesture on the card keeps the caret out of its text, or the title took the next
+        // keys -- measured, typing "X" in the connect mode renamed a note.
+        if (armed || Node.prev === this || Mod.isHeld(e)) e.preventDefault();
 
         clearTextSelections();
 
@@ -358,6 +363,15 @@ class Node {
     stopFollowingMouse = (e) => {
         this.followingMouse = 0;
         Graph.movingNode = undefined;
+
+        // The release that makes a press a click finishes an armed link; a drag dropped it
+        // already (`_maybeAddGrabbing`). A click on the armed Node itself only disarms it.
+        const armed = this.#linkOnClick;
+        this.#linkOnClick = null;
+        if (armed && !this._hasAddedGrabbing) {
+            if (armed !== this) connectNodes(this, armed);
+            Node.prev = null;
+        }
 
         Off.mousemove(window, this._maybeAddGrabbing);
         Off.mouseup(window, this.stopFollowingMouse);
@@ -392,7 +406,7 @@ class Node {
         // A note whose body has more text than fits still scrolls, because that is what
         // the wheel means inside a scrollable box; the canvas only takes the gesture when
         // there is nothing to scroll.
-        if (!App.nodeMode) {
+        if (!App.interface.nodeMode.isOnFor(e)) {
             if (Node.wheelScrollsContent(e)) return;
             Autopilot.stop();
             const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);

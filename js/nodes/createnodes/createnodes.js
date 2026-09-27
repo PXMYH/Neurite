@@ -26,9 +26,11 @@
     } else if (Mod.isHeld(e)) {
         // Control + double click => Create Link node (Command on a Mac, globals.js)
         e.preventDefault();
+        // It asks for the URL first, and returns nothing to hold on to: each double-click
+        // threw "Cannot set properties of null (setting 'followingMouse')".
         const node = returnLinkNodes();
-        node.followingMouse = 0;
-    } else if (App.nodeMode && !Node.prev) {
+        if (node) node.followingMouse = 0;
+    } else if (App.interface.nodeMode.isOnFor(e) && !Node.prev) {
         // Shift + double click => Create regular node
         createNodeFromWindow();
     } else if (!Node.prev) {

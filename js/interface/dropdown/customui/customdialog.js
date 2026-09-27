@@ -68,6 +68,7 @@ window.alert = async (message) => {
             Modal.close();
             resolve();
         }, { once: true });
+        okBtn.focus();
     });
 }
 window.confirm = async (message) => {
@@ -85,5 +86,8 @@ window.confirm = async (message) => {
         };
         okBtn.addEventListener('click', () => cleanup(true), { once: true });
         cancelBtn.addEventListener('click', () => cleanup(false), { once: true });
+        // The keyboard starts on the answer that changes nothing: the dialog opened with focus
+        // on the page behind it, where Enter did nothing and no Tab led into the dialog.
+        cancelBtn.focus();
     });
 }

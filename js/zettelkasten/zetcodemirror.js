@@ -280,9 +280,11 @@ class ZettelkastenParser {
         const escClose = escapeRegExp(closingBracket || refTag);
         const escTitle = escapeRegExp(toTitle);
 
+        // The section ends at the next Title line, an `AI:` line included, as
+        // `getNodeSectionRange` says: a Ref in the AI Node's prompt below is not this note's.
         for (let j = nodeLine + 1; j < cm.lineCount(); j++) {
             const line = cm.getLine(j);
-            if (line.startsWith(Tag.node)) break;
+            if (line.startsWith(Tag.node) || line.startsWith(LLM_TAG)) break;
             if (!line.includes(refTag)) continue;
 
             const isList = ZettelkastenParser.#isRefList(line, refTag, escTag, escClose, closingBracket);

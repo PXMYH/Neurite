@@ -154,6 +154,7 @@ const Mod = {
 // The Help panel names that key as the platform does. Its tab is in the page before any
 // script runs (`PageLoad.mainLoad`).
 if (Mod.isMac) document.querySelectorAll('kbd.mod-key').forEach( (kbd)=>{ kbd.textContent = 'Cmd' } );
+if (Mod.isMac) document.querySelectorAll('kbd.alt-key').forEach( (kbd)=>{ kbd.textContent = 'Option' } );
 
 class Settings {
     #stored = new Stored('settings');

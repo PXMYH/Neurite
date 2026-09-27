@@ -90,6 +90,9 @@ class NodeSimulation {
         const svg_mousePath = this.svg_mousePath;
         let width = Graph.zoom.mag() * 0.0005 * Svg.zoom;
 
+        // The same path is the band of a link being drawn, which is drawn in the accent
+        // (foundation.css): in the orbit's grey it measured 1.4:1 on the Plane.
+        svg_mousePath.classList.toggle('link-band', Boolean(Node.prev));
         if (Node.prev) {
             const m = Node.prev.pos.toSvg();
             const l = Graph.vecToZ().toSvg();

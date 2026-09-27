@@ -42,17 +42,25 @@ Menu.Context = class {
         menu.style.left = x + 'px';
         menu.style.top = y + 'px';
     }
+    // Over the chrome -- the tool pill, the panel at the bottom left, a resize corner -- there
+    // is nothing to offer: it opened a single "Generic Action" row that did nothing.
     open(x, y, target){
         this.menu.innerHTML = ''; // clear options
         const view = Graph.viewForElem(target);
-        if (!view) {
-            this.populateForGeneric(target);
-        } else {
-            this.targetModel = view.model;
-            this[view.funcPopulate](x, y);
-        }
+        if (!view) return this.hide();
+
+        this.targetModel = view.model;
+        this[view.funcPopulate](x, y);
         this.position(x, y);
-        App.menuSuggestions.repositionIfDisplayed(x, y);
+        App.menuSuggestions.repositionIfDisplayed(this.menu);
+        this.inputField?.isConnected && this.focusSearch();
+    }
+    // The search takes the keys while the menu is open: they went to the canvas, where f and
+    // d scaled the selection the menu was about.
+    focusSearch(){
+        const pinned = this.menu.querySelector('li.dynamic-option');
+        if (pinned) this.inputField.dataset.quiet = '1';
+        this.inputField.focus({preventScroll: true});
     }
     option(text, onClick, closing = true){
         const handler = (!closing) ? onClick
@@ -78,7 +86,19 @@ Menu.Context = class {
     }
     populateForEdge(x, y){
         const edge = this.targetModel;
-        const onDirection = edge.toggleDirection.bind(edge);
+        // The one place the arrow turns (a plain click on an Edge does nothing). A turn that
+        // takes a Ref out of a note asks first and names it: the Ref may sit in a sentence,
+        // and there is no undo outside the Notes panel.
+        const onDirection = async ()=>{
+            const from = edge.turnTakesRefFrom();
+            if (from) {
+                const other = edge.pts.find( (pt)=>(pt !== from) ).getTitle();
+                const ref = Tag.ref + other + (bracketsMap[Tag.ref] ?? '');
+                const question = `Turn the arrow? That takes ${ref} out of "${from.getTitle()}".`;
+                if (!await window.confirm(question)) return;
+            }
+            edge.toggleDirection();
+        };
         const onDelete = edge.removeInstance.bind(edge);
         // Named for what they do, as the Help panel names them (#50).
         this.menu.append(
@@ -103,11 +123,6 @@ Menu.Context = class {
         );
         this.menu.append(...options);
     }
-    populateForGeneric(target){ // non-SVG targets
-        const onClick = Logger.info.bind(Logger, "Generic action for:");
-        this.menu.append(this.option("Generic Action", onClick, false));
-    }
-
     makeFileInput(){
         const input = Html.new.input();
         input.type = 'file';

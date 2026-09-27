@@ -56,7 +56,9 @@ _Avoid_: link, connection, relation, arrow, line, join
 
 **AI Node**:
 A Node that holds a conversation with a Model and can read the Nodes connected
-to it as context.
+to it as context. Where its answer goes next follows the arrows: along the
+Edges that leave it, and those with no arrow, through any notes on the way,
+to the next AI Node.
 _Avoid_: LLM node, GPT node, chat node, agent, assistant
 
 **Link Node**:
