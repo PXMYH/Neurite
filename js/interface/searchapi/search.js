@@ -178,23 +178,26 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
     const maxNodes = maxNodesOverride ?? Elem.byId('node-count-slider').value;
     const keywords = searchTermLowered.split(/,\s*/);
 
-    const nodes = Object.values(Graph.nodes);
+    // Text Nodes only, filtered before anything is embedded. Every Node used to be
+    // embedded and the others skipped afterwards, so an image, link or AI Node cost a
+    // whole forward pass for nothing -- 7 passes for 3 text Nodes and 3 AI Nodes.
+    const nodes = Object.values(Graph.nodes).filter( (node)=>node.isTextNode );
     if (nodes.length < 1) return [];
 
     const matched = [];
 
+    // Keyed by what is embedded, so an edited Node is embedded again rather than ranked
+    // by its old text for the rest of the session. And only a real vector is kept:
+    // `Embeddings.fetch` resolves `[]` on any failure, and caching that meant a Node
+    // that failed once -- Ollama down, a missing key -- was never embedded again.
     async function fetchNodeEmbedding(node){
-        const compoundKey = node.uuid + '-' + Embeddings.selectModel.value;
-        const cachedEmbedding = nodeCache.get(compoundKey);
+        const text = (node.getTitle() || '') + ' ' + (node.getText() || '');
+        const key = Embeddings.selectModel.value + '\n' + text;
+        const cachedEmbedding = nodeCache.get(key);
         if (cachedEmbedding) return cachedEmbedding;
 
-        const titleText = node.getTitle() || '';
-        const contentText = node.getText() || '';
-        Logger.debug("Extracted title text:", titleText);
-        Logger.debug("Extracted content text:", contentText);
-
-        const embedding = await Embeddings.fetch(titleText + ' ' + contentText);
-        nodeCache.set(compoundKey, embedding);
+        const embedding = await Embeddings.fetch(text);
+        if (embedding?.length) nodeCache.set(key, embedding);
         return embedding;
     }
 
@@ -205,7 +208,6 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
     Logger.debug("Keyword Embedding:", keywordEmbedding);
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
-        if (!node.isTextNode) continue;
 
         // Updated to use new property names
         const titleLowered = node.view.titleInput.value.toLowerCase();
@@ -220,32 +222,23 @@ Embeddings.search = async function(searchTerm, maxNodesOverride){
         const weightedTitleScore = titleMatchScore * 10;
         const weightedContentScore = contentMatchScore;
 
-        const nodeEmbedding = nodeEmbeddings[i];
-
-        const dotProduct = keywordEmbedding.reduce((sum, value, index) => sum + (value * nodeEmbedding[index]), 0);
-        Math.magnitude = (arr)=>Math.sqrt(arr.reduce( (sum, value)=>(sum + (value * value)) , 0));
-        const keywordMagnitude = Math.magnitude(keywordEmbedding);
-        const nodeMagnitude = Math.magnitude(nodeEmbedding);
-
-        Logger.debug("Dot Product:", dotProduct);
-        Logger.debug("Keyword Magnitude:", keywordMagnitude);
-        Logger.debug("Node Magnitude:", nodeMagnitude);
-
-        const cosineSimilarity = dotProduct / (keywordMagnitude * nodeMagnitude);
-        Logger.debug("Cosine Similarity:", cosineSimilarity);
+        // The one cosine helper (embeddingsdb.js) rather than a second copy inline. The
+        // local is not called `cosineSimilarity`: that would shadow the helper for this
+        // whole block, and calling it by that name here would throw.
+        const similarity = cosineSimilarity(keywordEmbedding, nodeEmbeddings[i]);
+        Logger.debug("Cosine Similarity:", similarity);
 
         const similarityThreshold = -1;
-        const keywordMatchPercentage = 0.5;
 
-        if (weightedTitleScore + weightedContentScore > 0 || cosineSimilarity > similarityThreshold) {
+        if (weightedTitleScore + weightedContentScore > 0 || similarity > similarityThreshold) {
             matched.push({
                 node,
                 title: node.title,
                 content: node.content.innerText.trim(),
                 weightedTitleScore,
                 weightedContentScore,
-                similarity: cosineSimilarity,
-                scoreSum: weightedTitleScore + weightedContentScore + cosineSimilarity
+                similarity,
+                scoreSum: weightedTitleScore + weightedContentScore + similarity
             });
             Logger.debug("embeddings", node.content.innerText.trim());
         }

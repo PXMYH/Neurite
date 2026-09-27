@@ -127,14 +127,21 @@ const Embeddings = {
     }
 }
 
+// The cosine, for any vectors -- not a dot product that equals it only when both came in
+// normalised (#75). The local Worker and OpenAI normalise; Ollama returns raw vectors, and
+// with an Ollama model selected every ranking built on this was a dot product in which a
+// longer text scored higher for being longer. 0 for an empty, zero or mismatched vector,
+// never NaN: a NaN in a score sum makes the sort that follows arbitrary.
 function cosineSimilarity(vecA, vecB) {
     if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
 
-    let dotProduct = 0;
+    let dot = 0, magA = 0, magB = 0;
     for (let i = 0; i < vecA.length; i++) {
-        dotProduct += vecA[i] * vecB[i];
+        dot += vecA[i] * vecB[i];
+        magA += vecA[i] * vecA[i];
+        magB += vecB[i] * vecB[i];
     }
-    return dotProduct;
+    return (magA > 0 && magB > 0) ? dot / Math.sqrt(magA * magB) : 0;
 }
 
 
