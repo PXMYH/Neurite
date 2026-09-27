@@ -231,6 +231,46 @@ test('f, d and the arrows leave the selection alone while typing, or with Cmd or
     assert.ok(near((await place(page, a)).w, k0.w, 0.5), 'Cmd+F or Ctrl+F scaled the selection');
 });
 
+test('a selected Node wears a ring two screen pixels wide, zoomed out as far as x0.1', async () => {
+    // The ring is drawn inside the card's own transform, so its 2px were 0.34 screen px at
+    // x0.25 -- nothing to see where a selection of many Nodes is most often made.
+    ({ context, page } = await openNeurite(browser));
+    const [a] = await threeNotes(page);
+    await clickCard(page, a, await modKey(page));
+    for (const mag of [0.1, 0.25, 1]) {
+        await page.evaluate(([id, mag]) => { Graph.pan_set(Graph.nodes[id].pos); Hud.setZoomMag(1 / mag); }, [a, mag]);
+        await page.waitForTimeout(400);
+        const ring = await page.evaluate((id) => {
+            const div = Graph.nodes[id].view.div;
+            const s = +/scale\(([\d.e+-]+)/.exec(div.parentElement.style.transform)[1];
+            return { s, px: parseFloat(getComputedStyle(div, '::before').borderTopWidth) * s };
+        }, a);
+        assert.ok(ring.px >= 1.5 && ring.px <= 2.5, `at x${mag} the ring is ${ring.px.toFixed(2)} screen px`);
+    }
+});
+
+test('the box a Mod + drag draws is the accent, and blurs nothing behind it', async () => {
+    // Its 1px blur made the Nodes being chosen unreadable while they were being chosen.
+    ({ context, page } = await openNeurite(browser));
+    await threeNotes(page);
+    const key = await modKey(page);
+    const p = await bareCanvas(page);
+    await page.keyboard.down(key);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.mouse.move(p.x + 200, p.y + 120, { steps: 5 });
+    const box = await page.evaluate(() => {
+        const s = getComputedStyle(document.querySelector('.drag-box'));
+        const accent = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim();
+        return { blur: s.backdropFilter, border: s.borderTopColor, style: s.borderTopStyle, accent };
+    });
+    await page.mouse.up();
+    await page.keyboard.up(key);
+    assert.equal(box.blur, 'none');
+    assert.equal(box.style, 'solid');
+    assert.equal(box.border, 'rgb(115, 150, 212)', `the box is not the accent (${box.accent})`);
+});
+
 for (const [platform, key, other, label] of [['MacIntel', 'Meta', 'Control', 'Cmd'], ['Win32', 'Control', 'Meta', 'Ctrl']]) {
     test(`on ${platform}, ${label} + click and ${label} + drag select, and the Help says ${label}`, async () => {
         // On a Mac, Control and a click is the secondary click: Blink and WebKit fire

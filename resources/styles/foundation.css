@@ -249,6 +249,30 @@ textarea.title-input {
     border-color: transparent;
 }
 
+/* And the ring is the same width on screen at any zoom (#46). It is drawn inside the card's
+   own transform, which `Node.draw` scales with the zoom, so its 2px measured 5.4 screen px at
+   x4 and 0.34 at x0.25 -- invisible where a selection of many Nodes is most often made. A
+   selected Node carries its scale as `--card-scale` (`Node.draw`), and the ring divides by it.
+   A box round the whole selection, with handles, was drawn and rejected on sight: it enclosed
+   the unselected Nodes between the selected ones, and put a second resize handle beside each
+   Node's own. */
+.window.selected::before {
+    --ring: calc(1px / var(--card-scale, 1));
+    top: calc(-1 * var(--ring));
+    left: calc(-1 * var(--ring));
+    right: calc(-1 * var(--ring));
+    bottom: calc(-1 * var(--ring));
+    border-width: calc(2 * var(--ring));
+}
+
+/* The box a Mod + drag draws, in the accent and with nothing blurred behind it: its 1px blur
+   made the Nodes being chosen unreadable while they were being chosen (#46). */
+.drag-box {
+    border: 1px solid var(--ui-accent);
+    background: var(--ui-accent-dim);
+    backdrop-filter: none;
+}
+
 /* `display: relative` at styles.css:200 is not a value `display` accepts, so it was
    dropped and the rule did nothing -- it was meant to be `position`. The collapsed disc
    needs it: its title is absolutely positioned against it, which is why an expanded

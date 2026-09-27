@@ -20,6 +20,10 @@ class Node {
         node?.view?.div?.classList.add('link-pending');
     }
 
+    // The scale last written as `--card-scale` for the selection ring (`draw`). Private, so
+    // `toJSON` does not save it.
+    #ringScale = null;
+
     // How far the pointer travels before a press counts as a drag rather than a click.
     // A press under this distance keeps the pending Edge alive, so Shift plus a click
     // can still start one; past it the press is moving the Node instead.
@@ -134,6 +138,13 @@ class Node {
         const svgbb = svg.getBoundingClientRect();
         e.style.position = 'absolute';
         e.style.transform = 'scale(' + s + ',' + s + ')';
+        // The selection ring divides by this to stay 2 screen px at any zoom (foundation.css).
+        // Written only for a selected Node, and only when it changes: it is inherited, so a
+        // write restyles the whole card.
+        if (this.#ringScale !== s && this.view?.div?.classList.contains('selected')) {
+            e.style.setProperty('--card-scale', s);
+            this.#ringScale = s;
+        }
         let p = fromZtoUV(this.pos);
         const cond = p.minus(new vec2(0.5, 0.5)).mag2() > 16;
         e.style.display = (cond ? 'none' : 'initial');
