@@ -355,60 +355,14 @@ class Interface {
 
 
 
-//Touchpad controls (WIP)
-let touches = new Map();
-On.touchstart(svg, (e)=>{
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches.item(i);
-        touches.set(touch.identifier, {
-            prev: touch,
-            now: touch
-        });
-    }
-}, false);
-On.touchcancel(svg, (e)=>{
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches.item(i);
-        touches.delete(touch.identifier);
-    }
-}, false);
-On.touchend(svg, (e)=>{
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches.item(i);
-        touches.delete(touch.identifier);
-    }
-}, false);
-On.touchmove(svg, (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches.item(i);
-        touches.set(touch.identifier, {
-            prev: touches.get(touch.identifier)?.now,
-            now: touch
-        });
-    }
-
-    switch (touches.size) {
-        case 1: {
-            Autopilot.stop();
-            App.interface.coordsLive = true;
-            const t = [...touches.values()][0];
-            const prev = new vec2(t.prev.clientX, t.prev.clientY);
-            const now = new vec2(t.now.clientX, t.now.clientY);
-            Graph.pan_incBy(toDZ(prev.minus(now)));
-            e.stopPropagation();
-            break;
-        }
-
-        default:
-            break;
-    }
-}, false);
-
-// One pinch (#55), from the two touches on the Fractal as Pointer Events, and absolute from where
-// they came down: the view that keeps both points of the Plane under both fingers, from the view
-// the pinch started with. There were two, and both ran on an iPad. The touch path read its pivot
-// in the wrong units, which flung it, and grew |zoom| as the fingers spread, which is zooming
-// out; Safari's `gesturechange` pivoted on `pageX`/`pageY`, which WebKit leaves at 0.
+// Touch on the Fractal (#55), through Pointer Events: one finger pans, two pinch.
+//
+// Every touch pointer is captured to the Fractal as it lands. Left to the browser, a pointer is
+// captured to whatever it landed on -- often one of the Fractal's lines, which the renderer takes
+// away as it redraws -- and a capture lost with its element sent the finger's lift somewhere
+// else. The finger stayed down here, so the next one-finger drag was read as a pinch with a
+// finger that had gone, and flung the view (rv14). The touch events that carried the pan before
+// had the same hole: a touch whose target is removed ends where nothing hears it.
 //
 // A point of the screen in the Plane's units before the zoom and pan: `xyToZ` without them.
 function screenUnits(x, y){ return Graph.xyToZ(x, y).minus(Graph.pan).cdiv(Graph.zoom) }
@@ -424,42 +378,114 @@ function pinchView(zoom0, pan0, a0, b0, a1, b1){
     const pan = m0.cmult(zoom0).plus(pan0).minus(m1.cmult(zoom));
     return {zoom, pan};
 }
-const pinch = {pointers: new Map(), start: null};
-On.pointerdown(svg, (e)=>{
-    if (e.pointerType !== 'touch') return;
+// `a1` and `b1` turned about their midpoint by `angle`: a pinch whose turn is taken out.
+function turnedAboutMidpoint(a1, b1, angle){
+    const m = a1.plus(b1).scale(0.5), unit = new vec2(Math.cos(angle), Math.sin(angle));
+    return [m.plus(a1.minus(m).cmult(unit)), m.plus(b1.minus(m).cmult(unit))];
+}
+const TouchOnPlane = {
+    // Where each finger is, in screen pixels, in the order the fingers came down.
+    points: new Map(),
+    pinch: null,
+    // A pinch turns the view only once the fingers have turned this far (radians, about 11
+    // degrees): no two fingers spread without turning a little, and a map that turned with
+    // every zoom ended up at an angle nobody chose.
+    turnAfter: 0.2,
 
-    pinch.pointers.set(e.pointerId, screenUnits(e.clientX, e.clientY));
-    if (pinch.pointers.size !== 2) return;
+    // Measured again whenever a finger comes or goes, so two fingers are always taken from
+    // where both of them are now, and the view never jumps.
+    restartPinch(turning = false){
+        const points = [...this.points.values()];
+        this.pinch = (points.length !== 2) ? null : {
+            a: screenUnits(points[0].x, points[0].y),
+            b: screenUnits(points[1].x, points[1].y),
+            zoom: Graph.zoom, pan: Graph.pan, turning
+        };
+    },
+    onDown(e){
+        if (e.pointerType !== 'touch') return;
 
-    const [a, b] = [...pinch.pointers.values()];
-    pinch.start = {a, b, zoom: Graph.zoom, pan: Graph.pan};
-    Autopilot.stop();
-});
-On.pointermove(svg, (e)=>{
-    if (e.pointerType !== 'touch' || !pinch.pointers.has(e.pointerId)) return;
+        try { svg.setPointerCapture(e.pointerId) } catch (err) { Logger.debug("No capture:", err) }
+        this.points.set(e.pointerId, {x: e.clientX, y: e.clientY});
+        this.restartPinch();
+        Autopilot.stop();
+    },
+    onMove(e){
+        const was = this.points.get(e.pointerId);
+        if (e.pointerType !== 'touch' || !was) return;
 
-    pinch.pointers.set(e.pointerId, screenUnits(e.clientX, e.clientY));
-    const start = pinch.start;
-    if (!start || pinch.pointers.size !== 2) return;
+        const now = {x: e.clientX, y: e.clientY};
+        this.points.set(e.pointerId, now);
+        App.interface.coordsLive = true;
+        if (this.points.size === 1) return this.pan(was, now);
+        if (this.pinch) this.pinchTo([...this.points.values()]);
+    },
+    pan(was, now){
+        const delta = new vec2(was.x - now.x, was.y - now.y);
+        regenAmount += delta.mag() * 0.25;
+        Graph.pan_incBy(toDZ(delta));
+    },
+    pinchTo(points){
+        const pinch = this.pinch;
+        let [a, b] = points.map( (p)=>screenUnits(p.x, p.y) );
+        if (!pinch.turning) {
+            const turn = Math.atan2(...(({x, y})=>[y, x])(a.minus(b).cdiv(pinch.a.minus(pinch.b))));
+            // Past the dead zone the pinch starts over from here, turning, so the view picks
+            // the turn up from the fingers as they are rather than snapping by the zone's width.
+            if (Math.abs(turn) >= this.turnAfter) return this.restartPinch(true);
+            [a, b] = turnedAboutMidpoint(a, b, -turn);
+        }
+        const view = pinchView(pinch.zoom, pinch.pan, pinch.a, pinch.b, a, b);
+        if (!view) return;
 
-    const [a, b] = [...pinch.pointers.values()];
-    const view = pinchView(start.zoom, start.pan, start.a, start.b, a, b);
-    if (!view) return;
-
-    // As much of the Fractal redrawn as the zoom changed this move, as the wheel does.
-    regenAmount += Math.abs(Math.log(view.zoom.mag() / Graph.zoom.mag())) * settings.maxLines;
-    Graph.zoom_set(view.zoom);
-    Graph.pan_set(view.pan);
-    App.interface.coordsLive = true;
-});
-const pinchEnds = (e)=>{
-    pinch.pointers.delete(e.pointerId);
-    if (pinch.pointers.size < 2) pinch.start = null;
+        // As much of the Fractal redrawn as the zoom changed this move, as the wheel does.
+        regenAmount += Math.abs(Math.log(view.zoom.mag() / Graph.zoom.mag())) * settings.maxLines;
+        Graph.zoom_set(view.zoom);
+        Graph.pan_set(view.pan);
+    },
+    onEnd(e){
+        if (this.points.delete(e.pointerId)) this.restartPinch();
+    }
 };
-On.pointerup(svg, pinchEnds);
-On.pointercancel(svg, pinchEnds);
+On.pointerdown(svg, TouchOnPlane.onDown.bind(TouchOnPlane));
+On.pointermove(svg, TouchOnPlane.onMove.bind(TouchOnPlane));
+On.pointerup(svg, TouchOnPlane.onEnd.bind(TouchOnPlane));
+On.pointercancel(svg, TouchOnPlane.onEnd.bind(TouchOnPlane));
 
-// Safari's own pinch events are only kept from zooming the page.
-On.gesturestart(window, Event.preventDefault);
-On.gesturechange(window, Event.preventDefault);
-On.gestureend(window, Event.preventDefault);
+// Every finger on the page, wherever it landed. Captured, so that no card's handler can hide one.
+const FingersDown = new Set();
+On.pointerdown(document, (e)=>{ if (e.pointerType === 'touch') FingersDown.add(e.pointerId) }, true);
+On.pointerup(document, (e)=>{ FingersDown.delete(e.pointerId) }, true);
+On.pointercancel(document, (e)=>{ FingersDown.delete(e.pointerId) }, true);
+
+// Safari's own pinch events. An iPad sends them with its fingers -- on the Fractal, where the
+// touches above own the pinch, or anywhere else -- so while a finger is down they only keep the
+// page from zooming. A Mac's trackpad sends them with no finger down at all, and there they zoom
+// the Fractal about the pointer, as the wheel does: keeping only the page from zooming left a
+// pinch on a Mac doing nothing. The turn is not taken from a trackpad.
+const TrackpadPinch = {
+    start: null,
+    onStart(e){
+        e.preventDefault();
+        this.start = (FingersDown.size ? null : {zoom: Graph.zoom, pan: Graph.pan, at: Graph.vecToZ()});
+    },
+    onChange(e){
+        e.preventDefault();
+        const start = this.start;
+        if (!start || FingersDown.size || !(e.scale > 0)) return;
+
+        // Fingers apart is closer, a smaller |zoom|; the point under the pointer stays put.
+        const zoom = start.zoom.unscale(e.scale);
+        regenAmount += Math.abs(Math.log(zoom.mag() / Graph.zoom.mag())) * settings.maxLines;
+        Graph.zoom_set(zoom);
+        Graph.pan_set(start.at.plus(start.pan.minus(start.at).unscale(e.scale)));
+        App.interface.coordsLive = true;
+    },
+    onEnd(e){
+        e.preventDefault();
+        this.start = null;
+    }
+};
+On.gesturestart(window, TrackpadPinch.onStart.bind(TrackpadPinch));
+On.gesturechange(window, TrackpadPinch.onChange.bind(TrackpadPinch));
+On.gestureend(window, TrackpadPinch.onEnd.bind(TrackpadPinch));

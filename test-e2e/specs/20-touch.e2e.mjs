@@ -319,3 +319,121 @@ test('a dialog stays above an on-screen keyboard', async () => {
     const bottom = await page.evaluate(() => document.querySelector('.modal-content').getBoundingClientRect().bottom);
     assert.ok(bottom <= keys, `the dialog ends at ${Math.round(bottom)}, under a keyboard whose top is at ${keys}`);
 });
+
+// Two fingers, as a review drove them (rv14). Real touches need Chromium; WebKit gets the
+// gesture-event checks, which are synthetic in both.
+const cdpTouch = async (page, type, points) => {
+    const cdp = page.cdp ??= await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], i) => ({ x, y, id: i + 1 })) });
+};
+const viewNow = (page) => page.evaluate(() => ({ mag: Graph.zoom.mag(), arg: Math.atan2(Graph.zoom.y, Graph.zoom.x), pan: [Graph.pan.x, Graph.pan.y] }));
+const bareFractal = (page) => page.evaluate(() => {
+    for (let y = 150; y < innerHeight - 150; y += 13) {
+        for (let x = 150; x < innerWidth - 250; x += 13) {
+            const el = document.elementFromPoint(x, y);
+            if (el?.closest('#svg_bg') && el.tagName !== 'svg' && document.elementFromPoint(x + 80, y + 40)?.closest('#svg_bg')) return { x, y };
+        }
+    }
+    return null;
+});
+
+test('a finger whose line of the Fractal is redrawn away still lifts', { skip: isIPad && 'needs real touches' }, async () => {
+    // The finger was captured to the line it landed on; the renderer removed the line, the lift
+    // went elsewhere, the finger stayed down, and the next one-finger drag zoomed and turned.
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const at = await bareFractal(page);
+    assert.ok(at, 'no bare line of the Fractal to land on');
+    await cdpTouch(page, 'touchStart', [[at.x, at.y]]);
+    await page.evaluate(([x, y]) => document.elementFromPoint(x, y).remove(), [at.x, at.y]);
+    await cdpTouch(page, 'touchEnd', []);
+    assert.equal(await page.evaluate(() => TouchOnPlane.points.size), 0, 'the lifted finger is still down');
+
+    const v0 = await viewNow(page);
+    await cdpTouch(page, 'touchStart', [[at.x, at.y]]);
+    for (let k = 1; k <= 8; k++) await cdpTouch(page, 'touchMove', [[at.x + 10 * k, at.y + 5 * k]]);
+    await cdpTouch(page, 'touchEnd', []);
+    const v1 = await viewNow(page);
+    assert.ok(Math.abs(v1.mag / v0.mag - 1) < 1e-9 && Math.abs(v1.arg - v0.arg) < 1e-9, 'a one-finger drag zoomed or turned');
+    assert.notDeepEqual(v1.pan, v0.pan, 'a one-finger drag did not pan');
+});
+
+test('a pinch that starts on a card leaves the page unzoomed', { skip: isIPad && 'needs real touches' }, async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const at = await page.evaluate(() => {
+        const r = Object.values(Graph.nodes)[0].view.div.querySelector('.editable-div').getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    await cdpTouch(page, 'touchStart', [[at.x - 20, at.y], [at.x + 20, at.y]]);
+    for (let k = 1; k <= 8; k++) await cdpTouch(page, 'touchMove', [[at.x - 20 - 10 * k, at.y], [at.x + 20 + 10 * k, at.y]]);
+    await cdpTouch(page, 'touchEnd', []);
+    await page.waitForTimeout(300);
+    assert.equal(await page.evaluate(() => visualViewport.scale), 1, 'the page itself zoomed, and the menu and tool bar with it');
+});
+
+test('a pinch turns the view only when the fingers turn on purpose', { skip: isIPad && 'needs real touches' }, async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    // Bare Fractal all round, so that both fingers land on it however they turn.
+    const at = await page.evaluate(() => {
+        const bare = (x, y) => document.elementFromPoint(x, y)?.closest('#svg_bg');
+        for (let y = 150; y < innerHeight - 150; y += 13) {
+            for (let x = 150; x < innerWidth - 150; x += 13) {
+                if ([0, 1, 2, 3, 4, 5, 6, 7].every((k) => bare(x + 100 * Math.cos(k * Math.PI / 4), y + 100 * Math.sin(k * Math.PI / 4)))) return { x, y };
+            }
+        }
+        return null;
+    });
+    assert.ok(at, 'no bare stretch of the Fractal to pinch on');
+    const pinch = async (turnDeg, spreadBy) => {
+        const v0 = await viewNow(page);
+        const r0 = 60;
+        await cdpTouch(page, 'touchStart', [[at.x - r0, at.y], [at.x + r0, at.y]]);
+        for (let k = 1; k <= 12; k++) {
+            const t = (turnDeg * Math.PI / 180) * k / 12, r = r0 * (1 + (spreadBy - 1) * k / 12);
+            await cdpTouch(page, 'touchMove', [[at.x - r * Math.cos(t), at.y - r * Math.sin(t)], [at.x + r * Math.cos(t), at.y + r * Math.sin(t)]]);
+        }
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const v1 = await viewNow(page);
+        await cdpTouch(page, 'touchEnd', []);
+        return { zoomIn: v0.mag / v1.mag, turnedDeg: (v1.arg - v0.arg) * 180 / Math.PI };
+    };
+    const slight = await pinch(5, 1.5);
+    assert.ok(Math.abs(slight.zoomIn - 1.5) < 0.01, `a spread to 1.5x zoomed ${slight.zoomIn}x`);
+    assert.ok(Math.abs(slight.turnedDeg) < 1e-6, `five degrees of wobble turned the view ${slight.turnedDeg} degrees`);
+    const quarter = await pinch(90, 1);
+    assert.ok(Math.abs(quarter.turnedDeg) > 60, `a quarter turn of the fingers turned the view only ${quarter.turnedDeg} degrees`);
+
+    // And Home puts it upright again.
+    await page.evaluate(() => Hud.home());
+    const home = await viewNow(page);
+    assert.deepEqual([home.mag, home.arg, ...home.pan], [1, 0, 0, 0]);
+});
+
+test("Safari's pinch events zoom for a trackpad, and stand aside for a finger", async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const result = await page.evaluate(() => {
+        const gesture = (type, scale) => { const e = new Event(type, { cancelable: true }); Object.defineProperty(e, 'scale', { value: scale }); window.dispatchEvent(e); return e; };
+        const pinchOnce = () => { gesture('gesturestart', 1); for (let k = 1; k <= 10; k++) gesture('gesturechange', 1 + k / 10); return gesture('gestureend', 2); };
+        const out = {};
+        // A finger down on a card, as a pinch over one is: the gesture is the touch's.
+        const card = Object.values(Graph.nodes)[0].view.div.querySelector('.editable-div');
+        const before = Graph.zoom.mag();
+        card.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 31, pointerType: 'touch', isPrimary: true, bubbles: true, composed: true }));
+        out.prevented = pinchOnce().defaultPrevented;
+        card.dispatchEvent(new PointerEvent('pointerup', { pointerId: 31, pointerType: 'touch', isPrimary: true, bubbles: true, composed: true }));
+        out.withFinger = Graph.zoom.mag() / before;
+        // No finger at all: a trackpad, zooming about the pointer.
+        const z0 = Graph.zoom.mag(), at0 = Graph.vecToZ();
+        pinchOnce();
+        out.trackpad = z0 / Graph.zoom.mag();
+        out.pointerMoved = Graph.vecToZ().minus(at0).mag();
+        return out;
+    });
+    assert.equal(result.prevented, true, "Safari's own zoom was let through");
+    assert.equal(result.withFinger, 1, "a finger's gesture moved the view beside the touch pinch");
+    assert.ok(Math.abs(result.trackpad - 2) < 1e-9, `a trackpad spread to 2x zoomed ${result.trackpad}x`);
+    assert.ok(result.pointerMoved < 1e-9, 'the point under the pointer moved');
+});

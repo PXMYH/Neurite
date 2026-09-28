@@ -51,7 +51,7 @@ class Hud {
                 <button type="button" class="hud-btn" data-act="tidy"
                         data-tooltip="Push overlapping notes apart, without rearranging the map (T)">Tidy</button>
                 <button type="button" class="hud-btn" data-act="home"
-                        data-tooltip="Back to the start: pan 0, zoom 1 (Home)">Home</button>
+                        data-tooltip="Back to the start: pan 0, zoom 1, upright (Home)">Home</button>
             </div>`;
         root.appendChild(panel);
 
@@ -477,10 +477,12 @@ class Hud {
         return {top, bottom, left, right};
     }
 
+    // The view the app opens with: pan 0, zoom 1, and upright. A pinch can turn the view, and a
+    // turned view is otherwise put right only by turning it back by hand.
     static home(){
         Autopilot.stop();
         Graph.pan_set(new vec2(0, 0));
-        Hud.setZoomMag(1);
+        Graph.zoom_set(new vec2(1, 0));
     }
 
     // Push overlapping notes apart, and nothing else.

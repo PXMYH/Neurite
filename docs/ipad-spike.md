@@ -65,7 +65,7 @@ check below that needs one of those is marked as a device check.
 
 **Device checks:** run each on the iPad, record what happens, and say which iPadOS version.
 
-1. **Pinch.** Two fingers on the fractal: the zoom and the turn follow the fingers, and the page
+1. **Pinch.** Two fingers on the fractal: the zoom follows the fingers, a clear twist turns the view, and the page
    itself never zooms. Then pinch over a card and over the Pane. Nothing should zoom there, because
    Safari's gesture events are cancelled.
 2. **Header.** A finger on a card's header drags the card. A tap on the Title opens the keyboard. A

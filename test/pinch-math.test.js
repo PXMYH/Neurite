@@ -106,16 +106,38 @@ test('two fingers on one spot give no view instead of an infinite zoom', ()=>{
     assert.equal(pinchFrom(v(-0.1, 0), v(0.1, 0), v(0.02, 0.02), v(0.02, 0.02)), null);
 });
 
-test('there is one pinch: Safari\'s gesture events are only kept from zooming the page', ()=>{
-    // A second handler moving the view would fight the first on every iPad frame.
+test('there is one pinch: Safari\'s gesture events stand aside while a finger is on the Fractal', ()=>{
+    // An iPad sends gesture events with every two-finger touch, and a second handler moving the
+    // view would fight the first on every frame. A Mac's trackpad sends them with no touch at
+    // all, which is the only case they are for.
     const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-    const gestures = code.match(/On\.gesture\w+\([^\n]*/g) ?? [];
-    assert.deepEqual(gestures, [
-        'On.gesturestart(window, Event.preventDefault);',
-        'On.gesturechange(window, Event.preventDefault);',
-        'On.gestureend(window, Event.preventDefault);',
-    ]);
-    assert.doesNotMatch(code, /case 2:/, 'the two-touch case of the touch path is back beside the pinch');
+    const trackpad = code.slice(code.indexOf('const TrackpadPinch = {'), code.indexOf('On.gesturestart('));
+    // Every finger counts, not only the Fractal's: a pinch over a card sends gesture events too.
+    assert.match(code, /On\.pointerdown\(document, \(e\)=>\{ if \(e\.pointerType === 'touch'\) FingersDown\.add\(e\.pointerId\) \}, true\);/);
+    assert.ok(trackpad.length > 0, 'TrackpadPinch is gone; this test reads nothing');
+    assert.match(trackpad, /onStart\(e\)\{[\s\S]*?FingersDown\.size \? null/,
+        'a gesture that starts with a finger down is taken for a trackpad pinch');
+    assert.match(trackpad, /onChange\(e\)\{[\s\S]*?if \(!start \|\| FingersDown\.size/,
+        'a gesture that goes on while a finger is down moves the view beside the touch pinch');
+    assert.doesNotMatch(code, /On\.touch(start|move|end|cancel)\(svg/,
+        'the touch-event path is back beside the Pointer Events one');
+});
+
+test('a small turn of the fingers does not turn the view', ()=>{
+    // No two fingers spread without turning a little. Taken out below `turnAfter`, the pinch is
+    // a pure zoom: the view keeps its angle and the fingers' midpoint keeps its point.
+    const start = source.indexOf('function turnedAboutMidpoint(');
+    assert.notEqual(start, -1, 'turnedAboutMidpoint is gone');
+    runInContext(source.slice(start, source.indexOf('\n}\n', start) + 2)
+        + '\n;globalThis.turnedAboutMidpoint = turnedAboutMidpoint;', sandbox);
+    const a0 = v(-0.1, 0), b0 = v(0.1, 0);
+    // Spread to twice the span and turned 0.1 rad, about the midpoint (0.02, 0.01).
+    const m = v(0.02, 0.01), turn = v(Math.cos(0.1), Math.sin(0.1));
+    const a1 = m.plus(v(-0.2, 0).cmult(turn)), b1 = m.plus(v(0.2, 0).cmult(turn));
+    const [a, b] = sandbox.turnedAboutMidpoint(a1, b1, -0.1);
+    const view = pinchFrom(a0, b0, a, b);
+    near(view.zoom.cdiv(view0.zoom), v(0.5, 0), 'the view turned, or did not zoom by two');
+    near(onPlane(m, view), onPlane(a0.plus(b0).scale(0.5), view0), "the midpoint's point moved");
 });
 
 test('the Fractal keeps a pinch from the browser', ()=>{

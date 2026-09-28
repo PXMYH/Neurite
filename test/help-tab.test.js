@@ -141,9 +141,9 @@ const CLAIMS = [
      why: 'the notes editor answers Escape itself again, so the row promises a way out that is gone'},
     // By touch (#55, #57, #58): each row has a handler that reads a finger, not a mouse.
     {row: /<td>One finger on the fractal<\/td>/, says: /Move around/,
-     file: 'js/interface/interface.js', code: /case 1: \{/,
+     file: 'js/interface/interface.js', code: /if \(this\.points\.size === 1\) return this\.pan\(was, now\);/,
      why: 'the one-finger pan is gone, so a finger on the fractal moves nothing'},
-    {row: /<td>Two fingers on the fractal<\/td>/, says: /stays under your fingers/,
+    {row: /<td>Two fingers on the fractal<\/td>/, says: /under your fingers/,
      file: 'js/interface/interface.js', code: /function pinchView\(/,
      why: 'the pinch no longer keeps the Plane under the fingers'},
     {row: /<td>The Note tool, then a tap<\/td>/, says: /A note where you tap/,
