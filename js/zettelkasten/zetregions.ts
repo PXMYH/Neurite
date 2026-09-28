@@ -116,6 +116,15 @@ class ZetRegions {
         return s;
     }
 
+    // Whether a Node is one of a Region's: its Archive has a Region and it sits inside it. Read
+    // off the Plane and the Panes rather than a flag, so it holds after a reload.
+    static holds(node: any): boolean {
+        const title = node.getTitle?.();
+        const pane = title ? paneHoldingTitle(title) : null;
+        const region = pane ? ZetRegions.of(pane.paneId) : null;
+        return Boolean(region) && Math.hypot(node.pos.x - region!.x, node.pos.y - region!.y) <= region!.r;
+    }
+
     // The Archive whose Region holds a point of the Plane, or null.
     static at(z: {x: number, y: number}): string | null {
         for (const pane of (window as any).zetPaneList) {
@@ -167,7 +176,23 @@ class ZetRegions {
         const region = ZetRegions.of(paneId);
         if (!region) return false;
 
+        // Its block of cards, not the whole disk: the disk left a Region of 17 cards at 75 px
+        // a card, too small to read. Through Fit, which leaves the chrome and the open Notes
+        // panel the room they take.
         const hud = Hud as any;
+        const block = new Set<any>();
+        ((window as any).zetPaneList as any[]).find( (pane)=>(pane.paneId === paneId) )?.processor.forEachNodeWrap( (wrap: any)=>{
+            const node = wrap.node;
+            if (!node.removed && Math.hypot(node.pos.x - region.x, node.pos.y - region.y) <= region.r) block.add(node);
+        });
+        if (block.size) {
+            // With room above the block for the Region's name, which is drawn there.
+            const box = hud.contentBounds( (node: any)=>block.has(node) );
+            if (box) box.minY -= 0.15 * Math.max(box.maxX - box.minX, box.maxY - box.minY);
+            hud.fitBox(box);
+            return true;
+        }
+
         (Autopilot as any).stop?.();
         (Graph as any).pan_set(new vec2(region.x, region.y));
         // The zoom first: the centring converts screen pixels at the zoom it finds.
@@ -207,9 +232,18 @@ class ZetRegions {
             if (label.textContent !== name) label.textContent = name;
 
             const diameter = 2 * region.r / graph.zoom.mag() * w / 2;
-            // Just over the block of cards, which fills the middle 1.3 radii of the disk: at
-            // the disk's own top the name sat under the tool bar whenever the Region was framed.
-            const top = fromZtoUV(new vec2(region.x, region.y - region.r * 0.72));
+            // Just over the block of cards, on screen, whichever way the view is turned: the
+            // block's corners taken to the screen, and the name over the highest. It was put
+            // 0.72 radii up the Plane, which at 180 degrees is under the block, and for the
+            // folder's top notes -- one row in a disk sized for more -- 150 px above them.
+            // With a gap of 0.07 radii, as the name had over a full block: a card is often a little
+            // taller than the cell it was measured into, and the name is drawn under the cards.
+            const gap = 0.07 * region.r;
+            const hx = gap + ((region.cols && region.cw) ? region.cols * region.cw * region.s / 2 : 0.65 * region.r);
+            const hy = gap + ((region.rows && region.ch) ? region.rows * region.ch * region.s / 2 : 0.65 * region.r);
+            const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]]
+                .map( ([sx, sy])=>fromZtoUV(new vec2(region.x + sx * hx, region.y + sy * hy)) );
+            const top = {x: fromZtoUV(new vec2(region.x, region.y)).x, y: Math.min(...corners.map( (c: any)=>c.y ))};
             const shown = diameter >= ZetRegions.labelMinPx && diameter < 2.5 * w
                        && top.x > -0.5 && top.x < 1.5 && top.y > -0.5 && top.y < 1.5;
             label.hidden = !shown;

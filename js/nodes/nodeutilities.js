@@ -186,6 +186,10 @@ class Graph {
             if (half) extents.set(node, half);
         }
         const favoured = (favour instanceof Set) ? favour : new Set(favour ? [favour] : []);
+        // A Region's cards are a laid-out block (#73), and hold still: a card that overlaps one
+        // moves by the whole of the correction. One double-click on the Plane beside the
+        // bundle's Regions moved 28 of their cards and pushed 8 out of their Regions.
+        const fixed = new Set(nodes.filter( (node)=>ZetRegions.holds(node) ));
 
         const margin = 0.06;
         const deadline = performance.now() + budgetMs;
@@ -203,9 +207,13 @@ class Graph {
                     const overY = (ea.hh + eb.hh) * (1 + margin) - Math.abs(dy);
                     if (overX <= 0 || overY <= 0) continue;
 
+                    const aFixed = fixed.has(a), bFixed = fixed.has(b);
+                    if (aFixed && bFixed) continue;
+
                     // The card that has to move most is the one the caller named, if any.
                     const aFav = favoured.has(a), bFav = favoured.has(b);
-                    const aShare = (aFav === bFav) ? 0.5 : aFav ? bias : 1 - bias;
+                    const aShare = aFixed ? 0 : bFixed ? 1
+                        : (aFav === bFav) ? 0.5 : aFav ? bias : 1 - bias;
                     // Along the axis of least penetration, which is the shortest way out
                     // and what keeps a row of notes a row.
                     const along = (overX < overY) ? 'x' : 'y';

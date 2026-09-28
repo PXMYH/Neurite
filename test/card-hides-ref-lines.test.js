@@ -378,3 +378,47 @@ test('the card shows what follows the head, and typing in it keeps the head', ()
     toNote(note, card);
     assert.equal(note.value, FRONT + '\nThe loop, rewritten.\n[[RAG]]\n');
 });
+
+// A line the import escaped with one space (` ## Overview`) keeps it when the card is typed
+// in: the sync trimmed the card's copy from the start, the space went on the first key, and
+// the line became a Node Tag that took the rest of the note (rv8, 27 of the bundle's cards).
+test('typing in a card whose text starts with an escaped heading keeps the escape', ()=>{
+    const {
+        syncInputTextareaWithHiddenTextarea: toCard,
+        syncHiddenTextareaWithInputTextarea: toNote
+    } = load();
+    const note = makeArea(FRONT + '# The Agent Loop\n\n ## Overview\nThe loop.\n');
+    const card = makeArea('');
+    toCard(card, note);
+    assert.equal(card.value, ' ## Overview\nThe loop.\n');
+
+    card.value = ' ## Overview\nThe loop.x\n';
+    toNote(note, card);
+    assert.equal(note.value, FRONT + '# The Agent Loop\n\n ## Overview\nThe loop.x\n');
+});
+
+// A block the reader types at the top of a card of their own is read as a head once the note
+// holds it, while the card, left alone as it is typed in, still starts with it: the head was
+// written in front of it again at every key, three times over by the end of a line (rv8).
+test('frontmatter typed into a card is written once', ()=>{
+    const {syncHiddenTextareaWithInputTextarea: toNote} = load();
+    const typed = '---\nDate: 27 September\n---\nWe agreed on the plan.';
+    const note = makeArea(typed.slice(0, -1));
+    const card = makeArea(typed);
+    toNote(note, card);
+    assert.equal(note.value, typed);
+    toNote(note, card);
+    assert.equal(note.value, typed, 'and again');
+});
+
+// As the import reads frontmatter: a first key with a space in it, or a blank line first.
+test('frontmatter whose first key has a space, or which opens on a blank line, is a head', ()=>{
+    const spaced = '---\ndate created: 2024-01-01\ndescription: Spaced.\n---\nBody.';
+    const split = Parser.splitHead(spaced, 'x');
+    assert.equal(split.rest, 'Body.');
+    assert.equal(split.description, 'Spaced.');
+    const blank = '---\n\ntype: concept\ndescription: Blank first.\n---\nBody.';
+    assert.equal(Parser.splitHead(blank, 'x').rest, 'Body.');
+    // Still no head for prose between two rules.
+    assert.equal(Parser.splitHead('---\n\nJust prose.\n---\nmore', 'x').head, '');
+});

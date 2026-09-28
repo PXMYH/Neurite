@@ -299,7 +299,12 @@ class Hud {
     // (#40); every note when there is not.
     static fitAll(){
         const selection = App.selectedNodes;
-        const box = Hud.contentBounds(selection.uuids.size ? selection.hasNode.bind(selection) : null);
+        return Hud.fit(selection.uuids.size ? selection.hasNode.bind(selection) : null);
+    }
+    // The Nodes `only` keeps on screen, or every Node.
+    static fit(only){ return Hud.fitBox(Hud.contentBounds(only)) }
+    // A rectangle of the Plane on screen, clear of the chrome.
+    static fitBox(box){
         if (!box) return Hud.home();
 
         Autopilot.stop();
@@ -376,7 +381,9 @@ class Hud {
     static chromeInsets(){
         const vw = window.innerWidth, vh = window.innerHeight;
         let top = 0, bottom = 0, left = 0, right = 0;
-        for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel')) {
+        // And the menu's panel while it is open: an Archive picked in the Notes panel was framed
+        // half under the panel it was picked from (#73).
+        for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel, .dropdown-content.open')) {
             const b = el.getBoundingClientRect();
             if (!b.width || !b.height) continue;
 

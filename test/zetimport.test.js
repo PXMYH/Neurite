@@ -57,8 +57,9 @@ test('a note is a Markdown file whose frontmatter names its type', ()=>{
         'no frontmatter': ['Courses/MISSION.md'],
         'log': ['log.md'],
         'contract': ['AGENTS.md'],
+        'kept': ['.claude/memory.md', '_attachments/notes.md'],
     });
-    assert.match(ZetImport.summary(plan, 1), /Not imported, as not notes: 1 index, 1 log, 1 contract, 1 with no type in its frontmatter, 1 file with no frontmatter\./);
+    assert.match(ZetImport.summary(plan, 1), /Not imported, as not notes: 1 index, 1 log, 1 contract, 1 with no type in its frontmatter, 1 file with no frontmatter, 2 files in folders whose names start with “\.” or “_”\./);
 });
 
 test('a Title is the file name, with as much of the path as two alike need', ()=>{
@@ -100,6 +101,20 @@ test('the tags are the reader\'s: with "@@" as the Node Tag, "##" stays and "@@"
     const plan = ZetImport.notesFrom([{path: 'A/One.md', text: note('concept', '## kept\n@@ escaped')}], 'Root', {...TAGS, node: '@@'});
     assert.match(plan.areas[0].text, /^@@ One\n/);
     assert.match(plan.notes[0].text, /\n## kept\n @@ escaped$/);
+});
+
+test('a link by another name or to a heading is a plain Ref to its note, and one to nothing stays', ()=>{
+    const text = note('concept', 'See [[Agent Loop|the loop]], [[RAG#Chunking]], [[rag#Part|a part]] and [[rag]].\n'
+        + 'Not [[Missing|gone]], nor ![[RAG|embedded]].');
+    const plan = ZetImport.notesFrom([...files, {path: 'Learning/Links.md', text}], 'Artificial Intelligence', TAGS);
+    const links = plan.notes.find( (n)=>n.title === 'Links' ).text;
+    assert.match(links, /See \[\[Agent Loop\]\], \[\[RAG\]\], \[\[RAG\]\] and \[\[rag\]\]\.\n/);
+    assert.match(links, /Not \[\[Missing\|gone\]\], nor !\[\[RAG\|embedded\]\]\./);
+    assert.equal(plan.retargeted, 3);
+    assert.ok(plain(plan.unresolved).some( (u)=>(u.title === 'Links' && u.ref === 'Missing|gone') ));
+    // A Ref in another case names its note: Titles are one in any case (#64).
+    assert.ok(!plain(plan.unresolved).some( (u)=>(u.ref === 'rag') ));
+    assert.match(ZetImport.summary(plan, 1), /3 links by another name or to a heading are a plain link to their notes here\./);
 });
 
 test('the Refs that will draw nothing are listed, and an embed is not one of them', ()=>{

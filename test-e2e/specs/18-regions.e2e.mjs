@@ -1,7 +1,7 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { launchBrowser, openNeurite } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -66,6 +66,8 @@ test('each Archive of an imported bundle has a Region of its own, its notes pinn
 });
 
 test('a Region is named on the Plane, and picking its Archive frames it', async () => {
+    // A laptop's window, where the Notes panel takes a third of it.
+    if (!isIPad) await page.setViewportSize({ width: 1100, height: 720 });
     await importBundle(page);
     await page.click(".menu-row.tablink:has-text('Notes')");
     await page.click('.archive-choice .select-replacer');
@@ -74,11 +76,20 @@ test('a Region is named on the Plane, and picking its Archive frames it', async 
     const view = await page.evaluate(() => {
         const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
         const r = ZetRegions.of(pane.paneId);
-        return { r, pan: [Graph.pan.x, Graph.pan.y], zoom: Graph.zoom.mag() };
+        const panel = document.querySelector('.dropdown-content').getBoundingClientRect();
+        const cards = [];
+        pane.processor.forEachNodeWrap((wrap) => cards.push(wrap.node.view.div.getBoundingClientRect()));
+        return { r, pan: [Graph.pan.x, Graph.pan.y], zoom: Graph.zoom.mag(), panelRight: panel.right,
+            cards: cards.map((c) => ({ left: c.left, top: c.top, right: c.right, bottom: c.bottom })), w: innerWidth, h: innerHeight };
     });
-    // The Region fills the view, the chrome's share aside.
-    assert.ok(view.zoom > view.r.r && view.zoom < 3 * view.r.r, `framed at |zoom| ${view.zoom} for a Region of ${view.r.r}`);
+    // Its block of cards fills the view, beside the Notes panel it was picked from and not
+    // under it: the disk was framed, from the middle of the window, half under the panel (rv8).
     assert.ok(Math.hypot(view.pan[0] - view.r.x, view.pan[1] - view.r.y) < view.r.r, 'the view is not on the Region');
+    for (const c of view.cards) {
+        assert.ok(c.left >= view.panelRight && c.right <= view.w && c.top >= 0 && c.bottom <= view.h,
+            'a card is off screen or under the Notes panel: ' + JSON.stringify({ c, panelRight: view.panelRight }));
+    }
+    assert.ok(Math.max(...view.cards.map((c) => c.right - c.left)) > 0.15 * (view.w - view.panelRight), 'the cards are too small to read');
 
     await page.click('.menu-button');
     await page.waitForTimeout(400);
@@ -155,4 +166,68 @@ test('the Regions come back with the graph, and a new graph starts with the defa
     await page.click('#customModal .modal-ok');
     await page.waitForTimeout(800);
     assert.deepEqual(await views(), defaults, 'the new graph kept the last graph\'s Saved View');
+});
+
+// A double-click on the Plane beside the Regions makes a note at the size of the view, and its
+// separation from the others moved 28 of the bundle's pinned cards and pushed 8 out of their
+// Regions (rv8). A Region's cards hold still; the newcomer moves.
+test('a note made outside every Region moves none of the Regions\' cards', async () => {
+    await importBundle(page);
+    await page.click('.menu-button');
+    await page.evaluate(() => Hud.fitAll());
+    await page.waitForTimeout(400);
+    // Just past the edge of the largest Region, where a note the size of the view lands on it.
+    const z = await page.evaluate(() => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+        const r = ZetRegions.of(pane.paneId);
+        const z = { x: r.x + r.r * 1.05, y: r.y };
+        return ZetRegions.at(z) === null ? z : null;
+    });
+    assert.ok(z, 'the point is in a Region');
+    const before = await regions(page);
+    const at = await onScreen(page, z);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none'; });
+    await page.mouse.dblclick(at.x, at.y);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = ''; });
+    await page.waitForTimeout(1500);
+    const after = await regions(page);
+    assert.ok(after.reduce((n, a) => n + a.nodes.length, 0) > before.reduce((n, a) => n + a.nodes.length, 0), 'no note was made');
+    for (const a of before) {
+        const now = after.find((x) => x.paneId === a.paneId);
+        for (const n of a.nodes) {
+            const m = now.nodes.find((x) => x.title === n.title);
+            assert.ok(Math.hypot(m.x - n.x, m.y - n.y) < 1e-9, `${n.title} of ${a.name} moved`);
+        }
+    }
+});
+
+// Fit measured the cards at the size they arrived at, before they were drawn at their Region's
+// scale: the import's own view came out 1.36 times too wide (rv8).
+test('the import frames its notes as Fit does', async () => {
+    await importBundle(page);
+    const imported = await page.evaluate(() => Graph.zoom.mag());
+    const fitted = await page.evaluate(() => { Hud.fitAll(); return Graph.zoom.mag(); });
+    assert.ok(Math.abs(imported / fitted - 1) < 0.08, `imported at |zoom| ${imported}, Fit says ${fitted}`);
+});
+
+// Put 0.72 radii up the Plane, the name was under the block with the view turned half round.
+test('a Region\'s name is over its block whichever way the view is turned', async () => {
+    await importBundle(page);
+    await page.click('.menu-button');
+    for (const turn of [0, Math.PI / 2, Math.PI / 2]) {
+        const seen = await page.evaluate((t) => {
+            Graph.zoom_cmultWith(new vec2(Math.cos(t), Math.sin(t)));
+            const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+            ZetRegions.frame(pane.paneId);
+            return new Promise((resolve) => setTimeout(() => {
+                const label = ZetRegions.labels.get(pane.paneId);
+                const lb = label.getBoundingClientRect();
+                let top = Infinity;
+                pane.processor.forEachNodeWrap((w) => { top = Math.min(top, w.node.view.div.getBoundingClientRect().top); });
+                resolve({ hidden: label.hidden, bottom: lb.bottom, top });
+            }, 400));
+        }, turn);
+        assert.equal(seen.hidden, false, 'the name is not drawn');
+        assert.ok(seen.bottom <= seen.top + 1, 'the name is not over the block: ' + JSON.stringify(seen));
+    }
 });

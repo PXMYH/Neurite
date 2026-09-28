@@ -415,6 +415,7 @@ class ZetPanes {
 
                 if (cm) {
                     cm.refresh();
+                    zetPane.ui?.markIfStale();
                 } else {
                     Logger.err("CodeMirror instance not found for the active pane.")
                 }

@@ -211,14 +211,21 @@ function syncHiddenTextareaWithInputTextarea(textarea, contentEditable) {
         // -- counting them in the whole note would count the newline above the
         // links as well, and re-adding it every sync grew the note a line at a time.
         const leadingEmptyLines = (body.match(/^(\n*)/) || [''])[0];
-        const prose = contentEditableValue.trimStart();
+        // Blank lines only, never the spaces the first line starts with: a line the import
+        // escaped with one space (` ## Overview`) lost it on the first keystroke, and became
+        // a Node Tag that took the rest of the note with it.
+        const prose = contentEditableValue.replace(/^\s*\n/, '');
         // The links own their lines, never the newline above them: a note whose
         // prose is gone starts at its links, and one that has prose again puts a
         // newline back rather than running the two together.
         const links = refs.replace(/^\n/, '');
 
-        // Combine leading empty lines with the content editable value
-        const newValue = head + leadingEmptyLines + prose + (prose && links ? '\n' : '') + links;
+        // The head goes back in front only when the card does not show it itself. A block the
+        // reader typed at the top of the card is read as a head once the note holds it, and
+        // the card, left alone while it is typed in, still starts with it: the head was
+        // written in front of it again at every keystroke.
+        const hidden = contentEditableValue.startsWith(head) ? '' : head;
+        const newValue = hidden + leadingEmptyLines + prose + (prose && links ? '\n' : '') + links;
 
         if (textareaValue !== newValue) {
             textarea.value = newValue;

@@ -344,7 +344,10 @@ class ZettelkastenParser {
     // card opened on nine lines of `---`, `title:`, `type:` and `tags:` before a word of the
     // note. A note with no frontmatter has no head, so a heading a reader types stays put.
     static splitHead(text, title = '') {
-        const front = /^---\n[\w-]+:[^\n]*\n(?:[^\n]*\n)*?---[ \t]*(?:\n|$)/.exec(text);
+        // As the import reads one (`ZetImport.frontmatter`): blank lines may open it and a key
+        // may hold spaces, which left two imported notes opening on raw YAML. A key line is
+        // still required, so a paragraph between two rules is not taken for one.
+        const front = /^---\n(?:[ \t]*\n)*[^\s:#][^:\n]*:[^\n]*\n(?:[^\n]*\n)*?---[ \t]*(?:\n|$)/.exec(text);
         if (!front) return {head: '', rest: text, description: ''};
 
         let head = front[0];
@@ -753,6 +756,14 @@ class ZettelkastenUI {
                 }
             });
         });
+    }
+    // Marked again if the Titles changed since this Pane was last marked. A Pane is marked when
+    // its own text changes, and the Titles change in the others -- a note typed there, a
+    // graph restored or imported a Pane at a time -- so after an import the earlier Archives
+    // missed 386 of their 2,090 marks. Called when a Pane is shown (`ZetPanes.switchPane`),
+    // which is when its marks can be clicked.
+    markIfStale(){
+        if (this.markedWith !== ZettelkastenUI.titlePattern()) this.highlightNodeTitles();
     }
     // One expression for every Title, longest first so the longer of two that start at one
     // place wins, and made again only when the Titles change.

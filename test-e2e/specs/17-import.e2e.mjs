@@ -50,8 +50,11 @@ test('a folder of notes becomes a note each, an Archive for each folder, and its
     const summary = await importBundle(page);
     assert.match(summary, /^6 notes from “notes-bundle”, in 4 Archives, with 4 Edges/);
     assert.match(summary, /4 lines of the notes begin with “##” or “AI:”/);
-    assert.match(summary, /Not imported, as not notes: 1 index, 1 log, 1 contract, 1 file with no frontmatter\./);
-    assert.match(summary, /2 links name no note here.*\[\[RAG\|retrieval\]\] in “Agent Loop”.*\[\[Missing\]\] in “Agent Loop”/);
+    // Two in `.hidden` and `_attachments`; WebKit hands over the folder without its dot-folder.
+    assert.match(summary, /Not imported, as not notes: 1 index, 1 log, 1 contract, 1 file with no frontmatter, (2 files|1 file) in folders whose names start with “\.” or “_”\./);
+    assert.match(summary, /1 link names no note here, and stays as text: \[\[Missing\]\] in “Agent Loop”\./);
+    // `[[RAG|retrieval]]`, the bundle's link by another name, is a Ref to RAG here.
+    assert.match(summary, /1 link by another name or to a heading is a plain link to its note here\./);
 
     const s = await state(page);
     // The file names, and the two named Courses by as much of their path as tells them apart.
@@ -117,4 +120,54 @@ test('with notes on screen the import asks first, and fills a graph of its own',
     const s = await state(page);
     assert.equal(s.titles.length, 6);
     assert.ok(!s.titles.includes('Mine'), 'the import went into the graph that was on screen');
+});
+
+// A card that starts with a line the import escaped (` ## Overview`): the escape went on the
+// first key typed, and the line became a note that took the rest of the text with it (rv8).
+test('typing in a card that starts with an escaped heading changes only what is typed', async () => {
+    await importBundle(page);
+    await page.evaluate(() => {
+        if (dropdownContent.classList.contains('open')) menuButton.click();
+        ZetRegions.frame(window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Agents').paneId);
+    });
+    await page.waitForTimeout(600);
+    const agents = () => page.evaluate(() => window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Agents').cm.getValue());
+    const before = await agents();
+    const handle = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'Agent Loop').contentEditableDiv);
+    await handle.asElement().click();
+    await page.keyboard.press('ControlOrMeta+End');
+    await page.keyboard.type('xyz');
+    await page.waitForTimeout(500);
+    const after = await agents();
+    assert.equal(after.length, before.length + 3, 'more than the three keys changed the Archive');
+    assert.deepEqual((await state(page)).titles, ['Agent Loop', 'Claude Code/Courses', 'Learning/Courses', 'RAG', 'Setup', 'Top'], 'a note was made or lost');
+});
+
+// Lines in the Notes panel that are no note yet were wiped by the import with no question,
+// and went from the saved graph with them (rv8).
+test('with only text in the Notes panel the import asks first, and No keeps the text', async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('A draft, not a note yet.\n'));
+    await page.waitForTimeout(300);
+    const question = await importBundle(page, { answer: 'no' });
+    assert.match(question, /^Import 6 notes from “notes-bundle” into a new graph/);
+    assert.equal(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), 'A draft, not a note yet.\n');
+});
+
+// Each Archive's Titles were marked in it as it was restored, before the later Archives' notes
+// existed: after an import the earlier Archives missed 386 of their 2,090 marks (rv8). An
+// Archive is marked again when it is shown.
+test('every mention of a Title is marked in each Archive when it is shown', async () => {
+    await importBundle(page);
+    const counts = await page.evaluate(() => window.zetPaneList.map((p) => {
+        App.zetPanes.switchPane(p.paneId);
+        const pattern = ZettelkastenUI.titlePattern();
+        let want = 0;
+        p.cm.eachLine((line) => { for (const m of line.text.matchAll(pattern)) want += 1; });
+        const have = p.cm.getAllMarks().filter((m) => m.className === 'node-title').length;
+        return `${App.zetPanes.getPaneName(p.paneId)} ${have}/${want}`;
+    }));
+    for (const c of counts) {
+        const [have, want] = c.split(' ').pop().split('/').map(Number);
+        assert.equal(have, want, c);
+    }
 });

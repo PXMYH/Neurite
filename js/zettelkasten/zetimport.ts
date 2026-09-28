@@ -26,6 +26,8 @@ interface ImportPlan {
     unresolved: {title: string, ref: string}[];
     embeds: number;
     escaped: number;
+    // Links by another name or to a heading, written as plain Refs to their notes.
+    retargeted: number;
 }
 
 class ZetImport {
@@ -68,7 +70,7 @@ class ZetImport {
             const parts = file.path.split('/').filter(Boolean);
             const name = parts.pop() ?? '';
             if (!/\.md$/i.test(name)) continue;
-            if (parts.some( (dir)=>(dir.startsWith('.') || dir.startsWith('_')) )) continue;
+            if (parts.some( (dir)=>(dir.startsWith('.') || dir.startsWith('_')) )) { skip('kept', file.path); continue; }
 
             const head = ZetImport.frontmatter(file.text);
             if (!head) { skip('no frontmatter', file.path); continue; }
@@ -98,9 +100,23 @@ class ZetImport {
             return {note, title: note.path.replace(/\.md$/i, '')};
         });
 
-        let escaped = 0;
+        // A link by another name (`[[Building Agents|Agents]]`) or to a heading (`[[Setup#Keys]]`)
+        // names its note to the bundle's own reader and to no Ref here: 5 of the 7 links the AI
+        // bundle's summary called unresolved were these. In Neurite's copy each is a plain Ref to
+        // its note, when there is one, and the summary says how many.
+        const known = new Map(titled.map( ({title})=>[title.toLowerCase(), title] ));
+        const open = ZetImport.escape(tags.ref), close = ZetImport.escape(tags.close ?? '');
+        const byOtherName = tags.close ? new RegExp(`(?<!!)${open}([^\\n|#\\]]*?)(?:#[^\\n|\\]]*)?(?:\\|[^\\n\\]]*)?${close}`, 'g') : null;
+        let escaped = 0, retargeted = 0;
         const notes: ImportNote[] = titled.map( ({note, title})=>{
             const lines = note.text.replace(/\r\n/g, '\n').replace(/\s+$/, '').split('\n').map( (line)=>{
+                if (byOtherName) line = line.replace(byOtherName, (whole, target: string)=>{
+                    const named = known.get(target.trim().toLowerCase());
+                    if (!named || whole === `${tags.ref}${target}${tags.close}`) return whole;
+
+                    retargeted += 1;
+                    return `${tags.ref}${named}${tags.close}`;
+                });
                 if (!line.startsWith(tags.node) && !line.startsWith(tags.ai)) return line;
 
                 escaped += 1;
@@ -124,23 +140,22 @@ class ZetImport {
 
         // Refs that will draw nothing, said once in the summary. An embed (`![[x]]`) is an
         // attachment shown in place, not a note named.
-        const titles = new Set(notes.map( (note)=>note.title ));
+        const titles = new Set(notes.map( (note)=>note.title.toLowerCase() ));
         const unresolved: {title: string, ref: string}[] = [];
         let embeds = 0;
-        const open = ZetImport.escape(tags.ref), close = ZetImport.escape(tags.close ?? '');
         const refPattern = tags.close ? new RegExp(`(!?)${open}(.*?)${close}`, 'g') : null;
         for (const note of notes) {
             if (!refPattern) break;
             for (const match of note.text.matchAll(refPattern)) {
                 if (match[1]) { embeds += 1; continue; }
                 const ref = match[2].trim();
-                if (titles.has(ref) || unresolved.some( (u)=>(u.title === note.title && u.ref === ref) )) continue;
+                if (titles.has(ref.toLowerCase()) || unresolved.some( (u)=>(u.title === note.title && u.ref === ref) )) continue;
 
                 unresolved.push({title: note.title, ref});
             }
         }
 
-        return {root, notes, areas, skipped, unresolved, embeds, escaped};
+        return {root, notes, areas, skipped, unresolved, embeds, escaped, retargeted};
     }
 
     static skippedPhrase(reason: string, n: number): string {
@@ -149,6 +164,7 @@ class ZetImport {
             case 'no frontmatter': return `${n} ${many ? 'files' : 'file'} with no frontmatter`;
             case 'no type': return `${n} with no type in ${many ? 'their' : 'its'} frontmatter`;
             case 'index': return `${n} ${many ? 'indexes' : 'index'}`;
+            case 'kept': return `${n} ${many ? 'files' : 'file'} in folders whose names start with “.” or “_”`;
             default: return `${n} ${reason}${many ? 's' : ''}`;
         }
     }
@@ -166,7 +182,7 @@ class ZetImport {
             lines.push(`${plan.escaped} ${many ? 'lines' : 'line'} of the notes ${many ? 'begin' : 'begins'} with “${(Tag as any).node}” or “${LLM_TAG}”, which would start a note of its own here, so ${many ? 'each begins' : 'it begins'} with a space instead. The folder is unchanged.`);
         }
         // In one order whatever order the browser listed the files in.
-        const order = ['index', 'log', 'contract', 'no type', 'no frontmatter'];
+        const order = ['index', 'log', 'contract', 'no type', 'no frontmatter', 'kept'];
         const skipped = [...plan.skipped].sort( (a, b)=>(order.indexOf(a[0]) - order.indexOf(b[0])) )
             .map( ([reason, paths])=>ZetImport.skippedPhrase(reason, paths.length) );
         if (skipped.length) lines.push('Not imported, as not notes: ' + skipped.join(', ') + '.');
@@ -174,6 +190,10 @@ class ZetImport {
             const shown = plan.unresolved.slice(0, 6).map( (u)=>`[[${u.ref}]] in “${u.title}”` );
             const many = (plan.unresolved.length !== 1);
             lines.push(`${plan.unresolved.length} ${many ? 'links name' : 'link names'} no note here, and ${many ? 'stay' : 'stays'} as text: ${shown.join(', ')}${plan.unresolved.length > 6 ? ', and more' : ''}.`);
+        }
+        if (plan.retargeted) {
+            const many = (plan.retargeted !== 1);
+            lines.push(`${plan.retargeted} ${many ? 'links' : 'link'} by another name or to a heading ${many ? 'are' : 'is'} a plain link to ${many ? 'their notes' : 'its note'} here.`);
         }
         if (plan.embeds) lines.push(`${plan.embeds} embedded ${plan.embeds === 1 ? 'attachment stays' : 'attachments stay'} as text.`);
         return lines.join('\n\n');
@@ -207,8 +227,11 @@ class ZetImport {
         }
 
         // Into the graph on screen when it holds nothing, otherwise into a graph of its own.
+        // Nothing means no text either: lines in an Archive that are no note yet were wiped
+        // without a question, and went from the saved graph with them.
         const app = App as any;
-        if (Object.keys((Graph as any).nodes).length > 0) {
+        const written = ((window as any).zetPaneList as any[]).some( (pane)=>pane.cm.getValue().trim() );
+        if (Object.keys((Graph as any).nodes).length > 0 || written) {
             const question = `Import ${plan.notes.length} notes from “${plan.root}” into a new graph, `
                 + `an Archive for each of its ${plan.areas.length} folders? The graph on screen is put away `
                 + 'first, as Clear puts it away: use Save to… first to keep a copy of it on disk.';
@@ -246,6 +269,9 @@ class ZetImport {
         });
         const rootPane = list.find( (pane)=>(panes.getPaneName(pane.paneId) === plan.root) );
         ZetRegions.layout(areas, rootPane?.paneId ?? null);
+        // Drawn at their new scale before Fit measures them: measured at the size they arrived
+        // at, every card was 348 px wide, and the view came out 1.36 times too wide.
+        for (const area of areas) for (const node of area.nodes) node.draw?.();
         (Hud as any).fitAll();
 
         const imported = new Set(plan.notes.map( (note)=>note.title ));

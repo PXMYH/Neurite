@@ -96,7 +96,7 @@ const CLAIMS = [
      file: 'js/interface/interface.js', code: /Graph\.applyRotationDelta\(angle\)/,
      why: 'Alt and the wheel no longer turn the view, so the row promises a gesture that is gone'},
     {row: /<kbd>0<\/kbd> <kbd>t<\/kbd>/, says: /Fit takes the selection/,
-     file: 'js/interface/hud.js', code: /contentBounds\(selection\.uuids\.size/,
+     file: 'js/interface/hud.js', code: /Hud\.fit\(selection\.uuids\.size/,
      why: 'Fit no longer fits the selection, so zoom-to-selection has no route left (#40)'},
     {row: /<kbd>Esc<\/kbd><\/td>/, says: /and the\s+selection/,
      file: 'js/nodes/nodeinteraction/nodemode.js', code: /App\.selectedNodes\.clear\(\)/,
