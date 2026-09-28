@@ -306,6 +306,13 @@ class Hud {
     // A rectangle of the Plane on screen, clear of the chrome.
     static fitBox(box){
         if (!box) return Hud.home();
+        // The chrome as it is now, not as the last tick drew it: the import closes the menu and
+        // fits in one task, and this panel, hidden under the menu until the next tick, was left
+        // out of the room it takes -- the view came out 9% tighter than a Fit a moment later.
+        if (Hud.panel) {
+            Hud.updateArchive();
+            Hud.updateUnderMenu();
+        }
 
         Autopilot.stop();
         Graph.pan_set(new vec2((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2));
@@ -381,10 +388,22 @@ class Hud {
     static chromeInsets(){
         const vw = window.innerWidth, vh = window.innerHeight;
         let top = 0, bottom = 0, left = 0, right = 0;
-        // And a panel docked beside the Graph, which frames notes while it is open (#72), and the
-        // menu's panel while it is open: an Archive picked in the Notes panel was framed half
-        // under the panel it was picked from (#73).
-        for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel, .modal.side-modal .modal-content, .dropdown-content.open')) {
+        // A panel beside the Graph -- the menu's while it is open, a dialog docked at the right
+        // (#72) -- costs its own side, and only while it leaves the Graph room beside it: an
+        // Archive picked in the Notes panel was framed half under the panel it was picked from
+        // (#73), and on a narrow window, where the menu is most of the width, charging it to the
+        // top as well as the side left Fit a corner of the screen (rv9).
+        for (const el of document.querySelectorAll('.dropdown-content.open, .modal.side-modal .modal-content')) {
+            const b = el.getBoundingClientRect();
+            if (!b.width || !b.height) continue;
+
+            if (b.left + b.width / 2 < vw / 2) {
+                if (vw - b.right >= 0.25 * vw) left = Math.max(left, b.right);
+            } else if (b.left >= 0.25 * vw) {
+                right = Math.max(right, vw - b.left);
+            }
+        }
+        for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel')) {
             const b = el.getBoundingClientRect();
             if (!b.width || !b.height) continue;
 

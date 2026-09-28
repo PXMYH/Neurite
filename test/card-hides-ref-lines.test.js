@@ -422,3 +422,28 @@ test('frontmatter whose first key has a space, or which opens on a blank line, i
     // Still no head for prose between two rules.
     assert.equal(Parser.splitHead('---\n\nJust prose.\n---\nmore', 'x').head, '');
 });
+
+// Asked by whether the card still started with the head, a key inside a typed block -- a
+// dash taken off its first line -- made the card start otherwise, and the head went in
+// front again (rv9). The card knows what it was not shown.
+test('a block typed into a card and then changed inside is still written once', ()=>{
+    const {
+        syncInputTextareaWithHiddenTextarea: toCard,
+        syncHiddenTextareaWithInputTextarea: toNote
+    } = load();
+    const note = makeArea('');
+    const card = makeArea('');
+    toCard(card, note);
+    const typed = '---\nDate: 2026-09-27\n---\nBody text.';
+    card.value = typed;
+    toNote(note, card);
+    assert.equal(note.value, typed);
+    const edited = '--\nDate: 2026-09-27\n---\nBody text.';
+    card.value = edited;
+    toNote(note, card);
+    assert.equal(note.value, edited);
+    // A line typed above the block, likewise.
+    card.value = 'Above.\n' + typed;
+    toNote(note, card);
+    assert.equal(note.value, 'Above.\n' + typed);
+});

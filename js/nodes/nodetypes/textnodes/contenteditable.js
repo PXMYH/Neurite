@@ -177,8 +177,10 @@ function syncInputTextareaWithHiddenTextarea(userInputTextarea, textarea) {
     if (!isHiddenTextareaProgrammaticChange) {
         isEditableDivProgrammaticChange = true;
         let previousContent = userInputTextarea.value;
-        const {rest, description} = ZettelkastenParser.splitHead(textarea.value, cardTitleOf(userInputTextarea));
+        const {head, rest, description} = ZettelkastenParser.splitHead(textarea.value, cardTitleOf(userInputTextarea));
         const currentContent = ZettelkastenParser.splitTrailingRefs(rest).body;
+        // What the card is not shown, which typing in it gives back (below).
+        userInputTextarea.hiddenHead = head;
         showCardDescription(userInputTextarea, description);
 
         if (previousContent !== currentContent) {
@@ -220,11 +222,15 @@ function syncHiddenTextareaWithInputTextarea(textarea, contentEditable) {
         // newline back rather than running the two together.
         const links = refs.replace(/^\n/, '');
 
-        // The head goes back in front only when the card does not show it itself. A block the
-        // reader typed at the top of the card is read as a head once the note holds it, and
-        // the card, left alone while it is typed in, still starts with it: the head was
-        // written in front of it again at every keystroke.
-        const hidden = contentEditableValue.startsWith(head) ? '' : head;
+        // The head goes back in front only when the card was not shown it. A block the reader
+        // types at the top of a card of their own is read as a head once the note holds it,
+        // and the card, left alone while it is typed in, still shows it: the head was written
+        // in front of it again at every key -- and, asked by whether the card still started
+        // with it, again once a key inside the block made it start otherwise. A card never
+        // filled from its note falls back on that question.
+        const known = contentEditable.hiddenHead;
+        const hidden = (known === undefined) ? (contentEditableValue.startsWith(head) ? '' : head)
+                     : (known ? head : '');
         const newValue = hidden + leadingEmptyLines + prose + (prose && links ? '\n' : '') + links;
 
         if (textareaValue !== newValue) {

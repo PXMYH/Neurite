@@ -78,13 +78,25 @@ function createNodeFromWindow(title = null, content = null, followMouse = false)
     // Inside an Archive's Region (#73) the note is that Archive's, at its Region's scale: a
     // note made among the bundle's Agents is one of them, whichever Archive the Notes panel
     // had on show.
-    const paneId = ZetRegions.at(Graph.vecToZ());
+    const at = Graph.vecToZ();
+    const paneId = ZetRegions.at(at);
     if (paneId) App.zetPanes.switchPane(paneId);
     const node = addNodeTagToZettelkasten(title || getDefaultTitle(), content);
     const region = paneId && ZetRegions.of(paneId);
     if (node && region) {
+        // In the free cell of the block nearest the double-click, pinned: dropped where the
+        // pointer was, it sat on the card beside it, and a Region's cards -- itself one of them
+        // -- hold still in the separation, so Tidy could not part them either (rv9).
+        const others = [];
+        window.zetPaneList.find( (pane)=>(pane.paneId === paneId) )?.processor.forEachNodeWrap( (wrap)=>{
+            if (wrap.node !== node && !wrap.node.removed) others.push(wrap.node);
+        });
         node.scale = region.s;
+        node.pos = ZetRegions.freeSpot(region, others, at) ?? node.pos;
+        node.anchor = node.pos;
+        node.anchorForce = 1;
         node.inRegion = true;
+        ZetRegions.grow(paneId, node.pos);
         node.draw();
     }
     return node;

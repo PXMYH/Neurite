@@ -153,6 +153,10 @@ test('similar wording is read with a line saying how far it has got, once, and i
     await setup(page, { ai: true, delay: 150 });
     await page.click('#proposeEdgesButton');
     await page.waitForFunction(() => /Reading notes for similar wording: [1-4] of 5/.test(document.querySelector('#customModal .proposals-status')?.textContent || ''), undefined, { timeout: 10000, polling: 20 });
+    // Closed and opened again while it reads: the notes still in hand were asked for a second
+    // time, and the second list waited behind the first (rv9).
+    await page.click('#customModal .close');
+    await page.click('#proposeEdgesButton');
     await page.waitForFunction(() => !/Reading/.test(document.querySelector('#customModal .proposals-status')?.textContent || 'Reading'), undefined, { timeout: 15000 });
     assert.equal(await page.evaluate(() => window.embedCalls), 5);
     const similar = await page.evaluate(() => {
@@ -186,4 +190,64 @@ test('the Connect modal proposes first, and a proposed row writes one Ref into t
     assert.equal((vs.match(/\[\[Retrieval\]\]/g) || []).length, 1, 'one Ref, in the note being linked: ' + JSON.stringify(vs));
     assert.equal(await textOf(page, 'Retrieval'), before.r, 'the other note is unchanged');
     assert.match(await page.evaluate(() => document.querySelector('#nodeList li.proposed').className), /\bconnected\b/);
+});
+
+// Framed across two Regions, the two notes are often a few pixels each: the chosen row says what
+// each is about (rv9).
+test('a chosen row says what each of its notes is about', async () => {
+    await setup(page);
+    await openPanel(page);
+    const row = page.locator('#customModal .proposal', { hasText: 'Vector Store' }).first();
+    const gist = () => row.locator('.proposal-gist').evaluate((g) => ({ shown: getComputedStyle(g).display !== 'none', text: g.textContent }));
+    assert.equal((await gist()).shown, false, 'shown before the row is chosen');
+    await row.locator('.proposal-pair').click();
+    const after = await gist();
+    assert.equal(after.shown, true);
+    assert.match(after.text, /Retrieval: Finding passages for a model\./);
+    assert.match(after.text, /Vector Store: Where the vectors live\./);
+});
+
+// By uuid, a dismissal passed to the next note to take a deleted one's uuid, which a reload
+// hands out again (rv9). It is kept by the two Titles.
+test('a dismissal is the two notes\' Titles, not whichever notes hold their uuids later', async () => {
+    await setup(page);
+    await openPanel(page);
+    await page.locator('#customModal .proposal', { hasText: 'Vector Store' }).first().locator('.proposal-dismiss').click();
+    await page.click('#customModal .close');
+    // Vector Store goes, and a new note with its uuid names what Retrieval's prose mentions.
+    await page.evaluate(() => {
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.setValue(cm.getValue().replace(/## Vector Store\n[\s\S]*?\n\n(?=## Evaluation)/, '')
+            .replace('The Vector Store holds', 'The Vector Store and the Vector Index hold'));
+    });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => App.viewGraphs.saveNow());
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true && Object.keys(Graph.nodes).length === 4, undefined, { timeout: 30000 });
+    await page.waitForTimeout(800);
+    await page.evaluate(async () => {
+        AiFeatures.enabled = false;
+        await window.createNote('Vector Index', 'An index of vectors.');
+    });
+    await page.waitForTimeout(800);
+    await openPanel(page);
+    const pairs = (await rows(page)).map((r) => r.pair);
+    assert.ok(pairs.some((p) => /Vector Index/.test(p) && /Retrieval/.test(p)), 'the new note is not proposed: ' + JSON.stringify(pairs));
+});
+
+// A row outlives a note deleted after the list was made; linking it wrote a Ref to nothing (rv9).
+test('Link on a pair whose other note has gone writes nothing', async () => {
+    await setup(page);
+    await openPanel(page);
+    const row = page.locator('#customModal .proposal', { hasText: 'Vector Store' }).first();
+    const [from, to] = (await row.locator('.proposal-pair').textContent()).split('→');
+    const gone = from === 'Vector Store' ? from : to;
+    const stays = from === 'Vector Store' ? to : from;
+    const before = await textOf(page, stays);
+    await page.evaluate((t) => deleteNodeAndItsZetText(Object.values(Graph.nodes).find((n) => n.getTitle() === t)), gone);
+    await page.waitForTimeout(400);
+    await row.locator('.proposal-link').click();
+    await page.waitForTimeout(300);
+    assert.equal(await row.locator('.proposal-done').textContent(), 'A note is gone');
+    assert.equal(await textOf(page, stays), before, 'a Ref was written to a note that is gone');
 });

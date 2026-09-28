@@ -78,8 +78,8 @@ The light bulb in the tool bar, **Propose Edges**, lists pairs of notes that cou
 
 Each note gets at most three, and no note is named more than four times, so the few notes everything mentions do not fill the list. Nothing is proposed until the button is pressed, and a note's vector is kept in the browser, so a second look is instant.
 
-- Click a pair to frame both notes; a dashed line on the canvas shows the Edge it would make.
+- Click a pair to frame both notes and to read, under it, what each is about; a dashed line on the canvas shows the Edge it would make.
 - **Link** writes one Ref, into the first note of the pair, naming the second: the line a reader would have typed. Its tooltip says what it will write.
-- **Dismiss** keeps the pair out of the list from then on; the dismissal is saved with the graph. **Undo** takes it back while the list is open.
+- **Dismiss** keeps the pair out of the list from then on, by the two notes' titles; the dismissal is saved with the graph. **Undo** takes it back while the list is open.
 
 The Connect modal (Link "…" to…) offers the note's own three first, under **Proposed**; a click on one writes one Ref, into the note being linked.

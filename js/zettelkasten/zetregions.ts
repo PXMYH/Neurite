@@ -138,7 +138,8 @@ class ZetRegions {
     // inside the disk while there is room, and just outside it once there is not. The path a
     // note otherwise walks from the last one made lands on a neighbour, and the separation
     // then pushed it out of a small Region altogether.
-    static freeSpot(region: Region, others: any[]): any {
+    // `near`, where given, is the point the free cell is nearest instead: a double-click's.
+    static freeSpot(region: Region, others: any[], near: {x: number, y: number} | null = null): any {
         if (!region.cw || !region.ch || !region.cols || !region.rows) return null;
 
         const cw = region.cw * region.s, ch = region.ch * region.s;
@@ -148,7 +149,7 @@ class ZetRegions {
         for (let row = -3; row < region.rows + 3; row++) for (let col = -3; col < region.cols + 3; col++) {
             const x = x0 + col * cw, y = y0 + row * ch;
             const d = Math.hypot(x - region.x, y - region.y);
-            cells.push({x, y, d, inside: d + Math.hypot(cw, ch) / 2 <= region.r});
+            cells.push({x, y, d: near ? Math.hypot(x - near.x, y - near.y) : d, inside: d + Math.hypot(cw, ch) / 2 <= region.r});
         }
         cells.sort( (a, b)=>((Number(b.inside) - Number(a.inside)) || (a.d - b.d)) );
         const cell = cells.find( (c)=>free(c.x, c.y) );

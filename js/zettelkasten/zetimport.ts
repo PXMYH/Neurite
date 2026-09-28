@@ -239,6 +239,11 @@ class ZetImport {
 
             await app.viewGraphs.startNewGraph();
         }
+        // The graph is what the import was for, so the menu it was asked for from closes: open,
+        // it covers a third of the notes, and Fit frames them beside it rather than on the screen.
+        if (document.querySelector('.dropdown-content')?.classList.contains('open')) {
+            (document.querySelector('.menu-button') as HTMLElement | null)?.click();
+        }
         const edges = ZetImport.load(plan);
         await ui.alert(ZetImport.summary(plan, edges));
     }

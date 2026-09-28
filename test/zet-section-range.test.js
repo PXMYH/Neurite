@@ -35,7 +35,8 @@ function makeParser(text){
         eachLine(cb){ lines.forEach((text, i)=>cb({text, lineNo: ()=>i})) }
     };
     const sandbox = {Tag: {node: '##', ref: '[['}, LLM_TAG: 'AI:', tagValues: {refTag: '[['}, bracketsMap: {'[[': ']]'},
-        Logger: {err(){}, warn(){}, info(){}, debug(){}}};
+        Logger: {err(){}, warn(){}, info(){}, debug(){}},
+        escapeRegExp: (s)=>s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')};
     vm.runInNewContext([
         // Node 22 has no `RegExp.escape`, which a static field in the class calls.
         "if (!RegExp.escape) RegExp.escape = (s)=>s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')",
@@ -89,4 +90,32 @@ test('adding a Ref a note already has, inside a sentence, writes nothing', ()=>{
     cm.replaceRange = ()=>{ throw new Error('nothing should be written') };
     parser.addEdge('A', 'B', cm);
     assert.equal(lines.join('\n'), before);
+});
+
+// A line that only begins with a Ref is a sentence, and a Ref appended to it ran into the
+// middle of the prose: the AI bundle's notes have many ("[[llm-wiki]]. [[0. Prompts Gateway]]").
+// The Ref goes onto the note's own line of Refs, or onto a line of its own (rv9).
+function writable(lines, cm){
+    const at = (p)=>lines.slice(0, p.line).reduce( (n, line)=>n + line.length + 1, 0 ) + p.ch;
+    cm.replaceRange = (text, from, to = from)=>{
+        const doc = lines.join('\n');
+        const next = doc.slice(0, at(from)) + text + doc.slice(Math.min(doc.length, at(to)));
+        lines.splice(0, lines.length, ...next.split('\n'));
+    };
+}
+
+test('a Ref is not appended to a sentence that begins with one', ()=>{
+    const {parser, cm, lines} = makeParser(['## A', '[[C]] is where the loop ends.', '', '## B', 'b', '', '## C', 'c'].join('\n'));
+    writable(lines, cm);
+    parser.addEdge('A', 'B', cm);
+    assert.equal(lines[1], '[[C]] is where the loop ends.', 'the sentence was changed');
+    assert.ok(lines.slice(0, lines.indexOf('## B')).includes('[[B]]'), 'no line of its own: ' + JSON.stringify(lines));
+});
+
+test('a Ref joins the note\'s own line of Refs', ()=>{
+    const {parser, cm, lines} = makeParser(['## A', 'Prose.', '[[C]]', '', '## B', 'b', '', '## C', 'c'].join('\n'));
+    writable(lines, cm);
+    parser.addEdge('A', 'B', cm);
+    assert.equal(lines[2], '[[C]] [[B]]');
+    assert.equal(lines[1], 'Prose.');
 });

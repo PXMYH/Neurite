@@ -1,5 +1,9 @@
+// The Edge the two share, or undefined. `find(node2.edges.includes, node2.edges)` passed each
+// Edge's index on as `includes`' fromIndex, so an Edge further along node1's list than node2's
+// was not found: on the AI bundle, 63 of 144 Edge ends. The Connect list then showed linked
+// notes as not linked, and Link said "Not linked" of an Edge it had just made.
 function findExistingEdge(node1, node2) {
-    return node1.edges.find(node2.edges.includes, node2.edges);
+    return node1.edges.find( (edge)=>node2.edges.includes(edge) );
 }
 
 class Edge {

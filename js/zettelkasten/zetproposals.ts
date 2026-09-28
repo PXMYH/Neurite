@@ -35,6 +35,8 @@ interface ProposalNote {
     tags: string[];
     // What is embedded.
     summary: string;
+    // What the note is about, in a line: its description, or its opening.
+    gist: string;
     // The Nodes it already has an Edge with.
     linked: Set<any>;
 }
@@ -56,9 +58,13 @@ class ZetProposals {
     static weights = {mention: 2, tags: 1, similar: 0.5};
     static openingChars = 300;
 
-    // Dismissed pairs, by both uuids in order. Kept with the Graph.
+    // Dismissed pairs, by both Titles in order, in any case, kept with the Graph. A Title is a
+    // note's identity in the text (CONTEXT.md); a uuid is handed out again after a reload, and a
+    // dismissal passed to whichever new note took a deleted one's.
     static dismissed = new Set<string>();
-    static pairKey(a: any, b: any): string { return [a.uuid, b.uuid].sort().join('|') }
+    static pairKey(a: any, b: any): string {
+        return [a.getTitle(), b.getTitle()].map( (title: string)=>title.trim().toLowerCase() ).sort().join('\n');
+    }
 
     // A note's Tags, from its frontmatter: `tags: [a, b]`, `tags: a, b`, or a YAML list.
     static tagsOf(head: string): string[] {
@@ -226,6 +232,7 @@ class ZetProposals {
                 node, title, prose,
                 tags: ZetProposals.tagsOf(head),
                 summary: `${title}. ${description}\n${opening}`.trim(),
+                gist: description || prose.replace(/\s+/g, ' ').trim().slice(0, 160),
                 linked: new Set(node.edges.flatMap( (edge: any)=>edge.pts ).filter( (pt: any)=>(pt !== node) )),
             });
         }
@@ -243,6 +250,7 @@ class ZetProposals {
     // ponytail: never pruned -- one ~8 KB entry per version of a note's opening; prune by last
     // use if the store ever matters.
     static #memo = new Map<string, number[]>();
+    static #pending = new Map<string, Promise<number[] | null>>();
     static #store = new Stored('proposalVectors');
     // `kept` asks for the vectors already kept and nothing else: the Connect modal's group
     // must not load a model the reader did not ask for -- a 127 MB download the first time.
@@ -254,21 +262,48 @@ class ZetProposals {
             ?? ZetProposals.#store.load(key).catch( ()=>null )) ));
 
         const out: (number[] | null)[] = new Array(notes.length).fill(null);
-        let next = 0, done = 0;
+        let next = 0, done = 0, answered = 0, failed = 0;
         const one = async (i: number)=>{
             let vector = stored[i]?.length ? stored[i] : null;
-            if (!vector && !kept) {
-                const fetched = await Promise.resolve().then( ()=>embeddings.fetch(notes[i].summary) ).catch( ()=>null );
-                vector = fetched?.length ? Array.from(fetched as ArrayLike<number>) : null;
-                if (vector) ZetProposals.#store.save(keys[i], vector).catch( ()=>{} );
+            // A model that has answered nothing three times is not asked for the rest: with its
+            // Ollama not running, every note of the bundle was two failed requests and five
+            // logged errors.
+            if (!vector && !kept && (answered || failed < 3)) {
+                vector = await ZetProposals.#fetch(keys[i], notes[i].summary);
+                if (vector) answered += 1;
+                else failed += 1;
             }
             if (vector) ZetProposals.#memo.set(keys[i], vector);
             out[i] = vector;
             progress(++done);
         };
+        // One at a time until the model has answered once: a model that is not there costs three
+        // requests, not one for every note in flight.
+        while (next < notes.length && !answered && failed < 3) await one(next++);
         const lane = async ()=>{ while (next < notes.length) await one(next++) };
         await Promise.all(Array.from({length: Math.min(8, notes.length)}, lane));
         return out;
+    }
+    // One request a text, however many ask for it: the list opened again while the first was
+    // still reading asked for every note a second time, and waited behind the first.
+    static #fetch(key: string, text: string): Promise<number[] | null> {
+        const kept = ZetProposals.#memo.get(key);
+        if (kept) return Promise.resolve(kept);
+        let pending = ZetProposals.#pending.get(key);
+        if (pending) return pending;
+
+        pending = Promise.resolve().then( ()=>(Embeddings as any).fetch(text) ).catch( ()=>null )
+            .then( (fetched: any)=>{
+                const vector = fetched?.length ? Array.from(fetched as ArrayLike<number>) : null;
+                if (vector) {
+                    ZetProposals.#memo.set(key, vector);
+                    ZetProposals.#store.save(key, vector).catch( ()=>{} );
+                }
+                return vector;
+            })
+            .finally( ()=>ZetProposals.#pending.delete(key) );
+        ZetProposals.#pending.set(key, pending);
+        return pending;
     }
 
     // The proposals for a Graph's notes: the Graph-wide list, or one note's own when `only` is
@@ -293,7 +328,12 @@ class ZetProposals {
     }
 
     // Accepting: one Ref, into `from`'s text, naming `to`. True when the Edge is there after.
+    // Only between two notes still in the Graph: a row outlives a note deleted after the list
+    // was made, and linking it wrote a Ref to nothing.
     static link(from: any, to: any): boolean {
+        const nodes = (Graph as any).nodes;
+        if (from.removed || to.removed || nodes[from.uuid] !== from || nodes[to.uuid] !== to) return false;
+
         addEdgeToZettelkasten(from.getTitle(), to.getTitle());
         return Boolean(findExistingEdge(from, to));
     }
@@ -305,6 +345,9 @@ class ZetProposals {
 
     static async open(): Promise<void> {
         const generation = ++ZetProposals.#generation;
+        // No row is chosen in a list just made: the line of one chosen before, in a list another
+        // dialog replaced, was drawn again with nothing chosen.
+        ZetProposals.shown = null;
         const modal = Modal as any;
         modal.open('proposalsModal');
         const body = modal.div.querySelector('.modal-body') as HTMLElement;
@@ -336,7 +379,7 @@ class ZetProposals {
 
         const noEdge = (isolated === 1) ? '1 note has no Edge' : `${isolated} notes have no Edge`;
         const count = (list.length === 1) ? '1 proposal' : `${list.length} proposals`;
-        const lead = !list.length ? 'Nothing to propose: every pair of notes is linked or dismissed.'
+        const lead = !list.length ? 'Nothing to propose: no two notes, other than those linked or dismissed, mention each other, share a Tag or read alike.'
             : isolated ? `${noEdge}. ${count}, for those first.` : `${count}.`;
         (body.querySelector('.proposals-status') as HTMLElement).textContent = [lead, note].filter(Boolean).join(' ');
 
@@ -362,15 +405,26 @@ class ZetProposals {
 
         const link = html.make.button('proposal-link', 'Link') as HTMLButtonElement;
         link.setAttribute('aria-label', `Link ${a.title} to ${b.title}`);
-        // What the click writes, and where, before it is written.
-        const ref = (Tag as any).ref as string;
-        link.dataset.tooltip = `Writes ${ref}${b.title}${(bracketsMap as any)[ref] ?? ''} into ${a.title}.`;
+        // What the click writes, and where, before it is written: a Ref Tag with no closing half
+        // is written as its own line, `@ Title` (`addEdge`).
+        const ref = (Tag as any).ref as string, close = (bracketsMap as any)[ref] as string | undefined;
+        link.dataset.tooltip = `Writes ${close ? ref + b.title + close : ref + ' ' + b.title} into ${a.title}.`;
         const dismiss = html.make.button('proposal-dismiss', 'Dismiss') as HTMLButtonElement;
         dismiss.setAttribute('aria-label', `Dismiss ${a.title} and ${b.title}`);
         const actions = html.make.div('proposal-actions');
         actions.append(link, dismiss);
 
-        li.append(pair, actions, ZetProposals.reason(notes, p));
+        // What each note is about, shown once the row is chosen: the two framed across Regions
+        // are often a few pixels each, too small to read.
+        const gist = html.make.div('proposal-gist');
+        for (const note of [a, b]) {
+            const line = html.make.span('proposal-gist-line');
+            const name = html.create('b');
+            name.textContent = note.title + ': ';
+            line.append(name, note.gist || 'no text yet');
+            gist.append(line);
+        }
+        li.append(pair, actions, ZetProposals.reason(notes, p), gist);
         on.click(pair, ()=>ZetProposals.show(li, a.node, b.node) );
         on.click(link, ()=>ZetProposals.accept(li, a.node, b.node) );
         on.click(dismiss, ()=>ZetProposals.dismiss(li, a.node, b.node) );
@@ -427,12 +481,15 @@ class ZetProposals {
     }
 
     static accept(li: HTMLElement, a: any, b: any): void {
+        const gone = a.removed || b.removed;
         const linked = ZetProposals.link(a, b);
         li.classList.add(linked ? 'accepted' : 'failed');
         const done = (Html as any).make.span('proposal-done');
         done.setAttribute('role', 'status');
-        done.textContent = linked ? 'Linked' : 'Not linked';
+        done.textContent = linked ? 'Linked' : gone ? 'A note is gone' : 'Not linked';
         li.querySelector('.proposal-actions')?.replaceChildren(done);
+        // The keyboard stays in the row: the Link button it was on is gone.
+        (li.querySelector('.proposal-pair') as HTMLElement | null)?.focus({preventScroll: true});
         if (ZetProposals.shown?.a === a && ZetProposals.shown?.b === b) ZetProposals.hide();
     }
 

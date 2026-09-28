@@ -23,6 +23,10 @@ async function importBundle(page) {
     await page.click('#customModal .modal-ok');
     await page.waitForTimeout(600);
 }
+// The menu open or closed, whichever it was: the import closes it, a question closes it too.
+const setMenu = (page, open) => page.evaluate((open) => {
+    if (dropdownContent.classList.contains('open') !== open) menuButton.click();
+}, open);
 const regions = (page) => page.evaluate(() => window.zetPaneList.map((pane) => {
     const nodes = [];
     pane.processor.forEachNodeWrap((wrap) => nodes.push(wrap.node));
@@ -69,6 +73,7 @@ test('a Region is named on the Plane, and picking its Archive frames it', async 
     // A laptop's window, where the Notes panel takes a third of it.
     if (!isIPad) await page.setViewportSize({ width: 1100, height: 720 });
     await importBundle(page);
+    await setMenu(page, true);
     await page.click(".menu-row.tablink:has-text('Notes')");
     await page.click('.archive-choice .select-replacer');
     await page.click(".archive-choice .dropdown-option:has-text('Harnesses')");
@@ -100,7 +105,7 @@ test('a Region is named on the Plane, and picking its Archive frames it', async 
 
 test('a note made by double-click in a Region is its Archive\'s, at its scale', async () => {
     await importBundle(page);
-    await page.click('.menu-button');   // closed, so the canvas takes the double-click
+    await setMenu(page, false);   // closed, so the canvas takes the double-click
     const target = await page.evaluate(() => {
         const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Learning');
         ZetRegions.frame(pane.paneId);
@@ -173,7 +178,7 @@ test('the Regions come back with the graph, and a new graph starts with the defa
 // Regions (rv8). A Region's cards hold still; the newcomer moves.
 test('a note made outside every Region moves none of the Regions\' cards', async () => {
     await importBundle(page);
-    await page.click('.menu-button');
+    await setMenu(page, false);
     await page.evaluate(() => Hud.fitAll());
     await page.waitForTimeout(400);
     // Just past the edge of the largest Region, where a note the size of the view lands on it.
@@ -213,7 +218,7 @@ test('the import frames its notes as Fit does', async () => {
 // Put 0.72 radii up the Plane, the name was under the block with the view turned half round.
 test('a Region\'s name is over its block whichever way the view is turned', async () => {
     await importBundle(page);
-    await page.click('.menu-button');
+    await setMenu(page, false);
     for (const turn of [0, Math.PI / 2, Math.PI / 2]) {
         const seen = await page.evaluate((t) => {
             Graph.zoom_cmultWith(new vec2(Math.cos(t), Math.sin(t)));
@@ -229,5 +234,71 @@ test('a Region\'s name is over its block whichever way the view is turned', asyn
         }, turn);
         assert.equal(seen.hidden, false, 'the name is not drawn');
         assert.ok(seen.bottom <= seen.top + 1, 'the name is not over the block: ' + JSON.stringify(seen));
+    }
+});
+
+// Dropped where the pointer was, a note double-clicked beside a Region's card sat on it, and a
+// Region's cards hold still, so Tidy could not part them either (rv9). It takes the free cell
+// of the block nearest the double-click.
+test('a note double-clicked beside a Region\'s card takes a free cell of the block', async () => {
+    await importBundle(page);
+    await setMenu(page, false);
+    const target = await page.evaluate(() => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+        ZetRegions.frame(pane.paneId);
+        const r = ZetRegions.of(pane.paneId);
+        return { paneId: pane.paneId, x: r.x, y: r.y };
+    });
+    await page.waitForTimeout(500);
+    // On the Plane just past the block's rightmost card, still inside the Region's disk.
+    const beside = await page.evaluate((paneId) => {
+        const pane = window.zetPaneList.find((p) => p.paneId === paneId);
+        let box = null;
+        pane.processor.forEachNodeWrap((w) => {
+            const b = w.node.view.div.getBoundingClientRect();
+            if (!box || b.right > box.right) box = b;
+        });
+        return { x: box.right + box.width * 0.15, y: box.top + box.height * 0.5 };
+    }, target.paneId);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none'; });
+    await page.mouse.dblclick(beside.x, beside.y);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = ''; });
+    await page.waitForTimeout(1200);
+    const overlaps = await page.evaluate((paneId) => {
+        const pane = window.zetPaneList.find((p) => p.paneId === paneId);
+        const boxes = [];
+        pane.processor.forEachNodeWrap((w) => boxes.push({ t: w.node.getTitle(), b: w.node.view.div.getBoundingClientRect() }));
+        const out = [];
+        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+            const [p, q] = [boxes[i].b, boxes[j].b];
+            const w = Math.min(p.right, q.right) - Math.max(p.left, q.left), h = Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top);
+            if (w > 1 && h > 1) out.push(`${boxes[i].t} / ${boxes[j].t}`);
+        }
+        return { count: boxes.length, out };
+    }, target.paneId);
+    assert.equal(overlaps.count, 3, 'the note went into another Archive');
+    assert.deepEqual(overlaps.out, [], 'cards overlap');
+});
+
+// On a narrow window the menu is most of the width, and charged to the top as well as the
+// side it left Fit a corner of the screen (rv9): it costs its side, while there is room there.
+test('with the Notes panel open on a narrow window, an Archive is framed in the room beside it', { skip: isIPad && 'the iPad window is its own size' }, async () => {
+    await page.setViewportSize({ width: 700, height: 900 });
+    await importBundle(page);
+    await setMenu(page, true);
+    await page.click(".menu-row.tablink:has-text('Notes')");
+    await page.click('.archive-choice .select-replacer');
+    await page.click(".archive-choice .dropdown-option:has-text('Harnesses')");
+    await page.waitForTimeout(600);
+    const seen = await page.evaluate(() => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+        const panel = document.querySelector('.dropdown-content').getBoundingClientRect();
+        const cards = [];
+        pane.processor.forEachNodeWrap((w) => cards.push(w.node.view.div.getBoundingClientRect()));
+        return { panelRight: panel.right, cards: cards.map((c) => ({ left: c.left, right: c.right, top: c.top, bottom: c.bottom })), w: innerWidth, h: innerHeight };
+    });
+    for (const c of seen.cards) {
+        assert.ok(c.left >= seen.panelRight && c.right <= seen.w && c.top >= 0 && c.bottom <= seen.h,
+            'a card is not in the room beside the panel: ' + JSON.stringify({ c, panelRight: seen.panelRight }));
     }
 });
