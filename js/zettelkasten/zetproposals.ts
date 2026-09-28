@@ -62,9 +62,9 @@ class ZetProposals {
 
     // Dismissed pairs, kept with the Graph, each by both notes' uuids and Titles: the uuid follows
     // a rename, which by Title alone brought the pair back; the Title follows a note deleted and
-    // made again -- a section cut and pasted back, an undo. One whose notes are gone is dropped
-    // when the Graph is saved, so a uuid a reload hands out again finds nothing waiting for it:
-    // by uuid alone, a dismissal passed to whichever new note took a deleted one's.
+    // made again -- a section cut and pasted back, an undo. A uuid is handed out once in a session
+    // (`Graph.nextUuid`), and one whose notes are gone is dropped when the Graph is saved, so a
+    // uuid a reload hands out again finds nothing waiting for it.
     static dismissed: Dismissal[] = [];
     static #uuidKey(a: string, b: string): string { return [a, b].sort().join('|') }
     static #titleKey(a: string, b: string): string {
@@ -281,7 +281,8 @@ class ZetProposals {
                 tags: ZetProposals.tagsOf(head),
                 summary: `${title}. ${description}\n${opening}`.trim(),
                 // The words of its Refs kept: without them "Holds what [[RAG]] made" read "Holds what made".
-                gist: description || rest.replace(refs, (found: string)=>(close ? found.slice(ref.length, -close.length) : found.slice(ref.length)))
+                // `[[Note|shown]]` reads as its shown words, and an embed's `!` goes.
+                gist: description || rest.replace(new RegExp(`!(?=${escape(ref)})`, 'g'), '').replace(refs, (found: string)=>(close ? found.slice(ref.length, -close.length).split('|').pop() ?? '' : found.slice(ref.length)))
                     .replace(/\s+/g, ' ').trim().slice(0, 160),
                 linked: new Set(node.edges.flatMap( (edge: any)=>edge.pts ).filter( (pt: any)=>(pt !== node) )),
             });
@@ -537,7 +538,8 @@ class ZetProposals {
         const a = ZetProposals.live(from), b = ZetProposals.live(to);
         li.closest('.modal-body')?.querySelectorAll('.proposal.selected').forEach( (row)=>row.classList.remove('selected') );
         li.classList.add('selected');
-        if (!a || !b) return;
+        // A note gone takes the last row's line with it, not left drawn under this one.
+        if (!a || !b) return ZetProposals.hide();
 
         ZetProposals.shown = {a, b};
         (Hud as any).fit( (node: any)=>(node === a || node === b) );

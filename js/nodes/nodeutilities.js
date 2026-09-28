@@ -189,7 +189,8 @@ class Graph {
         // A Region's cards are a laid-out block (#73), and hold still: a card that overlaps one
         // moves by the whole of the correction. One double-click on the Plane beside the
         // bundle's Regions moved 28 of their cards and pushed 8 out of their Regions.
-        const fixed = new Set(nodes.filter( (node)=>ZetRegions.holds(node) ));
+        // Not a note arriving among them, which is the one that moves.
+        const fixed = new Set(nodes.filter( (node)=>(ZetRegions.holds(node) && !favoured.has(node)) ));
 
         const margin = 0.06;
         const deadline = performance.now() + budgetMs;
@@ -415,12 +416,14 @@ class Graph {
         this.mousePos.y = y;
     }
 
+    // Once each in a session. The newest Node's uuid was handed out again once it was deleted,
+    // and whatever was keyed by it -- a dismissed Proposed Edge -- passed to the next note (rv11).
     get nextUuid(){
         const nodes = this.nodes;
         while (nodes[this.#nextUuid]) {
             this.#nextUuid += 1;
         }
-        return this.#nextUuid;
+        return this.#nextUuid++;
     }
 
     pan_decBy(vec){

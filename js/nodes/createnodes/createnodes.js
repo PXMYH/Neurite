@@ -84,15 +84,15 @@ function createNodeFromWindow(title = null, content = null, followMouse = false)
     const node = addNodeTagToZettelkasten(title || getDefaultTitle(), content);
     const region = paneId && ZetRegions.of(paneId);
     if (node && region) {
-        // In the free cell of the block nearest the double-click, pinned: dropped where the
-        // pointer was, it sat on the card beside it, and a Region's cards -- itself one of them
-        // -- hold still in the separation, so Tidy could not part them either (rv9).
+        // Where the pointer is, pinned, if nothing is there; on a card or between two, in the
+        // free cell of the block nearest the pointer (`ZetRegions.freeSpot`). Whichever it is,
+        // the view is moved to show it whole (`Hud.reveal`): the cell may be off screen.
         const others = [];
         window.zetPaneList.find( (pane)=>(pane.paneId === paneId) )?.processor.forEachNodeWrap( (wrap)=>{
             if (wrap.node !== node && !wrap.node.removed) others.push(wrap.node);
         });
         node.scale = region.s;
-        node.pos = ZetRegions.freeSpot(region, others, at) ?? node.pos;
+        node.pos = ZetRegions.freeSpot(region, others, at) ?? at;
         node.anchor = node.pos;
         node.anchorForce = 1;
         node.inRegion = true;
@@ -122,11 +122,10 @@ function addNodeTagToZettelkasten(title, content = null) {
     const ui = pane.ui;
 
     const node = ui.scrollToTitle(title);
-    node.contentEditableDiv.value = content;
-    node.contentEditableDiv.dispatchEvent(new Event('input'));
-    // And then as the note's card shows it: a pasted note's frontmatter is its head, which the
-    // card hides (#71), and written whole the card opened on raw YAML.
-    if (content && node.textarea) syncInputTextareaWithHiddenTextarea(node.contentEditableDiv, node.textarea);
+    // The card filled from its note, as the note shows it. It was given the content whole and
+    // the card's sync then put back what a card never shows -- the note's head and its trailing
+    // Refs -- so a pasted, dropped or remembered note held them twice (rv10, rv11).
+    if (node.textarea) syncInputTextareaWithHiddenTextarea(node.contentEditableDiv, node.textarea);
     return node;
 }
 

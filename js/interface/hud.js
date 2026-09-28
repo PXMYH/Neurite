@@ -333,6 +333,41 @@ class Hud {
         Hud.centreOnUsableRect();
     }
 
+    // The view moved just enough to show a card whole in the space the chrome leaves, the card
+    // left where it is: a note made at a Region's edge ran past the window's, and was typed
+    // into there out of sight (rv11). A card larger than the space keeps its top left in it.
+    //
+    // The card's box is worked out from where it is on the Plane now, not read off the page:
+    // the page shows where it was last drawn, before the separation moved it and before the
+    // pan this makes, so asked again in the same task it moved the view as far again.
+    static reveal(node){
+        const rect = Hud.usableRect();
+        const half = node && Graph.planeHalfExtent(node);
+        if (!rect || !half) return;
+
+        const perPx = 2 * Graph.zoom.mag() / Svg.windowScale();
+        const c = Hud.toScreen(node.pos);
+        const box = {left: c.x - half.hw / perPx, right: c.x + half.hw / perPx,
+                     top: c.y - half.hh / perPx, bottom: c.y + half.hh / perPx};
+        const margin = 8;
+        const shift = (lo, hi, from, to)=>((hi - lo > to - from - 2 * margin || lo < from + margin)
+            ? (from + margin - lo) : (hi > to - margin ? (to - margin - hi) : 0));
+        const dx = shift(box.left, box.right, rect.left, rect.right);
+        const dy = shift(box.top, box.bottom, rect.top, rect.bottom);
+        if (!dx && !dy) return;
+
+        // The Graph moves the way the card has to, so the pan goes the other.
+        Graph.pan_set(new vec2(Graph.pan.x - dx * perPx, Graph.pan.y - dy * perPx));
+    }
+    // A point of the Plane on the page, as `Node.draw` places a card.
+    static toScreen(z){
+        const uv = fromZtoUV(z);
+        const box = svg.getBoundingClientRect();
+        const w = Math.min(box.width, box.height);
+        const off = (box.width < box.height ? box.right : box.bottom);
+        return {x: uv.x * w - (off - box.right) / 2, y: uv.y * w - (off - box.bottom) / 2};
+    }
+
     // Offset the pan so the graph is centred in the space the chrome leaves, rather than in
     // the viewport.
     //
@@ -510,3 +545,8 @@ class Hud {
         return !!el.closest?.('.dropdown-content, .modal-content, .CodeMirror');
     }
 }
+
+// The page never scrolls: the Graph is the whole window and has a pan of its own. A card past the
+// window's edge scrolled it when focused or typed into, taking the tool bar and the menu button
+// off screen with nothing but Home to bring them back (rv10, rv11).
+On.scroll(window, ()=>{ if (window.scrollX || window.scrollY) window.scrollTo(0, 0) });

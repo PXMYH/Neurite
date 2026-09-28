@@ -282,3 +282,30 @@ test('Link finds a note moved in its Archive, and a dismissal follows a rename',
     const pairs = (await rows(page)).map((r) => r.pair);
     assert.ok(!pairs.some((p) => /Retrieval/.test(p) && /Evals/.test(p)), 'the renamed pair came back: ' + JSON.stringify(pairs));
 });
+
+// The newest Node's uuid was handed out again once it was deleted, in the same session, and a
+// dismissal made with it passed to the next note (rv11). A uuid is given out once a session.
+test('a dismissal does not pass to a new note made after its note was deleted', async () => {
+    await setup(page);
+    await page.evaluate(async () => {
+        await window.createNote('Metrics', '---\ntags: [rag]\n---\nNumbers.');
+    });
+    await page.waitForTimeout(800);
+    await openPanel(page);
+    const row = page.locator('#customModal .proposal', { hasText: 'Metrics' }).first();
+    await row.locator('.proposal-dismiss').click();
+    await page.click('#customModal .close');
+    const uuids = await page.evaluate(async () => {
+        const metrics = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Metrics');
+        const gone = metrics.uuid;
+        deleteNodeAndItsZetText(metrics);
+        await new Promise((r) => setTimeout(r, 400));
+        await window.createNote('Chunking', '---\ntags: [rag]\n---\nPieces.');
+        await new Promise((r) => setTimeout(r, 800));
+        return { gone, made: Object.values(Graph.nodes).find((n) => n.getTitle() === 'Chunking').uuid };
+    });
+    assert.notEqual(uuids.made, uuids.gone, 'the deleted note\'s uuid was handed out again');
+    await openPanel(page);
+    const pairs = (await rows(page)).map((r) => r.pair);
+    assert.ok(pairs.some((p) => /Chunking/.test(p) && /Retrieval/.test(p)), 'the new note is not proposed: ' + JSON.stringify(pairs));
+});

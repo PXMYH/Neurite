@@ -204,7 +204,8 @@ class NodeView {
                 // Separation still applies -- two cards on the same spot is wrong wherever
                 // the reader is looking -- but the clamp only applies while they are still
                 // looking at the place the notes arrived in.
-                if (clamp) live.forEach( (node)=>{ if (!node.inRegion) Graph.keepInView(node) } );
+                // A note of a Region stays where it was made, and the view comes to it instead.
+                if (clamp) live.forEach( (node)=>{ if (node.inRegion) Hud.reveal(node); else Graph.keepInView(node) } );
             }
             // A pile too big for three bounded passes is finished off a frame at a time.
             if (!result.clear) Graph.relaxInBackground({bias: 0.85, favour});

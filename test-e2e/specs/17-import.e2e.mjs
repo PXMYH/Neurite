@@ -186,3 +186,18 @@ test('a note pasted with its frontmatter keeps it once, and its card starts at t
     assert.equal((got.pane.match(/description: A pasted note\./g) || []).length, 1, 'the frontmatter is in the Pane twice');
     assert.equal(got.card.trim(), 'Its body line.');
 });
+
+// Written into its card whole, a pasted note's trailing Refs were put back behind the card's
+// copy of them: the note held them twice (rv11).
+test('a pasted note with a trailing line of Refs holds it once', async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\na\n\n## Beta\nb\n'));
+    await page.waitForTimeout(600);
+    const got = await page.evaluate(async () => {
+        createNodeFromWindow('Refs Note', 'Body line.\n\n[[Alpha]] [[Beta]]');
+        await new Promise((r) => setTimeout(r, 600));
+        const node = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Refs Note');
+        return { note: node.getText(), card: node.contentEditableDiv.value };
+    });
+    assert.equal(got.note, 'Body line.\n\n[[Alpha]] [[Beta]]');
+    assert.equal(got.card.trim(), 'Body line.');
+});

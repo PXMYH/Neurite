@@ -138,28 +138,26 @@ class ZetRegions {
     // inside the disk while there is room, and just outside it once there is not. The path a
     // note otherwise walks from the last one made lands on a neighbour, and the separation
     // then pushed it out of a small Region altogether.
-    // `near`, where given, is the point the free cell is nearest instead: a double-click's.
+    // `near`, a double-click's point: the note goes there if it is free, else to the free cell
+    // nearest it with its middle in the disk. A block is packed a card's width apart, so a note
+    // put down on a gap between cards cannot be separated from them in place -- the cards hold
+    // still, and it was pushed back and forth between two of them for good (rv11).
     static freeSpot(region: Region, others: any[], near: {x: number, y: number} | null = null): any {
         if (!region.cw || !region.ch || !region.cols || !region.rows) return null;
 
         const cw = region.cw * region.s, ch = region.ch * region.s;
         const x0 = region.x - (region.cols - 1) / 2 * cw, y0 = region.y - (region.rows - 1) / 2 * ch;
         const free = (x: number, y: number)=>!others.some( (n)=>(Math.abs(n.pos.x - x) < cw * 0.9 && Math.abs(n.pos.y - y) < ch * 0.9) );
-        // A double-click on a free spot of the Region is where the note goes; on a card, the
-        // free cell nearest it, anywhere in the disk. Ranked by whole cells inside first, the
-        // block's far corner won over the cell under the pointer (rv10).
-        if (near) {
-            if (free(near.x, near.y)) return new vec2(near.x, near.y);
-        }
+        if (near && free(near.x, near.y)) return new vec2(near.x, near.y);
         const cells: {x: number, y: number, d: number, inside: boolean}[] = [];
         for (let row = -3; row < region.rows + 3; row++) for (let col = -3; col < region.cols + 3; col++) {
             const x = x0 + col * cw, y = y0 + row * ch;
             const d = Math.hypot(x - region.x, y - region.y);
-            cells.push({x, y, d: near ? Math.hypot(x - near.x, y - near.y) : d, inside: d + Math.hypot(cw, ch) / 2 <= region.r});
+            cells.push({x, y, d, inside: d + Math.hypot(cw, ch) / 2 <= region.r});
         }
         if (near) {
-            const inDisk = cells.filter( (c)=>(Math.hypot(c.x - region.x, c.y - region.y) <= region.r) );
-            const nearest = inDisk.sort( (a, b)=>(a.d - b.d) ).find( (c)=>free(c.x, c.y) );
+            const away = (c: {x: number, y: number})=>Math.hypot(c.x - near.x, c.y - near.y);
+            const nearest = cells.filter( (c)=>(c.d <= region.r && free(c.x, c.y)) ).sort( (a, b)=>(away(a) - away(b)) )[0];
             if (nearest) return new vec2(nearest.x, nearest.y);
         }
         cells.sort( (a, b)=>((Number(b.inside) - Number(a.inside)) || (a.d - b.d)) );
@@ -168,13 +166,17 @@ class ZetRegions {
     }
     // A Region takes in a note placed past its edge, so a full Region grows by its new notes
     // instead of losing them: a Region that held one note had no free cell inside it.
+    // Only for a note whose middle is past the edge: one made at the rim, its card over the
+    // edge, grew a Region with room inside by a fifth (rv11).
     static grow(paneId: string, pos: {x: number, y: number}): void {
         const region = ZetRegions.of(paneId);
         if (!region) return;
 
+        const d = Math.hypot(pos.x - region.x, pos.y - region.y);
+        if (d <= region.r) return;
+
         const half = Math.hypot((region.cw ?? 0) * region.s, (region.ch ?? 0) * region.s) / 2;
-        const reach = Math.hypot(pos.x - region.x, pos.y - region.y) + half;
-        if (reach > region.r) ZetRegions.set(paneId, {...region, r: reach});
+        ZetRegions.set(paneId, {...region, r: d + half});
     }
     // A point inside a Region, for a Region saved without its grid.
     static clampInto(region: Region, pos: {x: number, y: number}): any {

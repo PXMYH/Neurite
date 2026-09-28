@@ -332,3 +332,45 @@ test('a note double-clicked on a free spot of a Region lands there, and the page
     assert.equal(made.scrollY, 0, 'the page scrolled');
     assert.equal(made.scrollX, 0, 'the page scrolled');
 });
+
+// Put down on a gap between a Region's cards at a zoom to read by, the note cannot stay there --
+// the cards hold still -- and goes to the nearest free cell, which may be off screen; the view
+// comes to it, and typing into it scrolls nothing (rv11).
+test('a note double-clicked between a Region\'s cards is shown whole, clear of them, and typing scrolls nothing', async () => {
+    await importBundle(page);
+    await setMenu(page, false);
+    const paneId = await page.evaluate(() => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+        ZetRegions.frame(pane.paneId);
+        Hud.setZoomMag(Graph.zoom.mag() / 3);
+        return pane.paneId;
+    });
+    await page.waitForTimeout(500);
+    // Halfway between the block's two cards.
+    const gap = await page.evaluate((paneId) => {
+        const boxes = [];
+        window.zetPaneList.find((p) => p.paneId === paneId).processor.forEachNodeWrap((w) => boxes.push(w.node.view.div.getBoundingClientRect()));
+        const [a, b] = boxes.sort((p, q) => p.left - q.left);
+        return { x: (a.right + b.left) / 2, y: (a.top + a.bottom) / 2 };
+    }, paneId);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none'; });
+    await page.mouse.dblclick(gap.x, gap.y);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = ''; });
+    await page.waitForTimeout(900);
+    await page.keyboard.type('Typed here');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('And a second line');
+    await page.waitForTimeout(400);
+    const seen = await page.evaluate((paneId) => {
+        const cards = [];
+        window.zetPaneList.find((p) => p.paneId === paneId).processor.forEachNodeWrap((w) => cards.push({ t: w.node.getTitle(), b: w.node.view.div.getBoundingClientRect() }));
+        const made = cards.find((c) => !['Claude Code/Courses', 'Setup'].includes(c.t));
+        const overlaps = cards.filter((c) => c !== made && !(c.b.right <= made.b.left || c.b.left >= made.b.right || c.b.bottom <= made.b.top || c.b.top >= made.b.bottom)).map((c) => c.t);
+        return { on: made.b.left >= 0 && made.b.top >= 0 && made.b.right <= innerWidth && made.b.bottom <= innerHeight, overlaps, scrollX, scrollY,
+            toolbar: document.querySelector('.tool-bar').getBoundingClientRect().top };
+    }, paneId);
+    assert.ok(seen.on, 'the new card is not on screen');
+    assert.deepEqual(seen.overlaps, [], 'it overlaps a card of the Region');
+    assert.equal(seen.scrollY, 0, 'the page scrolled');
+    assert.ok(seen.toolbar >= 0, 'the tool bar left the screen');
+});
