@@ -388,6 +388,55 @@ class Node {
         Off.mouseup(window, this.stopFollowingMouse);
         OverlayHelper.remove(); // Clean up just in case
     }
+    // A finger or a pen on the header moves the card (#57), through Pointer Events: a touch
+    // sends no mousemove, and the browser took the drag as a pan and cancelled it. The mouse
+    // keeps `onMouseDown`, because moving it here would route around the `mousedown` guards
+    // that keep a press on a card's text from dragging the card. A tap is not taken here
+    // either: the browser sends it on as mouse events and a click once the finger lifts
+    // (measured in WebKit and Chromium), so it lands where a click always did -- the header's
+    // buttons, the Title's caret, the Link tool (#58). A press moves the card once it travels
+    // past `dragThreshold`, so a tap's wobble moves nothing, and the point pressed stays under
+    // the finger. Page coordinates for both ends, as `Graph.mousePos` is kept in them: the
+    // page may be scrolled while the keyboard is up.
+    onHeaderPointerDown = (e)=>{
+        if (e.pointerType === 'mouse' || !e.isPrimary) return;
+        if (e.target.closest('[role="button"]')) return;
+
+        const id = e.pointerId, from = {x: e.pageX, y: e.pageY};
+        let dragging = false;
+        const move = (e)=>{
+            if (e.pointerId !== id) return;
+            if (!dragging) {
+                if (Math.hypot(e.pageX - from.x, e.pageY - from.y) <= Node.dragThreshold) return;
+
+                dragging = true;
+                // As a mouse press becomes a drag (`_maybeAddGrabbing`): it moves this Node,
+                // and an Edge a press had started is discarded.
+                Node.prev = null;
+                Autopilot.stop();
+                this.mouseAnchor = Graph.xyToZ(from.x, from.y).minus(this.pos);
+                this.followingMouse = 1;
+                Graph.draggedNode = this;
+                Graph.movingNode = this;
+            }
+            Graph.mousePos_setXY(e.pageX, e.pageY);
+        };
+        const end = (e)=>{
+            if (e.pointerId !== id) return;
+
+            Off.pointermove(window, move);
+            Off.pointerup(window, end);
+            Off.pointercancel(window, end);
+            if (!dragging) return;
+
+            this.followingMouse = 0;
+            Graph.draggedNode = undefined;
+            Graph.movingNode = undefined;
+        };
+        On.pointermove(window, move);
+        On.pointerup(window, end);
+        On.pointercancel(window, end);
+    }
 
     disableEmbedPointerEvents(){this.setEmbedPointerEvents('none')};
     enableEmbedPointerEvents(){ this.setEmbedPointerEvents('auto')};

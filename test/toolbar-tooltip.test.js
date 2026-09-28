@@ -150,6 +150,6 @@ test('the chrome asks for its tooltip by attribute, not per element', ()=>{
     // the pill's classes instead would quietly limit it to the pill.
     assert.match(tooltipJs, /static selector = '\[data-tooltip\]'/,
         'hovertooltip.js no longer keys off data-tooltip');
-    assert.match(tooltipJs, /On\.mouseover\(document/,
+    assert.match(tooltipJs, /On\.pointerover\(document/,
         'hovertooltip.js no longer delegates from document, so late markup is uncovered');
 });

@@ -23,7 +23,7 @@ function loadNodeView(){
             querySelector: ()=>null,
             getElementsByClassName: ()=>[],
         },
-        On: {mousedown(){}},
+        On: {mousedown(){}, pointerdown(){}},
         Elem: {},
     });
     runInContext(

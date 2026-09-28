@@ -113,20 +113,28 @@ class HoverTooltip {
     }
 }
 
-// `mouseenter` does not bubble, so the delegated pair is `mouseover`/`mouseout`
+// `mouseenter` does not bubble, so the delegated pair is `pointerover`/`pointerout`
 // and the control is read out of the event target. Cheap: these fire when the
 // hovered element changes, not per pixel.
-On.mouseover(document, (e)=>{
+//
+// A mouse's only (#57). A finger has no hover: a tap is sent on as a `mouseover` just
+// before its click (measured in WebKit and Chromium), and on iOS a box made visible by
+// that `mouseover` is what WebKit's content-change observer takes for a hover menu, so it
+// holds the click back for a second tap. The pointer's type says which this one was;
+// `(hover: none)` describes the device's primary pointer, not this one.
+On.pointerover(document, (e)=>{
+    if (e.pointerType !== 'mouse') return;
+
     const target = e.target.closest?.(HoverTooltip.selector);
     if (target === HoverTooltip.target) return;
     if (target) HoverTooltip.show(target);
     else HoverTooltip.hide();
 });
 
-// Moving from a control onto anything else fires `mouseover` there and the handler
-// above hides the box. Leaving the window fires no `mouseover` at all, which is
+// Moving from a control onto anything else fires `pointerover` there and the handler
+// above hides the box. Leaving the window fires no `pointerover` at all, which is
 // what this is for.
-On.mouseout(document, (e)=>{
+On.pointerout(document, (e)=>{
     if (!HoverTooltip.target) return;
     if (e.relatedTarget) return;
     HoverTooltip.hide();

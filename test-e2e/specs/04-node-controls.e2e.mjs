@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote, nodeDiv } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, nodeDiv, isIPad } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -29,7 +29,7 @@ test('Ctrl+Shift+M collapses and Ctrl+Shift+F expands a selected card', async ()
 
 // Shift + scroll resizes a card: node-mode (Shift held) gates Node.onWheel, and
 // scrolling up zooms in (commit ed5b1a0), which multiplies node.scale up.
-test('Shift + scroll up grows a card scale', async () => {
+test('Shift + scroll up grows a card scale', { skip: isIPad && 'mobile WebKit takes no wheel' }, async () => {
     const uuid = await addNote(page, 'Resizable', '');
     const win = await nodeDiv(page, uuid);
 

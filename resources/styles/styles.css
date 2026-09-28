@@ -639,6 +639,10 @@ body {
     border-radius: calc(var(--ui-radius) - 1px) calc(var(--ui-radius) - 1px) 0 0;
     transition: border-color var(--ui-transition);
     z-index: 1;
+    /* A finger on the header drags the card (#57), so the browser must not take the drag
+       as a pan of the page -- it did, and cancelled the pointer. The header only: the
+       card's text still scrolls under a finger. The resize handle says the same. */
+    touch-action: none;
 }
 
 /* Replaces the accent underline the title input used to grow on focus. The rule is
@@ -1050,7 +1054,7 @@ textarea.title-input.title-input-stowed {
             cursor: nwse-resize;
             z-index: 4;
             pointer-events: auto;
-            /* Add this line */
+            touch-action: none;
         }
 
             /* Two parallel ticks along the corner, the short one nearest it — the
@@ -1097,6 +1101,28 @@ textarea.title-input.title-input-stowed {
 
             .resize-handle.dragging {
                 background-color: none;
+            }
+
+            /* A finger's target where the pointer is one (#57): the 15px grip, centred in a
+               29px square that hangs 7px past the card's corner, the ticks moved with it so
+               they do not move on screen. */
+            @media (pointer: coarse) {
+                .resize-handle {
+                    width: 29px;
+                    height: 29px;
+                    right: -7px;
+                    bottom: -7px;
+                }
+
+                .resize-handle::before {
+                    right: 13px;
+                    bottom: 8px;
+                }
+
+                .resize-handle::after {
+                    right: 9px;
+                    bottom: 7px;
+                }
             }
 
         iframe {

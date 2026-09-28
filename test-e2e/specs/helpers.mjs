@@ -60,10 +60,12 @@ export function launchBrowser() {
 // failed fetches whenever the optional localhost gateway (7070) or Ollama is not
 // running, which is an environment difference rather than a regression.
 // `setup(context)` runs before the first navigation: a route the page needs at boot -- to
-// hide a running gateway, say -- has to exist before the page asks.
-export async function openNeurite(browser, { setup } = {}) {
+// hide a running gateway, say -- has to exist before the page asks. `touch` gives Chromium a
+// touch screen and a coarse pointer at the iPad's size; the iPad already has both.
+export async function openNeurite(browser, { setup, touch } = {}) {
     const context = await browser.newContext(IPAD ? devices['iPad Pro 11 landscape']
-                                                  : { viewport: { width: 1600, height: 1000 } });
+                                           : touch ? { viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: true }
+                                                   : { viewport: { width: 1600, height: 1000 } });
     await context.route(CDN, fromCdnCache);
     if (setup) await setup(context);
     const page = await context.newPage();

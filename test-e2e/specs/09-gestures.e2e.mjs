@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, isIPad } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -12,7 +12,7 @@ afterEach(async () => { await context?.close(); });
 // canvas's own listener is bound to #svg_bg which a card is not inside, so zooming
 // silently did nothing wherever a note sat under the pointer -- and cards are drawn at
 // full scale now, so that is most of the screen.
-test('the wheel zooms the canvas when the pointer is over a note', async () => {
+test('the wheel zooms the canvas when the pointer is over a note', { skip: isIPad && 'mobile WebKit takes no wheel' }, async () => {
     const uuid = await addNote(page, 'Short', 'One line.');
     await page.waitForTimeout(600);
 
@@ -31,7 +31,7 @@ test('the wheel zooms the canvas when the pointer is over a note', async () => {
 
 // But a note with more text than fits keeps the wheel until it is read to the end, which
 // is what the wheel means inside a scrollable box.
-test('a note with overflowing text scrolls before the canvas zooms', async () => {
+test('a note with overflowing text scrolls before the canvas zooms', { skip: isIPad && 'mobile WebKit takes no wheel' }, async () => {
     const body = Array.from({ length: 60 }, (_, i) => `Sentence ${i} of a long note.`).join(' ');
     const uuid = await addNote(page, 'Long', body);
 
@@ -81,7 +81,7 @@ test('a note with overflowing text scrolls before the canvas zooms', async () =>
 });
 
 // The menu button's tooltip described the two file commands and then covered them.
-test("the menu's tooltip does not cover the menu", async () => {
+test("the menu's tooltip does not cover the menu", { skip: isIPad && 'a finger has no hover' }, async () => {
     await page.click('.menu-button');
     await page.waitForTimeout(350);
     await page.hover('.menu-button');

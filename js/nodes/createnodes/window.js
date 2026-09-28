@@ -249,6 +249,7 @@ class NodeView {
         this.model.wrapperDivs = document.getElementsByClassName('wrapperDiv');
 
         On.mousedown(this.headerContainer, NodeView.onHeaderContainerMouseDown);
+        On.pointerdown(this.headerContainer, this.model.onHeaderPointerDown);
         this.setWindowDivListeners();
         this.setTitleInputListeners();
         this.setResizeEventListeners();
@@ -287,6 +288,12 @@ class NodeView {
         this.titleInputWrapper = this.headerContainer?.querySelector('.title-input-wrapper') || null;
         this.titleInput = this.titleInputWrapper?.querySelector('.title-input') || null;
         this.titleInput = this.upgradeTitleInputElement();
+        // A Title is a name that every `[[Ref]]` to it has to spell exactly, so the iPad
+        // keyboard neither corrects it nor capitalises it (#57) -- as it does neither in the
+        // Pane, whose CodeMirror turns both off. Here rather than in `makeTitleInput`: a
+        // Saved Graph brings back the markup it was saved with, and this runs for both.
+        this.titleInput?.setAttribute('autocorrect', 'off');
+        this.titleInput?.setAttribute('autocapitalize', 'off');
         this.collapsedTitle = this.ensureCollapsedTitle();
         this.copyBtn = this.titleInputWrapper?.querySelector('.copy-button') || null;
         this.innerContent = div?.querySelector('.content') || null;
@@ -897,7 +904,7 @@ class NodeView {
                 });
         };
 
-        On.mousedown(this.resizeHandle, (e) => {
+        const startResize = (e) => {
             e.preventDefault();
             e.stopPropagation();
             // Use the helper to add an overlay
@@ -908,14 +915,30 @@ class NodeView {
             startWidth = parseInt(document.defaultView.getComputedStyle(windowDiv).width, 10);
             startHeight = parseInt(document.defaultView.getComputedStyle(windowDiv).height, 10);
             isMouseMoving = true; // Indicate that a resize is in progress
+        };
+        On.mousedown(this.resizeHandle, (e) => {
+            startResize(e);
             On.mousemove(document, handleMouseMove);
             On.mouseup(document, handleMouseUp);
+        });
+        // A finger or a pen (#57): a touch sends no mousemove while it moves. The same move
+        // handler, since a pointer event carries the same `pageX`, `pageY` and `buttons`.
+        On.pointerdown(this.resizeHandle, (e) => {
+            if (e.pointerType === 'mouse') return;
+
+            startResize(e);
+            On.pointermove(document, handleMouseMove);
+            On.pointerup(document, handleMouseUp);
+            On.pointercancel(document, handleMouseUp);
         });
 
         const handleMouseUp = () => {
             isMouseMoving = false;
             Off.mousemove(document, handleMouseMove);
             Off.mouseup(document, handleMouseUp);
+            Off.pointermove(document, handleMouseMove);
+            Off.pointerup(document, handleMouseUp);
+            Off.pointercancel(document, handleMouseUp);
             // Remove the overlay via the helper
             OverlayHelper.remove();
         };
