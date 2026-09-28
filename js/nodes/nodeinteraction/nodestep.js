@@ -128,9 +128,17 @@ class NodeSimulation {
         return dt;
     }
 
+    // Every card is measured before any is moved. A box read after another card's style was
+    // written makes the engine lay the page out again before it can answer, and each card read
+    // its box between two writes: a frame with a hundred new cards laid the page out two
+    // hundred times, which in WebKit stalled it for 1.6 to 2.4 s (0.8 s measured this way).
     updateNodes(dt) {
         dt *= (1 - nodeMode_v) ** 5;
-        Graph.forEachNode(this.updateForThisDt, dt);
+        const nodes = [];
+        Graph.forEachNode(Array.prototype.push, nodes);
+        const svgbb = svg.getBoundingClientRect();
+        const boxes = nodes.map(Node.boxOf);
+        nodes.forEach( (node, i)=> node.step(dt, boxes[i], svgbb) );
         return this;
     }
     updateForThisDt(item){

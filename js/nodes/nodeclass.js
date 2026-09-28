@@ -31,6 +31,9 @@ class Node {
     // can still start one; past it the press is moving the Node instead.
     static dragThreshold = 10;
 
+    // A card's box on screen, for `draw` (`NodeSimulation.updateNodes` reads every one first).
+    static boxOf(node){ return node.content.getBoundingClientRect() }
+
     anchor = new vec2(0, 0);
     anchorForce = 0;
     createdAt = new Date().toISOString();
@@ -141,11 +144,14 @@ class Node {
         return bb && bb.width > 0 && bb.height > 0;
     }
 
-    draw() {
+    // `box` is the card's own box, when the caller measured it before this frame wrote anything
+    // (`NodeSimulation.updateNodes`); it was measured at the scale the card was last drawn at.
+    // Without it the box is read here, after the transform below, at this frame's scale.
+    draw(box = null, svgbb = svg.getBoundingClientRect()) {
         const e = this.content;
         const s = this.intrinsicScale * this.scale * (Graph.zoom.mag2() ** -settings.zoomContentExp);
+        const measuredAt = box ? (parseFloat(e.style.transform.slice('scale('.length)) || s) : s;
 
-        const svgbb = svg.getBoundingClientRect();
         e.style.position = 'absolute';
         e.style.transform = 'scale(' + s + ',' + s + ')';
         // The selection ring divides by this to stay 2 screen px at any zoom (foundation.css).
@@ -164,8 +170,8 @@ class Node {
         p.x = w * p.x - (off - svgbb.right) / 2;
         p.y = w * p.y - (off - svgbb.bottom) / 2;
 
-        const bb = e.getBoundingClientRect();
-        p = p.minus(new vec2(bb.width, bb.height).scale(0.5 / s));
+        const bb = box ?? e.getBoundingClientRect();
+        p = p.minus(new vec2(bb.width, bb.height).scale(0.5 / measuredAt));
         e.style.left = p.x + 'px';
         e.style.top = p.y + 'px';
 
@@ -175,13 +181,13 @@ class Node {
         //e.style['text-align']= 'center';
     }
 
-    step(dt) {
+    step(dt, box, svgbb) {
         dt = this.clampDt(dt);
         this.updatePosition(dt);
         this.applyMandelbrotForce();
         this.applyAnchorForce();
         this.handleMouseInteraction(dt);
-        this.draw();
+        this.draw(box, svgbb);
         // Returns immediately unless this card's links changed since the last
         // frame. See linkstrip.js for why the row is polled and not pushed to.
         LinkStrip.refresh(this.view);
