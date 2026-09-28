@@ -399,86 +399,67 @@ On.touchmove(svg, (e) => {
             break;
         }
 
-        case 2: {
-            const pts = [...touches.values()];
-            const p1p = toS(new vec2(pts[0].prev.clientX, pts[0].prev.clientY));
-            const p2p = toS(new vec2(pts[1].prev.clientX, pts[1].prev.clientY));
-            const p1n = toS(new vec2(pts[0].now.clientX, pts[0].now.clientY));
-            const p2n = toS(new vec2(pts[1].now.clientX, pts[1].now.clientY));
-
-            const midpointPrev = p1p.plus(p2p).scale(0.5);
-            const midpointNow = p1n.plus(p2n).scale(0.5);
-
-            const zPrev = Graph.vecToZ(midpointPrev);
-            const zNow = Graph.vecToZ(midpointNow);
-            const zc = zNow.minus(Graph.pan); // relative center
-
-            const zoomFactor = p2n.minus(p1n).mag() / p2p.minus(p1p).mag();
-
-            const anglePrev = Math.atan2(p2p.y - p1p.y, p2p.x - p1p.x);
-            const angleNow = Math.atan2(p2n.y - p1n.y, p2n.x - p1n.x);
-            const rotationAngle = angleNow - anglePrev;
-            const deltaRotation = Graph.applyRotationDelta(rotationAngle);
-
-            const deltaZoom = new vec2(zoomFactor, 0);
-            Graph.zoom = Graph.zoom.cmult(deltaRotation).scale(zoomFactor);
-            Graph.pan = Graph.pan
-                .plus(zc.cmult(new vec2(1, 0).minus(deltaRotation.cmult(deltaZoom))))
-                .minus(zNow.minus(zPrev));
-
-            e.preventDefault();
-            e.stopPropagation();
-            break;
-        }
-
         default:
             break;
     }
 }, false);
 
+// One pinch (#55), from the two touches on the Fractal as Pointer Events, and absolute from where
+// they came down: the view that keeps both points of the Plane under both fingers, from the view
+// the pinch started with. There were two, and both ran on an iPad. The touch path read its pivot
+// in the wrong units, which flung it, and grew |zoom| as the fingers spread, which is zooming
+// out; Safari's `gesturechange` pivoted on `pageX`/`pageY`, which WebKit leaves at 0.
+//
+// A point of the screen in the Plane's units before the zoom and pan: `xyToZ` without them.
+function screenUnits(x, y){ return Graph.xyToZ(x, y).minus(Graph.pan).cdiv(Graph.zoom) }
+// The zoom and pan that keep the points of the Plane under `a0` and `b0` (at `zoom0`, `pan0`)
+// under `a1` and `b1`: the zoom is the ratio of the spans, turn and all, and the pan keeps the
+// midpoint's point where it was. Null for two fingers on one spot.
+function pinchView(zoom0, pan0, a0, b0, a1, b1){
+    const span1 = a1.minus(b1);
+    if (!(span1.mag() > 0)) return null;
 
+    const zoom = zoom0.cmult(a0.minus(b0)).cdiv(span1);
+    const m0 = a0.plus(b0).scale(0.5), m1 = a1.plus(b1).scale(0.5);
+    const pan = m0.cmult(zoom0).plus(pan0).minus(m1.cmult(zoom));
+    return {zoom, pan};
+}
+const pinch = {pointers: new Map(), start: null};
+On.pointerdown(svg, (e)=>{
+    if (e.pointerType !== 'touch') return;
 
-var gestureStartParams = {
-    rotation: 0,
-    x: 0,
-    y: 0,
-    scale: 0,
-    zoom: new vec2(0, 0),
-    pan: new vec2(0, 0)
+    pinch.pointers.set(e.pointerId, screenUnits(e.clientX, e.clientY));
+    if (pinch.pointers.size !== 2) return;
+
+    const [a, b] = [...pinch.pointers.values()];
+    pinch.start = {a, b, zoom: Graph.zoom, pan: Graph.pan};
+    Autopilot.stop();
+});
+On.pointermove(svg, (e)=>{
+    if (e.pointerType !== 'touch' || !pinch.pointers.has(e.pointerId)) return;
+
+    pinch.pointers.set(e.pointerId, screenUnits(e.clientX, e.clientY));
+    const start = pinch.start;
+    if (!start || pinch.pointers.size !== 2) return;
+
+    const [a, b] = [...pinch.pointers.values()];
+    const view = pinchView(start.zoom, start.pan, start.a, start.b, a, b);
+    if (!view) return;
+
+    // As much of the Fractal redrawn as the zoom changed this move, as the wheel does.
+    regenAmount += Math.abs(Math.log(view.zoom.mag() / Graph.zoom.mag())) * settings.maxLines;
+    Graph.zoom_set(view.zoom);
+    Graph.pan_set(view.pan);
+    App.interface.coordsLive = true;
+});
+const pinchEnds = (e)=>{
+    pinch.pointers.delete(e.pointerId);
+    if (pinch.pointers.size < 2) pinch.start = null;
 };
-On.gesturestart(window, (e)=>{
-    e.preventDefault();
-    Logger.debug(e);
-    gestureStartParams.rotation = e.rotation;
-    gestureStartParams.scale = e.scale;
-    gestureStartParams.x = e.pageX;
-    gestureStartParams.y = e.pageY;
-    gestureStartParams.zoom = Graph.zoom;
-    gestureStartParams.pan = Graph.pan;
-});
-On.gesturechange(window, (e)=>{
-    e.preventDefault();
-    Logger.debug(e);
-    let d_theta = e.rotation - gestureStartParams.rotation;
-    let d_scale = e.scale;
-    const r = -e.rotation * settings.gestureRotateSpeed;
-    const o = new vec2(Math.cos(r), Math.sin(r));
-    Graph.pan_set(gestureStartParams.pan)
-        .zoom_set(gestureStartParams.zoom.cmult(o));
+On.pointerup(svg, pinchEnds);
+On.pointercancel(svg, pinchEnds);
 
-    const r_center = Graph.xyToZ(e.pageX, e.pageY);
-    let s = 0;
-    if (e.scale !== 0) {
-        let s = 1 / e.scale;
-        Graph.zoom_scaleBy(s);
-        regenAmount += Math.abs(Math.log(s)) * settings.maxLines;
-    }
-    let dest = r_center;
-    let amount = s;
-    const dp = r_center.minus(gestureStartParams.pan);
-    Graph.pan_set(gestureStartParams.pan.plus(dp.minus(
-                    dp.cmult(Graph.zoom.cdiv(gestureStartParams.zoom)))));
-    //Graph.pan_set(dest.scale(1-amount).plus(gestureStartParams.pan.scale(amount)));
-
-});
+// Safari's own pinch events are only kept from zooming the page.
+On.gesturestart(window, Event.preventDefault);
+On.gesturechange(window, Event.preventDefault);
 On.gestureend(window, Event.preventDefault);

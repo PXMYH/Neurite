@@ -109,7 +109,7 @@ class On {
     'input', 'keydown', 'keypress', 'keyup', 'load', 'loadedmetadata',
     'message', 'mousedown', 'mouseenter', 'mouseleave',
     'mousemove', 'mouseout', 'mouseover', 'mouseup',
-    'paste', 'resize', 'scroll',
+    'paste', 'pointercancel', 'pointerdown', 'pointermove', 'pointerup', 'resize', 'scroll',
     'touchcancel', 'touchend', 'touchmove', 'touchstart', 'transitionend',
     'visibilitychange', 'wheel'
 ].forEach( (eName)=>{

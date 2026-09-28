@@ -871,3 +871,9 @@ body.connect-mode .window textarea {
 .modal-overlay-content {
     background-color: rgba(51, 51, 51, 0.3);
 }
+
+/* The Fractal takes every touch itself -- one finger pans it and two pinch it (#55) -- and a
+   browser left to pan or zoom the page would cancel the pinch's pointers part way through. */
+#svg_bg {
+    touch-action: none;
+}
