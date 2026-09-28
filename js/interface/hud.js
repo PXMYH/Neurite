@@ -574,3 +574,21 @@ On.blur(document, ()=>{
         Graph.mousePos_setXY(Graph.mousePos.x - sx, Graph.mousePos.y - sy);
     });
 }, true);
+
+// The height an on-screen keyboard leaves (#56). The keyboard covers the page rather than
+// resizing it, so neither `vh` nor `dvh` moves, and a Pane as tall as the window kept its last
+// lines -- and the caret typing them -- under the keys. `visualViewport` is the part on screen:
+// the menu, the Pane and the dialogs are clamped to it (`--visible-height`), and the Pane's
+// CodeMirror, which measures its box only when told to, is told, with the caret kept in sight.
+if (window.visualViewport) {
+    const keepVisibleHeight = ()=>{
+        document.documentElement.style.setProperty('--visible-height', visualViewport.height + 'px');
+
+        const cm = window.currentActiveZettelkastenMirror;
+        if (!cm) return;
+        cm.refresh();
+        if (cm.hasFocus()) cm.scrollIntoView(null, 24);
+    };
+    On.resize(visualViewport, keepVisibleHeight);
+    keepVisibleHeight();
+}

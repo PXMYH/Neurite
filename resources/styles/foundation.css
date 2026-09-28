@@ -590,7 +590,7 @@ body.connect-mode .window textarea {
 }
 
 .proposals-scroll {
-    max-height: calc(100dvh - 220px);
+    max-height: calc(var(--visible-height, 100dvh) - 220px);
     overflow-y: auto;
 }
 
@@ -848,7 +848,7 @@ body.connect-mode .window textarea {
    pill's lower edge (the pill ends at 68px), including the Connect and Search tools. */
 .modal-content {
     top: 84px;
-    max-height: calc(100dvh - 100px);
+    max-height: calc(var(--visible-height, 100dvh) - 100px);
 }
 
 /* A light-theme leftover that was forced into the dark editor with !important at

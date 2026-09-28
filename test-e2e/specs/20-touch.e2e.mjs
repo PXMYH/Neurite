@@ -235,3 +235,62 @@ test('"+ link" and the chip\'s × make and cut an Edge by touch', async () => {
     await page.waitForTimeout(400);
     assert.deepEqual(await refsIn(page), []);
 });
+
+// The on-screen keyboard (#56). It covers the page rather than resizing it, so `dvh` does not
+// move, and a Pane as tall as the window kept its last lines -- and the caret typing them --
+// under the keys. The keyboard is simulated the way iOS reports it: `visualViewport.height`
+// shrinks and the visual viewport sends a resize.
+const keyboardUpTo = (page, height) => page.evaluate((h) => {
+    if (h === null) delete visualViewport.height;
+    else Object.defineProperty(visualViewport, 'height', { configurable: true, get: () => h });
+    visualViewport.dispatchEvent(new Event('resize'));
+}, height);
+
+test('the Pane, the menu and the caret stay above an on-screen keyboard', async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await page.evaluate(async () => {
+        window.currentActiveZettelkastenMirror.setValue(
+            Array.from({ length: 40 }, (_, i) => `## Note ${i + 1}\nLine ${i + 1}.\n`).join('\n'));
+        await new Promise((r) => setTimeout(r, 1500));
+        Hud.openNotes();
+        await new Promise((r) => setTimeout(r, 600));
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.focus();
+        cm.setCursor(cm.lastLine(), 0);
+    });
+    const bottoms = () => page.evaluate(() => ({
+        pane: App.zetPanes.container.getBoundingClientRect().bottom,
+        menu: document.querySelector('.dropdown-content').getBoundingClientRect().bottom,
+        caret: window.currentActiveZettelkastenMirror.cursorCoords(null, 'window').bottom,
+    }));
+    const open = await bottoms();
+    const keys = Math.round(open.pane - 150);   // a keyboard's top edge, 150px above the Pane's bottom
+    assert.ok(open.caret > keys, 'the caret is not where the keyboard will be, so this proves nothing');
+
+    await keyboardUpTo(page, keys);
+    await page.waitForTimeout(300);
+    const up = await bottoms();
+    for (const [what, y] of Object.entries(up)) {
+        assert.ok(y <= keys, `the ${what} ends at ${Math.round(y)}, under a keyboard whose top is at ${keys}`);
+    }
+
+    await keyboardUpTo(page, null);
+    await page.waitForTimeout(300);
+    assert.equal(Math.round((await bottoms()).pane), Math.round(open.pane), 'the Pane did not come back when the keyboard went');
+});
+
+test('a dialog stays above an on-screen keyboard', async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).find((x) => x.getTitle() === 'Alpha');
+        n.view.div.querySelector('.link-add').click();
+    });
+    await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 3000 });
+    const open = await page.evaluate(() => document.querySelector('.modal-content').getBoundingClientRect().bottom);
+    const keys = Math.round(open - 100);
+    await keyboardUpTo(page, keys);
+    await page.waitForTimeout(300);
+    const bottom = await page.evaluate(() => document.querySelector('.modal-content').getBoundingClientRect().bottom);
+    assert.ok(bottom <= keys, `the dialog ends at ${Math.round(bottom)}, under a keyboard whose top is at ${keys}`);
+});

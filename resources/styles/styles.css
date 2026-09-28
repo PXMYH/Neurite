@@ -1666,7 +1666,7 @@ textarea.title-input.title-input-stowed {
        that safe: the overflow lands at the bottom edge, where this element's own
        scrollbar can reach it. Anchored to the bottom instead, a panel that
        outgrew the window ran off the top, where nothing could. */
-    max-height: calc(100dvh - 88px);
+    max-height: calc(var(--visible-height, 100dvh) - 88px);
     overflow-y: auto;
     /* One width for the list and every panel, and never wider than the window leaves
        room for (the 16px gutter each side). */
@@ -2879,7 +2879,7 @@ input[type="checkbox"] {
        `ZetPanes.trackBarHeight`, as they wrap with the panel's width), 37px from the pane
        to the menu's bottom edge, and 16px to spare. A pane made 700px tall kept its height
        in a 600px window, its handle at y=814. */
-    max-height: calc(100dvh - 177px - var(--archive-bar-space, 77px));
+    max-height: calc(var(--visible-height, 100dvh) - 177px - var(--archive-bar-space, 77px));
     height: 60vh;
     /* The panel's width (#32), which the side handle sets for every panel. */
     width: 100%;
