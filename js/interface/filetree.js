@@ -52,7 +52,12 @@ class Path {
 class FileTree {
     constructor(containerElement, filePathInput, filePath = '/', shouldSavePath = false, onPathChangeCallback = null) {
         if (!(containerElement instanceof HTMLElement)) throw new Error("Container must be a valid HTMLElement");
-        if (!(filePathInput instanceof HTMLInputElement)) throw new Error("File path input must be an input element");
+        // A File Tree Node's path is its Title, and a Title is a textarea now: an input here
+        // only, and every File Tree Node -- made, or restored from a Saved Graph -- threw here
+        // half built.
+        if (!(filePathInput instanceof HTMLInputElement || filePathInput instanceof HTMLTextAreaElement)) {
+            throw new Error("File path input must be an input or a textarea");
+        }
 
         this.container = containerElement;
         this.filePathInput = filePathInput;
@@ -62,7 +67,10 @@ class FileTree {
         this.onPathChangeCallback = onPathChangeCallback;
 
         this.filePathInput.value = this.currentPath;
-        On.keypress(this.filePathInput, this.handlePathInput.bind(this));
+        // `change`, which an input sends on Enter and both send when left edited. A Title
+        // takes Enter as done -- it blurs, and its keydown is cancelled -- so a keypress for
+        // Enter never reached a File Tree Node's path.
+        On.change(this.filePathInput, this.handlePathInput.bind(this));
 
         this.init(this.currentPath);
     }
@@ -83,22 +91,20 @@ class FileTree {
         await this.loadDirectory(path, this.container);
     }
 
-    // Handle the 'Enter' key event on the file path input
+    // A path typed into the file path input, once it is committed (`change`)
     handlePathInput(event) {
-        if (event.key === 'Enter') {
-            const newPath = this.filePathInput.value.trim();
-            if (!newPath) {
-                Logger.info("Invalid path");
-                return;
-            }
+        const newPath = this.filePathInput.value.trim();
+        if (!newPath) {
+            Logger.info("Invalid path");
+            return;
+        }
 
-            this.container.innerHTML = '';
-            this.init(newPath); // load the new directory
+        this.container.innerHTML = '';
+        this.init(newPath); // load the new directory
 
-            // Trigger the callback to update the node's filePath
-            if (this.onPathChangeCallback) {
-                this.onPathChangeCallback(newPath);
-            }
+        // Trigger the callback to update the node's filePath
+        if (this.onPathChangeCallback) {
+            this.onPathChangeCallback(newPath);
         }
     }
 
