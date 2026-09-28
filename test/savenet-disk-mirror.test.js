@@ -40,16 +40,21 @@ function makeStoredClass(tables){
 // Stands in for a FileSystemFileHandle. `permission` is what the browser would
 // answer after a restart: 'granted' when the user allowed the file for every
 // visit, 'prompt' when the grant lapsed and only a click can renew it.
+// `lastModified` moves on every write, as a file's does; `changeElsewhere()` moves it the way
+// another device writing the same file through iCloud Drive would.
 function makeFileHandle({permission = 'granted', failWrites = false} = {}){
     const writes = [];
+    let lastModified = 1000;
     return {
         writes,
+        changeElsewhere(){ lastModified += 7 },
         queryPermission: ()=> Promise.resolve(permission),
+        getFile: ()=> Promise.resolve({ name: 'Graph.neurite', lastModified }),
         createWritable(){
             if (failWrites) return Promise.reject(new Error("disk is read-only"));
             return Promise.resolve({
                 write(blob){ writes.push(blob); return Promise.resolve() },
-                close(){ return Promise.resolve() }
+                close(){ lastModified += 1; return Promise.resolve() }
             });
         }
     };
@@ -60,6 +65,7 @@ function load({showSaveFilePicker} = {}){
     const errors = [];
     const sandbox = createContext({
         Blob,
+        crypto,
         View: {},
         window: (showSaveFilePicker ? {showSaveFilePicker} : {}),
         Stored: makeStoredClass(tables),
@@ -222,4 +228,61 @@ test('an idle tab writes nothing: the same graph is not saved twice', async ()=>
 test('the mirror stays off in a browser with no file picker', ()=>{
     const { DiskMirror } = load(); // no window.showSaveFilePicker: Safari, and all of iOS
     assert.equal(DiskMirror.isSupported, false);
+});
+
+// One writer at a time (#60). The Mac mirrors every autosave to a file in iCloud Drive, and the
+// iPad saves over the same file; a file whose `lastModified` moved since this browser last
+// wrote it holds the other device's work, and the next autosave wrote over it in silence.
+test('a file another device changed is not written over, and the mirror says why it stopped', async ()=>{
+    const handle = makeFileHandle();
+    const { GraphsKeeper, tables } = load({showSaveFilePicker: ()=>Promise.resolve(handle)});
+    const Stored = makeStoredClass(tables);
+    const keeper = new GraphsKeeper();
+    await keeper.disk.useState(new Stored('state', 'GraphsView'));
+    const stops = [];
+    keeper.disk.onStopped = (why)=> stops.push(why);
+    await keeper.disk.pick();
+    const meta = metaFor("Graph 1");
+
+    await keeper.saveMetaAndData(meta, '<div>one</div>');
+    assert.equal(handle.writes.length, 1);
+    assert.equal(typeof meta.savedToFileAt, 'number', 'nothing records when the file was written');
+
+    handle.changeElsewhere();
+    await keeper.saveMetaAndData(meta, '<div>two</div>');
+    assert.equal(handle.writes.length, 1, "the other device's file was written over");
+    assert.equal(JSON.stringify(stops), JSON.stringify([{reason: 'changed', name: 'Graph.neurite'}]));
+    assert.equal(keeper.disk.isActive, false);
+    assert.equal(tables['state/GraphsView'].has('disk-file-handle'), false,
+        'the next visit would reconnect the file and write over it then');
+});
+
+test('what this browser last wrote is remembered across a reload', async ()=>{
+    // The case that matters most: the Mac is closed while the iPad works, and on the next
+    // visit the mirror reconnects the file with no click at all.
+    const handle = makeFileHandle();
+    const { GraphsKeeper, tables } = load({showSaveFilePicker: ()=>Promise.resolve(handle)});
+    const Stored = makeStoredClass(tables);
+    const keeper = new GraphsKeeper();
+    await keeper.disk.useState(new Stored('state', 'GraphsView'));
+    await keeper.disk.pick();
+    await keeper.saveMetaAndData(metaFor("Graph 1"), '<div>one</div>');
+
+    handle.changeElsewhere();
+    const next = new GraphsKeeper();
+    assert.equal(await next.disk.useState(new Stored('state', 'GraphsView')), true, 'the file did not reconnect');
+    await next.saveMetaAndData(metaFor("Graph 1"), '<div>two</div>');
+    assert.equal(handle.writes.length, 1, "after a reload the other device's file was written over");
+});
+
+test('a file just picked is the reader\'s to write over', async ()=>{
+    // Picking is the one explicit act: the file chosen may be any file, and writing it is
+    // what the reader asked for.
+    const handle = makeFileHandle();
+    handle.changeElsewhere();
+    const { GraphsKeeper } = load({showSaveFilePicker: ()=>Promise.resolve(handle)});
+    const keeper = new GraphsKeeper();
+    await keeper.disk.pick();
+    await keeper.saveMetaAndData(metaFor("Graph 1"), '<div>one</div>');
+    assert.equal(handle.writes.length, 1);
 });

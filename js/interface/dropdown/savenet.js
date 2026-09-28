@@ -2,6 +2,28 @@
     return new Blob([json], {type: 'application/json'})
 }
 
+// The kind of device a save was written on, in the words a warning uses (#60): "saved on the
+// iPad". iPadOS Safari calls itself a Mac, so a Mac with a touch screen is taken for one.
+function deviceKind(){
+    const nav = globalThis.navigator;
+    const ua = nav?.userAgent ?? '';
+    if (/iPhone/.test(ua)) return 'iPhone';
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && nav.maxTouchPoints > 1)) return 'iPad';
+    if (/Macintosh/.test(ua)) return 'Mac';
+    if (/Android/.test(ua)) return 'Android device';
+    if (/Windows/.test(ua)) return 'Windows computer';
+    if (/Linux/.test(ua)) return 'Linux computer';
+    return 'another device';
+}
+
+// Which Graph a save is a copy of, across devices (#60). A graphId is this browser's own
+// numbering -- the first graph on every device is `1.graph` -- so a file carries this instead.
+// `getRandomValues` rather than `randomUUID`, which a LAN address over plain HTTP does not have.
+function lineageId(){
+    return Array.from(crypto.getRandomValues(new Uint8Array(16)),
+                      (b)=> b.toString(16).padStart(2, '0')).join('');
+}
+
 // A web page cannot write to disk on its own. The user has to name the file
 // once, in a real click, and only then may the page keep writing to it. Chrome
 // remembers that grant across restarts, so after the one click every autosave
@@ -39,6 +61,11 @@ class DiskMirror {
     #handle = null;
     #state = null;
     #writing = null;
+    // The file's `lastModified` just after this browser last wrote it, kept with the handle
+    // (#60). Null for a file just picked, which the reader chose to write over.
+    #modified = null;
+    // Told when mirroring stops, with why: `{reason: 'changed', name}` or `{reason: 'failed'}`.
+    onStopped = ()=>{};
 
     get isActive(){ return this.#handle !== null }
 
@@ -46,7 +73,10 @@ class DiskMirror {
         this.#state = state;
         if (!DiskMirror.isSupported) return Promise.resolve(false);
 
-        return state.load('disk-file-handle').then(this.#adoptStored);
+        return state.load('disk-file-modified')
+            .then( (modified)=>{ this.#modified = modified ?? null } )
+            .then(state.load.bind(state, 'disk-file-handle'))
+            .then(this.#adoptStored);
     }
     #adoptStored = (handle)=>{
         if (!handle) return false;
@@ -87,6 +117,8 @@ class DiskMirror {
     }
     #adoptPicked = (handle)=>{
         this.#handle = handle;
+        this.#modified = null;
+        this.#state?.delete('disk-file-modified');
         this.#state?.save('disk-file-handle', handle)
             .catch(Logger.warn.bind(Logger, "Could not remember the disk file:"));
         return true;
@@ -98,29 +130,59 @@ class DiskMirror {
 
     forget(){
         this.#handle = null;
+        this.#state?.delete('disk-file-modified');
         return this.#state?.delete('disk-file-handle');
     }
 
+    // Settles true once the blob is in the file, false when it was not written.
     write(blob){
         const handle = this.#handle;
-        if (!handle) return Promise.resolve();
+        if (!handle) return Promise.resolve(false);
 
         // Autosave runs on a timer, so a slow disk must not leave two writes
         // holding the same file open. Queue them behind each other instead.
         this.#writing = Promise.resolve(this.#writing)
-            .then(this.#writeThrough.bind(this, handle, blob))
+            .then(this.#writeUnlessChanged.bind(this, handle, blob))
             .catch(this.#onWriteFailed);
         return this.#writing;
+    }
+    // One writer at a time (#60). A file in iCloud Drive is written from the iPad too, and one
+    // changed there since this browser last wrote it is the other device's work: the next
+    // autosave wrote over it, every eight seconds, and said nothing. So it is left alone, and
+    // the mirror stops until the reader picks a file again.
+    #writeUnlessChanged(handle, blob){
+        if (handle !== this.#handle) return false;
+
+        return handle.getFile().then( (file)=>{
+            if (this.#modified !== null && file.lastModified !== this.#modified) {
+                return this.#stop({reason: 'changed', name: file.name});
+            }
+            return this.#writeThrough(handle, blob)
+                .then( ()=>handle.getFile() )
+                .then(this.#noteWritten);
+        });
     }
     #writeThrough(handle, blob){
         return handle.createWritable()
             .then( (stream)=>stream.write(blob).then(stream.close.bind(stream)) )
+    }
+    #noteWritten = (file)=>{
+        this.#modified = file.lastModified;
+        this.#state?.save('disk-file-modified', file.lastModified);
+        return true;
+    }
+    #stop(why){
+        this.forget();
+        this.onStopped(why);
+        return false;
     }
     #onWriteFailed = (err)=>{
         // Keeping the handle would mean repeating the same failure every eight
         // seconds. Drop it, say so once, and let the button reconnect.
         Logger.err("Failed to mirror the save to disk:", err);
         this.#handle = null;
+        this.onStopped({reason: 'failed'});
+        return false;
     }
 }
 
@@ -176,6 +238,9 @@ class GraphsKeeper {
         if (this.#lastWritten.get(meta.graphId) === data) return Promise.resolve();
 
         meta.lastUpdated = new Date().toLocaleString();
+        // `lastUpdated` is for reading and does not sort; this does (#60).
+        meta.updatedAt = Date.now();
+        meta.uuid ??= lineageId();
         meta.revisions += 1;
         meta.size = new Blob([data]).size;
         return this.#data.save(meta.graphId, data)
@@ -192,13 +257,32 @@ class GraphsKeeper {
         // Mirror the same bundle the drop-to-import path reads, so the file on
         // disk is a whole graph -- images and media included -- rather than
         // markup that points at blobs left behind in IndexedDB.
-        return (new GraphExporter(meta, this)).export().then(this.#writeToDisk);
+        return (new GraphExporter(meta, this)).export()
+            .then(this.#writeToDisk)
+            .then( (written)=>written && this.markSavedToFile(meta) );
     }
     #writeToDisk = (blob)=>this.disk.write(blob);
+    // When the Graph was last written to a file, which the Save row shows (#11): the file is
+    // the copy that survives, so its age is what a reader needs to know.
+    markSavedToFile(meta){
+        meta.savedToFileAt = Date.now();
+        return this.saveMeta(meta);
+    }
 }
 
+// A `.neurite` file (#61): a JSON header, a NUL, then every image and media file of the Graph
+// back to back, each at the offset the header gives it. "Complete" is what this writes: the
+// Graph's markup, the Panes' text and every blob it points at.
+//
+// `v` is the format's version. A file with none is version 0, the same shape without `meta`,
+// and still reads. `meta` says which Graph the file is a copy of and how far along -- so a file
+// opened on another device can say it is older than what is on screen (#60) -- and where it
+// was written.
 class GraphExporter {
+    static version = 1;
     #out = {
+        v: GraphExporter.version,
+        meta: null,
         data: '',
         blobMeta: {},
         offsets: {}
@@ -206,6 +290,12 @@ class GraphExporter {
     constructor(meta, stored){
         this.meta = meta;
         this.stored = stored;
+        this.#out.meta = {
+            uuid: meta.uuid ?? null,
+            revisions: meta.revisions ?? 0,
+            updatedAt: meta.updatedAt ?? null,
+            device: deviceKind()
+        };
     }
     export(){
         return this.#gatherData()
@@ -247,6 +337,9 @@ class GraphImporter {
     #offsets = {};
 
     data = '';
+    // The file's format version (#61) and its `meta` block, if it has one.
+    version = 0;
+    meta = null;
     saveNodeItsBlob = null;
     blobForNode(node){
         const blobId = node.blob;
@@ -273,25 +366,29 @@ class GraphImporter {
             .then(this.#handleBuffer)
             .then(this.#handleJson)
     }
+    // The header ends at the first NUL. A file with none -- an old `.txt` save, or anything
+    // else -- is all header, and reads as text below. The scan used to step past the end of
+    // such a file and throw, so Open… did nothing at all.
     #handleBuffer = (buffer)=>{
         this.#buffer = buffer;
-        let i = 0;
+        const nul = new Uint8Array(buffer).indexOf(0);
+        const end = (nul < 0 ? buffer.byteLength : nul);
 
-        const dv = new DataView(buffer);
-        const len = dv.byteLength;
-        while (i < len && dv.getInt8(i += 1));
-
-        this.#base = i + 1;
-        return Blob.forJson(buffer.slice(0, i)).text();
+        this.#base = end + 1;
+        return Blob.forJson(buffer.slice(0, end)).text();
     }
     #handleJson = (json)=>{
-        let input = '';
+        let input = null;
         try {
             input = JSON.parse(json)
         } catch(err) {
             return Promise.resolve()
         }
+        // Not a bundle unless it is one: a `.txt` save whose text is a JSON number parsed.
+        if (typeof input?.data !== 'string') return;
 
+        this.version = Number(input.v) || 0;
+        this.meta = input.meta ?? null;
         this.#blobMeta = input.blobMeta;
         this.data = input.data;
         this.#offsets = input.offsets;
@@ -302,6 +399,12 @@ View.Graphs = class {
     #btnClear = Elem.byId('clear-button');
     #btnDiskFile = Elem.byId('disk-file-button');
     #btnOpenFile = Elem.byId('open-file-button');
+    #saveNote = Elem.byId('save-note');
+    // What the note under Save to… has to say, beside the file's age: the restore failed, so
+    // nothing is saved; the mirror stopped, and why; whether this origin's storage is kept.
+    #restoreFailed = false;
+    #diskStopped = null;
+    #persisted = null;
     // A page cannot open a file dialog on its own: the input is what Open… clicks.
     #inputOpenFile = Elem.byId('open-file-input');
 
@@ -369,7 +472,9 @@ View.Graphs = class {
             lastUpdated: strDate,
             revisions: 0,
             size: 0,
-            title
+            title,
+            updatedAt: Date.now(),
+            uuid: lineageId()
         };
     }
 
@@ -412,12 +517,23 @@ View.Graphs = class {
     #import(file){
         const importer = new GraphImporter();
         const afterImport = this.#afterImport.bind(this, importer, file);
-        importer.import(file).then(afterImport);
+        return importer.import(file).then(afterImport).catch(this.#onImportFailed);
     }
-    #afterImport(importer, file){
+    #onImportFailed = (err)=>{
+        Logger.err("Could not open the file:", err);
+        alert("This file could not be opened. The graph on screen is unchanged.");
+    }
+    async #afterImport(importer, file){
         const name = file.name;
         const index = name.lastIndexOf('.');
         const title = this.#freeTitle(index > -1 ? name.slice(0, index) : name);
+
+        // A newer format may carry what this version would drop on its next save (#61).
+        if (importer.version > GraphExporter.version) {
+            return alert("This file was saved by a newer version of Neurite, so this one "
+                       + "cannot open it without losing part of it. Update Neurite and try again.");
+        }
+        if (!await this.#confirmIfOlderThanOpen(importer.meta)) return Logger.info("Open cancelled");
 
         if (!importer.data) {
             const reader = new FileReader();
@@ -442,8 +558,28 @@ View.Graphs = class {
         return base + ' (' + n + ')';
     }
 
+    // One writer at a time (#60): a file is the Graph moving between devices, so opening an
+    // older copy of the Graph on screen is most likely the wrong file -- the one from before
+    // the other device's work. Asked, not refused: the copy opens as a Graph of its own, and
+    // the one on screen is kept either way.
+    #confirmIfOlderThanOpen(theirs){
+        const open = this.#selectedGraph;
+        const isOlder = theirs?.uuid && theirs.uuid === open?.uuid
+                     && (theirs.updatedAt ?? 0) < (open.updatedAt ?? 0);
+        if (!isOlder) return Promise.resolve(true);
+
+        const when = (t)=> (t ? new Date(t).toLocaleString() : 'at an unknown time');
+        return window.confirm(`This file is an older copy of the graph on screen: it was saved `
+            + `${when(theirs.updatedAt)} on ${theirs.device ? 'the ' + theirs.device : 'another device'}, `
+            + `and the graph on screen ${when(open.updatedAt)}. Open the older copy anyway? `
+            + `It opens as a graph of its own, and the one on screen is kept.`);
+    }
     #loadAndSave(importer, title){
         const meta = this.#makeMetaForTitle(title);
+        // The Graph the file is a copy of, and how far along it was (#60), so the next file
+        // this device saves still says which Graph it is.
+        if (importer.meta?.uuid) meta.uuid = importer.meta.uuid;
+        meta.revisions = importer.meta?.revisions ?? 0;
         this.#graphs.push(meta);
 
         const blobSaver = new View.Graphs.BlobSaver(this, meta.graphId);
@@ -454,12 +590,16 @@ View.Graphs = class {
     }
     // The same guard on the older path: a `.txt` or a bundle this importer could not read
     // still arrives with a name, and `addSave` does not check titles either.
+    // A file that is not a bundle -- an older save, which was the markup as text -- is stored
+    // and put on screen, as a bundle is. It was stored only: with no list of graphs, that was
+    // a record no one could reach, so Open… on one did nothing to be seen.
     async #onFileLoaded(title, e) {
         const content = e.target.result;
 
         try {
-            this.#saver.addSave('dropped', title, content)
-                .then(this.#updateGraphs)
+            await this.#saver.addSave('dropped', title, content, 'select');
+            this.#loadGraph(content);
+            await this.#updateGraphs();
         } catch (err) {
             const loadAnyway = await window.confirm(
                 "The file is too large to store. Would you like to load it anyway?"
@@ -511,13 +651,15 @@ View.Graphs = class {
         settings.init();
         editTab.init();
     }
+    // Settings, keys and view history, as the button says -- and not the Graphs. It dropped
+    // the `graphs` and `blobs` stores and the record of which Graph to reopen, under a
+    // tooltip saying saved graphs are untouched: one click on a settings button lost every
+    // Graph in the browser.
     #onBtnClearLocalClicked = (e)=>{
         localStorage.clear();
-        Stored.drop('Neurite');
-        Stored.drop('state');
-        this.#stored.drop()
-            .then(this.#updateGraphs)
-            .then(alert.bind(null, "Local storage has been cleared."));
+        Stored.drop('Neurite')
+            .then(alert.bind(null, "Settings, API keys and view history are cleared. "
+                                 + "Your graphs are kept."));
     }
 
     static CoreSaver = class {
@@ -933,9 +1075,10 @@ View.Graphs = class {
     // blanking and the exit are gone.
     #autosave = ()=>{
         const selected = this.#selectedGraph;
-        if (!selected) return this.#saver.saveWithTitle(this.#titleForNewGraph());
-
-        return this.#saver.saveWithTitle(selected.title || this.#titleForNewGraph());
+        const saved = (!selected) ? this.#saver.saveWithTitle(this.#titleForNewGraph())
+                    : this.#saver.saveWithTitle(selected.title || this.#titleForNewGraph());
+        // The note's "5 min ago" ages with the clock, and every tick is when it is looked at.
+        return saved.finally(this.#updateSaveNote);
     }
     // #maxGraphId only ever climbs, so this cannot collide with a title already
     // in the list, and it stays readable in the way a timestamp would not.
@@ -966,15 +1109,19 @@ View.Graphs = class {
     // matters most: a browser with no picker is exactly the browser whose only
     // copy of the graph is an evictable one, so it needs the download the most.
     #updateDiskFileButton = ()=>{
+        this.#updateSaveNote();
         const btn = this.#btnDiskFile;
         if (!btn) return;
 
         const label = btn.querySelector('.menu-row-label') ?? btn;
         if (!DiskMirror.isSupported) {
             label.textContent = "Save to…";
-            btn.title = "Download this graph as a .neurite file. "
-                      + "This browser cannot keep writing to a file, so take "
-                      + "another copy after more work.";
+            btn.title = (View.Graphs.isInstalled
+                ? "Share this graph as a .neurite file: Save to Files puts it in iCloud Drive "
+                  + "or on this device. Take another copy after more work."
+                : "Download this graph as a .neurite file. "
+                  + "This browser cannot keep writing to a file, so take "
+                  + "another copy after more work.");
             return;
         }
 
@@ -984,6 +1131,66 @@ View.Graphs = class {
             ? "Every autosave also writes to the file you picked. Click to pick another."
             : "Also write every autosave to a file on this computer.");
     }
+    // The line under Save to…, most urgent first. Nothing being saved at all outranks
+    // everything; then a mirror that stopped; then the file's age, with the risk that makes
+    // it matter where the browser has said its storage is not kept.
+    #updateSaveNote = ()=>{
+        const note = this.#saveNote;
+        if (!note) return;
+
+        const [text, isWarning] = this.#saveNoteText();
+        if (note.textContent !== text) note.textContent = text;
+        note.classList.toggle('is-warning', isWarning);
+    }
+    #saveNoteText(){
+        if (this.#restoreFailed) {
+            return ["The last graph did not reopen, so nothing is being saved. "
+                  + "Reload to try again.", true];
+        }
+        const stopped = this.#diskStopped;
+        if (stopped?.reason === 'changed') {
+            return [`${stopped.name} was changed on another device, so it was not written over. `
+                  + "Save to… picks a file again.", true];
+        }
+        if (stopped?.reason === 'failed') {
+            return ["The file could not be written. Save to… picks a file again.", true];
+        }
+
+        // The browser's own copy is the only one until there is a file, so that is when its
+        // being cleared is worth a word.
+        const at = this.#selectedGraph?.savedToFileAt;
+        if (at) return ["Saved to a file " + View.Graphs.ago(at) + ".", false];
+        if (this.#persisted === false) {
+            return ["Not saved to a file yet, and this browser may clear its own copy.", true];
+        }
+        return ["Not saved to a file yet.", false];
+    }
+    // "just now", "5 min ago", "3 h ago", then the date.
+    static ago(t, now = Date.now()){
+        const min = Math.floor((now - t) / 60000);
+        if (min < 1) return "just now";
+        if (min < 60) return min + " min ago";
+        if (min < 24 * 60) return Math.floor(min / 60) + " h ago";
+        return "on " + new Date(t).toLocaleDateString();
+    }
+    // Installed to the Home Screen, or run as an app anywhere else. `navigator.standalone` is
+    // Safari's alone, and `(display-mode: standalone)` misses the other app modes, so the
+    // question asked is whether this is a browser tab.
+    static get isInstalled(){
+        return globalThis.matchMedia?.('(display-mode: browser)').matches === false
+    }
+    #onDiskStopped = (why)=>{
+        this.#diskStopped = why;
+        this.#updateDiskFileButton();
+        // Said once and out loud: every save from here on stays in this browser only, and a
+        // line in a closed menu is not where a reader is looking.
+        if (why.reason === 'changed') {
+            alert(`${why.name} was changed on another device since this browser last saved to it, `
+                + "so it was not written over. Open it to carry on from that copy, or use "
+                + "Save to… to pick a file for the graph on screen.");
+        }
+    }
+
     #onBtnDiskFileClicked = (e)=>{
         if (!DiskMirror.isSupported) return this.#downloadCopy();
 
@@ -1067,8 +1274,29 @@ View.Graphs = class {
         this.#stored.saveMeta(meta);
 
         return (new GraphExporter(meta, this.#stored)).export()
-            .then(DiskMirror.download.bind(DiskMirror, filename))
+            .then(this.#deliver.bind(this, filename))
             .then(this.#afterDownload, this.#onDownloadFailed);
+    }
+    // Installed, the file goes through the share sheet, whose Save to Files puts it in iCloud
+    // Drive or on the device (#59). A download there leaves the installed app for a browser
+    // view it cannot come back from (WebKit bugs 236943, 290847). In a browser tab it stays a
+    // download. Settles on the name, or null when the reader closed the sheet.
+    #deliver(filename, blob){
+        const file = new File([blob], filename, {type: 'application/octet-stream'});
+        if (!View.Graphs.isInstalled || !navigator.canShare?.({files: [file]})) {
+            return DiskMirror.download(filename, blob);
+        }
+        return this.#share(file).catch(this.#onShareRefused.bind(this, file));
+    }
+    #share(file){ return navigator.share({files: [file]}).then( ()=>file.name ) }
+    // The sheet opens only while the click that asked for it is recent, and building a bundle
+    // with media in it can outlast that. A second click, on the question, is a fresh one.
+    async #onShareRefused(file, err){
+        if (err?.name === 'AbortError') return null;
+        if (err?.name !== 'NotAllowedError') throw err;
+
+        if (!await window.confirm(`${file.name} is ready. Share it now?`)) return null;
+        return this.#share(file).catch( (e)=> (e?.name === 'AbortError' ? null : Promise.reject(e)) );
     }
     // A save's title is whatever the user typed in the list, so it reaches here
     // with spaces, slashes and anything else a file name cannot hold. The pass is
@@ -1086,7 +1314,13 @@ View.Graphs = class {
             .trim();
         return (clean ? clean + '.neurite' : '');
     }
-    #afterDownload = (filename)=>{ Logger.info("Downloaded", filename) }
+    #afterDownload = (filename)=>{
+        if (!filename) return Logger.info("Save cancelled");
+
+        Logger.info("Saved to a file:", filename);
+        const meta = this.#selectedGraph;
+        if (meta) this.#stored.markSavedToFile(meta).then(this.#updateSaveNote);
+    }
     // Silence is the one thing this cannot do: the user clicked Save because they
     // want the graph outside the browser, and a log line is not where they are
     // looking. `alert` is what the app already uses when it must be sure a message
@@ -1147,8 +1381,12 @@ View.Graphs = class {
         On.click(Elem.byId('resetSettings'), this.#onBtnResetSettingsClicked);
         On.click(Elem.byId('clearLocalStorage'), this.#onBtnClearLocalClicked);
 
+        this.#stored.disk.onStopped = this.#onDiskStopped;
         this.#stored.disk.useState(this.#state)
             .then(this.#updateDiskFileButton);
+        navigator.storage?.persisted?.()
+            .then( (kept)=>{ this.#persisted = kept; this.#updateSaveNote() } )
+            .catch(Function.nop);
 
         for (const htmlnode of Graph.htmlNodes.children) {
             const node = new Node(htmlnode);
@@ -1170,6 +1408,10 @@ View.Graphs = class {
     // This used to surface only as an unhandled rejection.
     #onRestoreFailed = (err)=>{
         Logger.err("Could not restore the last graph; autosave is off for this session:", err);
+        // And on screen, where it used to be only in the console (#59): the canvas looks
+        // like a new graph, and nothing typed into it is being kept.
+        this.#restoreFailed = true;
+        this.#updateSaveNote();
         return false;
     }
     #processMeta = (meta, graphId)=>{

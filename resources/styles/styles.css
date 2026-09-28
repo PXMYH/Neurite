@@ -1805,6 +1805,24 @@ textarea.title-input.title-input-stowed {
                         opacity: 0.45;
                     }
 
+                /* A line under a row, in line with its label: 12px of row padding, the
+                   16px icon and the 10px gap. Quiet unless it has to be read (#59). */
+                .menu-note {
+                    margin: -4px 0 4px;
+                    padding: 0 12px 0 38px;
+                    font-size: 12px;
+                    line-height: 1.35;
+                    color: var(--ui-chrome-text-dim, rgba(255, 255, 255, 0.55));
+                }
+
+                    .menu-note:empty {
+                        display: none;
+                    }
+
+                    .menu-note.is-warning {
+                        color: var(--ui-danger);
+                    }
+
             /* The file input behind Open, and the help text each Fractal control is
                described by. `display: none` would be simpler, but Safari refuses to
                open a dialog for an input it treats as unrendered, and a screen reader

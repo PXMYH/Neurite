@@ -41,13 +41,14 @@ function makeStoredClass(tables){
     };
 }
 
-function load(){
+function load({matchMedia} = {}){
     const tables = {};
     const clicked = [];
     const deferred = [];
     const revoked = [];
     const sandbox = createContext({
         Blob,
+        crypto,
         View: {},
         window: {}, // no showSaveFilePicker: the browsers this had nothing for
         Stored: makeStoredClass(tables),
@@ -58,13 +59,14 @@ function load(){
         // Captured rather than run: the point to pin is that the revoke is
         // deferred at all, and a real timer here would hold the test runner open
         // for as long as the delay.
-        setTimeout: (cb, msecs)=>deferred.push([cb, msecs])
+        setTimeout: (cb, msecs)=>deferred.push([cb, msecs]),
+        ...(matchMedia ? {matchMedia} : {})
     });
     const names = ['DiskMirror', 'GraphsKeeper', 'GraphExporter', 'GraphImporter'];
     runInContext(src + '\n;globalThis.exported = {' + names.join(', ') + '};',
         sandbox, { filename: PATH });
 
-    return { ...sandbox.exported, clicked, deferred, revoked, tables };
+    return { ...sandbox.exported, View: sandbox.View, clicked, deferred, revoked, tables };
 }
 
 const metaFor = (title)=>({
@@ -238,4 +240,72 @@ test('the download name keeps titles in any script and drops path characters', (
     // ...and the caller is what turns that nothing into a file name.
     assert.match(src, /return this\.#fileNameForName\(meta\.title\) \|\| 'Graph\.neurite'/,
         'a graph with a blank title no longer falls back to a name');
+});
+
+// The file's version and its `meta` block (#61), which is how a file opened on another device
+// knows which Graph it is a copy of and how far along (#60).
+test('a file says its format version and which Graph it is a copy of', async ()=>{
+    const { GraphsKeeper, GraphExporter, GraphImporter } = load();
+    const keeper = new GraphsKeeper();
+    const meta = metaFor("Graph 1");
+    await keeper.saveMetaAndData(meta, '<div>a node</div>');
+    assert.match(meta.uuid, /^[0-9a-f]{32}$/, 'a Graph saved without a lineage id is not given one');
+    assert.equal(typeof meta.updatedAt, 'number', 'nothing orders two saves of the Graph');
+
+    const importer = new GraphImporter();
+    await importer.import(await (new GraphExporter(meta, keeper)).export());
+    assert.equal(importer.version, 1);
+    assert.equal(JSON.stringify(importer.meta),
+        JSON.stringify({uuid: meta.uuid, revisions: 1, updatedAt: meta.updatedAt, device: 'another device'}),
+        'the meta block is not what the Graph on screen says');
+    assert.equal(importer.data, '<div>a node</div>');
+});
+
+test('a file with no version is version 0, and still opens', async ()=>{
+    const { GraphImporter } = load();
+    const header = JSON.stringify({data: '<div>older</div>', blobMeta: null, offsets: {}});
+    const importer = new GraphImporter();
+    await importer.import(new Blob([header, '\x00']));
+    assert.equal(importer.version, 0);
+    assert.equal(importer.meta, null);
+    assert.equal(importer.data, '<div>older</div>');
+});
+
+test('an old text save, with no header, is left for the text path instead of throwing', async ()=>{
+    // The NUL scan stepped past the end of a file that had none and threw a RangeError, so
+    // Open… on an old save did nothing at all.
+    const { GraphImporter } = load();
+    for (const text of ['<div data-node_json="{}">a note</div>', '42', '']) {
+        const importer = new GraphImporter();
+        await importer.import(new Blob([text]));
+        assert.equal(importer.data, '', JSON.stringify(text) + ' was taken for a bundle');
+    }
+});
+
+test('a file from a newer version is refused, and an older copy of the open Graph is asked about', ()=>{
+    // `#afterImport` needs the page to run, so its two checks are read from the source.
+    const after = src.match(/async #afterImport\(importer, file\)\{[\s\S]*?\n {4}\}/)?.[0];
+    assert.ok(after, '#afterImport is gone or no longer an async method at that indent');
+    assert.match(after, /importer\.version > GraphExporter\.version/, 'a newer format is opened in part');
+    assert.match(after, /#confirmIfOlderThanOpen\(importer\.meta\)/, 'an older copy opens without a word');
+    const older = src.match(/#confirmIfOlderThanOpen\(theirs\)\{[\s\S]*?\n {4}\}/)?.[0];
+    assert.ok(older, '#confirmIfOlderThanOpen is gone');
+    assert.match(older, /theirs\.uuid === open\?\.uuid/, 'the check no longer asks whether it is the same Graph');
+    assert.match(older, /\(theirs\.updatedAt \?\? 0\) < \(open\.updatedAt \?\? 0\)/);
+});
+
+test('the Save row says a file\'s age in words', ()=>{
+    const { View } = load();
+    const now = 1_000_000_000_000;
+    assert.equal(View.Graphs.ago(now - 10_000, now), 'just now');
+    assert.equal(View.Graphs.ago(now - 5 * 60_000, now), '5 min ago');
+    assert.equal(View.Graphs.ago(now - 3 * 3_600_000, now), '3 h ago');
+    assert.match(View.Graphs.ago(now - 3 * 86_400_000, now), /^on /);
+});
+
+test('installed means not a browser tab, and nothing is assumed without the question', ()=>{
+    const asked = (matches)=> load({matchMedia: (q)=>({matches: (q === '(display-mode: browser)' ? matches : false)})});
+    assert.equal(asked(false).View.Graphs.isInstalled, true, 'an app window is not taken for installed');
+    assert.equal(asked(true).View.Graphs.isInstalled, false, 'a browser tab is taken for installed');
+    assert.equal(load().View.Graphs.isInstalled, false, 'no matchMedia at all reads as installed');
 });

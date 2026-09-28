@@ -233,10 +233,16 @@
                 </button>
                 <!-- The title is written by `savenet.js`: what this does depends on
                      whether the browser can hold a file open. -->
-                <button type="button" class="menu-row" id="disk-file-button">
+                <button type="button" class="menu-row" id="disk-file-button" aria-describedby="save-note">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#download-icon"></use></svg>
                     <span class="menu-row-label">Save to…</span>
                 </button>
+                <!-- How safe the Graph is, under the row that makes it safer (#59, #11): when it
+                     was last saved to a file, whether this browser may clear its own copy, and
+                     why nothing is being saved when that is the case. The file is the copy that
+                     survives, so its age is the one fact here that changes what a reader should
+                     do. Written by `savenet.js`. -->
+                <p class="menu-note" id="save-note"></p>
                 <!-- Clear asks before it acts, and it asks through `window.confirm`, which
                      is the app's own modal. In the panel it asked with a Yes/No pair that
                      appeared beside it and a label that rewrote itself to "Are you sure?"
