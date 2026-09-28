@@ -54,3 +54,15 @@ The Notes panel can hold several texts for one graph, each called an Archive. Th
 - A Title names one note across all the Archives, in any case. A Title line written a second time, in the same Archive or another, makes no second note: the line is dimmed, the Title is underlined in red, and the panel says which Archive has the note. Click the line number in that message to select the Title and rename it. When the first note is renamed or deleted, the second line becomes a note.
 - A graph saved with one Title in two Archives opens with the later line renamed "Title (2)", both notes kept where they were, and a notice that lists each rename.
 - Delete Archive says how many notes go with the Archive. The last Archive cannot be deleted, because new notes need an Archive to go into.
+
+## Importing a folder of notes
+
+**Import notes…** in the menu reads a folder of Markdown notes into a graph, the way an Open Knowledge Format bundle keeps them (the AI bundle of #69 is the case it was built on):
+
+- Each `.md` file whose YAML frontmatter names a `type` becomes one note. Indexes, logs and the bundle's contract (`type: index`, `log`, `contract`), files with no frontmatter or no `type`, and folders whose names start with `.` or `_` are not notes, and are counted in the summary instead.
+- Each top-level folder becomes an Archive; notes at the top of the folder go into an Archive named after it.
+- A note's Title is its file name. Two files with one name, in any case, each take as much of their path as tells them apart, as the bundle's own `[[Claude Code/Courses]]` does.
+- The notes' own `[[links]]` become Edges at once, across Archives as well. A link that names no note stays as text, and the summary lists it.
+- A line of a note that begins with the Node Tag (`##` by default) or `AI:` would start a note of its own, so Neurite's copy of it begins with a space. The folder itself is only read, never written.
+- A card starts at the note's text: its frontmatter, and a first heading that repeats its Title, stay in the note (the Notes panel shows them), and the frontmatter's `description` is the line above the text.
+- Into an empty graph the import goes straight in; with notes on screen it asks, and puts the graph on screen away first, as **Clear** does.

@@ -93,6 +93,9 @@ function load(refTag = '[['){
         slice(PARSER_SRC, 'RegExp.forNodeTitle', 'RegExp.forNodeTitle = function('),
         slice(PARSER_SRC, 'escapeRegExp', 'function escapeRegExp('),
         slice(PARSER_SRC, 'ZettelkastenParser', 'class ZettelkastenParser {'),
+        // The card's Title and its description line, which the two syncs read and write.
+        slice(SYNC_SRC, 'cardTitleOf', 'function cardTitleOf('),
+        slice(SYNC_SRC, 'showCardDescription', 'function showCardDescription('),
         slice(SYNC_SRC, 'syncInputTextareaWithHiddenTextarea',
               'function syncInputTextareaWithHiddenTextarea('),
         slice(SYNC_SRC, 'syncHiddenTextareaWithInputTextarea',
@@ -326,4 +329,52 @@ test('a full round trip keeps every link and then settles', ()=>{
         toNote(note, card);
         assert.equal(note.value, first, what + ' must not drift on a second pass');
     }
+});
+
+// ---- a note's head (#71) ----
+//
+// An imported note keeps its YAML frontmatter at the top of its text, and most start with a
+// heading that repeats the note's Title. The card starts after both -- it opened on nine
+// lines of `---`, `title:`, `type:` and `tags:` -- and the note keeps them: typing in the
+// card must not read as deleting them, any more than it deletes the trailing links.
+
+const FRONT = '---\ntitle: "The Agent Loop"\ndescription: "Model, tools and feedback, in a loop."\ntype: concept\n---\n';
+
+test('a note\'s frontmatter, and a first heading that repeats its Title, are its head', ()=>{
+    const text = FRONT + '# Agent Loop\n\nThe loop.\n[[RAG]]\n';
+    const {head, rest, description} = Parser.splitHead(text, 'Agent Loop');
+    assert.equal(head, FRONT + '# Agent Loop\n\n');
+    assert.equal(rest, 'The loop.\n[[RAG]]\n');
+    assert.equal(head + rest, text);
+    assert.equal(description, 'Model, tools and feedback, in a loop.');
+    // The frontmatter's own title counts too, and a Title with a folder in it by its name.
+    assert.equal(Parser.splitHead(FRONT + '# The Agent Loop\nx', 'Loop').rest, 'x');
+    assert.equal(Parser.splitHead(FRONT + '# Courses\nx', 'Claude Code/Courses').rest, 'x');
+});
+
+test('a heading that is not the Title stays, and a note with no frontmatter has no head', ()=>{
+    assert.equal(Parser.splitHead(FRONT + '# Something else\nx', 'Agent Loop').rest, '# Something else\nx');
+    // A heading a reader types over a note of their own is theirs to see.
+    assert.equal(Parser.splitHead('# Agent Loop\nx', 'Agent Loop').head, '');
+    // Two rules of dashes around prose is a thematic break, not frontmatter.
+    assert.equal(Parser.splitHead('---\nJust prose.\n---\nmore', 'x').head, '');
+});
+
+test('the card shows what follows the head, and typing in it keeps the head', ()=>{
+    const {
+        syncInputTextareaWithHiddenTextarea: toCard,
+        syncHiddenTextareaWithInputTextarea: toNote
+    } = load();
+    const note = makeArea(FRONT + '\nThe loop.\n[[RAG]]\n');
+    const card = makeArea('');
+    toCard(card, note);
+    assert.equal(card.value, 'The loop.');
+
+    card.value = 'The loop, rewritten.';
+    toNote(note, card);
+    assert.equal(note.value, FRONT + '\nThe loop, rewritten.\n[[RAG]]\n');
+    // And it settles.
+    toCard(card, note);
+    toNote(note, card);
+    assert.equal(note.value, FRONT + '\nThe loop, rewritten.\n[[RAG]]\n');
 });

@@ -52,7 +52,7 @@ function makeNode(){
         '.syntax-display-div': {},
         '#html-iframe': {},
         '#python-frame': {},
-        '#text-syntax-wrapper': {}
+        '#text-syntax-wrapper': {before(){}}
     };
     return {
         title, body, card,

@@ -337,6 +337,28 @@ class ZettelkastenParser {
         return withoutRefs.replace(/[\s,]/g, '') === '';
     }
 
+    // A note's head, split off from the rest, so that `head + rest` is the text again: the
+    // YAML frontmatter a bundle keeps at the top of a note (#71), then a first heading that
+    // only repeats the note's Title, and the blank lines after them. The card starts after
+    // it, with the frontmatter's `description` as one line of its own: an imported note's
+    // card opened on nine lines of `---`, `title:`, `type:` and `tags:` before a word of the
+    // note. A note with no frontmatter has no head, so a heading a reader types stays put.
+    static splitHead(text, title = '') {
+        const front = /^---\n[\w-]+:[^\n]*\n(?:[^\n]*\n)*?---[ \t]*(?:\n|$)/.exec(text);
+        if (!front) return {head: '', rest: text, description: ''};
+
+        let head = front[0];
+        const field = (name)=>(new RegExp(`^${name}:[ \t]*(.*)$`, 'm').exec(head)?.[1] ?? '')
+            .trim().replace(/^(["'])(.*)\1$/, '$2');
+        const description = field('description');
+        const titles = [title, title.split('/').pop(), field('title')].map( (t)=>t.trim().toLowerCase() ).filter(Boolean);
+
+        const heading = /^\n*# ([^\n]*)(?:\n|$)/.exec(text.slice(head.length));
+        if (heading && titles.includes(heading[1].trim().toLowerCase())) head += heading[0];
+        head += /^\n*/.exec(text.slice(head.length))[0];
+        return {head, rest: text.slice(head.length), description};
+    }
+
     // A note's trailing link-only lines, split off from its prose, so that
     // `body + refs` is the text again.
     //
@@ -464,7 +486,10 @@ CodeMirror.defineMode("custom", function (config, parserConfig) {
                 return "prompt-block";
             }
 
-            if (stream.match(node, true)) return "node";
+            // At the start of a line only, which is the one place the parser reads a Node
+            // Tag: an imported note's headings are written " ## Overview" (#71), and were
+            // coloured as if each started a note.
+            if (stream.sol() && stream.match(node, true)) return "node";
 
             if (bracketsMap[ref]) {
                 if (stream.match(ref, true)) return "ref";

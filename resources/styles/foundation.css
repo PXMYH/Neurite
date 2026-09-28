@@ -205,6 +205,25 @@ textarea.title-input {
     max-width: 344px;
 }
 
+/* An imported note's description, above its text (`ZettelkastenParser.splitHead`): part of
+   the body panel, set in the chrome's muted type, one line. The whole of it is its title. */
+.card-description {
+    align-self: stretch;
+    min-width: 0;
+    padding: 6px 8px 0 10px;
+    background-color: var(--ui-note-surface);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+    .card-description[hidden] {
+        display: none;
+    }
+
 /* The card responds to the pointer.
 
    .window declared transitions for box-shadow, background-color and border-color

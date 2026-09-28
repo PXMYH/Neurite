@@ -96,6 +96,15 @@ class TextNode {
         node.pythonView = content.querySelector('#python-frame');
         node.textNodeSyntaxWrapper = content.querySelector('#text-syntax-wrapper');
 
+        // The line above the text that holds a note's frontmatter description (#71),
+        // written by the sync from the note's text. Found before it is made: a restored card
+        // brings the one it was saved with.
+        if (node.textNodeSyntaxWrapper && !content.querySelector('.card-description')) {
+            const line = Html.make.div('card-description');
+            line.hidden = true;
+            node.textNodeSyntaxWrapper.before(line);
+        }
+
         // Attach events for contentEditable and textarea
         addEventsToUserInputTextarea(divContentEditable, textarea, node, divDisplay);
     }

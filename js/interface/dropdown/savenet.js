@@ -501,6 +501,9 @@ View.Graphs = class {
         App.zetPanes.addPane();
         return this.#updateGraphs();
     }
+    // A graph of its own for something that comes in whole -- a folder of notes
+    // (`ZetImport`): what is on screen is banked first, as Clear banks it.
+    startNewGraph(){ return this.#autosave().then(this.#startNewGraph) }
 
     #onBtnResetSettingsClicked(e){
         settings.clear();

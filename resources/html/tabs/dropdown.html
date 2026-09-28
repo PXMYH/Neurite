@@ -200,9 +200,9 @@
                      a filing cabinet: it holds the graph you are in, and Save to… is what
                      keeps a graph you want to come back to.
 
-                     Four of the five rows cross the page's edge -- two move a `.neurite`
-                     file, two read the screen through `getDisplayMedia` -- and Clear is
-                     the one that does not, which is why it sits beside Save to… rather
+                     Five of the six rows cross the page's edge -- two move a `.neurite`
+                     file, one reads a folder of notes, two read the screen through
+                     `getDisplayMedia` -- and Clear is the one that does not, which is why it sits beside Save to… rather
                      than among them: it is the row you want next after saving, and the row
                      a reader should be least able to hit by accident on the way to a
                      panel.
@@ -215,6 +215,14 @@
                         title="Open a .neurite file. It is added as a new save, so nothing on screen is overwritten.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-open-icon"></use></svg>
                     <span class="menu-row-label">Open…</span>
+                </button>
+                <!-- A folder of Markdown notes, read into a graph (#71): `zetimport.ts`
+                     binds it and the folder input below. Beside Open…, the other way a
+                     graph comes in. -->
+                <button type="button" class="menu-row" id="import-notes-button"
+                        title="Read a folder of Markdown notes into a graph: each file whose frontmatter names its type becomes a note, each folder an Archive, and the notes' own [[links]] become edges. The folder is only read.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-text-icon"></use></svg>
+                    <span class="menu-row-label">Import notes…</span>
                 </button>
                 <!-- The title is written by `savenet.js`: what this does depends on
                      whether the browser can hold a file open. -->
@@ -438,6 +446,8 @@
                  anywhere `savenet.js` decides to click it. -->
             <input type="file" id="open-file-input" class="visually-hidden"
                    accept=".neurite,.txt,application/octet-stream" />
+            <!-- The folder behind Import notes…, out here for the same reason. -->
+            <input type="file" id="import-notes-input" class="visually-hidden" webkitdirectory multiple />
         </div>
     </div>
 </div>

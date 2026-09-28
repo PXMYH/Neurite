@@ -310,14 +310,14 @@ test('both ways out of a view ask one focus predicate', ()=>{
 
 test('every menu row is a button that says what it does', ()=>{
     const rows = htmlCode.match(/<button[^>]*class="[^"]*menu-row[^"]*"[^>]*>/g) || [];
-    assert.equal(rows.length, 11,
-        'the menu no longer holds eleven rows as <button> open tags; every count below '
+    assert.equal(rows.length, 12,
+        'the menu no longer holds twelve rows as <button> open tags; every count below '
         + 'reads this list');
 
     for (const row of rows) {
         assert.match(row, /type="button"/,
             'a menu row has no type, so it is a submit button: harmless only while '
-            + '`closest(\'form\')` is null for all eleven, and `aitab.html` does contain a '
+            + '`closest(\'form\')` is null for all twelve, and `aitab.html` does contain a '
             + '<form>. Row: ' + row.slice(0, 60));
     }
 

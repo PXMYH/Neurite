@@ -158,11 +158,28 @@ let isHiddenTextareaProgrammaticChange = false;
 // are also the one place the card's copy can differ from the note -- which is what
 // keeps a link-only line off the card. See `splitTrailingRefs`.
 
+// The card's Title, which a note's head is read against (`splitHead`).
+function cardTitleOf(elem) {
+    return elem.closest?.('.window')?.querySelector('.title-input')?.value ?? '';
+}
+
+// The frontmatter's description, as the line above the card's text (`TextNode.init`).
+function showCardDescription(userInputTextarea, description) {
+    const line = userInputTextarea.closest?.('.editor-wrapper')?.previousElementSibling;
+    if (!line?.classList.contains('card-description')) return;
+
+    line.textContent = description;
+    line.title = description;
+    line.hidden = !description;
+}
+
 function syncInputTextareaWithHiddenTextarea(userInputTextarea, textarea) {
     if (!isHiddenTextareaProgrammaticChange) {
         isEditableDivProgrammaticChange = true;
         let previousContent = userInputTextarea.value;
-        const currentContent = ZettelkastenParser.splitTrailingRefs(textarea.value).body;
+        const {rest, description} = ZettelkastenParser.splitHead(textarea.value, cardTitleOf(userInputTextarea));
+        const currentContent = ZettelkastenParser.splitTrailingRefs(rest).body;
+        showCardDescription(userInputTextarea, description);
 
         if (previousContent !== currentContent) {
             const selectionStart = userInputTextarea.selectionStart;
@@ -184,11 +201,12 @@ function syncHiddenTextareaWithInputTextarea(textarea, contentEditable) {
         const contentEditableValue = contentEditable.value;
         const textareaValue = textarea.value;
 
-        // The card never held the note's trailing link lines, so typing in it must
-        // not be read as deleting them. They come back off the note's own text,
+        // The card never held the note's head or its trailing link lines, so typing in
+        // it must not be read as deleting them. They come back off the note's own text,
         // which is still the copy this is about to overwrite -- there is no second
         // store of them to fall out of step with this one.
-        const {body, refs} = ZettelkastenParser.splitTrailingRefs(textareaValue);
+        const {head, rest} = ZettelkastenParser.splitHead(textareaValue, cardTitleOf(contentEditable));
+        const {body, refs} = ZettelkastenParser.splitTrailingRefs(rest);
         // Count leading empty lines in the prose, which is what the card was given
         // -- counting them in the whole note would count the newline above the
         // links as well, and re-adding it every sync grew the note a line at a time.
@@ -200,7 +218,7 @@ function syncHiddenTextareaWithInputTextarea(textarea, contentEditable) {
         const links = refs.replace(/^\n/, '');
 
         // Combine leading empty lines with the content editable value
-        const newValue = leadingEmptyLines + prose + (prose && links ? '\n' : '') + links;
+        const newValue = head + leadingEmptyLines + prose + (prose && links ? '\n' : '') + links;
 
         if (textareaValue !== newValue) {
             textarea.value = newValue;

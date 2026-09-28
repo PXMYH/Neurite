@@ -42,7 +42,7 @@ function makeNode(placeholder){
         '.node-textarea': {value: ''},
         '#html-iframe': {},
         '#python-frame': {},
-        '#text-syntax-wrapper': {}
+        '#text-syntax-wrapper': {before(){}}
     };
     return {
         content: {querySelector: (sel)=>parts[sel] ?? null},
