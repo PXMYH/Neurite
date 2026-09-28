@@ -124,6 +124,9 @@ function addNodeTagToZettelkasten(title, content = null) {
     const node = ui.scrollToTitle(title);
     node.contentEditableDiv.value = content;
     node.contentEditableDiv.dispatchEvent(new Event('input'));
+    // And then as the note's card shows it: a pasted note's frontmatter is its head, which the
+    // card hides (#71), and written whole the card opened on raw YAML.
+    if (content && node.textarea) syncInputTextareaWithHiddenTextarea(node.contentEditableDiv, node.textarea);
     return node;
 }
 

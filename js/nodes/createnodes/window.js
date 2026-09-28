@@ -124,7 +124,9 @@ class NodeView {
         if (!node) return;
         const target = node.contentEditableDiv;
         if (target) {
-            target.focus();
+            // Without scrolling the page: a card placed off screen took the tool bar and the
+            // menu button off it too, and nothing but Home brought them back (rv10).
+            target.focus({preventScroll: true});
             if (typeof target.setSelectionRange === 'function') {
                 const end = target.value?.length ?? 0;
                 target.setSelectionRange(end, end);

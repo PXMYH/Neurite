@@ -222,15 +222,16 @@ function syncHiddenTextareaWithInputTextarea(textarea, contentEditable) {
         // newline back rather than running the two together.
         const links = refs.replace(/^\n/, '');
 
-        // The head goes back in front only when the card was not shown it. A block the reader
-        // types at the top of a card of their own is read as a head once the note holds it,
-        // and the card, left alone while it is typed in, still shows it: the head was written
-        // in front of it again at every key -- and, asked by whether the card still started
-        // with it, again once a key inside the block made it start otherwise. A card never
-        // filled from its note falls back on that question.
+        // The head goes back in front only when the card was not shown it, and does not hold
+        // it already. A block the reader types at the top of a card of their own is read as a
+        // head once the note holds it, and the card, left alone while it is typed in, still
+        // shows it: the head was written in front of it again at every key -- and, asked only
+        // whether the card started with it, again once a key inside the block made it start
+        // otherwise. A note pasted whole is written into its card whole, head and all, after
+        // the card was told what it would not be shown: asked only that, the head went in twice.
         const known = contentEditable.hiddenHead;
-        const hidden = (known === undefined) ? (contentEditableValue.startsWith(head) ? '' : head)
-                     : (known ? head : '');
+        const hidden = (!head || contentEditableValue.startsWith(head)) ? ''
+                     : (known === undefined || known) ? head : '';
         const newValue = hidden + leadingEmptyLines + prose + (prose && links ? '\n' : '') + links;
 
         if (textareaValue !== newValue) {

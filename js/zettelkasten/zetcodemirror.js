@@ -256,18 +256,19 @@ class ZettelkastenParser {
             if (names(cm.getLine(i))) return;
         }
 
-        // The note's own list of Refs, where it has one: the last line of nothing but Refs, which
-        // is where the card leaves them off (`splitTrailingRefs`). A line that only begins with a
-        // Ref is a sentence -- the AI bundle's notes have many -- and a Ref appended to one ran
-        // into the middle of the prose ("…should Codex stop being a [[0. Overview]]").
+        // The note's own list of Refs, where it has one: a line of nothing but Refs at the end of
+        // the note, blank lines aside, which is where the card leaves them off
+        // (`splitTrailingRefs`). A line that only begins with a Ref is a sentence -- the AI
+        // bundle's notes have many -- and a Ref appended to one ran into the middle of the prose
+        // ("…should Codex stop being a [[0. Overview]]"); a list of Refs in the middle of a note
+        // is the note's own text, and a Ref appended there showed on its card (rv10).
         const escTag = escapeRegExp(refTag);
         const escClose = escapeRegExp(closingBracket || refTag);
         let tagLineStart = null;
         for (let i = fromRange.endLineNo; i > fromRange.startLineNo; i--) {
             const line = cm.getLine(i);
-            if (!line.startsWith(refTag) || !ZettelkastenParser.#isRefList(line, refTag, escTag, escClose, closingBracket)) continue;
-
-            tagLineStart = i;
+            if (line.trim() === '') continue;
+            if (line.startsWith(refTag) && ZettelkastenParser.#isRefList(line, refTag, escTag, escClose, closingBracket)) tagLineStart = i;
             break;
         }
 

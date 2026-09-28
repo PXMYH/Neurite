@@ -302,3 +302,33 @@ test('with the Notes panel open on a narrow window, an Archive is framed in the 
             'a card is not in the room beside the panel: ' + JSON.stringify({ c, panelRight: seen.panelRight }));
     }
 });
+
+// On a free spot of a Region a double-click puts the note where the pointer is; it went to the
+// block's far corner, and focusing it there scrolled the page, tool bar and all, off screen (rv10).
+test('a note double-clicked on a free spot of a Region lands there, and the page does not scroll', async () => {
+    await importBundle(page);
+    await setMenu(page, false);
+    const spot = await page.evaluate(() => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+        ZetRegions.frame(pane.paneId);
+        const r = ZetRegions.of(pane.paneId);
+        return { paneId: pane.paneId, z: { x: r.x, y: r.y + r.r * 0.8 } };
+    });
+    await page.waitForTimeout(500);
+    const at = await onScreen(page, spot.z);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none'; });
+    await page.mouse.dblclick(at.x, at.y);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = ''; });
+    await page.waitForTimeout(1000);
+    const made = await page.evaluate(([paneId, z]) => {
+        const pane = window.zetPaneList.find((p) => p.paneId === paneId);
+        let node = null;
+        pane.processor.forEachNodeWrap((w) => { if (!['Claude Code/Courses', 'Setup'].includes(w.node.getTitle())) node = w.node; });
+        const r = ZetRegions.of(paneId);
+        return { found: Boolean(node), off: node && Math.hypot(node.pos.x - z.x, node.pos.y - z.y) / (r.cw * r.s), scrollY, scrollX };
+    }, [spot.paneId, spot.z]);
+    assert.ok(made.found, 'no note in the Archive');
+    assert.ok(made.off < 0.5, `the note is ${made.off} cells from the double-click`);
+    assert.equal(made.scrollY, 0, 'the page scrolled');
+    assert.equal(made.scrollX, 0, 'the page scrolled');
+});

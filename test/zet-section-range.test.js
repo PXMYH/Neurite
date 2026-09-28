@@ -119,3 +119,14 @@ test('a Ref joins the note\'s own line of Refs', ()=>{
     assert.equal(lines[2], '[[C]] [[B]]');
     assert.equal(lines[1], 'Prose.');
 });
+
+// A list of Refs in the middle of a note is the note's own text, and a Ref appended there showed
+// on its card (rv10): only a list at the note's end takes it.
+test('a Ref is not added to a list of Refs in the middle of a note', ()=>{
+    const {parser, cm, lines} = makeParser(['## A', 'Intro.', '[[C]]', 'More prose after it.', '', '## B', 'b', '', '## C', 'c'].join('\n'));
+    writable(lines, cm);
+    parser.addEdge('A', 'B', cm);
+    assert.equal(lines[2], '[[C]]', 'the list in the middle was changed');
+    const end = lines.indexOf('## B');
+    assert.ok(lines.slice(3, end).includes('[[B]]'), 'no line of its own at the end: ' + JSON.stringify(lines));
+});

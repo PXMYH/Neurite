@@ -145,11 +145,22 @@ class ZetRegions {
         const cw = region.cw * region.s, ch = region.ch * region.s;
         const x0 = region.x - (region.cols - 1) / 2 * cw, y0 = region.y - (region.rows - 1) / 2 * ch;
         const free = (x: number, y: number)=>!others.some( (n)=>(Math.abs(n.pos.x - x) < cw * 0.9 && Math.abs(n.pos.y - y) < ch * 0.9) );
+        // A double-click on a free spot of the Region is where the note goes; on a card, the
+        // free cell nearest it, anywhere in the disk. Ranked by whole cells inside first, the
+        // block's far corner won over the cell under the pointer (rv10).
+        if (near) {
+            if (free(near.x, near.y)) return new vec2(near.x, near.y);
+        }
         const cells: {x: number, y: number, d: number, inside: boolean}[] = [];
         for (let row = -3; row < region.rows + 3; row++) for (let col = -3; col < region.cols + 3; col++) {
             const x = x0 + col * cw, y = y0 + row * ch;
             const d = Math.hypot(x - region.x, y - region.y);
             cells.push({x, y, d: near ? Math.hypot(x - near.x, y - near.y) : d, inside: d + Math.hypot(cw, ch) / 2 <= region.r});
+        }
+        if (near) {
+            const inDisk = cells.filter( (c)=>(Math.hypot(c.x - region.x, c.y - region.y) <= region.r) );
+            const nearest = inDisk.sort( (a, b)=>(a.d - b.d) ).find( (c)=>free(c.x, c.y) );
+            if (nearest) return new vec2(nearest.x, nearest.y);
         }
         cells.sort( (a, b)=>((Number(b.inside) - Number(a.inside)) || (a.d - b.d)) );
         const cell = cells.find( (c)=>free(c.x, c.y) );

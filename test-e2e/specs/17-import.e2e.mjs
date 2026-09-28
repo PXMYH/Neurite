@@ -171,3 +171,18 @@ test('every mention of a Title is marked in each Archive when it is shown', asyn
         assert.equal(have, want, c);
     }
 });
+
+// A note pasted whole is written into its card whole, after the card was told what it would not
+// be shown: the frontmatter went in twice, and the card opened on raw YAML (rv10).
+test('a note pasted with its frontmatter keeps it once, and its card starts at the text', async () => {
+    const text = '---\ntitle: Pasted Note\ntype: concept\ndescription: A pasted note.\n---\n\nIts body line.';
+    const got = await page.evaluate(async (text) => {
+        createNodeFromWindow('Pasted Note', text);
+        await new Promise((r) => setTimeout(r, 600));
+        const node = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Pasted Note');
+        return { note: node.getText(), card: node.contentEditableDiv.value, pane: window.currentActiveZettelkastenMirror.getValue() };
+    }, text);
+    assert.equal(got.note, text);
+    assert.equal((got.pane.match(/description: A pasted note\./g) || []).length, 1, 'the frontmatter is in the Pane twice');
+    assert.equal(got.card.trim(), 'Its body line.');
+});

@@ -447,3 +447,20 @@ test('a block typed into a card and then changed inside is still written once', 
     toNote(note, card);
     assert.equal(note.value, 'Above.\n' + typed);
 });
+
+// A note pasted whole is written into its card whole, head and all, after the card was told
+// what it would not be shown: the head went in front of it a second time (rv10).
+test('a card given its note whole, head and all, writes the head once', ()=>{
+    const {
+        syncInputTextareaWithHiddenTextarea: toCard,
+        syncHiddenTextareaWithInputTextarea: toNote
+    } = load();
+    const whole = FRONT + 'Pasted body.';
+    const note = makeArea(whole);
+    const card = makeArea('');
+    toCard(card, note);
+    assert.equal(card.value, 'Pasted body.');
+    card.value = whole;
+    toNote(note, card);
+    assert.equal(note.value, whole);
+});

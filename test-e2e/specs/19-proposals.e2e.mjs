@@ -133,7 +133,7 @@ test('a dismissed pair stays dismissed through a save and a reload, and Undo bri
     await first.locator('.proposal-dismiss').click();
     assert.equal(await first.locator('.proposal-dismiss').textContent(), 'Undo');
     await first.locator('.proposal-dismiss').click();
-    assert.equal(await page.evaluate(() => ZetProposals.dismissed.size), 0, 'Undo takes the dismissal back');
+    assert.equal(await page.evaluate(() => ZetProposals.dismissed.length), 0, 'Undo takes the dismissal back');
     await first.locator('.proposal-dismiss').click();
 
     await page.click('#customModal .close');
@@ -250,4 +250,35 @@ test('Link on a pair whose other note has gone writes nothing', async () => {
     await page.waitForTimeout(300);
     assert.equal(await row.locator('.proposal-done').textContent(), 'A note is gone');
     assert.equal(await textOf(page, stays), before, 'a Ref was written to a note that is gone');
+});
+
+// A note moved in its Archive after the list was made -- its section cut and pasted lower -- is
+// made again as a new Node: held to the first, Link said it was gone (rv10). And a dismissal
+// follows a rename: by Title alone the pair came back (rv10).
+test('Link finds a note moved in its Archive, and a dismissal follows a rename', async () => {
+    await setup(page);
+    await openPanel(page);
+    await page.evaluate(() => {
+        const cm = window.currentActiveZettelkastenMirror;
+        const text = cm.getValue();
+        const section = /## Vector Store\n[\s\S]*?\n\n(?=## Evaluation)/.exec(text)[0];
+        cm.setValue(text.replace(section, '') + '\n' + section);
+    });
+    await page.waitForTimeout(800);
+    const row = page.locator('#customModal .proposal', { hasText: 'Vector Store' }).first();
+    await row.locator('.proposal-link').click();
+    await page.waitForTimeout(300);
+    assert.equal(await row.locator('.proposal-done').textContent(), 'Linked');
+
+    const other = page.locator('#customModal .proposal', { hasText: 'Evaluation' }).first();
+    await other.locator('.proposal-dismiss').click();
+    await page.click('#customModal .close');
+    await page.evaluate(() => {
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.setValue(cm.getValue().replace('## Evaluation', '## Evals'));
+    });
+    await page.waitForTimeout(800);
+    await openPanel(page);
+    const pairs = (await rows(page)).map((r) => r.pair);
+    assert.ok(!pairs.some((p) => /Retrieval/.test(p) && /Evals/.test(p)), 'the renamed pair came back: ' + JSON.stringify(pairs));
 });

@@ -405,7 +405,8 @@ class Hud {
         }
         for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel')) {
             const b = el.getBoundingClientRect();
-            if (!b.width || !b.height) continue;
+            // Hidden under the open menu, it covers nothing the menu does not (`updateUnderMenu`).
+            if (!b.width || !b.height || el.classList.contains('is-under-menu')) continue;
 
             // An island only costs an edge the space it actually spans. This used to add
             // every island to both a horizontal and a vertical band, so the 194x196 HUD in

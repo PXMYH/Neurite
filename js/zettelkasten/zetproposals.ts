@@ -41,6 +41,8 @@ interface ProposalNote {
     linked: Set<any>;
 }
 interface Mention { at: number; length: number }
+// A pair the reader dismissed: both notes by uuid and by Title.
+interface Dismissal { uuids: string[]; titles: string[] }
 interface Proposal {
     // The note it is for, which the Ref is written into, and the note the Ref names.
     from: number;
@@ -58,12 +60,58 @@ class ZetProposals {
     static weights = {mention: 2, tags: 1, similar: 0.5};
     static openingChars = 300;
 
-    // Dismissed pairs, by both Titles in order, in any case, kept with the Graph. A Title is a
-    // note's identity in the text (CONTEXT.md); a uuid is handed out again after a reload, and a
-    // dismissal passed to whichever new note took a deleted one's.
-    static dismissed = new Set<string>();
-    static pairKey(a: any, b: any): string {
-        return [a.getTitle(), b.getTitle()].map( (title: string)=>title.trim().toLowerCase() ).sort().join('\n');
+    // Dismissed pairs, kept with the Graph, each by both notes' uuids and Titles: the uuid follows
+    // a rename, which by Title alone brought the pair back; the Title follows a note deleted and
+    // made again -- a section cut and pasted back, an undo. One whose notes are gone is dropped
+    // when the Graph is saved, so a uuid a reload hands out again finds nothing waiting for it:
+    // by uuid alone, a dismissal passed to whichever new note took a deleted one's.
+    static dismissed: Dismissal[] = [];
+    static #uuidKey(a: string, b: string): string { return [a, b].sort().join('|') }
+    static #titleKey(a: string, b: string): string {
+        return [a, b].map( (title)=>String(title ?? '').trim().toLowerCase() ).sort().join('\n');
+    }
+    static dismissedKeys(): {uuids: Set<string>, titles: Set<string>} {
+        const list = ZetProposals.dismissed;
+        // A renamed note's dismissals take its new Title, or its old one would dismiss a new
+        // note that takes it.
+        const nodes = (Graph as any).nodes;
+        for (const d of list) d.titles = d.uuids.map( (uuid, i)=>{
+            const node = nodes[uuid];
+            return (node && !node.removed && node.getTitle) ? node.getTitle() : d.titles[i];
+        });
+        return {
+            uuids: new Set(list.map( (d)=>ZetProposals.#uuidKey(d.uuids[0], d.uuids[1]) )),
+            titles: new Set(list.map( (d)=>ZetProposals.#titleKey(d.titles[0], d.titles[1]) )),
+        };
+    }
+    static isDismissed(a: any, b: any, keys = ZetProposals.dismissedKeys()): boolean {
+        return keys.uuids.has(ZetProposals.#uuidKey(a.uuid, b.uuid))
+            || keys.titles.has(ZetProposals.#titleKey(a.getTitle(), b.getTitle()));
+    }
+    static setDismissed(a: any, b: any, on: boolean): void {
+        const uuids = ZetProposals.#uuidKey(a.uuid, b.uuid), titles = ZetProposals.#titleKey(a.getTitle(), b.getTitle());
+        ZetProposals.dismissed = ZetProposals.dismissed.filter( (d)=>(ZetProposals.#uuidKey(d.uuids[0], d.uuids[1]) !== uuids
+            && ZetProposals.#titleKey(d.titles[0], d.titles[1]) !== titles) );
+        if (on) ZetProposals.dismissed.push({uuids: [a.uuid, b.uuid], titles: [a.getTitle(), b.getTitle()]});
+    }
+    // What a Saved Graph keeps: each dismissal with its notes as they are now, none whose notes
+    // are gone.
+    static dismissedForSave(): Dismissal[] {
+        const nodes = (Graph as any).nodes;
+        const find = (uuid: string, title: string)=>{
+            const node = nodes[uuid];
+            return (node && !node.removed && node.getTitle?.() !== undefined) ? node : ((Node as any).byTitle?.(title) ?? null);
+        };
+        const kept: Dismissal[] = [];
+        for (const d of ZetProposals.dismissed) {
+            const a = find(d.uuids[0], d.titles[0]), b = find(d.uuids[1], d.titles[1]);
+            if (a && b && a !== b) kept.push({uuids: [a.uuid, b.uuid], titles: [a.getTitle(), b.getTitle()]});
+        }
+        return kept;
+    }
+    static restoreDismissed(list: unknown): void {
+        ZetProposals.dismissed = Array.isArray(list) ? list.filter( (d: any)=>(Array.isArray(d?.uuids) && Array.isArray(d?.titles)
+            && d.uuids.length === 2 && d.titles.length === 2) ) : [];
     }
 
     // A note's Tags, from its frontmatter: `tags: [a, b]`, `tags: a, b`, or a YAML list.
@@ -232,7 +280,9 @@ class ZetProposals {
                 node, title, prose,
                 tags: ZetProposals.tagsOf(head),
                 summary: `${title}. ${description}\n${opening}`.trim(),
-                gist: description || prose.replace(/\s+/g, ' ').trim().slice(0, 160),
+                // The words of its Refs kept: without them "Holds what [[RAG]] made" read "Holds what made".
+                gist: description || rest.replace(refs, (found: string)=>(close ? found.slice(ref.length, -close.length) : found.slice(ref.length)))
+                    .replace(/\s+/g, ' ').trim().slice(0, 160),
                 linked: new Set(node.edges.flatMap( (edge: any)=>edge.pts ).filter( (pt: any)=>(pt !== node) )),
             });
         }
@@ -269,7 +319,7 @@ class ZetProposals {
             // Ollama not running, every note of the bundle was two failed requests and five
             // logged errors.
             if (!vector && !kept && (answered || failed < 3)) {
-                vector = await ZetProposals.#fetch(keys[i], notes[i].summary);
+                vector = await ZetProposals.#fetch(keys[i], notes[i].summary, model);
                 if (vector) answered += 1;
                 else failed += 1;
             }
@@ -286,13 +336,15 @@ class ZetProposals {
     }
     // One request a text, however many ask for it: the list opened again while the first was
     // still reading asked for every note a second time, and waited behind the first.
-    static #fetch(key: string, text: string): Promise<number[] | null> {
+    // With the model the key names, not whichever is chosen by the time the request goes: switched
+    // in the middle, the new model's vector was kept under the old one's key.
+    static #fetch(key: string, text: string, model: string): Promise<number[] | null> {
         const kept = ZetProposals.#memo.get(key);
         if (kept) return Promise.resolve(kept);
         let pending = ZetProposals.#pending.get(key);
         if (pending) return pending;
 
-        pending = Promise.resolve().then( ()=>(Embeddings as any).fetch(text) ).catch( ()=>null )
+        pending = Promise.resolve().then( ()=>(Embeddings as any).fetch(text, model || undefined) ).catch( ()=>null )
             .then( (fetched: any)=>{
                 const vector = fetched?.length ? Array.from(fetched as ArrayLike<number>) : null;
                 if (vector) {
@@ -311,9 +363,10 @@ class ZetProposals {
     static propose(notes: ProposalNote[], vectors: (number[] | null)[] | null, only: number | null = null): Proposal[] {
         const mentions = ZetProposals.mentions(notes, ZettelkastenUI.titlePattern());
         const similar = vectors?.some(Boolean) ? ZetProposals.similarity(vectors) : null;
+        const keys = ZetProposals.dismissedKeys();
         const open = (i: number, j: number)=>((only === null || i === only)
             && !notes[i].linked.has(notes[j].node)
-            && !ZetProposals.dismissed.has(ZetProposals.pairKey(notes[i].node, notes[j].node)));
+            && !ZetProposals.isDismissed(notes[i].node, notes[j].node, keys));
         const scored = ZetProposals.score(notes, mentions, similar, open);
         if (only !== null) return scored.sort( (a, b)=>(b.score - a.score) ).slice(0, ZetProposals.perNote);
         return ZetProposals.allocate(scored, notes.map( (note)=>!note.linked.size ));
@@ -408,7 +461,8 @@ class ZetProposals {
         // What the click writes, and where, before it is written: a Ref Tag with no closing half
         // is written as its own line, `@ Title` (`addEdge`).
         const ref = (Tag as any).ref as string, close = (bracketsMap as any)[ref] as string | undefined;
-        link.dataset.tooltip = `Writes ${close ? ref + b.title + close : ref + ' ' + b.title} into ${a.title}.`;
+        link.dataset.tooltip = close ? `Writes ${ref}${b.title}${close} into ${a.title}.`
+                                     : `Adds ${b.title} to the ${ref} line of ${a.title}.`;
         const dismiss = html.make.button('proposal-dismiss', 'Dismiss') as HTMLButtonElement;
         dismiss.setAttribute('aria-label', `Dismiss ${a.title} and ${b.title}`);
         const actions = html.make.div('proposal-actions');
@@ -425,9 +479,9 @@ class ZetProposals {
             gist.append(line);
         }
         li.append(pair, actions, ZetProposals.reason(notes, p), gist);
-        on.click(pair, ()=>ZetProposals.show(li, a.node, b.node) );
-        on.click(link, ()=>ZetProposals.accept(li, a.node, b.node) );
-        on.click(dismiss, ()=>ZetProposals.dismiss(li, a.node, b.node) );
+        on.click(pair, ()=>ZetProposals.show(li, a, b) );
+        on.click(link, ()=>ZetProposals.accept(li, a, b) );
+        on.click(dismiss, ()=>ZetProposals.dismiss(li, a, b) );
         return li;
     }
 
@@ -468,10 +522,23 @@ class ZetProposals {
         return parts.join(' · ') || 'Similar wording';
     }
 
+    // A row's note as it is now: the Node the row was made with, or -- deleted and made again, a
+    // section cut and pasted back -- the note that holds its Title. Held to the first alone, a
+    // note moved in its Archive after the list was made was "gone".
+    static live(note: ProposalNote): any {
+        const node = note.node;
+        if (!node.removed && (Graph as any).nodes[node.uuid] === node) return node;
+        const again = (Node as any).byTitle?.(note.title);
+        return (again?.isTextNode && !again.removed) ? again : null;
+    }
+
     // A row chosen: both notes framed, and the Edge it would make drawn dashed between them.
-    static show(li: HTMLElement, a: any, b: any): void {
+    static show(li: HTMLElement, from: ProposalNote, to: ProposalNote): void {
+        const a = ZetProposals.live(from), b = ZetProposals.live(to);
         li.closest('.modal-body')?.querySelectorAll('.proposal.selected').forEach( (row)=>row.classList.remove('selected') );
         li.classList.add('selected');
+        if (!a || !b) return;
+
         ZetProposals.shown = {a, b};
         (Hud as any).fit( (node: any)=>(node === a || node === b) );
     }
@@ -480,9 +547,10 @@ class ZetProposals {
         ZetProposals.draw();
     }
 
-    static accept(li: HTMLElement, a: any, b: any): void {
-        const gone = a.removed || b.removed;
-        const linked = ZetProposals.link(a, b);
+    static accept(li: HTMLElement, from: ProposalNote, to: ProposalNote): void {
+        const a = ZetProposals.live(from), b = ZetProposals.live(to);
+        const gone = !a || !b;
+        const linked = !gone && ZetProposals.link(a, b);
         li.classList.add(linked ? 'accepted' : 'failed');
         const done = (Html as any).make.span('proposal-done');
         done.setAttribute('role', 'status');
@@ -494,11 +562,10 @@ class ZetProposals {
     }
 
     // Dismissed, or back again: the row stays, so a slip is one click to undo.
-    static dismiss(li: HTMLElement, a: any, b: any): void {
-        const key = ZetProposals.pairKey(a, b);
+    static dismiss(li: HTMLElement, from: ProposalNote, to: ProposalNote): void {
+        const a = ZetProposals.live(from) ?? from.node, b = ZetProposals.live(to) ?? to.node;
         const dismissed = li.classList.toggle('dismissed');
-        if (dismissed) ZetProposals.dismissed.add(key);
-        else ZetProposals.dismissed.delete(key);
+        ZetProposals.setDismissed(a, b, dismissed);
 
         const button = li.querySelector('.proposal-dismiss') as HTMLButtonElement;
         button.textContent = dismissed ? 'Undo' : 'Dismiss';
