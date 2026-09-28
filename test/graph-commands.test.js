@@ -258,12 +258,19 @@ test('autosave has no switch', ()=>{
     assert.match(start[0], /On\.visibilitychange\(document, this\.#onVisibilityChanged\)/,
         'the save on tab-hide is gone, and it is the one that catches a closing tab');
 
-    // Called from the load chain, unconditionally, exactly once. An `if` in front of this
-    // is how autosave would quietly become opt-in.
+    // Called from the load chain, unconditionally. An `if` in front of this is how autosave
+    // would quietly become opt-in. The one other call is the Graph opened or started after a
+    // restore that failed, which is the reader's work from then on (rv15); the guard inside
+    // keeps a second start from running a second timer, and nothing else.
     const calls = savenet.match(/#startAutosave\b/g) || [];
-    assert.equal(calls.length, 2, 'expected one definition and one call site: ' + calls.length);
+    assert.equal(calls.length, 3, 'expected a definition, the load chain and the recovery: ' + calls.length);
     assert.match(savenet, /\.then\(this\.#startAutosave\)/,
         '#startAutosave is no longer reached by the load chain');
+    const recovery = savenet.match(/#resumeAfterRecovery = \(\)=>\{[\s\S]*?\n {4}\}/);
+    assert.ok(recovery, '#resumeAfterRecovery is gone or no longer a field at that indent');
+    assert.match(recovery[0], /this\.#startAutosave\(\)/);
+    assert.match(start[0], /if \(this\.#autosaving\) return;/,
+        'a second start runs a second timer');
 
     // A setting named for it would be the switch arriving by the back door.
     assert.doesNotMatch(savenet, /settings\.\w*[aA]utosave/,
@@ -293,8 +300,12 @@ test('Clear is a command row that asks through the modal', ()=>{
     assert.ok(handler, '#handleConfirmClear is gone or no longer a field at that indent');
     assert.match(handler[0], /if \(!confirmed\) return/,
         'Clear wipes the screen whatever the reader answers');
-    assert.match(handler[0], /#autosave\(\)\.then\(this\.#startNewGraph\)/,
+    assert.match(handler[0], /#bankScreen\(\)\.then\(this\.#startNewGraph\)/,
         'Clear no longer banks the graph before clearing it');
+    // Banked by the autosave, except when the last Graph did not reopen: then the screen is
+    // not a Graph, and banking it wrote the empty canvas over the one that failed (rv15).
+    assert.match(savenet, /#bankScreen\(\)\{ return \(this\.#restoreFailed \? Promise\.resolve\(\) : this\.#autosave\(\)\) \}/,
+        'the screen is banked some other way, or banked after a failed restore');
     assert.match(savenet, /window\.confirm\(msg\)\.then\(this\.#handleConfirmClear\)/,
         'nothing asks the question that #handleConfirmClear answers');
 });

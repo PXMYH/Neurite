@@ -103,7 +103,9 @@ test('once a file is picked, every save is mirrored to it whole', async ()=>{
     assert.equal(await keeper.disk.pick(), true);
     assert.equal(keeper.disk.isActive, true);
 
-    await keeper.saveMetaAndData(metaFor("Graph 1"), '<div>a node</div>');
+    // One Graph, one record: the same meta across saves, as the page keeps it.
+    const meta = metaFor("Graph 1");
+    await keeper.saveMetaAndData(meta, '<div>a node</div>');
 
     assert.equal(handle.writes.length, 1, 'one write per save');
     const text = await handle.writes[0].text();
@@ -112,9 +114,54 @@ test('once a file is picked, every save is mirrored to it whole', async ()=>{
     assert.ok(text.startsWith('{'), 'the bundle leads with its JSON header');
     assert.ok(text.includes('a node'), 'and carries the graph data');
 
-    await keeper.saveMetaAndData(metaFor("Graph 1"), '<div>edited</div>');
+    await keeper.saveMetaAndData(meta, '<div>edited</div>');
     assert.equal(handle.writes.length, 2, 'and again on the next save');
     assert.ok((await handle.writes[1].text()).includes('edited'));
+});
+
+test('a file is one Graph\'s: another Graph saved while it is picked is not written into it', async ()=>{
+    // Clear, or Open… of another file, put a different Graph on screen, and its first autosave
+    // wrote over the file that held the first one (rv15).
+    const handle = makeFileHandle();
+    const { GraphsKeeper } = load({showSaveFilePicker: ()=>Promise.resolve(handle)});
+    const keeper = new GraphsKeeper();
+    const first = metaFor("Alpha"), other = {...metaFor("Gamma"), graphId: '2.graph'};
+    await keeper.saveMetaAndData(first, '<div>alpha</div>');
+    assert.equal(await keeper.disk.pick('Alpha.neurite', first.uuid), true);
+
+    await keeper.saveMetaAndData(other, '<div>gamma</div>');
+    assert.equal(handle.writes.length, 0, "another Graph was written into the first one's file");
+    await keeper.saveMetaAndData(first, '<div>alpha, edited</div>');
+    assert.equal(handle.writes.length, 1);
+    assert.ok((await handle.writes[0].text()).includes('alpha, edited'));
+});
+
+test('a file picked during a slow write keeps its own time, not the old file\'s', async ()=>{
+    // The queued write to the first file finished after the second was picked, and recorded the
+    // first file's lastModified for the second: its first autosave read as another device's
+    // change (rv15).
+    let release;
+    const slow = makeFileHandle();
+    const origWritable = slow.createWritable;
+    slow.createWritable = ()=> new Promise((ok)=>{ release = ()=> ok(origWritable()) });
+    const second = makeFileHandle();
+    second.changeElsewhere();
+    second.changeElsewhere();
+    const handles = [slow, second];
+    const { GraphsKeeper } = load({showSaveFilePicker: ()=>Promise.resolve(handles.shift())});
+    const keeper = new GraphsKeeper();
+    const stops = [];
+    keeper.disk.onStopped = (why)=> stops.push(why);
+    const meta = metaFor("Graph 1");
+    await keeper.disk.pick();
+    const writing = keeper.saveMetaAndData(meta, '<div>one</div>');
+    await new Promise((r)=> setTimeout(r, 10));
+    await keeper.disk.pick('Second.neurite', meta.uuid);
+    release();
+    await writing;
+    await keeper.saveMetaAndData(meta, '<div>two</div>');
+    assert.equal(JSON.stringify(stops), '[]', 'the new file was taken for one another device had changed');
+    assert.equal(second.writes.length, 1);
 });
 
 test('the picker opens on the name the graph already has', async ()=>{
@@ -147,7 +194,7 @@ test('the picker opens on the name the graph already has', async ()=>{
     const code = src.replace(/^[ \t]*\/\/[^\n]*$/gm, '');
     const clicked = code.match(/#onBtnDiskFileClicked = \(e\)=>\{[\s\S]*?\n {4}\}/);
     assert.ok(clicked, '#onBtnDiskFileClicked is gone or no longer a field at that indent');
-    assert.match(clicked[0], /\.pick\(this\.#suggestedFileName\(\)\)/,
+    assert.match(clicked[0], /\.pick\(this\.#suggestedFileName\(\)[,)]/,
         'Save to… opens the picker with no name again, so every graph is offered the '
         + 'same default however it is titled');
 

@@ -64,10 +64,24 @@ class DiskMirror {
     // The file's `lastModified` just after this browser last wrote it, kept with the handle
     // (#60). Null for a file just picked, which the reader chose to write over.
     #modified = null;
+    // The Graph the file is a copy of, by lineage id (#60), kept with the handle. A file is one
+    // Graph's: Clear, or Open… of another, wrote the Graph now on screen over the one the file
+    // held, and the lineage in its header changed with nothing to check it.
+    #graph = null;
     // Told when mirroring stops, with why: `{reason: 'changed', name}` or `{reason: 'failed'}`.
     onStopped = ()=>{};
 
     get isActive(){ return this.#handle !== null }
+    // Whether a save of the Graph with this lineage id belongs in the file. A file picked
+    // before files were bound to a Graph takes the first one saved to it.
+    isFor(uuid){
+        if (this.#graph === null) this.#bindTo(uuid);
+        return this.#graph === uuid;
+    }
+    #bindTo(uuid){
+        this.#graph = uuid ?? null;
+        this.#state?.save('disk-file-graph', this.#graph);
+    }
 
     useState(state){
         this.#state = state;
@@ -75,6 +89,8 @@ class DiskMirror {
 
         return state.load('disk-file-modified')
             .then( (modified)=>{ this.#modified = modified ?? null } )
+            .then(state.load.bind(state, 'disk-file-graph'))
+            .then( (graph)=>{ this.#graph = graph ?? null } )
             .then(state.load.bind(state, 'disk-file-handle'))
             .then(this.#adoptStored);
     }
@@ -106,19 +122,20 @@ class DiskMirror {
     // 'neurite-graph.neurite' for every graph, while the download fallback beside it
     // named the file after the graph -- so the same command produced a titled file in
     // one browser and an untitled one in the browser that lets you choose.
-    pick(suggestedName = 'neurite-graph.neurite'){ // only from within a user gesture
+    pick(suggestedName = 'neurite-graph.neurite', graphUuid = null){ // only from within a user gesture
         return window.showSaveFilePicker({
             suggestedName,
             types: [{
                 description: "Neurite graph",
                 accept: {'application/octet-stream': ['.neurite', '.txt']}
             }]
-        }).then(this.#adoptPicked, this.#onPickFailed)
+        }).then(this.#adoptPicked.bind(this, graphUuid), this.#onPickFailed)
     }
-    #adoptPicked = (handle)=>{
+    #adoptPicked = (graphUuid, handle)=>{
         this.#handle = handle;
         this.#modified = null;
         this.#state?.delete('disk-file-modified');
+        this.#bindTo(graphUuid);
         this.#state?.save('disk-file-handle', handle)
             .catch(Logger.warn.bind(Logger, "Could not remember the disk file:"));
         return true;
@@ -130,7 +147,9 @@ class DiskMirror {
 
     forget(){
         this.#handle = null;
+        this.#graph = null;
         this.#state?.delete('disk-file-modified');
+        this.#state?.delete('disk-file-graph');
         return this.#state?.delete('disk-file-handle');
     }
 
@@ -159,14 +178,19 @@ class DiskMirror {
             }
             return this.#writeThrough(handle, blob)
                 .then( ()=>handle.getFile() )
-                .then(this.#noteWritten);
+                .then(this.#noteWritten.bind(this, handle));
         });
     }
     #writeThrough(handle, blob){
         return handle.createWritable()
             .then( (stream)=>stream.write(blob).then(stream.close.bind(stream)) )
     }
-    #noteWritten = (file)=>{
+    // Recorded for the file it was, and only while that file is still the one being written: a
+    // file picked during a slow write took the old file's time for its own, and its first
+    // autosave then read as another device's change.
+    #noteWritten = (handle, file)=>{
+        if (handle !== this.#handle) return true;
+
         this.#modified = file.lastModified;
         this.#state?.save('disk-file-modified', file.lastModified);
         return true;
@@ -252,22 +276,32 @@ class GraphsKeeper {
     saveMeta(meta){ return this.#meta.save(meta.graphId, meta) }
 
     #mirrorToDisk(meta){
-        if (!this.disk.isActive) return;
+        if (!this.disk.isActive || !this.disk.isFor(meta.uuid)) return;
 
         // Mirror the same bundle the drop-to-import path reads, so the file on
         // disk is a whole graph -- images and media included -- rather than
         // markup that points at blobs left behind in IndexedDB.
         return (new GraphExporter(meta, this)).export()
             .then(this.#writeToDisk)
-            .then( (written)=>written && this.markSavedToFile(meta) );
+            .then( (written)=>written && this.markSavedToFile(meta, 'file') );
     }
     #writeToDisk = (blob)=>this.disk.write(blob);
-    // When the Graph was last written to a file, which the Save row shows (#11): the file is
-    // the copy that survives, so its age is what a reader needs to know.
-    markSavedToFile(meta){
-        meta.savedToFileAt = Date.now();
+    // When the Graph last went to a file, which the Save row shows (#11), and how: written to
+    // it (`file`), handed to a download, which a page cannot see finish (`download`), or opened
+    // from one (`opened`). Two more things from that moment: the save time of the content the
+    // file holds, which is the one a file's header carries and so the one to compare a file
+    // against (#60); and the revision, which says whether the Graph has changed since.
+    markSavedToFile(meta, how, content = meta.updatedAt){
+        meta.savedToFileAt = (how === 'opened' ? content : Date.now());
+        meta.savedToFileHow = how;
+        meta.savedToFileContent = content;
+        meta.savedToFileRevision = meta.revisions;
+        meta.savedToFileSignature = this.signatureOf?.() ?? null;
         return this.saveMeta(meta);
     }
+    // What the Graph holds, apart from where it is viewed from -- the page supplies it
+    // (`View.Graphs.contentSignature`), since only the page can read it.
+    signatureOf = null;
 }
 
 // A `.neurite` file (#61): a JSON header, a NUL, then every image and media file of the Graph
@@ -495,7 +529,7 @@ View.Graphs = class {
     importFile(file){
         if (!file) return Logger.info("Missing file");
 
-        return this.#autosave().then(this.#import.bind(this, file));
+        return this.#bankScreen().then(this.#import.bind(this, file));
     }
 
     // For a host that is about to close the page and can wait for it: the macOS app
@@ -549,6 +583,17 @@ View.Graphs = class {
     // costs work is `CoreSaver.save`, which overwrites *every* save whose title matches:
     // one autosave tick after that, both rows hold the same graph and the older one is
     // gone. So an imported title is made free before it is used.
+    // Why a file's text is not an old save, or null if it is one: the markup of a Graph, which
+    // begins as HTML and carries a Node, a Pane or the old single-Pane save.
+    static notAGraph(text){
+        const start = String(text ?? '').trimStart();
+        if (start.startsWith('{')) return "This file looks like a Neurite file, but it is damaged or cut short.";
+        if (!start.startsWith('<')
+            || !/data-node_json|id="zettelkasten-pane-|id="zettelkasten-save"/.test(start)) {
+            return "This file is not a Neurite graph.";
+        }
+        return null;
+    }
     #freeTitle(title){
         const base = (title || 'Graph').trim() || 'Graph';
         if (!this.#graphs.some(Object.hasTitleThis, base)) return base;
@@ -562,17 +607,35 @@ View.Graphs = class {
     // older copy of the Graph on screen is most likely the wrong file -- the one from before
     // the other device's work. Asked, not refused: the copy opens as a Graph of its own, and
     // the one on screen is kept either way.
+    //
+    // Older than the last file this device has of the Graph, not than its last save: every save
+    // moves that time, a pan's too, and an import stamps it, so the file saved seconds before a
+    // pan -- or one newer than the screen -- was called an older copy (rv15).
+    //
+    // And a copy of the Graph on screen from before changes that are in no file yet is asked
+    // about too: opened, it takes the screen, and those changes stay behind in this browser,
+    // where nothing in the interface reaches them.
     #confirmIfOlderThanOpen(theirs){
         const open = this.#selectedGraph;
-        const isOlder = theirs?.uuid && theirs.uuid === open?.uuid
-                     && (theirs.updatedAt ?? 0) < (open.updatedAt ?? 0);
-        if (!isOlder) return Promise.resolve(true);
+        if (!theirs?.uuid || theirs.uuid !== open?.uuid) return Promise.resolve(true);
 
+        const isOlder = (theirs.updatedAt ?? 0) < (open.savedToFileContent ?? 0);
+        const hasChanges = Boolean(open.savedToFileSignature)
+                        && View.Graphs.contentSignature() !== open.savedToFileSignature;
+        if (!isOlder && !hasChanges) return Promise.resolve(true);
+
+        // The question comes up over the menu Open… was chosen from, which covered it.
+        if (dropdownContent.classList.contains('open')) menuButton.click();
         const when = (t)=> (t ? new Date(t).toLocaleString() : 'at an unknown time');
-        return window.confirm(`This file is an older copy of the graph on screen: it was saved `
-            + `${when(theirs.updatedAt)} on ${theirs.device ? 'the ' + theirs.device : 'another device'}, `
-            + `and the graph on screen ${when(open.updatedAt)}. Open the older copy anyway? `
-            + `It opens as a graph of its own, and the one on screen is kept.`);
+        const where = (theirs.device && theirs.device !== deviceKind()) ? ` on the ${theirs.device}` : '';
+        const why = isOlder
+            ? `This file is an older copy of the graph on screen. The file was saved `
+              + `${when(theirs.updatedAt)}${where}, and this graph's latest file was saved `
+              + `${when(open.savedToFileContent)}.`
+            : `The graph on screen has changes that are in no file yet, and this file is a copy `
+              + `of it from before them.`;
+        return window.confirm(why + ` Open this copy anyway? It opens as a graph of its own, and `
+            + `the one on screen stays in this browser.`);
     }
     #loadAndSave(importer, title){
         const meta = this.#makeMetaForTitle(title);
@@ -585,21 +648,36 @@ View.Graphs = class {
         const blobSaver = new View.Graphs.BlobSaver(this, meta.graphId);
         importer.saveNodeItsBlob = blobSaver.saveNodeItsBlob.bind(blobSaver);
 
+        this.#detachMirror();
         this.#setSelectedGraph(meta).#loadGraph(importer.data, importer);
-        return this.#stored.saveMetaAndData(meta, importer.finalData);
+        // What is on screen is the file's content, so it is in a file: the one it came from,
+        // saved when its header says (#11).
+        return this.#stored.saveMetaAndData(meta, importer.finalData)
+            .then( ()=>this.#stored.markSavedToFile(meta, 'opened', importer.meta?.updatedAt ?? Date.now()) )
+            .then(this.#resumeAfterRecovery)
+            .then(this.#updateSaveNote);
     }
     // The same guard on the older path: a `.txt` or a bundle this importer could not read
     // still arrives with a name, and `addSave` does not check titles either.
     // A file that is not a bundle -- an older save, which was the markup as text -- is stored
     // and put on screen, as a bundle is. It was stored only: with no list of graphs, that was
     // a record no one could reach, so Open… on one did nothing to be seen.
+    //
+    // And only if it is one. Any other text -- a note, a bundle cut short -- was taken for an
+    // old save, the screen was cleared for it, and the empty record became the one a reload
+    // reopens (rv15).
     async #onFileLoaded(title, e) {
         const content = e.target.result;
+        const problem = View.Graphs.notAGraph(content);
+        if (problem) return alert(problem + " Nothing was opened, and the graph on screen is unchanged.");
 
         try {
             await this.#saver.addSave('dropped', title, content, 'select');
+            this.#detachMirror();
             this.#loadGraph(content);
             await this.#updateGraphs();
+            this.#resumeAfterRecovery();
+            this.#updateSaveNote();
         } catch (err) {
             const loadAnyway = await window.confirm(
                 "The file is too large to store. Would you like to load it anyway?"
@@ -634,17 +712,43 @@ View.Graphs = class {
         // Bank what is on screen before wiping it, then leave nothing selected:
         // the next autosave tick opens a fresh save rather than overwriting the
         // one just banked.
-        this.#autosave().then(this.#startNewGraph);
+        this.#bankScreen().then(this.#startNewGraph);
     }
     #startNewGraph = ()=>{
+        this.#detachMirror();
         this.#setSelectedGraph(null).#clearGraph();
         App.zetPanes.addPane();
         resetSavedViews();
-        return this.#updateGraphs();
+        return this.#updateGraphs()
+            .then(this.#resumeAfterRecovery)
+            .then(this.#updateSaveNote);
     }
     // A graph of its own for something that comes in whole -- a folder of notes
     // (`ZetImport`): what is on screen is banked first, as Clear banks it.
-    startNewGraph(){ return this.#autosave().then(this.#startNewGraph) }
+    startNewGraph(){ return this.#bankScreen().then(this.#startNewGraph) }
+
+    // What is on screen, saved before another Graph takes its place -- unless the last Graph did
+    // not reopen, when the screen is not a Graph at all: banked, it wrote the empty canvas over
+    // the record that failed, the one a reload retries (rv15).
+    #bankScreen(){ return (this.#restoreFailed ? Promise.resolve() : this.#autosave()) }
+    // A Graph back on screen after a restore that failed -- opened, or started -- is the reader's
+    // work from here, and saved like any other.
+    #resumeAfterRecovery = ()=>{
+        if (!this.#restoreFailed) return;
+
+        this.#restoreFailed = false;
+        this.#startAutosave();
+    }
+    // A file is one Graph's (DiskMirror.isFor), so another Graph on screen ends the mirror,
+    // said on the button rather than by a write that goes nowhere.
+    #detachMirror(){
+        const disk = this.#stored.disk;
+        if (!disk.isActive) return;
+
+        disk.forget();
+        this.#diskStopped = null;
+        this.#updateDiskFileButton();
+    }
 
     #onBtnResetSettingsClicked(e){
         settings.clear();
@@ -655,7 +759,17 @@ View.Graphs = class {
     // the `graphs` and `blobs` stores and the record of which Graph to reopen, under a
     // tooltip saying saved graphs are untouched: one click on a settings button lost every
     // Graph in the browser.
-    #onBtnClearLocalClicked = (e)=>{
+    //
+    // Asked first: API keys go with it, and on a GitHub Pages address the storage belongs to
+    // every Pages site of the account, whose own settings go too.
+    #onBtnClearLocalClicked = async (e)=>{
+        const shared = /\.github\.io$/.test(location.hostname)
+            ? " This address is shared with the other GitHub Pages sites under "
+              + location.hostname + ", and what they keep in it goes too." : "";
+        const confirmed = await window.confirm("Clear this browser's local storage for this site? "
+            + "Settings, API keys and view history go; your graphs are kept." + shared);
+        if (!confirmed) return;
+
         localStorage.clear();
         Stored.drop('Neurite')
             .then(alert.bind(null, "Settings, API keys and view history are cleared. "
@@ -766,56 +880,55 @@ View.Graphs = class {
             // Combine both slider values and saved views in one string
             return savedInputValues + savedViewsElement + mandelbrotSaveElement + fractalTypeSaveElement + dismissedEdges;
         }
+        // One damaged part costs itself, not the Graph. A saved-views block that did not decode
+        // threw here -- after the screen was cleared and before any card was built -- so a file
+        // opened as an empty Graph, and a Graph with one did not reopen at all (rv15). Removed
+        // either way, or the card loop would try to build a Node out of it.
+        #restorePart(d, selector, restore){
+            const elem = d.querySelector(selector);
+            if (!elem) return;
+
+            try {
+                restore(elem);
+            } catch (err) {
+                Logger.warn("Could not restore the saved", selector, "- skipping it:", err);
+            }
+            elem.remove();
+        }
         restoreAdditionalSaveObjects(d){
-            const savedViewsElement = d.querySelector("#saved-views");
-            if (savedViewsElement) {
-                let savedViewsContent = decodeURIComponent(savedViewsElement.innerHTML);
-                savedViews = JSON.parse(savedViewsContent);
+            this.#restorePart(d, "#saved-views", (elem)=>{
+                savedViews = JSON.parse(decodeURIComponent(elem.innerHTML));
                 if (savedViews) {
                     updateSavedViewsCache();
                     displaySavedCoordinates();
                 }
-                savedViewsElement.remove();
-            }
+            });
 
-            const sliderValuesElement = d.querySelector("#saved-input-values");
-            if (sliderValuesElement) {
-                const sliderValuesContent = decodeURIComponent(sliderValuesElement.innerHTML);
-                localStorage.setItem('inputValues', sliderValuesContent);
-                sliderValuesElement.remove();
-            }
+            this.#restorePart(d, "#saved-input-values", (elem)=>{
+                localStorage.setItem('inputValues', decodeURIComponent(elem.innerHTML));
+            });
 
             restoreInputValues();
 
-            const mandelbrotSaveElement = d.querySelector("#mandelbrot-coords-params");
-            if (mandelbrotSaveElement) {
-                const mandelbrotParams = JSON.parse(decodeURIComponent(mandelbrotSaveElement.textContent));
+            this.#restorePart(d, "#mandelbrot-coords-params", (elem)=>{
+                const mandelbrotParams = JSON.parse(decodeURIComponent(elem.textContent));
                 const pan = mandelbrotParams.pan.split('+i');
                 Animation.goToCoords(mandelbrotParams.zoom, pan[0], pan[1]); // Direct function call using parsed params
-                mandelbrotSaveElement.remove();
-            }
+            });
 
-            const fractalTypeSaveElement = d.querySelector("#fractal-type");
-            if (fractalTypeSaveElement) {
+            this.#restorePart(d, "#fractal-type", (elem)=>{
                 const fractalSelectElement = Elem.byId('fractal-select');
-                const fractalType = JSON.parse(decodeURIComponent(fractalTypeSaveElement.textContent));
+                const fractalType = JSON.parse(decodeURIComponent(elem.textContent));
                 if (fractalType) {
                     fractalSelectElement.value = fractalType;
                     Select.updateSelectedOption(fractalSelectElement);
                     Fractal.updateJuliaDisplay(fractalType);
                 }
-                fractalTypeSaveElement.remove();
-            }
+            });
 
-            const dismissedElement = d.querySelector("#dismissed-edges");
-            if (dismissedElement) {
-                try {
-                    ZetProposals.restoreDismissed(JSON.parse(decodeURIComponent(dismissedElement.textContent)));
-                } catch (err) {
-                    Logger.warn("Could not read the dismissed Proposed Edges:", err);
-                }
-                dismissedElement.remove();
-            }
+            this.#restorePart(d, "#dismissed-edges", (elem)=>{
+                ZetProposals.restoreDismissed(JSON.parse(decodeURIComponent(elem.textContent)));
+            });
         }
 
         #makeSaveData = (meta)=>{
@@ -1023,12 +1136,21 @@ View.Graphs = class {
             App.zetPanes.restorePane("Zettelkasten Save", zettelContent);
         }
 
+        // A Pane whose text does not decode is skipped, and one whose Titles taken or Region do
+        // not is restored without them: the rest of the Graph is not lost to it.
+        const readOr = (value, fallback)=>{
+            try { return (value ? JSON.parse(decodeURIComponent(value)) : fallback) }
+            catch (err) { Logger.warn("Could not read part of a saved Pane:", err); return fallback }
+        };
         zettelkastenPaneSaveElements.forEach((elem) => {
-            const paneContent = decodeURIComponent(elem.innerHTML);
-            const paneName = decodeURIComponent(elem.dataset.paneName);
-            const taken = (elem.dataset.taken ? JSON.parse(decodeURIComponent(elem.dataset.taken)) : []);
-            const region = (elem.dataset.region ? JSON.parse(decodeURIComponent(elem.dataset.region)) : null);
-            App.zetPanes.restorePane(paneName, paneContent, taken, region);
+            let paneContent, paneName;
+            try {
+                paneContent = decodeURIComponent(elem.innerHTML);
+                paneName = decodeURIComponent(elem.dataset.paneName);
+            } catch (err) {
+                return Logger.err("Could not read a saved Pane; skipping it:", err);
+            }
+            App.zetPanes.restorePane(paneName, paneContent, readOr(elem.dataset.taken, []), readOr(elem.dataset.region, null));
         });
         App.zetPanes.reportRenames();
 
@@ -1095,7 +1217,11 @@ View.Graphs = class {
         this.#setSelectedGraph(null);
     }
 
+    #autosaving = false;
     #startAutosave = ()=>{
+        if (this.#autosaving) return;
+
+        this.#autosaving = true;
         setInterval(this.#autosave, 8000);
         // Eight seconds is a long time to lose when a tab closes or an iPad
         // switches apps. Neither fires a reliable unload, but both go hidden.
@@ -1144,8 +1270,8 @@ View.Graphs = class {
     }
     #saveNoteText(){
         if (this.#restoreFailed) {
-            return ["The last graph did not reopen, so nothing is being saved. "
-                  + "Reload to try again.", true];
+            return ["The last graph did not reopen, and it is kept as it was: Save to… saves it "
+                  + "to a file as it is, and a reload tries again.", true];
         }
         const stopped = this.#diskStopped;
         if (stopped?.reason === 'changed') {
@@ -1156,14 +1282,43 @@ View.Graphs = class {
             return ["The file could not be written. Save to… picks a file again.", true];
         }
 
-        // The browser's own copy is the only one until there is a file, so that is when its
-        // being cleared is worth a word.
-        const at = this.#selectedGraph?.savedToFileAt;
-        if (at) return ["Saved to a file " + View.Graphs.ago(at) + ".", false];
-        if (this.#persisted === false) {
-            return ["Not saved to a file yet, and this browser may clear its own copy.", true];
+        // The browser's own copy is the only one of what is not in a file, so that is when its
+        // being cleared is worth a word. A download is only a download: the page cannot see it
+        // finish, or be cancelled.
+        const meta = this.#selectedGraph;
+        const at = meta?.savedToFileAt;
+        const mayClear = (this.#persisted === false);
+        if (!at) {
+            return mayClear ? ["Not saved to a file yet, and this browser may clear its own copy.", true]
+                            : ["Not saved to a file yet.", false];
         }
-        return ["Not saved to a file yet.", false];
+        const how = {download: "Downloaded a copy", opened: "From a file saved"}[meta.savedToFileHow]
+                 ?? "Saved to a file";
+        const changed = meta.savedToFileSignature
+            ? View.Graphs.contentSignature() !== meta.savedToFileSignature
+            : (meta.revisions ?? 0) > (meta.savedToFileRevision ?? meta.revisions ?? 0);
+        if (!changed) return [how + " " + View.Graphs.ago(at) + ".", false];
+        return [how + " " + View.Graphs.ago(at) + ", and changed since."
+              + (mayClear ? " This browser may clear its own copy of the changes." : ""), mayClear];
+    }
+    // What a Graph holds, apart from where it is viewed from: the Panes' text, which carries the
+    // notes' words, and each Node's Title and place on the Plane. The saved markup cannot say
+    // whether a Graph changed since its file -- every pan rewrites the screen positions it
+    // carries -- and neither can a card's text, which its link strip redraws a frame after a
+    // load: both called a Graph just opened from a file "changed since" (rv15).
+    static contentSignature(){
+        const parts = (window.zetPaneList ?? []).map( (pane)=>pane.cm.getValue() );
+        const nodes = [];
+        Graph.forEachNode( (n)=>nodes.push([n.uuid, n.getTitle?.(), n.pos?.x?.toFixed(6),
+                                            n.pos?.y?.toFixed(6)].join('|')) );
+        parts.push(...nodes.sort());
+
+        let hash = 0x811c9dc5; // FNV-1a
+        for (const part of parts) {
+            for (let i = 0; i < part.length; i++) hash = Math.imul(hash ^ part.charCodeAt(i), 0x01000193) >>> 0;
+            hash = Math.imul(hash ^ 10, 0x01000193) >>> 0;
+        }
+        return hash.toString(16) + ':' + parts.length;
     }
     // "just now", "5 min ago", "3 h ago", then the date.
     static ago(t, now = Date.now()){
@@ -1194,7 +1349,7 @@ View.Graphs = class {
     #onBtnDiskFileClicked = (e)=>{
         if (!DiskMirror.isSupported) return this.#downloadCopy();
 
-        this.#stored.disk.pick(this.#suggestedFileName())
+        this.#stored.disk.pick(this.#suggestedFileName(), this.#selectedGraph?.uuid)
             .then(this.#afterDiskFilePicked);
     }
     // The same name the download fallback writes, so the two paths agree. A graph with
@@ -1209,7 +1364,12 @@ View.Graphs = class {
     // one that cannot be skipped. `saveMetaAndData` returns early when the data matches the
     // last write, which is right for a timer and wrong here: it is the difference between
     // "nothing changed" and "nothing was written", and a file is the only copy there is.
+    //
+    // After a restore that failed there is nothing on screen to bank: the file is the Graph that
+    // did not reopen, as the store holds it, which is the way to take it somewhere else.
     #downloadCopy(){
+        if (this.#restoreFailed) return this.#askNameThenDownload();
+
         this.#stored.forgetLastWritten();
         return this.#autosave().then(this.#askNameThenDownload)
     }
@@ -1284,11 +1444,12 @@ View.Graphs = class {
     #deliver(filename, blob){
         const file = new File([blob], filename, {type: 'application/octet-stream'});
         if (!View.Graphs.isInstalled || !navigator.canShare?.({files: [file]})) {
-            return DiskMirror.download(filename, blob);
+            return {name: DiskMirror.download(filename, blob), how: 'download'};
         }
         return this.#share(file).catch(this.#onShareRefused.bind(this, file));
     }
-    #share(file){ return navigator.share({files: [file]}).then( ()=>file.name ) }
+    // A share that resolves is one the reader finished: Save to Files, or wherever it went.
+    #share(file){ return navigator.share({files: [file]}).then( ()=>({name: file.name, how: 'file'}) ) }
     // The sheet opens only while the click that asked for it is recent, and building a bundle
     // with media in it can outlast that. A second click, on the question, is a fresh one.
     async #onShareRefused(file, err){
@@ -1314,12 +1475,12 @@ View.Graphs = class {
             .trim();
         return (clean ? clean + '.neurite' : '');
     }
-    #afterDownload = (filename)=>{
-        if (!filename) return Logger.info("Save cancelled");
+    #afterDownload = (delivered)=>{
+        if (!delivered) return Logger.info("Save cancelled");
 
-        Logger.info("Saved to a file:", filename);
+        Logger.info("Saved to a file:", delivered.name, "by", delivered.how);
         const meta = this.#selectedGraph;
-        if (meta) this.#stored.markSavedToFile(meta).then(this.#updateSaveNote);
+        if (meta) this.#stored.markSavedToFile(meta, delivered.how).then(this.#updateSaveNote);
     }
     // Silence is the one thing this cannot do: the user clicked Save because they
     // want the graph outside the browser, and a log line is not where they are
@@ -1339,11 +1500,21 @@ View.Graphs = class {
         input.value = '';
         if (!file) return;
 
-        this.#autosave().then(this.#import.bind(this, file));
+        this.#bankScreen().then(this.#import.bind(this, file));
     }
     #afterDiskFilePicked = (isPicked)=>{
         this.#updateDiskFileButton();
         if (!isPicked) return;
+
+        // After a restore that failed, the file gets the stored Graph as it is, once: the screen
+        // holds nothing to write, and the timer that would write it is off.
+        const meta = this.#selectedGraph;
+        if (this.#restoreFailed && meta) {
+            return (new GraphExporter(meta, this.#stored)).export()
+                .then( (blob)=>this.#stored.disk.write(blob) )
+                .then( (written)=>written && this.#stored.markSavedToFile(meta, 'file') )
+                .then(this.#updateSaveNote);
+        }
 
         // The graph is already in the store, so the next autosave would find
         // nothing changed and skip -- leaving the new file empty. Fill it now.
@@ -1382,6 +1553,7 @@ View.Graphs = class {
         On.click(Elem.byId('clearLocalStorage'), this.#onBtnClearLocalClicked);
 
         this.#stored.disk.onStopped = this.#onDiskStopped;
+        this.#stored.signatureOf = View.Graphs.contentSignature;
         this.#stored.disk.useState(this.#state)
             .then(this.#updateDiskFileButton);
         navigator.storage?.persisted?.()

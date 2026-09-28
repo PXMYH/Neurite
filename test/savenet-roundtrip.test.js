@@ -290,8 +290,13 @@ test('a file from a newer version is refused, and an older copy of the open Grap
     assert.match(after, /#confirmIfOlderThanOpen\(importer\.meta\)/, 'an older copy opens without a word');
     const older = src.match(/#confirmIfOlderThanOpen\(theirs\)\{[\s\S]*?\n {4}\}/)?.[0];
     assert.ok(older, '#confirmIfOlderThanOpen is gone');
-    assert.match(older, /theirs\.uuid === open\?\.uuid/, 'the check no longer asks whether it is the same Graph');
-    assert.match(older, /\(theirs\.updatedAt \?\? 0\) < \(open\.updatedAt \?\? 0\)/);
+    assert.match(older, /if \(!theirs\?\.uuid \|\| theirs\.uuid !== open\?\.uuid\) return Promise\.resolve\(true\);/,
+        'the check no longer asks whether it is the same Graph');
+    assert.match(older, /View\.Graphs\.contentSignature\(\) !== open\.savedToFileSignature/,
+        'changes on screen that are in no file are no longer asked about');
+    // Older than the last file this device has of it, not than its last save: every save moves
+    // that, a pan's too, and a newer file was called an older copy (rv15).
+    assert.match(older, /\(theirs\.updatedAt \?\? 0\) < \(open\.savedToFileContent \?\? 0\)/);
 });
 
 test('the Save row says a file\'s age in words', ()=>{
@@ -308,4 +313,18 @@ test('installed means not a browser tab, and nothing is assumed without the ques
     assert.equal(asked(false).View.Graphs.isInstalled, true, 'an app window is not taken for installed');
     assert.equal(asked(true).View.Graphs.isInstalled, false, 'a browser tab is taken for installed');
     assert.equal(load().View.Graphs.isInstalled, false, 'no matchMedia at all reads as installed');
+});
+
+test('only a Graph\'s markup is taken for an old save', ()=>{
+    // Any other text was: the screen was cleared for it, and the empty record became the one a
+    // reload reopens (rv15).
+    const { View } = load();
+    const notAGraph = View.Graphs.notAGraph;
+    assert.equal(notAGraph('<div data-node_json="{}"></div>'), null);
+    assert.equal(notAGraph('\n <div id="zettelkasten-pane-0" data-pane-name="A">%23%23%20A</div>'), null);
+    assert.equal(notAGraph('<div id="zettelkasten-save">x</div>'), null);
+    assert.match(notAGraph('Just a note.'), /not a Neurite graph/);
+    assert.match(notAGraph('<p>Some HTML, not a Graph</p>'), /not a Neurite graph/);
+    assert.match(notAGraph('{"v":1,"data":"<div data-node'), /damaged or cut short/);
+    assert.match(notAGraph(''), /not a Neurite graph/);
 });

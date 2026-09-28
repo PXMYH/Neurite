@@ -66,7 +66,15 @@ test('the Save row says whether the Graph is in a file yet, and the file says wh
     assert.ok(header.meta.revisions >= 1);
     assert.equal(header.meta.device, isIPad ? 'iPad' : 'Mac');
     await page.waitForTimeout(300);
-    assert.deepEqual(await saveNote(page), { text: 'Saved to a file just now.', warning: false });
+    // A download is a download: the page cannot see it finish, or be cancelled (rv15).
+    assert.deepEqual(await saveNote(page), { text: 'Downloaded a copy just now.', warning: false });
+
+    // An edit after it is only in the browser, and the line says so.
+    await withNotes(page, '## Alpha\nFirst, edited after the file.\n');
+    await page.waitForTimeout(300);
+    const edited = await saveNote(page);
+    assert.match(edited.text, /^Downloaded a copy just now, and changed since\./);
+    assert.equal(edited.warning, !persisted);
 });
 
 test('installed, Save to… hands the file to the share sheet', async () => {
@@ -119,7 +127,7 @@ test('a file another device changed is not written over, and the Save row says s
     assert.equal(await page.textContent('#disk-file-button .menu-row-label'), 'Save to…');
 });
 
-test('opening an older copy of the Graph on screen asks first, and No keeps the screen', async () => {
+test('opening a copy from before the changes on screen asks first, and No keeps the screen', async () => {
     ({ context, page } = await openNeurite(browser, noPicker));
     await withNotes(page, '## Alpha\nFirst.\n');
     const { path } = await download(page);
@@ -129,7 +137,7 @@ test('opening an older copy of the Graph on screen asks first, and No keeps the 
 
     await page.setInputFiles('#open-file-input', path);
     await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 5000 });
-    assert.match(await dialogText(page), /This file is an older copy of the graph on screen/);
+    assert.match(await dialogText(page), /The graph on screen has changes that are in no file yet/);
     await answer(page, false);
     await page.waitForTimeout(800);
     assert.match(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), /and more since/,
@@ -157,8 +165,11 @@ test('Clear Local Storage keeps the Graphs', async () => {
     ({ context, page } = await openNeurite(browser));
     await withNotes(page, '## Alpha\nFirst.\n\n## Beta\nSecond.\n');
     await page.evaluate(() => document.getElementById('clearLocalStorage').click());
+    // Asked first now: API keys go with it (rv15).
     await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 5000 });
-    assert.match(await dialogText(page), /Your graphs are kept/);
+    assert.match(await dialogText(page), /Clear this browser's local storage for this site\? Settings, API keys and view history go; your graphs are kept\./);
+    await answer(page, true);
+    await page.waitForFunction(() => Boolean(Modal.current) && /Your graphs are kept/.test(document.querySelector('.modal-body').innerText), undefined, { timeout: 5000 });
     await answer(page, true);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
@@ -166,23 +177,150 @@ test('Clear Local Storage keeps the Graphs', async () => {
     assert.deepEqual(await titles(page), ['Alpha', 'Beta']);
 });
 
-test('a Graph that did not reopen is said to be unsaved, where it was only logged', async () => {
-    ({ context, page } = await openNeurite(browser));
-    await withNotes(page, '## Alpha\nFirst.\n');
-    // The stored markup made unreadable: the restore throws on it.
-    await page.evaluate(async () => {
-        const db = await new Promise((ok) => { const r = indexedDB.open('graphs'); r.onsuccess = () => ok(r.result); });
-        const store = db.transaction('graph-data', 'readwrite').objectStore('graph-data');
-        const keys = await new Promise((ok) => { const q = store.getAllKeys(); q.onsuccess = () => ok(q.result); });
-        await new Promise((ok) => { const q = store.put(null, keys.at(-1)); q.onsuccess = ok; });
-    });
+// The stored Graph, and one way to make its restore throw with the rest of it intact: a card
+// whose Edges attribute does not parse.
+const storedGraph = (page) => page.evaluate(async () => {
+    const db = await new Promise((ok) => { const r = indexedDB.open('graphs'); r.onsuccess = () => ok(r.result); });
+    const store = db.transaction('graph-data').objectStore('graph-data');
+    const keys = await new Promise((ok) => { const q = store.getAllKeys(); q.onsuccess = () => ok(q.result); });
+    const data = await new Promise((ok) => { const q = store.get(keys.at(-1)); q.onsuccess = () => ok(q.result); });
+    return { key: keys.at(-1), data };
+});
+const breakTheRestore = (page) => page.evaluate(async () => {
+    const db = await new Promise((ok) => { const r = indexedDB.open('graphs'); r.onsuccess = () => ok(r.result); });
+    const store = db.transaction('graph-data', 'readwrite').objectStore('graph-data');
+    const keys = await new Promise((ok) => { const q = store.getAllKeys(); q.onsuccess = () => ok(q.result); });
+    const data = await new Promise((ok) => { const q = store.get(keys.at(-1)); q.onsuccess = () => ok(q.result); });
+    const broken = data.replace(/data-edges="[^"]*"/, 'data-edges="{not json"');
+    await new Promise((ok) => { const q = store.put(broken, keys.at(-1)); q.onsuccess = ok; });
+    return broken;
+});
+
+test('a Graph that did not reopen is kept as it was, and Save to… takes it to a file', async () => {
+    ({ context, page } = await openNeurite(browser, noPicker));
+    await withNotes(page, '## Alpha\nFirst.\n\n## Beta\nSecond.\n');
+    const broken = await breakTheRestore(page);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
-    await page.waitForFunction(() => document.getElementById('save-note').textContent.length > 0, undefined, { timeout: 10000 });
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => document.getElementById('save-note').textContent.startsWith('The last graph'), undefined, { timeout: 10000 });
     const note = await saveNote(page);
-    assert.match(note.text, /^The last graph did not reopen, so nothing is being saved/);
+    assert.match(note.text, /^The last graph did not reopen, and it is kept as it was/);
     assert.equal(note.warning, true);
+
+    // Save to… saves the stored Graph as it is -- it wrote the empty screen over it (rv15).
+    const { header } = await download(page);
+    assert.equal(header.data, broken, 'the file is not the Graph that did not reopen');
+    assert.equal((await storedGraph(page)).data, broken, 'the stored Graph was written over');
+
+    // And Clear, which banks the screen first, leaves it alone as well.
+    await page.evaluate(() => document.getElementById('clear-button').click());
+    await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 5000 });
+    await answer(page, true);
+    await page.waitForTimeout(1200);
+    const records = await page.evaluate(async () => {
+        const db = await new Promise((ok) => { const r = indexedDB.open('graphs'); r.onsuccess = () => ok(r.result); });
+        return new Promise((ok) => { const q = db.transaction('graph-data').objectStore('graph-data').getAll(); q.onsuccess = () => ok(q.result); });
+    });
+    assert.ok(records.includes(broken), 'Clear wrote the empty screen over the Graph that did not reopen');
+});
+
+test('a file that is not a Graph opens nothing, and the Graph on screen stays', async () => {
+    // Taken for an old save, it cleared the screen, and the empty record became the one a
+    // reload reopens (rv15).
+    ({ context, page } = await openNeurite(browser));
+    await withNotes(page, '## Alpha\nFirst.\n\n## Beta\nSecond.\n');
+    const cases = [
+        ['notes.txt', 'Just a note I wrote.\nNothing to do with Neurite.', /not a Neurite graph/],
+        ['cut.neurite', '{"v":1,"meta":{"uuid":"x"},"data":"<div data-node', /damaged or cut short/],
+    ];
+    for (const [name, text, says] of cases) {
+        const path = join(dir, name);
+        writeFileSync(path, text);
+        await page.setInputFiles('#open-file-input', path);
+        await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 5000 });
+        assert.match(await dialogText(page), says);
+        await answer(page, true);
+        await page.waitForTimeout(300);
+        assert.deepEqual(await titles(page), ['Alpha', 'Beta'], name + ' changed the screen');
+    }
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 2, undefined, { timeout: 15000 });
+    assert.deepEqual(await titles(page), ['Alpha', 'Beta'], 'a reload opened something else');
+});
+
+test('a file with one damaged part opens with the rest of it', async () => {
+    ({ context, page } = await openNeurite(browser, noPicker));
+    await withNotes(page, '## Gamma\nThird.\n');
+    const { path } = await download(page);
+    const bytes = readFileSync(path);
+    const nul = bytes.indexOf(0);
+    const header = JSON.parse(bytes.subarray(0, nul).toString('utf8'));
+    header.data = header.data.replace(/(<div id="saved-views"[^>]*>)[^<]*/, '$1%E0%A4%A');
+    const damaged = join(dir, 'damaged-part.neurite');
+    writeFileSync(damaged, Buffer.concat([Buffer.from(JSON.stringify(header)), bytes.subarray(nul)]));
+    await context.close();
+
+    ({ context, page } = await openNeurite(browser));
+    await withNotes(page, '## Alpha\nFirst.\n');
+    await page.setInputFiles('#open-file-input', damaged);
+    await page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.getTitle() === 'Gamma'), undefined, { timeout: 8000 });
+    assert.deepEqual(await titles(page), ['Gamma']);
+});
+
+test('while Save to… writes a file, another Graph on screen is not written into it', { skip: isIPad && 'no file picker in WebKit' }, async () => {
+    // Clear, or Open… of another file, and the next autosave wrote that Graph over the file (rv15).
+    ({ context, page } = await openNeurite(browser, { setup: (ctx) => ctx.addInitScript(() => {
+        window.file = { name: 'Alpha.neurite', lastModified: 1000, writes: 0, text: '' };
+        window.showSaveFilePicker = async () => ({
+            queryPermission: async () => 'granted',
+            getFile: async () => ({ name: window.file.name, lastModified: window.file.lastModified }),
+            createWritable: async () => ({
+                write: async (blob) => { window.file.writes++; window.file.text = await blob.text(); },
+                close: async () => { window.file.lastModified++; } }),
+        });
+    }) }));
+    await withNotes(page, '## Alpha\nFirst.\n');
+    await openMenu(page);
+    await page.click('#disk-file-button');
+    await page.waitForFunction(() => window.file.writes === 1, undefined, { timeout: 5000 });
+    await page.evaluate(() => document.getElementById('clear-button').click());
+    await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 5000 });
+    await answer(page, true);
+    await page.waitForTimeout(800);
+    await withNotes(page, '## Delta\nFourth.\n');
+    const file = await page.evaluate(() => ({ writes: window.file.writes, alpha: window.file.text.includes('Alpha'), delta: window.file.text.includes('Delta') }));
+    assert.deepEqual(file, { writes: 1, alpha: true, delta: false }, "another Graph was written into Alpha's file");
+    assert.equal(await page.textContent('#disk-file-button .menu-row-label'), 'Save to…', 'the button still says it is writing the file');
+});
+
+test('the older-copy question is asked for an older file, not after a pan or for a newer one', async () => {
+    ({ context, page } = await openNeurite(browser, noPicker));
+    await withNotes(page, '## Alpha\nv1.\n');
+    const f1 = await download(page);
+    await page.evaluate(() => menuButton.click());
+    await page.waitForTimeout(500);
+
+    // Only a pan since the file: opening it asks nothing.
+    await page.evaluate(async () => { Graph.pan_set(Graph.pan.plus(new vec2(0.2, 0.1))); await App.viewGraphs.saveNow(); });
+    await page.setInputFiles('#open-file-input', f1.path);
+    await page.waitForTimeout(1500);
+    assert.equal(await dialogText(page), null, 'a pan made the file an older copy');
+
+    // A newer file, then the older one: only the older one is asked about.
+    await withNotes(page, '## Alpha\nv2.\n');
+    const f2 = await download(page);
+    await page.evaluate(() => menuButton.click());
+    await page.waitForTimeout(500);
+    await page.setInputFiles('#open-file-input', f1.path);
+    await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 5000 });
+    assert.match(await dialogText(page), /older copy of the graph on screen/);
+    await answer(page, true);
+    await page.waitForTimeout(1500);
+    await page.setInputFiles('#open-file-input', f2.path);
+    await page.waitForTimeout(1500);
+    assert.equal(await dialogText(page), null, 'a newer file was called an older copy');
+    assert.match((await saveNote(page)).text, /^From a file saved/);
 });
 
 // "Complete" is what the exporter writes (#61), pinned by a round trip with one Node of every
