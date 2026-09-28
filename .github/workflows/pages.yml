@@ -1,0 +1,46 @@
+name: Pages
+
+# The app on GitHub Pages (#9): https://pxmyh.github.io/Neurite/, built from every push to main.
+# One permanent origin is what an iPad installs to its Home Screen, and a Graph lives in that
+# origin's storage, so the address is not to be moved lightly: a Graph moves between origins
+# only as a file (Save to... on one, Open... on the other).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push replaces a deploy still waiting.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No lockfile in this repo, so `npm ci` has nothing to install from.
+      - run: npm install --no-audit --no-fund
+
+      - run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

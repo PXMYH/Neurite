@@ -298,7 +298,7 @@ class PageLoad {
 
     async loadResource(templateName){ // dynamically and append to body
         try {
-            const response = await fetch(`/resources/${templateName}.html`);
+            const response = await fetch(`resources/${templateName}.html`);
             if (!response.ok) {
                 throw new Error(`Failed to load ${templateName}: ${response.statusText}`);
             }
@@ -337,7 +337,7 @@ class PageLoad {
     }
     static tabContentLoader = class {
         constructor(tabId, fileName){
-            this.url = '/resources/html/tabs/' + fileName;
+            this.url = 'resources/html/tabs/' + fileName;
             this.elem = Elem.byId(tabId);
             this.fileName = fileName;
         }

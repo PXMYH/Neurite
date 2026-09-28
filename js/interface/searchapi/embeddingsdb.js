@@ -33,7 +33,7 @@ const Embeddings = {
 
     init(){
         this.selectModel = Elem.byId('embeddingsModelSelect');
-        this.worker = new Worker('/embeddings.js', { type: 'module' });
+        this.worker = new Worker('embeddings.js', { type: 'module' });
         On.message(this.worker, this.onWorkerMessage);
 
         /*

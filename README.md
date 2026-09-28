@@ -110,6 +110,16 @@ Desktop** for Windows, Linux or macOS — see [`docs/desktop.md`](docs/desktop.m
 repository's own macOS app (Apple Silicon) is the `.dmg` on its
 [latest release](https://github.com/PXMYH/Neurite/releases/latest), built from `desktop/`.
 
+This fork's own build is at **[pxmyh.github.io/Neurite](https://pxmyh.github.io/Neurite/)**,
+deployed from `main` on every push. On an iPad, open it in Safari and choose **Share → Add to Home
+Screen**: installed, it opens offline once it has been opened online, and Safari keeps its storage
+instead of clearing it after seven days without a visit. What a finger does is in
+[`docs/controls.md`](docs/controls.md). Your Graphs live in that address's storage, so they move
+to another address, or another device, as a file: **Save to…** on one, **Open…** on the other.
+The address is shared by every GitHub Pages site under `pxmyh.github.io`, and so is its storage,
+so an API key typed in there can be read by any of them: give this site a domain of its own before
+entering one.
+
 ## Features, in depth
 
 | Doc | What's in it |

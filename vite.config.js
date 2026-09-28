@@ -5,8 +5,24 @@ import { dirname, resolve } from 'node:path';
 
 const checkoutRoot = dirname(fileURLToPath(import.meta.url));
 
+// The built app registers its service worker (`public/sw.js`, #9); the dev server does not, so
+// a checkout being worked on, and every browser test run against one, never has a cache
+// between it and the files. Relative, like every other path in the build: the app is served
+// from a subpath (`/Neurite/` on GitHub Pages) and from `app://neurite` in the Mac app, where
+// the registration fails and is let go.
+const registerServiceWorker = {
+    name: 'neurite-register-service-worker',
+    apply: 'build',
+    transformIndexHtml: () => [{
+        tag: 'script',
+        injectTo: 'body',
+        children: "if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});",
+    }],
+};
+
 export default defineConfig({
     base: './',
+    plugins: [registerServiceWorker],
     build: {
         sourcemap: 'inline',
         target: 'esnext',

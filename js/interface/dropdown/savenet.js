@@ -1209,7 +1209,7 @@ View.Graphs = class {
     static FileStateLoader = class {
         constructor(mom){ this.mom = mom }
         load(stateFromURL){ // in the /wiki/pages directory
-            return fetch(`/wiki/pages/neurite-wikis/${stateFromURL}.txt`)
+            return fetch(`wiki/pages/neurite-wikis/${stateFromURL}.txt`)
                 .then(this.#extractTextFromResponse)
                 .then(this.#handleResponseText)
                 .catch(this.#onResponseError)

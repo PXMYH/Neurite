@@ -155,6 +155,11 @@ Consequences that bite:
   `wiki/` into `dist/`. Third-party libs (CodeMirror 5, Prism, marked, DOMPurify, localforage, pdf.js)
   come from CDN `<script>` tags in `index.html`, not from `package.json`.
 - `public/embeddings.js` is a Web Worker (transformers.js from CDN) and is deliberately outside `js/`.
+  `public/sw.js` is the service worker, network first and cache second, and only the build
+  registers it (`registerServiceWorker` in `vite.config.js`), so `npm start` and the browser tests
+  never have a cache in front of them. The build is served from a subpath
+  (`https://pxmyh.github.io/Neurite/`, `.github/workflows/pages.yml`), so every path the app
+  fetches is relative: a leading `/` is the domain's root, which is not the app.
 
 ### Global singletons
 
