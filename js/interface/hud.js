@@ -354,10 +354,14 @@ class Hud {
             ? (from + margin - lo) : (hi > to - margin ? (to - margin - hi) : 0));
         const dx = shift(box.left, box.right, rect.left, rect.right);
         const dy = shift(box.top, box.bottom, rect.top, rect.bottom);
-        if (!dx && !dy) return;
+        if (!dx && !dy) return false;
 
-        // The Graph moves the way the card has to, so the pan goes the other.
-        Graph.pan_set(new vec2(Graph.pan.x - dx * perPx, Graph.pan.y - dy * perPx));
+        // The Graph moves the way the card has to, so the pan goes the other -- turned as the
+        // view is: taken as plain x and y, at 180 degrees the pan went the wrong way and threw
+        // the card 1500 px off screen (rv12).
+        const move = Graph.xyToZ(dx, dy).minus(Graph.xyToZ(0, 0));
+        Graph.pan_set(Graph.pan.minus(move));
+        return true;
     }
     // A point of the Plane on the page, as `Node.draw` places a card.
     static toScreen(z){
@@ -546,7 +550,12 @@ class Hud {
     }
 }
 
-// The page never scrolls: the Graph is the whole window and has a pan of its own. A card past the
-// window's edge scrolled it when focused or typed into, taking the tool bar and the menu button
-// off screen with nothing but Home to bring them back (rv10, rv11).
-On.scroll(window, ()=>{ if (window.scrollX || window.scrollY) window.scrollTo(0, 0) });
+// The page scrolls only while a card's text needs it. A caret typed past the window's edge
+// scrolls it into sight, as ever -- held at the top, the text went on out of sight (rv12) -- and
+// once the typing is done the page goes back, with the tool bar and the menu button it took off
+// screen, which only Home had brought back (rv10, rv11).
+On.blur(document, ()=>{
+    requestAnimationFrame( ()=>{
+        if ((window.scrollX || window.scrollY) && !Hud.isTyping()) window.scrollTo(0, 0);
+    });
+}, true);

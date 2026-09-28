@@ -160,7 +160,10 @@ class ZetRegions {
             const nearest = cells.filter( (c)=>(c.d <= region.r && free(c.x, c.y)) ).sort( (a, b)=>(away(a) - away(b)) )[0];
             if (nearest) return new vec2(nearest.x, nearest.y);
         }
-        cells.sort( (a, b)=>((Number(b.inside) - Number(a.inside)) || (a.d - b.d)) );
+        // And a full Region, with no free cell inside: the free cell nearest the pointer, not the
+        // one nearest the middle, which put a note on the far side of the block (rv12).
+        const from = (c: {x: number, y: number, d: number})=>(near ? Math.hypot(c.x - near.x, c.y - near.y) : c.d);
+        cells.sort( (a, b)=>((Number(b.inside) - Number(a.inside)) || (from(a) - from(b))) );
         const cell = cells.find( (c)=>free(c.x, c.y) );
         return cell ? new vec2(cell.x, cell.y) : null;
     }

@@ -179,7 +179,7 @@ class NodeView {
         // that window, a pass meant to make their new note visible instead drags it to
         // wherever they have since gone. "Make sure the note you just made is in view"
         // stops being a true statement the moment they move.
-        const arrivedAt = {panX: Graph.pan.x, panY: Graph.pan.y, zoom: Graph.zoom.mag()};
+        let arrivedAt = {panX: Graph.pan.x, panY: Graph.pan.y, zoom: Graph.zoom.mag()};
         // A note of a Region (`ZetRegions`) belongs where its Region is, not in view.
         const loose = batch.filter( (node)=>!node.inRegion );
         const fits = Graph.fitInView(loose);
@@ -204,8 +204,14 @@ class NodeView {
                 // Separation still applies -- two cards on the same spot is wrong wherever
                 // the reader is looking -- but the clamp only applies while they are still
                 // looking at the place the notes arrived in.
-                // A note of a Region stays where it was made, and the view comes to it instead.
-                if (clamp) live.forEach( (node)=>{ if (node.inRegion) Hud.reveal(node); else Graph.keepInView(node) } );
+                // A note of a Region stays where it was made, and the view comes to it instead --
+                // not for one following the pointer, which the view would move under it (rv12).
+                if (clamp) live.forEach( (node)=>{
+                    if (!node.inRegion) return Graph.keepInView(node);
+                    // The view as this moved it is still the view the notes arrived into: counted
+                    // as the reader's, it switched off the pass that measures the card grown (rv12).
+                    if (!node.followingMouse && Hud.reveal(node)) arrivedAt = {panX: Graph.pan.x, panY: Graph.pan.y, zoom: Graph.zoom.mag()};
+                });
             }
             // A pile too big for three bounded passes is finished off a frame at a time.
             if (!result.clear) Graph.relaxInBackground({bias: 0.85, favour});

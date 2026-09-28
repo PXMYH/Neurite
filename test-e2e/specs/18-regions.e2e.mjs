@@ -374,3 +374,65 @@ test('a note double-clicked between a Region\'s cards is shown whole, clear of t
     assert.equal(seen.scrollY, 0, 'the page scrolled');
     assert.ok(seen.toolbar >= 0, 'the tool bar left the screen');
 });
+
+// The view is moved to show a new note of a Region whole, turned as the view is: taken as plain
+// x and y, at 180 degrees the pan went the wrong way and threw the card 1500 px off screen (rv12).
+test('a note made at a Region\'s edge is shown whole with the view turned half round', async () => {
+    await importBundle(page);
+    await setMenu(page, false);
+    const at = await page.evaluate(() => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+        ZetRegions.frame(pane.paneId);
+        Graph.zoom_cmultWith(new vec2(-1, 0));
+        Hud.setZoomMag(Graph.zoom.mag() / 2);
+        const r = ZetRegions.of(pane.paneId);
+        let best = null;
+        for (let k = 0; k < 720; k++) {
+            const a = k * Math.PI / 360;
+            const z = new vec2(r.x + Math.cos(a) * r.r * 0.9, r.y + Math.sin(a) * r.r * 0.9);
+            const s = Hud.toScreen(z);
+            if (s.x < 0 || s.y < 80 || s.x > innerWidth - 2 || s.y > innerHeight - 2) continue;
+            const el = document.elementFromPoint(s.x, s.y);
+            if (!el || !svg.contains(el)) continue;
+            if (!best || s.x + s.y > best.x + best.y) best = s;
+        }
+        return best;
+    });
+    assert.ok(at, 'no free spot of the Region on screen');
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none'; });
+    await page.mouse.dblclick(at.x, at.y);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = ''; });
+    await page.waitForTimeout(1200);
+    const seen = await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).at(-1);
+        const b = n.view.div.getBoundingClientRect();
+        const u = Hud.usableRect();
+        return { box: [b.left, b.top, b.right, b.bottom], usable: [u.left, u.top, u.right, u.bottom] };
+    });
+    const [l, t, r, b] = seen.box, [ul, ut, ur, ub] = seen.usable;
+    assert.ok(l >= ul - 1 && t >= ut - 1 && r <= ur + 1 && b <= ub + 1, 'the card is not whole on screen: ' + JSON.stringify(seen));
+});
+
+// The page may scroll to keep a caret typed past the window's edge in sight -- held at the top,
+// the text went on out of sight (rv12) -- and goes back once the typing is done, bringing the
+// tool bar with it (rv10, rv11).
+test('the page goes back to the top once a card is no longer typed into', async () => {
+    const back = await page.evaluate(async () => {
+        const node = await window.createNote('Low', 'A body.');
+        await new Promise((r) => setTimeout(r, 600));
+        // Past the window's bottom edge, where a card can be put, so the page has room to scroll.
+        node.pos = Graph.xyToZ(innerWidth / 2, innerHeight + 100);
+        node.anchor = node.pos;
+        await new Promise((r) => setTimeout(r, 300));
+        node.contentEditableDiv.focus();
+        window.scrollTo(0, 150);
+        await new Promise((r) => setTimeout(r, 100));
+        const typing = window.scrollY;
+        node.contentEditableDiv.blur();
+        await new Promise((r) => setTimeout(r, 200));
+        return { typing, after: window.scrollY };
+    });
+    assert.ok(back.typing > 0, 'the page could not scroll while the card was typed into');
+    assert.equal(back.after, 0, 'the page stayed scrolled');
+});
