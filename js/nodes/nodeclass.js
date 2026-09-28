@@ -371,6 +371,14 @@ class Node {
         }
     }
     stopFollowingMouse = (e) => {
+        // Down where the pointer is now, not where the last frame drew it. A tap sends its
+        // mousemove and its mouseup in one go, with no frame between them, so a note made by a
+        // tap on the Note tool followed the finger nowhere and landed under the tool bar
+        // instead of where the next tap put it down (#56).
+        if (this.followingMouse) {
+            this.pos = Graph.vecToZ().minus(this.mouseAnchor);
+            this.anchor = this.pos;
+        }
         this.followingMouse = 0;
         Graph.movingNode = undefined;
 

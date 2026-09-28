@@ -27,13 +27,17 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <!-- Touch -->
   <tr>
-    <td rowspan="5"><strong>Touch</strong></td>
+    <td rowspan="6"><strong>Touch</strong></td>
     <td><code>One finger on the fractal</code></td>
     <td>Move around</td>
   </tr>
   <tr>
     <td><code>Two fingers on the fractal</code></td>
     <td>Zoom and turn. The fractal stays under your fingers.</td>
+  </tr>
+  <tr>
+    <td><code>The Note tool, then a tap</code></td>
+    <td>A note where you tap. Typing a <code>## Title</code> line in the Notes panel makes one too.</td>
   </tr>
   <tr>
     <td><code>A finger on a title</code></td>

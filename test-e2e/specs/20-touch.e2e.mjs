@@ -236,6 +236,31 @@ test('"+ link" and the chip\'s × make and cut an Edge by touch', async () => {
     assert.deepEqual(await refsIn(page), []);
 });
 
+// A note by touch (#56): the Note tool makes a note that follows the pointer until a click puts
+// it down. A tap sends its mousemove and its mouseup with no frame between them, so the note
+// followed nowhere and landed under the tool bar.
+test('a tap on the Note tool, then a tap on the fractal, puts a note there', async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    const tool = await page.evaluate(() => {
+        const r = document.querySelector('.panel-icon.note-icon').getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    await page.touchscreen.tap(tool.x, tool.y);
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate(() => Object.values(Graph.nodes).filter((n) => n.followingMouse).length), 1,
+        'the tap on the tool made no note to place');
+    await page.touchscreen.tap(400, 600);
+    await page.waitForTimeout(500);
+    const landed = await page.evaluate(() => Object.values(Graph.nodes).map((n) => {
+        const r = n.view.div.getBoundingClientRect();
+        return { following: n.followingMouse, x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }));
+    assert.equal(landed.length, 1);
+    assert.equal(landed[0].following, 0, 'the note is still following');
+    assert.ok(Math.hypot(landed[0].x - 400, landed[0].y - 600) < 3,
+        `the note landed at (${Math.round(landed[0].x)}, ${Math.round(landed[0].y)}), not where the tap put it down`);
+});
+
 // The on-screen keyboard (#56). It covers the page rather than resizing it, so `dvh` does not
 // move, and a Pane as tall as the window kept its last lines -- and the caret typing them --
 // under the keys. The keyboard is simulated the way iOS reports it: `visualViewport.height`
