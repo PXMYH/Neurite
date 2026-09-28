@@ -18,6 +18,10 @@ function createMediaNode(type, metadataOrFile, url) {
     const name = (typeof metadataOrFile === 'string' ? metadataOrFile : metadataOrFile.name || 'Untitled Media');
     const node = new Node();
     NodeView.addAtNaturalScale(node, name, [elem]);
+    // A dropped file's sound or video lives only in this page's memory: marked, as an image
+    // is (imagenode.js), the save keeps it with the Graph and a file carries it. Unmarked, it
+    // was in neither, and came back from a reload or a file as a player with nothing to play.
+    if (url?.startsWith('blob:')) node.blob = name;
     return node;
 }
 
