@@ -679,19 +679,23 @@ class Node {
     // already at its end hands it to the canvas, so a short note does not trap the
     // gesture at all and a long one stops trapping it once it is read to the bottom.
     static wheelScrollsContent(e){ return Boolean(Node.scrollerFor(e.target, e.deltaY)) }
-    // The box at or above `el` that can scroll the way `deltaY` goes (down when positive), or
-    // null. A finger on a card asks it too (interface.js).
-    static scrollerFor(el, deltaY){
+    // The box at or above `el` that can scroll the way `delta` goes -- down, or with `axis` 'x'
+    // right, when positive -- or null. A finger on a card asks it too, across as well as down:
+    // a code block's long line could not be reached by one (interface.js, rv16).
+    static scrollerFor(el, delta, axis = 'y'){
+        const [size, room, at, overflow] = (axis === 'x')
+            ? ['scrollWidth', 'clientWidth', 'scrollLeft', 'overflowX']
+            : ['scrollHeight', 'clientHeight', 'scrollTop', 'overflowY'];
         for (; el && el !== document.body; el = el.parentElement) {
-            const canScroll = el.scrollHeight - el.clientHeight > 1;
+            const canScroll = el[size] - el[room] > 1;
             if (!canScroll) continue;
             const style = getComputedStyle(el);
-            if (!/auto|scroll/.test(style.overflowY)) continue;
+            if (!/auto|scroll/.test(style[overflow])) continue;
 
-            const atTop = el.scrollTop <= 0;
-            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-            if (deltaY < 0 && !atTop) return el;
-            if (deltaY > 0 && !atBottom) return el;
+            const atStart = el[at] <= 0;
+            const atEnd = el[at] + el[room] >= el[size] - 1;
+            if (delta < 0 && !atStart) return el;
+            if (delta > 0 && !atEnd) return el;
         }
         return null;
     }

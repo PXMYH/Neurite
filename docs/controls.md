@@ -33,7 +33,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Two fingers, on the fractal or a note</code></td>
-    <td>Zoom, with the fractal under your fingers. A clear twist turns the view as well, and Upright, beside Home, turns it back where you are.</td>
+    <td>Zoom, with the fractal under your fingers. A clear twist turns the view as well, and the arrow over the overview turns it back, where you are.</td>
   </tr>
   <tr>
     <td><code>New note, then a tap</code></td>

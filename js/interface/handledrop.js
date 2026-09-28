@@ -81,9 +81,21 @@ const ToolArm = {
     // of it (rv15). The note takes the caret instead, as a double-click's does, and is moved
     // off any card it came down on, as a new note always is (`settlePlacement`).
     landing: [],
+    // A press on the lit tool takes back the Node it made, as a second tap on Connect turns
+    // Connect off: it put the Node down under the tool and made another, with the caret in the
+    // first (rv16).
+    takenBack: false,
     onMouseDown: (e)=>{
+        ToolArm.takenBack = false;
         ToolArm.landing = Object.values(Graph.nodes).filter( (node)=>node.followingMouse );
-        if (ToolArm.landing.length) e.preventDefault();
+        if (!ToolArm.landing.length) return;
+
+        e.preventDefault();
+        if (!ToolArm.el || e.target.closest?.('.node-add-item') !== ToolArm.el) return;
+
+        ToolArm.landing.forEach(deleteNodeAndItsZetText);
+        ToolArm.landing = [];
+        ToolArm.takenBack = true;
     },
     onMouseUp: ()=>{
         for (const node of ToolArm.landing) {
@@ -128,6 +140,10 @@ function makeIconDraggable(iconDiv) {
     });
 
     On.click(iconDiv, (e) => {
+        if (ToolArm.takenBack) {
+            ToolArm.takenBack = false;
+            return ToolArm.release();
+        }
         if (!Mouse.isDragging) {
             // Lit before the action runs, so the three tools that open a modal first are
             // lit while it is open -- the tool is engaged from the press, whatever it is

@@ -30,6 +30,16 @@ class Hud {
         panel.innerHTML = `
             <canvas class="hud-map" width="${Hud.minimapW}" height="${Hud.minimapH}"
                     aria-label="Overview of every note, and the part of it you are looking at"></canvas>
+            <!-- Only while the view is turned, which a twist of a pinch does (#55), and pointing
+                 the way the Plane's up is. Home puts the view upright as well, but back at the
+                 start, and a reader straightening a tilt lost their place (rv15). Over the
+                 overview, not beside Home: shown and hidden in that row, it moved Home from under
+                 the finger reaching for it (rv16). -->
+            <button type="button" class="hud-upright" data-act="upright" hidden
+                    aria-label="Turn the view upright"
+                    data-tooltip="Upright: turn the view back, and stay where you are">
+                <svg aria-hidden="true"><use href="#upright-icon"></use></svg>
+            </button>
             <div class="hud-row">
                 <span class="hud-scale" title="Magnification, relative to the whole set">&times;1</span>
                 <span class="hud-count">0 notes</span>
@@ -52,11 +62,6 @@ class Hud {
                         data-tooltip="Push overlapping notes apart, without rearranging the map (T)">Tidy</button>
                 <button type="button" class="hud-btn" data-act="home"
                         data-tooltip="Back to the start: pan 0, zoom 1, upright (Home)">Home</button>
-                <!-- Only while the view is turned, which a twist of a pinch does (#55). Home
-                     puts it upright as well, but back at the start, and a reader straightening
-                     a tilt lost their place (rv15). -->
-                <button type="button" class="hud-btn" data-act="upright" hidden
-                        data-tooltip="Turn the view upright, and stay where you are">Upright</button>
             </div>`;
         root.appendChild(panel);
 
@@ -99,7 +104,7 @@ class Hud {
         hint.innerHTML = `
             <p class="canvas-hint-lead">
                 <span class="for-pointer">Double-click anywhere to write a note</span>
-                <span class="for-touch">Tap <svg class="inline-icon" aria-label="the Note tool" role="img"><use xlink:href="#note-icon-symbol"></use></svg>, then where the note goes</span>
+                <span class="for-touch">Tap <svg class="inline-icon" aria-label="New note" role="img"><use xlink:href="#note-icon-symbol"></use></svg>, then where the note goes</span>
             </p>
             <!-- What the app actually does, checked against the handlers rather than
                  written from memory. This said "Shift + drag a note onto another to link
@@ -115,7 +120,8 @@ class Hud {
             <p class="canvas-hint-keys">
                 <span>Write <kbd>[[</kbd>another note's title<kbd>]]</kbd> in a note to link them</span>
                 <span class="for-pointer"><kbd>0</kbd> fit &middot; <kbd>T</kbd> tidy &middot; <kbd>Home</kbd> reset &middot; scroll to zoom</span>
-                <span class="for-touch">One finger moves the view, two zoom it &middot; Help has the rest</span>
+                <span class="for-touch">One finger moves the view, and two zoom it</span>
+                <span class="for-touch">The rest is in Menu &rsaquo; Help</span>
             </p>`;
         root.appendChild(hint);
         this.hint = hint;
@@ -184,8 +190,10 @@ class Hud {
         Hud.elemCount.title = selected ? 'Esc, or a click on bare canvas, clears the selection' : '';
 
         if (Hud.hint) Hud.hint.classList.toggle('is-hidden', frame.count > 0);
-        const turned = Math.abs(Math.atan2(Graph.zoom.y, Graph.zoom.x)) > 1e-3;
+        // A turn of the view takes the Plane's up the other way on screen.
+        const turn = Math.atan2(Graph.zoom.y, Graph.zoom.x), turned = Math.abs(turn) > 1e-3;
         if (Hud.elemUpright.hidden === turned) Hud.elemUpright.hidden = !turned;
+        if (turned) Hud.elemUpright.style.setProperty('--turn', -turn + 'rad');
         Hud.updateArchive();
         Hud.updateUnderMenu();
     }
@@ -379,6 +387,54 @@ class Hud {
         return Hud.revealBox({left: c.x - half.hw / perPx, right: c.x + half.hw / perPx,
                               top: c.y - half.hh / perPx, bottom: c.y + half.hh / perPx});
     }
+    // The caret of a card being typed into, kept above an on-screen keyboard (rv15, rv16): when
+    // the keys come up, as it is typed, and when it moves to another card while they are up. It
+    // was the typed field's box once, as the keys came up, and eight lines on the caret was under
+    // them. Once a frame at most, and from where the card is on the Plane now, as `reveal` works:
+    // taken from where it was last drawn, two moves before a frame moved the view twice as far.
+    static #caretFrame = 0;
+    static keepCaretInSight(){
+        if (Hud.#caretFrame) return;
+
+        Hud.#caretFrame = requestAnimationFrame( ()=>{
+            Hud.#caretFrame = 0;
+            const typing = document.activeElement;
+            const node = Graph.nodes[typing?.closest?.('#nodes [data-view-id]')?.dataset.viewId];
+            const half = node && Graph.planeHalfExtent(node);
+            if (!half) return;
+
+            const card = node.content.getBoundingClientRect(), caret = Hud.caretBoxOf(typing);
+            const perPx = 2 * Graph.zoom.mag() / Svg.windowScale(), c = Hud.toScreen(node.pos);
+            const left = c.x - half.hw / perPx - card.left, top = c.y - half.hh / perPx - card.top;
+            Hud.revealBox({left: caret.left + left, right: caret.right + left,
+                           top: caret.top + top, bottom: caret.bottom + top}, Hud.visibleRect());
+        });
+    }
+    // Where a text field's caret is on the screen, a line tall: a hidden copy of the text up to it,
+    // laid out as the field lays it out, gives its line, and the field's drawn scale takes that
+    // to the screen. Any other element is its own box.
+    static caretBoxOf(el){
+        const box = el.getBoundingClientRect();
+        if (el.tagName !== 'TEXTAREA' || typeof el.selectionEnd !== 'number') return box;
+
+        const style = getComputedStyle(el), copy = Html.new.div(), mark = Html.new.span();
+        for (const name of ['boxSizing', 'width', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+                            'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+                            'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight',
+                            'textTransform', 'wordSpacing', 'tabSize']) copy.style[name] = style[name];
+        Object.assign(copy.style, {position: 'absolute', visibility: 'hidden', top: '0', left: '0',
+                                   whiteSpace: 'pre-wrap', overflowWrap: 'break-word'});
+        copy.textContent = el.value.slice(0, el.selectionEnd);
+        mark.textContent = '\u200b';
+        copy.append(mark);
+        document.body.append(copy);
+        const top = mark.offsetTop - el.scrollTop, height = mark.offsetHeight;
+        copy.remove();
+
+        const scale = (box.height / el.offsetHeight) || 1;
+        const lineTop = box.top + Math.min(Math.max(top, 0), el.clientHeight) * scale;
+        return {left: box.left, right: box.right, top: lineTop, bottom: lineTop + height * scale};
+    }
     // The view moved just enough to bring a box of the screen into `rect`.
     static revealBox(box, rect = Hud.usableRect()){
         if (!rect) return;
@@ -524,10 +580,13 @@ class Hud {
         Graph.pan_set(new vec2(0, 0));
         Graph.zoom_set(new vec2(1, 0));
     }
-    // The same view, upright: turned about the middle of the screen, which is the pan.
+    // The same view, upright: turned about the middle of the screen, which is the pan. The
+    // button goes with the turn, so a keyboard's focus goes on to Home rather than to the page.
     static upright(){
         Autopilot.stop();
         Graph.zoom_set(new vec2(Graph.zoom.mag(), 0));
+        if (document.activeElement === Hud.elemUpright) Hud.panel.querySelector('[data-act="home"]').focus();
+        Hud.update();
     }
 
     // Push overlapping notes apart, and nothing else.
@@ -627,17 +686,18 @@ On.blur(document, ()=>{
 // lines -- and the caret typing them -- under the keys. `visualViewport` is the part on screen:
 // the menu, the Pane and the dialogs are clamped to it (`--visible-height`), and the Pane's
 // CodeMirror, which measures its box only when told to, is told, with the caret kept in sight.
-// A card typed into is brought above the keys by moving the view: it stayed under them, where
-// nothing but the keys could be seen (rv15).
+// The caret of a card typed into is kept above the keys by moving the view (`keepCaretInSight`).
 if (window.visualViewport) {
     // Only when a keyboard comes up is the caret brought back into sight: on every resize it
     // threw away where the Pane had been scrolled to (rv15). A keyboard shrinks the visible
     // height and leaves the window's alone; a window made smaller shrinks both.
-    let visibleHeight = visualViewport.height, windowHeight = window.innerHeight;
+    let visibleHeight = visualViewport.height, windowHeight = window.innerHeight, keysUp = false;
     const keepVisibleHeight = ()=>{
         const keyboardCameUp = visualViewport.height < visibleHeight && window.innerHeight === windowHeight;
         visibleHeight = visualViewport.height;
         windowHeight = window.innerHeight;
+        // Up, when it covers more than the shortcut bar a hardware keyboard leaves on an iPad.
+        keysUp = visibleHeight < windowHeight - 120;
         document.documentElement.style.setProperty('--visible-height', visibleHeight + 'px');
         // A keyboard that leaves little of the window -- an iPad's leaves some 470px in
         // landscape -- is short of room for the Archive controls above the Pane as well, and
@@ -645,8 +705,7 @@ if (window.visualViewport) {
         // is typed into (styles.css).
         document.documentElement.classList.toggle('short-of-room', visibleHeight < windowHeight - 120 && visibleHeight < 640);
 
-        const typing = document.activeElement;
-        if (keyboardCameUp && typing?.closest?.('#nodes')) Hud.revealBox(typing.getBoundingClientRect(), Hud.visibleRect());
+        if (keyboardCameUp) Hud.keepCaretInSight();
 
         const cm = window.currentActiveZettelkastenMirror;
         if (!cm) return;
@@ -655,4 +714,11 @@ if (window.visualViewport) {
     };
     On.resize(visualViewport, keepVisibleHeight);
     keepVisibleHeight();
+    const followCaret = (e)=>{ if (keysUp && e.target.closest?.('#nodes')) Hud.keepCaretInSight() };
+    On.input(document, followCaret, true);
+    On.focus(document, followCaret, true);
 }
+
+// Safari applies `:active` only under a listener for touches, and with its grey tap box gone a
+// press on a control showed nothing at all (rv16). Passive, and it does nothing.
+On.touchstart(document, ()=>{});

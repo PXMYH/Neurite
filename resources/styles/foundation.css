@@ -394,6 +394,49 @@ body.connect-mode .window textarea {
     cursor: crosshair;
 }
 
+/* Over the overview's top right corner, turned the way the Plane's up is (`--turn`, hud.js). */
+.hud-upright {
+    position: absolute;
+    top: calc(var(--space-2) + var(--space-1));
+    right: calc(var(--space-2) + var(--space-1));
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: var(--ui-chrome-text-strong);
+    background: var(--ui-chrome);
+    border: 1px solid var(--ui-chrome-rule);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.hud-upright[hidden] {
+    display: none;
+}
+
+.hud-upright svg {
+    width: 16px;
+    height: 16px;
+    transform: rotate(var(--turn, 0rad));
+}
+
+.hud-upright:hover {
+    background: var(--ui-chrome-hover);
+}
+
+.hud-upright:focus-visible {
+    outline: 2px solid var(--ui-accent);
+    outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+    .hud-upright {
+        width: 36px;
+        height: 36px;
+    }
+}
+
 .hud-row {
     display: flex;
     align-items: center;
@@ -894,6 +937,16 @@ html {
     -webkit-tap-highlight-color: transparent;
 }
 
+/* A press shows, in the chrome's own colour, now that the grey box does not (rv16). */
+.hud-btn:active,
+.hud-upright:active,
+.menu-row:active,
+.menu-button:active,
+.tool-bar-action:active,
+.panel-icon:active {
+    background: var(--ui-chrome-hover);
+}
+
 /* The empty canvas's hint, said to the hand it is read with (hud.js): the primary pointer, as
    an iPad with a trackpad is still read by its fingers. */
 @media (pointer: coarse) {
@@ -906,6 +959,12 @@ html {
     .canvas-hint .for-touch {
         display: none;
     }
+}
+
+/* No word left alone on the hint's last line (rv16). */
+.canvas-hint p,
+.canvas-hint span {
+    text-wrap: balance;
 }
 
 /* A tool's icon inside a line of text, at the text's size and in its colour. */

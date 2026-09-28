@@ -16,6 +16,7 @@ const EXPECTED = {
     'link-icon-symbol': 'link-2',
     'edges-icon-symbol': 'folder-tree',
     'connect-icon-symbol': 'spline',
+    'upright-icon': 'navigation-2',
     'ai-icon-symbol': 'bot',
     'searchSVG': 'search',
     'proposals-icon-symbol': 'lightbulb',

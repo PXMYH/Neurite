@@ -56,16 +56,20 @@ check below that needs one of those is marked as a device check.
 - **Every finger on the map** (same file). The cards are part of the map for touch, as the Fractal is:
   - a pinch with one finger or both on a card, or one on a header, zooms about the fingers;
   - one finger on a card's body pans the map, and a tap on it still puts the caret there;
-  - one finger on a long note's text scrolls it, with a fling, and pans the map sideways or past the
-    text's end;
+  - one finger on a long note's text scrolls it at the finger's own pace at any zoom, with a
+    fling, and pans the map past the text's end; content wider than its card scrolls sideways;
+  - a tap that stops a fling is no tap;
+  - a finger on a card's video, slider or field joins a pinch;
   - a finger whose lift never arrived is dropped when the next gesture begins;
   - a card past the window's edge no longer makes the page wider than the window;
-  - a turned view shows **Upright**, which straightens it in place;
+  - a turned view shows an arrow over the overview, pointing the way the Plane's up is, which
+    straightens the view in place;
   - the overview scrubs under a finger;
   - the first screen gives touch instructions under a coarse pointer.
 - **The keyboard** (same file): the Pane, the menu and the dialogs stay above it, with the keyboard
-  simulated as `visualViewport` reports it. A card typed into is moved above the keys. When the
-  keyboard leaves little room, as in landscape, the Archive controls give their room to the Pane.
+  simulated as `visualViewport` reports it. The caret of a card typed into is kept above the keys,
+  line after line. When the keyboard leaves little room, as in landscape, the Archive controls give
+  their room to the Pane.
 - **Save and Open** (`test-e2e/specs/21-durability.e2e.mjs`):
   - a round trip of one Node of every type, through a reload and through a file;
   - the Save row's note;
@@ -79,20 +83,26 @@ check below that needs one of those is marked as a device check.
 
 1. **Pinch.** Two fingers on the fractal: the zoom follows the fingers, a clear twist turns the view, and the page
    itself never zooms. Then pinch with a finger on a card, and with both on one: the map zooms the
-   same way. Over the Pane, nothing zooms. After a twist, **Upright** straightens the view in place.
+   same way. Over the Pane, nothing zooms. After a twist, the arrow over the overview straightens
+   the view in place.
 2. **One finger on a note.** On a short note it pans the map. On a long note it scrolls the text,
-   and a flick carries on after the lift. A long press on the text still selects it. A short pan
-   followed at once by a tap: the tap still puts the caret where it lands.
+   at the finger's pace, and a flick carries on after the lift. A tap on the moving text stops it
+   and opens no keyboard. A long press on the text still selects it, and a drag after the long
+   press moves the selection, not the map. A short pan followed at once by a tap: the tap still
+   puts the caret where it lands.
 3. **Header.** A finger on a card's header drags the card. A tap on the Title opens the keyboard. A
    long press on the Title selects text rather than starting a drag.
 4. **Small targets.** The grip resizes under a finger. Say whether the three 20 px header buttons can
    be hit without missing.
-5. **Tools.** Each tool in the bar acts on the first tap, not on a second one. New note and a tap on
-   a card: the keyboard comes up for the new note, not for the card under it.
+5. **Tools.** Each tool in the bar acts on the first tap, not on a second one, and shows that it
+   was pressed now that Safari's grey tap box is gone. New note and a tap on a card: the keyboard
+   comes up for the new note, not for the card under it. A second tap on the lit New note takes
+   its note back.
 6. **Keyboard.** Type at the end of a long note in the Pane. The caret stays above the keys, the
    Pane shrinks while the keyboard is up, and it comes back when the keyboard goes. In landscape the
-   Archive controls step aside while the Pane is typed into. Tap the Title of a card low on the
-   screen: the card comes up above the keys.
+   Archive controls step aside while the Pane is typed into. Tap the body of a card low on the
+   screen and type several lines: the caret stays above the keys. Say whether Safari also scrolls
+   the page to show the field, and whether the menu button and the overview move with it.
 7. **CodeMirror.** Typing, selection handles, autocorrect staying off, and dictation into the Pane,
    all on CodeMirror's `contenteditable` input.
 8. **Install.** Add to Home Screen from https://pxmyh.github.io/Neurite/. The app opens offline after

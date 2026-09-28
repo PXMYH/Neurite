@@ -330,10 +330,20 @@ class Graph {
         const halfUvX = half.hw / perUvX;
         const halfUvY = half.hh / perUvX;
 
-        const lo = margin, hi = 1 - margin;
-        const clamp = (v, h)=> Math.min(Math.max(v, lo + h), Math.max(hi - h, lo + h));
-        const targetU = clamp(uv.x, halfUvX);
-        const targetV = clamp(uv.y, halfUvY);
+        // The window in UV. 0..1 is the square the window's short side spans, centred as
+        // `Node.draw` places it, and the long side reaches past it: clamped to the square, a
+        // card in full view near the long side's ends was pulled up to 300 px toward the
+        // middle -- a note put down there, by a click or a tap, did not stay where it was put
+        // (rv16).
+        const box = svg.getBoundingClientRect();
+        const short = Math.min(box.width, box.height);
+        const reach = (side)=> (short > 0 ? side / (2 * short) : 0.5);
+        const clampIn = (v, h, reachOfSide)=>{
+            const lo = 0.5 - reachOfSide + margin, hi = 0.5 + reachOfSide - margin;
+            return Math.min(Math.max(v, lo + h), Math.max(hi - h, lo + h));
+        };
+        const targetU = clampIn(uv.x, halfUvX, reach(box.width));
+        const targetV = clampIn(uv.y, halfUvY, reach(box.height));
         if (targetU === uv.x && targetV === uv.y) return;
 
         // uv -> z is the inverse of fromZtoUV: ((uv - 0.5) * 2) * zoom + pan.
