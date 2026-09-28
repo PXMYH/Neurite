@@ -9,6 +9,87 @@ determined by the source, and reading it first means the device session records 
 re-deriving mechanisms. Everything below is either quoted from `main` or produced by a check that is
 reproducible here. Nothing in this file is a fix, and nothing in it substitutes for the device.
 
+## Since v1.5.0: what the WebKit engine says, and what only the iPad can
+
+Most of what follows this section was written before the touch work landed, and describes the code
+as it was then. It is kept as the record of why each change was made. This section is the current
+state.
+
+It was measured with Playwright's WebKit at the iPad's sizes: 820×1180 portrait and 1180×820
+landscape, with an iPad user agent, touch and a coarse pointer. **This is WebKit the engine, not an
+iPad.** It has no multi-touch, no on-screen keyboard, no Home Screen and no iCloud Drive, so every
+check below that needs one of those is marked as a device check.
+
+**What the engine reported:**
+
+- **Pickers.** `showSaveFilePicker`, `showOpenFilePicker` and `showDirectoryPicker` are all
+  undefined. Save to… is therefore a download in a Safari tab, and the share sheet in the installed
+  app.
+- **APIs present.** `navigator.share`, `navigator.canShare`, `serviceWorker`, `visualViewport`,
+  `PointerEvent`, `TouchEvent` and `GestureEvent` all exist. `touch-action: none` and `100dvh` are
+  supported.
+- **Storage.** `navigator.storage.persisted()` answers `false`, and the quota is 1049 MB.
+- **Media queries.** `(pointer: coarse)` and `(hover: none)` both match, and the display mode is
+  `browser`.
+- **CodeMirror.** It picks `inputStyle: contenteditable` for the Pane under the iPad user agent.
+- **Layout.** Nothing on screen is wider than the window, in either orientation.
+- **Tap targets under 28 px on screen.**
+  - The card header's three buttons, at 20×20 px.
+  - A link chip's label, its ×, and **+ link**. Each is 13–14 px tall as drawn, but a coarse
+    pointer gets a 44 px target for each.
+  - The resize grip. It is 23 px on screen at a card's default scale, drawn from 29 CSS px.
+
+**What is now verified in the engine, with the test that keeps it true:**
+
+- **One pinch.** Its math: `test/pinch-math.test.js`. Its wiring: drive scripts in #55, with real
+  touches in Chromium and synthetic pointers in WebKit.
+- **By touch** (`test-e2e/specs/20-touch.e2e.mjs`):
+  - a header drag;
+  - a tap that focuses the Title and moves nothing;
+  - a drag that starts on a header button and moves nothing;
+  - a grip resize;
+  - no tooltip on a tap;
+  - Titles typed as spelled.
+- **Edges by touch** (same file): the Connect tool and two taps, and **+ link** and ×.
+- **Placing a note** (same file): the Note tool and a tap put the note where the tap was.
+- **The keyboard** (same file): the Pane, the menu and the dialogs stay above it, with the keyboard
+  simulated as `visualViewport` reports it.
+- **Save and Open** (`test-e2e/specs/21-durability.e2e.mjs`):
+  - a round trip of one Node of every type, through a reload and through a file;
+  - the Save row's note;
+  - the share sheet when installed;
+  - an older copy asked about;
+  - an old text save opening.
+- **Offline boot.** The build is served under `/Neurite/`, the server is killed, and a reload still
+  boots from the service worker (#9).
+
+**Device checks:** run each on the iPad, record what happens, and say which iPadOS version.
+
+1. **Pinch.** Two fingers on the fractal: the zoom and the turn follow the fingers, and the page
+   itself never zooms. Then pinch over a card and over the Pane. Nothing should zoom there, because
+   Safari's gesture events are cancelled.
+2. **Header.** A finger on a card's header drags the card. A tap on the Title opens the keyboard. A
+   long press on the Title selects text rather than starting a drag.
+3. **Small targets.** The grip resizes under a finger. Say whether the three 20 px header buttons can
+   be hit without missing.
+4. **Tools.** Each tool in the bar acts on the first tap, not on a second one.
+5. **Keyboard.** Type at the end of a long note in the Pane. The caret stays above the keys, the
+   Pane shrinks while the keyboard is up, and it comes back when the keyboard goes.
+6. **CodeMirror.** Typing, selection handles, autocorrect staying off, and dictation into the Pane,
+   all on CodeMirror's `contenteditable` input.
+7. **Install.** Add to Home Screen from https://pxmyh.github.io/Neurite/. The app opens offline after
+   one online visit. Record `navigator.storage.persisted()` in the installed app, and whether clearing
+   Safari's website data takes the installed app's Graph with it.
+8. **Save and Open.** In the installed app, Save to… opens the share sheet. Save to Files puts the
+   file in iCloud Drive, and Open… on the Mac reads it back.
+9. **Double tap.** A double tap on a card toggles its pin. This checks whether WebKit sends the
+   `dblclick`.
+10. **Apple Pencil.** The Pencil drags a card by its header.
+11. **Long press.** Say whether iPadOS sends `contextmenu`, which is the route to the Node and Edge
+    menus.
+12. **Frame rate.** Read the FPS during a pan and during a pinch at the default settings. It is shown
+    in the Fractal panel.
+
 ## The ticket's premise has moved since it was written
 
 | The ticket says | What `main` holds today |
