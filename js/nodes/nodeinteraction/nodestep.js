@@ -192,6 +192,7 @@ class NodeSimulation {
         const dt = this.updateFPS(time);
         this.updateNodes(dt).updateEdges(dt).updateRegen();
         ZetRegions.draw();
+        ZetProposals.draw();
 
         window.requestAnimationFrame(this.nodeStep);
     }

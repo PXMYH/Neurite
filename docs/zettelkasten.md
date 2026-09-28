@@ -67,3 +67,19 @@ The Notes panel can hold several texts for one graph, each called an Archive. Th
 - A card starts at the note's text: its frontmatter, and a first heading that repeats its Title, stay in the note (the Notes panel shows them), and the frontmatter's `description` is the line above the text.
 - Into an empty graph the import goes straight in; with notes on screen, or text in the Notes panel, it asks, and puts the graph on screen away first, as **Clear** does.
 - Each Archive of the import is a **Region** of the Plane: a disk inside one of the Mandelbrot set's primary bulbs, the largest Archive in the largest bulb and the notes at the folder's top in the main cardioid, with the Archive's name drawn over it. The notes sit in it as a block, pinned, at the size that fits the bulb, so a smaller Archive's notes are smaller and are read by zooming in. Picking the Archive in the Notes panel frames its notes beside the panel; a note made by double-click inside a Region, or typed into its Archive, is that Archive's and takes the Region's size.
+
+## Proposed Edges
+
+The light bulb in the tool bar, **Propose Edges**, lists pairs of notes that could be linked and are not, with the reason for each, notes with no Edge at all first:
+
+- **A mention**: one note's text names the other's Title, whole words and outside a link, quoted with the Title marked. A Title of one word counts only in its own case, since "Setup" or "Models" is also a plain word.
+- **Tags**: the frontmatter `tags` both notes carry, rarest first. A Tag every note has is no reason.
+- **Similar wording**: the two notes' Titles and descriptions (or their first 300 characters) read by the embeddings model chosen in the AI tab, more alike than the note's usual. Pairs with only this to go on are the weakest, and are in a group that starts closed. It is off while the AI features are off.
+
+Each note gets at most three, and no note is named more than four times, so the few notes everything mentions do not fill the list. Nothing is proposed until the button is pressed, and a note's vector is kept in the browser, so a second look is instant.
+
+- Click a pair to frame both notes; a dashed line on the canvas shows the Edge it would make.
+- **Link** writes one Ref, into the first note of the pair, naming the second: the line a reader would have typed. Its tooltip says what it will write.
+- **Dismiss** keeps the pair out of the list from then on; the dismissal is saved with the graph. **Undo** takes it back while the list is open.
+
+The Connect modal (Link "…" to…) offers the note's own three first, under **Proposed**; a click on one writes one Ref, into the note being linked.

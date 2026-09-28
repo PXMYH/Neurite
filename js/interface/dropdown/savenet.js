@@ -618,8 +618,11 @@ View.Graphs = class {
             const selectedFractalType = localStorage.getItem('fractal-select');
             const fractalTypeSaveElement = `<div id="fractal-type" style="display:none;">${encodeURIComponent(JSON.stringify(selectedFractalType))}</div>`;
 
+            // The Proposed Edges the reader dismissed, so they stay dismissed (#72).
+            const dismissedEdges = `<div id="dismissed-edges" style="display:none;">${encodeURIComponent(JSON.stringify([...ZetProposals.dismissed]))}</div>`;
+
             // Combine both slider values and saved views in one string
-            return savedInputValues + savedViewsElement + mandelbrotSaveElement + fractalTypeSaveElement;
+            return savedInputValues + savedViewsElement + mandelbrotSaveElement + fractalTypeSaveElement + dismissedEdges;
         }
         restoreAdditionalSaveObjects(d){
             const savedViewsElement = d.querySelector("#saved-views");
@@ -660,6 +663,16 @@ View.Graphs = class {
                     Fractal.updateJuliaDisplay(fractalType);
                 }
                 fractalTypeSaveElement.remove();
+            }
+
+            const dismissedElement = d.querySelector("#dismissed-edges");
+            if (dismissedElement) {
+                try {
+                    ZetProposals.dismissed = new Set(JSON.parse(decodeURIComponent(dismissedElement.textContent)));
+                } catch (err) {
+                    Logger.warn("Could not read the dismissed Proposed Edges:", err);
+                }
+                dismissedElement.remove();
             }
         }
 
@@ -803,6 +816,7 @@ View.Graphs = class {
 
     #clearGraph(){
         Graph.clear();
+        ZetProposals.dismissed.clear();
 
         AiNode.count = 0;
         App.zetPanes.resetAllPanes();

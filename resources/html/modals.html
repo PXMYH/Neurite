@@ -255,6 +255,19 @@
     <ul id="nodeList" class="custom-scrollbar"></ul>
 </div>
 
+<!-- Proposed Edges (#72), filled by `ZetProposals.render`. The pairs with only similar
+     wording to go on are the weakest, so their group starts closed. -->
+<div id="proposalsModal" style="display: none;">
+    <p class="proposals-status" role="status"></p>
+    <div class="proposals-scroll custom-scrollbar">
+        <ul class="proposals-list" aria-label="Proposed Edges"></ul>
+        <details class="proposals-similar" hidden>
+            <summary></summary>
+            <ul class="proposals-list" aria-label="Proposed Edges with only similar wording"></ul>
+        </details>
+    </div>
+</div>
+
 <div id="ollamaManagerModal" style="display: none;">
     <input type="text" id="ollamaBaseUrl" value="http://127.0.0.1:11434/api/">
     <div id="ollamaModelList" class="custom-scrollbar"></div>

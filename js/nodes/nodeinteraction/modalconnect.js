@@ -16,6 +16,32 @@ Modal.Connect = class {
         On.input(this.searchBar, this.updateNodeList);
         On.keydown(this.searchBar, this.onKeyDown);
         this.searchBar.focus();
+        this.findProposed();
+    }
+
+    // The Edges proposed for this note (#72), above the nearest notes while nothing is typed.
+    // Similar wording only from the vectors already kept (Propose Edges keeps them): opening
+    // this list is no reason to load a model, so mentions and Tags carry it until then.
+    proposed = null;
+    findProposed(){
+        const origin = this.originNode;
+        const notes = ZetProposals.notes();
+        const at = notes.findIndex( (note)=>(note.node === origin) );
+        if (at < 0) return;
+
+        const vectors = AiFeatures.enabled ? ZetProposals.vectors(notes, undefined, true) : Promise.resolve(null);
+        vectors.then( (vectors)=>{
+            if (Modal.current?.id !== 'nodeConnectionModal' || !this.nodeList.isConnected) return;
+
+            this.proposed = ZetProposals.propose(notes, vectors, at)
+                .map( (p)=>({node: notes[p.to].node, why: ZetProposals.why(p)}) );
+            if (!this.proposed.length || this.searchBar.value.trim()) return;
+
+            // The row the arrows were on stays chosen.
+            const chosen = this.active?.dataset.nodeId;
+            this.updateNodeList();
+            if (chosen) this.setActive(this.rows().find( (li)=>(li.dataset.nodeId === chosen) ) ?? null);
+        }).catch( (err)=>Logger.warn("No Edges proposed for the note:", err) );
     }
 
     setContents(html){ this.nodeList.innerHTML = html }
@@ -26,10 +52,32 @@ Modal.Connect = class {
         const searchTerm = this.searchBar.value.trim();
         const nodes = (searchTerm) ? nodesForSearchTerm(searchTerm, this.maxNodes + 1)
                     : this.nearestNodes();
-        const others = nodes.filter(Object.isntThis, this.originNode).slice(0, this.maxNodes);
-        this.setContents(others.length > 0 ? '' : '<li>No notes found.</li>');
+        const proposed = (!searchTerm && this.proposed) || [];
+        const others = nodes.filter(Object.isntThis, this.originNode)
+            .filter( (node)=>!proposed.some( (p)=>(p.node === node) ) ).slice(0, this.maxNodes);
+        this.setContents(others.length + proposed.length > 0 ? '' : '<li>No notes found.</li>');
+        if (proposed.length) {
+            this.addLabel('Proposed');
+            proposed.forEach(this.addProposed, this);
+            if (others.length) this.addLabel('Nearest');
+        }
         others.forEach(this.addItem, this);
         this.setActive(null);
+    }
+    addLabel(text){
+        const li = Html.make.li(text, 'group-label');
+        li.setAttribute('role', 'presentation');
+        this.nodeList.appendChild(li);
+    }
+    // A proposed note, with the reason under its Title; a click writes one Ref, into this note.
+    addProposed({node, why}){
+        this.addItem(node);
+        const li = this.nodeList.lastElementChild;
+        li.classList.add('proposed');
+        li.dataset.proposed = '';
+        const reason = Html.make.span('proposal-why');
+        reason.textContent = why;
+        li.appendChild(reason);
     }
     nearestNodes(){
         const origin = this.originNode.pos;
@@ -89,18 +137,19 @@ Modal.Connect = class {
         (this.active ?? rows.find( (li)=>li.classList.contains('disconnected') ))?.click();
     }
     onItemClicked = (e)=>{
-        const li = e.target;
+        const li = e.target.closest('li');
         const node = Node.byUuid(li.dataset.nodeId);
         const originNode = this.originNode;
         const existingEdge = findExistingEdge(node, originNode);
         if (!existingEdge) {
-            connectNodes(node, originNode);
-            li.setAttribute('class', 'connected' + (li === this.active ? ' active' : ''));
+            if (li.dataset.proposed !== undefined) ZetProposals.link(originNode, node);
+            else connectNodes(node, originNode);
+            li.classList.replace('disconnected', 'connected');
             return;
         }
 
         // The one removal rule, Refs and all (`Edge.removeInstance`).
         existingEdge.removeInstance();
-        li.setAttribute('class', 'disconnected' + (li === this.active ? ' active' : ''));
+        li.classList.replace('connected', 'disconnected');
     }
 }

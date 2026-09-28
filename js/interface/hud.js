@@ -381,9 +381,10 @@ class Hud {
     static chromeInsets(){
         const vw = window.innerWidth, vh = window.innerHeight;
         let top = 0, bottom = 0, left = 0, right = 0;
-        // And the menu's panel while it is open: an Archive picked in the Notes panel was framed
-        // half under the panel it was picked from (#73).
-        for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel, .dropdown-content.open')) {
+        // And a panel docked beside the Graph, which frames notes while it is open (#72), and the
+        // menu's panel while it is open: an Archive picked in the Notes panel was framed half
+        // under the panel it was picked from (#73).
+        for (const el of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel, .modal.side-modal .modal-content, .dropdown-content.open')) {
             const b = el.getBoundingClientRect();
             if (!b.width || !b.height) continue;
 

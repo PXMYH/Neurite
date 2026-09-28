@@ -5,6 +5,8 @@ const Modals = {
     fileTreeModal: new Modal('fileTreeModal'),
     importLinkModalContent: new Modal('importLinkModalContent', "Import Text"),
     nodeConnectionModal: new Modal('nodeConnectionModal', "Connect Notes"),
+    // At the right edge rather than over the middle of the Graph, whose notes it frames.
+    proposalsModal: Object.assign(new Modal('proposalsModal', "Proposed Edges"), { customClass: 'side-modal' }),
     // Not openable: there is no `#noteModal` element to clone from. It is kept
     // because it is the store id the Zettelkasten controls persist under, and
     // `Modal.storeInputValue` keys its `ZetPath.updateOptions()` side effect off
@@ -158,6 +160,9 @@ Modal.close = function () {
         case 'zetSearchModal':
         case 'nodeConnectionModal':
             Graph.forEachNode(clearSearchHighlight);
+            break;
+        case 'proposalsModal':
+            ZetProposals.hide();
             break;
         case 'vectorDbImportConfirmModal':
             if (window.currentVectorDbImportReject) {

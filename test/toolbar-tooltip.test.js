@@ -42,7 +42,7 @@ function controls(){
         const inner = pill.slice(from, pill.indexOf('</' + tag + '>', from));
         out.push({tag, attrs, inner});
     }
-    assert.equal(out.length, 6, 'expected the four creators, Connect and Search: ' + out.length);
+    assert.equal(out.length, 7, 'expected the four creators, Connect, Search and Propose Edges: ' + out.length);
     return out;
 }
 

@@ -565,6 +565,186 @@ body.connect-mode .window textarea {
         display: none;
     }
 
+/* A panel docked at the right edge (`Modals.proposalsModal`), beside the Graph it frames
+   notes on rather than over the middle of it; Fit leaves it the room (`Hud.chromeInsets`). */
+.modal.side-modal .modal-content {
+    left: auto;
+    right: var(--space-4);
+    transform: none;
+    width: min(420px, calc(100vw - 2 * var(--space-4)));
+}
+
+/* Proposed Edges (#72). The accent, which marks what is chosen or pending across the app;
+   the Connect list's green says linked. */
+/* styles.css gives every element 16px and its grey by the universal selector; the parts of a
+   row take the row's instead. Specificity 0, so any rule for a part still wins. */
+:where(.proposal, #nodeList li.proposed) * {
+    font-size: inherit;
+    color: inherit;
+}
+
+.proposals-status {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.proposals-scroll {
+    max-height: calc(100dvh - 220px);
+    overflow-y: auto;
+}
+
+.proposals-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.proposal {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--space-2);
+    padding: var(--space-2) var(--space-1) var(--space-2) var(--space-2);
+    border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+    .proposal.selected {
+        background: var(--ui-accent-dim);
+        box-shadow: inset 3px 0 0 var(--ui-accent);
+    }
+
+    .proposal.dismissed .proposal-pair,
+    .proposal.dismissed .proposal-reason {
+        opacity: 0.45;
+        text-decoration: line-through;
+    }
+
+.proposal-pair {
+    grid-column: 1;
+    min-height: var(--hit-min);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-primary);
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    text-align: left;
+    cursor: pointer;
+}
+
+    .proposal-pair:hover {
+        color: #fff;
+    }
+
+.proposal-arrow {
+    margin: 0 var(--space-1);
+    color: var(--ui-accent);
+}
+
+.proposal-reason {
+    grid-column: 1;
+    margin: 0;
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+    color: var(--text-secondary);
+}
+
+.proposal-why {
+    display: block;
+}
+
+    .proposal-why + .proposal-why {
+        margin-top: 2px;
+    }
+
+    .proposal-why mark {
+        background: var(--ui-accent-dim);
+        color: var(--text-primary);
+        border-radius: 2px;
+    }
+
+.proposal-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    gap: var(--space-1);
+    align-items: flex-start;
+}
+
+    .proposal-actions button {
+        min-height: var(--hit-min);
+        padding: 2px var(--space-2);
+        border: 1px solid rgb(255 255 255 / 14%);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: var(--text-sm);
+        cursor: pointer;
+    }
+
+    .proposal-actions button:hover {
+        color: var(--text-primary);
+        border-color: rgb(255 255 255 / 30%);
+    }
+
+    .proposal-actions .proposal-link {
+        border-color: var(--ui-accent);
+        background: var(--ui-accent-solid);
+        color: #fff;
+    }
+
+    .proposal-actions .proposal-link:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+.proposal-done {
+    font-size: var(--text-sm);
+    color: var(--ui-accent);
+}
+
+.proposals-similar summary {
+    padding: var(--space-2) var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+/* The Connect list's groups (`Modal.Connect`): a label is not a row. */
+#nodeList li.group-label,
+#nodeList li.group-label:hover {
+    padding: var(--space-2) var(--space-3) 2px;
+    border-bottom: 0;
+    background: none;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    cursor: default;
+}
+
+#nodeList li.proposed {
+    box-shadow: inset 2px 0 0 var(--ui-accent);
+}
+
+    #nodeList li.proposed .proposal-why {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: var(--text-xs);
+        color: var(--text-secondary);
+    }
+
+/* The Edge a chosen proposal would make, dashed: the one line on the Plane that is not an
+   Edge yet, as a card with a link armed from it is the one dashed border. The same on screen
+   at any zoom. */
+#proposedEdge {
+    fill: none;
+    stroke: var(--ui-accent);
+    stroke-width: 2px;
+    stroke-dasharray: 8 6;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+}
+
 .canvas-hint-lead {
     margin: 0 0 var(--space-3);
     font-size: var(--text-lg);

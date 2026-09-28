@@ -62,6 +62,14 @@ its two Nodes are. Between two text Nodes it is also written as a Ref, and
 there the Refs decide: the Edge lasts while either Node Section names the other.
 _Avoid_: link, connection, relation, arrow, line, join
 
+**Proposed Edge**:
+An Edge the Graph could have between two text Nodes and does not, offered with
+the reason it was found: one Node Section mentions the other's Title, both carry
+a Tag, or their wording is alike. Accepting one writes one Ref, into the Node it
+was proposed for; dismissing one keeps the pair from being proposed again in
+that Graph. It is not an Edge until it is accepted.
+_Avoid_: suggestion, recommendation, candidate, ghost edge, link suggestion
+
 **AI Node**:
 A Node that holds a conversation with a Model and can read the Nodes connected
 to it as context. Where its answer goes next follows the arrows: along the
