@@ -25,6 +25,28 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
     <td><code>Scroll</code></td>
     <td>Zoom through the fractal</td>
   </tr>
+  <!-- Touch -->
+  <tr>
+    <td rowspan="5"><strong>Touch</strong></td>
+    <td><code>One finger on the fractal</code></td>
+    <td>Move around</td>
+  </tr>
+  <tr>
+    <td><code>Two fingers on the fractal</code></td>
+    <td>Zoom and turn. The fractal stays under your fingers.</td>
+  </tr>
+  <tr>
+    <td><code>A finger on a title</code></td>
+    <td>Move the card. A tap puts the caret in the title instead.</td>
+  </tr>
+  <tr>
+    <td><code>A finger on a card's corner</code></td>
+    <td>Resize the card</td>
+  </tr>
+  <tr>
+    <td><code>Connect tool, then two taps</code></td>
+    <td>Link two notes: tap the tool, then one note and then the other. <code>+ link</code> on each card links from a list, and the × beside a link cuts it.</td>
+  </tr>
   <!-- Node Management -->
   <tr>
     <td rowspan="9"><strong>Node Essentials</strong></td>

@@ -139,6 +139,22 @@ const CLAIMS = [
     {row: /<kbd>Esc<\/kbd> in the notes/, says: /way out/,
      file: 'js/interface/dropdown/tabs/notestab.js', code: /extraKeys: \{Esc: false\}/,
      why: 'the notes editor answers Escape itself again, so the row promises a way out that is gone'},
+    // By touch (#55, #57, #58): each row has a handler that reads a finger, not a mouse.
+    {row: /<td>One finger on the fractal<\/td>/, says: /Move around/,
+     file: 'js/interface/interface.js', code: /case 1: \{/,
+     why: 'the one-finger pan is gone, so a finger on the fractal moves nothing'},
+    {row: /<td>Two fingers on the fractal<\/td>/, says: /stays under your fingers/,
+     file: 'js/interface/interface.js', code: /function pinchView\(/,
+     why: 'the pinch no longer keeps the Plane under the fingers'},
+    {row: /<td>A finger on a title<\/td>/, says: /Move the card/,
+     file: 'js/nodes/createnodes/window.js', code: /On\.pointerdown\(this\.headerContainer, this\.model\.onHeaderPointerDown\)/,
+     why: 'the header takes no finger, so a card cannot be moved by touch'},
+    {row: /<td>A finger on a card's corner<\/td>/, says: /Resize/,
+     file: 'js/nodes/createnodes/window.js', code: /On\.pointerdown\(this\.resizeHandle,/,
+     why: 'the grip takes no finger, so a card cannot be resized by touch'},
+    {row: /<td>Connect, then two taps<\/td>/, says: /tap the Connect tool/,
+     file: 'js/nodes/nodeinteraction/nodemode.js', code: /On\.click\(this\.tool, this\.onToolClick\)/,
+     why: 'the Connect tool no longer answers a tap, so a device with no keyboard has no click-click link'},
 ];
 
 // "Any character" tempered to stop at the row's own end. `[\s\S]*?` is lazy but
