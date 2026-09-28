@@ -191,6 +191,7 @@ class NodeSimulation {
         this.updateMousePathWidth();
         const dt = this.updateFPS(time);
         this.updateNodes(dt).updateEdges(dt).updateRegen();
+        ZetRegions.draw();
 
         window.requestAnimationFrame(this.nodeStep);
     }

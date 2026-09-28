@@ -499,6 +499,7 @@ View.Graphs = class {
     #startNewGraph = ()=>{
         this.#setSelectedGraph(null).#clearGraph();
         App.zetPanes.addPane();
+        resetSavedViews();
         return this.#updateGraphs();
     }
     // A graph of its own for something that comes in whole -- a folder of notes
@@ -713,7 +714,10 @@ View.Graphs = class {
                 const taken = [...new Set((pane.processor.taken ?? [])
                     .filter( (t)=>(t.holder !== pane.processor) ).map( (t)=>t.title ))];
                 const takenAttr = (taken.length ? ` data-taken="${encodeURIComponent(JSON.stringify(taken))}"` : '');
-                const paneSaveElement = `<div id="zettelkasten-pane-${index}" data-pane-name="${encodeURIComponent(name)}"${takenAttr} style="display:none;">${encodeURIComponent(content)}</div>`;
+                // Where its notes are on the Plane, for an Archive a folder was imported into (#73).
+                const region = ZetRegions.of(pane.paneId);
+                const regionAttr = (region ? ` data-region="${encodeURIComponent(JSON.stringify(region))}"` : '');
+                const paneSaveElement = `<div id="zettelkasten-pane-${index}" data-pane-name="${encodeURIComponent(name)}"${takenAttr}${regionAttr} style="display:none;">${encodeURIComponent(content)}</div>`;
                 zettelkastenPanesSaveElements.push(paneSaveElement);
             });
 
@@ -867,7 +871,8 @@ View.Graphs = class {
             const paneContent = decodeURIComponent(elem.innerHTML);
             const paneName = decodeURIComponent(elem.dataset.paneName);
             const taken = (elem.dataset.taken ? JSON.parse(decodeURIComponent(elem.dataset.taken)) : []);
-            App.zetPanes.restorePane(paneName, paneContent, taken);
+            const region = (elem.dataset.region ? JSON.parse(decodeURIComponent(elem.dataset.region)) : null);
+            App.zetPanes.restorePane(paneName, paneContent, taken, region);
         });
         App.zetPanes.reportRenames();
 

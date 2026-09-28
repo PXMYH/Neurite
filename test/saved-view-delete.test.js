@@ -61,6 +61,7 @@ function makeSandbox(fractalType){
         Logger: {info(){}, debug(){}, warn(){}, err(){}},
         Animation: {goToCoords(){}},
         Graph: {getCoords: ()=>({zoom: '1', pan: '0+i0'})},
+        structuredClone,
         Promise
     });
     // `savedViews` is a `let` that `initializeSavedViews` reassigns, so it is exported as a

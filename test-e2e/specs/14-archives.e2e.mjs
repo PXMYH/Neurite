@@ -239,7 +239,13 @@ test("deleting an AI Node leaves a note with the same Title in its Archive", asy
     await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('AI: Helper\nsummarize\n\n## Helper\nmy note\n'));
     await page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.isLLM), undefined, { timeout: 8000 });
     await page.waitForTimeout(400);
-    await page.evaluate(() => { window.confirm = async () => true; });
+    // Centred first: in the iPad's smaller window the card can arrive under the tool pill,
+    // which then takes the click (one run in four, on main as well).
+    await page.evaluate(() => {
+        window.confirm = async () => true;
+        Graph.pan_set(Object.values(Graph.nodes).find((n) => n.isLLM).pos);
+    });
+    await page.waitForTimeout(200);
     const ai = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.isLLM).view.div.querySelector('#button-delete'));
     await ai.asElement().click();
     await page.waitForFunction(() => !Object.values(Graph.nodes).some((n) => n.isLLM), undefined, { timeout: 5000 });

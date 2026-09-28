@@ -231,6 +231,23 @@ class ZetImport {
         for (const pane of list) pane.processor.processAs(ZettelkastenProcessor.Pass.rewrite);
         panes.switchPane(list[0].paneId);
 
+        // Each Archive in its Region (#73), and all of them on screen. Laid out now, in the
+        // task that made the cards: the arrival settle, which runs a frame later, skips a
+        // card that is `laidOut`.
+        const areas = list.map( (pane)=>{
+            const nodes: any[] = [];
+            pane.processor.forEachNodeWrap( (wrap: any)=>{
+                if (wrap.node.removed) return;
+                wrap.node.laidOut = true;
+                nodes.push(wrap.node);
+            });
+            nodes.sort( (a, b)=>a.getTitle().localeCompare(b.getTitle(), undefined, {sensitivity: 'base'}) );
+            return {paneId: pane.paneId, nodes};
+        });
+        const rootPane = list.find( (pane)=>(panes.getPaneName(pane.paneId) === plan.root) );
+        ZetRegions.layout(areas, rootPane?.paneId ?? null);
+        (Hud as any).fitAll();
+
         const imported = new Set(plan.notes.map( (note)=>note.title ));
         const edges = new Set<unknown>();
         (Graph as any).forEachNode( (node: any)=>{

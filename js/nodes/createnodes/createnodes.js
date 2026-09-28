@@ -75,7 +75,19 @@ String.zeroPadded = function(num, len){
 function createNodeFromWindow(title = null, content = null, followMouse = false) {
     nodefromWindow = true;
     if (followMouse) followMouseFromWindow = true;
-    return addNodeTagToZettelkasten(title || getDefaultTitle(), content);
+    // Inside an Archive's Region (#73) the note is that Archive's, at its Region's scale: a
+    // note made among the bundle's Agents is one of them, whichever Archive the Notes panel
+    // had on show.
+    const paneId = ZetRegions.at(Graph.vecToZ());
+    if (paneId) App.zetPanes.switchPane(paneId);
+    const node = addNodeTagToZettelkasten(title || getDefaultTitle(), content);
+    const region = paneId && ZetRegions.of(paneId);
+    if (node && region) {
+        node.scale = region.s;
+        node.inRegion = true;
+        node.draw();
+    }
+    return node;
 }
 
 // With a Title no Pane holds (#64): a taken Title makes no Node, and a dropped file named

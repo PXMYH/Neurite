@@ -130,8 +130,34 @@ class ZettelkastenProcessor {
 
     spawnNodeFromZettelkasten(currentNodeTitle){
         App.processedNodes.update();
-        this.placementStrategy.nodeObjects = App.processedNodes.map;
-        return this.placementStrategy.calculatePositionAndScale(currentNodeTitle);
+        const paneId = ZetRegions.paneOf(this)?.paneId;
+        const region = ZetRegions.of(paneId);
+        if (!region) {
+            this.placementStrategy.nodeObjects = App.processedNodes.map;
+            return this.placementStrategy.calculatePositionAndScale(currentNodeTitle);
+        }
+
+        // In an Archive with a Region (#73) a note grows from that Archive's own notes, not
+        // from the newest note anywhere, takes the Region's scale -- the path's floor of 0.55
+        // made a note typed into a Region at 0.06 nine times the size of its neighbours --
+        // and stays inside it.
+        const own = {};
+        this.forEachNodeWrap( (wrap)=>{ if (!wrap.node.removed) own[wrap.node.uuid] = wrap.node } );
+        this.placementStrategy.nodeObjects = own;
+        const node = this.placementStrategy.calculatePositionAndScale(currentNodeTitle);
+        node.scale = region.s;
+        node.pos = ZetRegions.freeSpot(region, Object.values(own).filter( (other)=>(other !== node) ))
+                ?? ZetRegions.clampInto(region, node.pos);
+        // Pinned now, not at the settle a frame later: until then the Fractal's pull moved
+        // it, and at a Region's scale a frame's pull is a card's width.
+        node.anchor = node.pos;
+        node.anchorForce = 1;
+        node.inRegion = true;
+        ZetRegions.grow(paneId, node.pos);
+        // And drawn at that scale now: the separation a frame later measures the card's box,
+        // and read at the scale it was built at, a card nine times too big pushed itself out.
+        node.draw();
+        return node;
     }
 
     // The titles of the notes an edit touched: the one its first changed line sits in,

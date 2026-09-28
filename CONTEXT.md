@@ -35,6 +35,14 @@ returning to one moves no Node and changes no Fractal. Which Saved Views are
 offered depends on the Fractal being drawn.
 _Avoid_: coordinate, coordinates, place, bookmark, location, camera, viewport
 
+**Region**:
+The part of the Plane one Archive's Nodes sit in, for an Archive a folder of
+notes was imported into: a disk inside one of the Mandelbrot set's primary
+bulbs, its name drawn on the Plane. Picking the Archive frames its Region, and
+a Node made inside it belongs to that Archive, at the Region's scale. It holds
+Nodes where they are; it pulls nothing.
+_Avoid_: area, zone, cluster, island, territory, section
+
 ### Nodes and edges
 
 **Node**:

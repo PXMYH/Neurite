@@ -103,7 +103,7 @@ class NodeView {
         // returns a zero-width rect. Guarded on still being in the graph, since a
         // note typed and deleted inside one frame is a real sequence.
         Promise.delay(0).then(()=>{
-            if (Graph.nodes[node.uuid] !== node) return;
+            if (Graph.nodes[node.uuid] !== node || node.laidOut) return;
 
             NodeView.settlePlacement(node);
         });
@@ -178,8 +178,10 @@ class NodeView {
         // wherever they have since gone. "Make sure the note you just made is in view"
         // stops being a true statement the moment they move.
         const arrivedAt = {panX: Graph.pan.x, panY: Graph.pan.y, zoom: Graph.zoom.mag()};
-        const fits = Graph.fitInView(batch);
-        if (!fits) Graph.gatherIntoView(batch);
+        // A note of a Region (`ZetRegions`) belongs where its Region is, not in view.
+        const loose = batch.filter( (node)=>!node.inRegion );
+        const fits = Graph.fitInView(loose);
+        if (!fits) Graph.gatherIntoView(loose);
 
         const settle = ()=>{
             const live = batch.filter( (node)=>Graph.nodes[node.uuid] === node );
@@ -200,7 +202,7 @@ class NodeView {
                 // Separation still applies -- two cards on the same spot is wrong wherever
                 // the reader is looking -- but the clamp only applies while they are still
                 // looking at the place the notes arrived in.
-                if (clamp) live.forEach( (node)=>Graph.keepInView(node) );
+                if (clamp) live.forEach( (node)=>{ if (!node.inRegion) Graph.keepInView(node) } );
             }
             // A pile too big for three bounded passes is finished off a frame at a time.
             if (!result.clear) Graph.relaxInBackground({bias: 0.85, favour});

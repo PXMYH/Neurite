@@ -170,7 +170,12 @@ class ZetPanes {
 
     init(){
         CustomDropdown.setup(this.select);
-        On.change(this.select, ()=>this.switchPane(this.select.value));
+        // An Archive with a Region (#73) is a place on the Plane as well as a text: picking it
+        // goes there.
+        On.change(this.select, ()=>{
+            this.switchPane(this.select.value);
+            ZetRegions.frame(this.select.value);
+        });
         On.click(Elem.byId('archiveNew'), this.onNew);
         On.click(Elem.byId('archiveRename'), this.onRename);
         On.click(Elem.byId('archiveDelete'), this.onDelete);
@@ -459,9 +464,11 @@ class ZetPanes {
         this.renamedOnLoad = [];
     }
 
-    restorePane(paneName, paneContent, taken = []) {
+    restorePane(paneName, paneContent, taken = [], region = null) {
         const paneId = `zet-pane-${this.paneCounter}`;
         const pane = this.createPane(paneId, paneName);
+        // Before the pass, so the notes it makes are the Region's (`ZetRegions`).
+        if (region) pane.dataset.region = JSON.stringify(region);
 
         this.paneContent.appendChild(pane);
         this.switchPane(paneId);

@@ -539,6 +539,32 @@ body.connect-mode .window textarea {
     opacity: 0;
 }
 
+/* An Archive's Region, named on the Plane (`ZetRegions.draw`): under the cards, over the
+   Fractal, never a pointer target. Placed by its bottom centre at the Region's top. */
+#region-labels {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+    .region-label {
+        position: absolute;
+        transform: translate(-50%, -100%);
+        padding-bottom: 0.2em;
+        white-space: nowrap;
+        font-weight: var(--weight-semibold);
+        letter-spacing: 0.01em;
+        color: rgb(232 232 234 / 72%);
+        text-shadow: 0 1px 3px rgb(0 0 0 / 90%);
+    }
+
+    .region-label[hidden] {
+        display: none;
+    }
+
 .canvas-hint-lead {
     margin: 0 0 var(--space-3);
     font-size: var(--text-lg);

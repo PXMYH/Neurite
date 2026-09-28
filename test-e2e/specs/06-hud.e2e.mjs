@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, isIPad } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -74,7 +74,7 @@ test('the empty canvas says what to do, and stops once there is a note', async (
         undefined, { timeout: 5000 });
 });
 
-test('the scale readout tracks the zoom', async () => {
+test('the scale readout tracks the zoom', { skip: isIPad && 'mobile WebKit takes no wheel' }, async () => {
     const start = await view(page);
     assert.match(start.scale, /1(\.0)?$/, `starts near unity, got "${start.scale}"`);
 
@@ -112,6 +112,32 @@ test('Fit brings every note back on screen from a deep zoom', async () => {
     await page.click('.hud-btn[data-act="fit"]');
     await page.waitForTimeout(400);
     assert.ok(await allNotesOnScreen(page), 'every note is in view after Fit');
+});
+
+// The other way: from far out onto one small card, as a note of a Region is (#73). Fit centred
+// the view on the space the chrome leaves at the zoom it started from, not the one it set,
+// and from x0.5 onto a card at scale 0.01 that put the view 50 of its own widths off the card.
+test('Fit on one small selected card from far out puts that card on screen', async () => {
+    const card = await page.evaluate(async () => {
+        const node = await window.createNote('Small', 'A small card.');
+        await new Promise((r) => setTimeout(r, 800));
+        node.scale = 0.01;
+        node.pos = new vec2(0.3, -0.4);
+        node.anchor = node.pos;
+        Graph.zoom_scaleBy(2 / Graph.zoom.mag());
+        Graph.pan_set(new vec2(0, 0));
+        App.selectedNodes.uuids.add(node.uuid);
+        return node.uuid;
+    });
+    await page.waitForTimeout(300);
+    await page.click('.hud-btn[data-act="fit"]');
+    await page.waitForTimeout(400);
+    const box = await page.evaluate((uuid) => {
+        const b = Graph.nodes[uuid].view.div.getBoundingClientRect();
+        return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, w: innerWidth, h: innerHeight };
+    }, card);
+    assert.ok(box.right > box.left && box.left >= 0 && box.right <= box.w && box.top >= 0 && box.bottom <= box.h,
+        'the card is not on screen after Fit: ' + JSON.stringify(box));
 });
 
 test('Home returns to the origin at unit zoom', async () => {

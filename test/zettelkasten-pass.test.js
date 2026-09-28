@@ -57,6 +57,8 @@ function loadProcessor(extra = {}){
     const sandbox = {
         // Everything the class touches on the paths these tests exercise.
         NodePlacementStrategy: class { constructor(objects, options){ this.nodeObjects = objects; this.options = options } },
+        // No Pane here has a Region (#73), so a spawn takes the placement path as before.
+        ZetRegions: {of: ()=>null, paneOf: ()=>null},
         ZettelkastenParser: {regexpNodeTitle: /^##\s*(.+)$/},
         Tag: {node: '##', ref: '[['},
         LLM_TAG: 'AI:',

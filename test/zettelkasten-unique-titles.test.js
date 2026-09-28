@@ -91,6 +91,8 @@ function makeWorld(){
         nodefromWindow: false,
         followMouseFromWindow: false,
         App: {processedNodes: {update(){}, map: {}}},
+        // No Pane here has a Region (#73), so a spawn takes the placement path as before.
+        ZetRegions: {of: ()=>null, paneOf: ()=>null},
         On: {input(){}},
         Tag: {node: '##', ref: '[['},
         LLM_TAG: 'AI:',

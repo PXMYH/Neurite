@@ -209,12 +209,22 @@ function getSavedViewsFromCache() {
         }
     }
 
-    return { ...defaultSavedViews };
+    // A copy, not a spread: the spread shares each fractal's list with the defaults, so a
+    // view stored into it was stored into the defaults as well.
+    return structuredClone(defaultSavedViews);
 }
 
 function initializeSavedViews() {
     const cachedViews = getSavedViewsFromCache();
-    savedViews = cachedViews ? cachedViews : { ...defaultSavedViews };
+    savedViews = cachedViews ? cachedViews : structuredClone(defaultSavedViews);
+}
+
+// A new graph's Saved Views are the defaults. Clear kept the last graph's own, and the next
+// save kept them with a graph they were never made in.
+function resetSavedViews() {
+    savedViews = structuredClone(defaultSavedViews);
+    updateSavedViewsCache();
+    displaySavedCoordinates();
 }
 
 initializeSavedViews();

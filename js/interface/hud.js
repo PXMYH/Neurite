@@ -304,7 +304,6 @@ class Hud {
 
         Autopilot.stop();
         Graph.pan_set(new vec2((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2));
-        Hud.centreOnUsableRect();
 
         // |zoom| is the half-width of the view, and the viewport is square in plane
         // terms, so the half-span of the larger axis is what has to fit.
@@ -316,6 +315,10 @@ class Hud {
         // the chrome actually covers is measured and the view is opened up by it.
         const half = Math.max(box.maxX - box.minX, box.maxY - box.minY) / 2;
         Hud.setZoomMag(Math.max(half * Hud.chromeMargin(), 1e-12));
+        // Centred after the zoom, which its pixels are converted at. Before it, the offset
+        // was taken at the zoom Fit started from: from far out onto one small card (a note
+        // of a Region, #73) it moved the view 50 of its own widths off the card.
+        Hud.centreOnUsableRect();
     }
 
     // Offset the pan so the graph is centred in the space the chrome leaves, rather than in

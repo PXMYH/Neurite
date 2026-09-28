@@ -79,8 +79,12 @@ test('an imported note\'s card starts at its text, and typing in it keeps the fr
     assert.deepEqual(card, { text: 'The agent loop fetches context: [[Agent Loop]].', line: 'Retrieval-augmented generation.' });
 
     const handle = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'RAG').contentEditableDiv);
-    await page.evaluate(() => { if (dropdownContent.classList.contains('open')) menuButton.click(); });
-    await page.waitForTimeout(400);
+    // The Learning Region framed, so its cards are large enough to click into (#73).
+    await page.evaluate(() => {
+        if (dropdownContent.classList.contains('open')) menuButton.click();
+        ZetRegions.frame(window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Learning').paneId);
+    });
+    await page.waitForTimeout(600);
     await handle.asElement().click();
     await page.keyboard.press('ControlOrMeta+End');
     await page.keyboard.type(' More.');

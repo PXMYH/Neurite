@@ -209,6 +209,7 @@ class PageLoad {
         'js/zettelkasten/zetpath.js',
         'js/zettelkasten/zetsplitter.js',
         'js/zettelkasten/zetimport.js',
+        'js/zettelkasten/zetregions.js',
         'js/interface/dropdown/customui/customdropdown.js',
         'js/interface/dropdown/customui/customcontrols.js',
         'js/interface/dropdown/customui/togglepanel.js',
