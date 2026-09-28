@@ -436,3 +436,65 @@ test('the page goes back to the top once a card is no longer typed into', async 
     assert.ok(back.typing > 0, 'the page could not scroll while the card was typed into');
     assert.equal(back.after, 0, 'the page stayed scrolled');
 });
+
+// Asked only whether anything was typed into, a card in plain sight kept the page scrolled for the
+// card before it, the tool bar off screen (rv13); and the pointer, held in page coordinates, put
+// a double-click's note a scroll's height below it once the page went back (rv13).
+test('focus moved to a card in sight brings the page back, and a double-click after lands under the pointer', async () => {
+    await importBundle(page);
+    await setMenu(page, false);
+    const state = await page.evaluate(async () => {
+        const low = await window.createNote('Low', 'A body.');
+        const high = await window.createNote('High', 'Another.');
+        await new Promise((r) => setTimeout(r, 600));
+        low.pos = Graph.xyToZ(innerWidth / 2, innerHeight + 100);
+        low.anchor = low.pos;
+        high.pos = Graph.xyToZ(innerWidth / 3, innerHeight / 3);
+        high.anchor = high.pos;
+        await new Promise((r) => setTimeout(r, 300));
+        low.contentEditableDiv.focus();
+        window.scrollTo(0, 120);
+        await new Promise((r) => setTimeout(r, 100));
+        const scrolled = window.scrollY;
+        high.contentEditableDiv.focus();
+        await new Promise((r) => setTimeout(r, 200));
+        return { scrolled, after: window.scrollY };
+    });
+    assert.ok(state.scrolled > 0, 'the page did not scroll for the card past the edge');
+    assert.equal(state.after, 0, 'the page stayed scrolled for a card in plain sight');
+
+    // A free spot of a Region, found on the page as it stands unscrolled; then the page scrolled
+    // again for the card past the edge, and a double-click where that spot will be once it goes
+    // back: the note is made there, in the Region, not a scroll's height below.
+    const spot = await page.evaluate(async () => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
+        const r = ZetRegions.of(pane.paneId);
+        let best = null;
+        for (let k = 0; k < 360; k++) {
+            const a = k * Math.PI / 180;
+            const z = new vec2(r.x + Math.cos(a) * r.r * 0.9, r.y + Math.sin(a) * r.r * 0.9);
+            const s = Hud.toScreen(z);
+            if (s.x < 40 || s.y < 120 || s.x > innerWidth - 40 || s.y > innerHeight - 300) continue;
+            const el = document.elementFromPoint(s.x, s.y);
+            if (el && svg.contains(el)) { best = s; break; }
+        }
+        const low = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Low');
+        low.contentEditableDiv.focus();
+        window.scrollTo(0, 90);
+        await new Promise((r) => setTimeout(r, 100));
+        return best;
+    });
+    assert.ok(spot, 'no free spot of the Region in sight');
+    assert.ok(await page.evaluate(() => window.scrollY) > 0, 'the page did not scroll the second time');
+    await page.mouse.move(spot.x, spot.y);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none'; });
+    await page.mouse.dblclick(spot.x, spot.y, { delay: 60 });
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = ''; });
+    await page.waitForTimeout(1000);
+    const made = await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).filter((x) => !['Low', 'High'].includes(x.getTitle())).at(-1);
+        return { scrollY, inRegion: Boolean(n.inRegion) };
+    });
+    assert.equal(made.scrollY, 0);
+    assert.equal(made.inRegion, true, 'the note was not made in the Region under the pointer');
+});

@@ -554,8 +554,23 @@ class Hud {
 // scrolls it into sight, as ever -- held at the top, the text went on out of sight (rv12) -- and
 // once the typing is done the page goes back, with the tool bar and the menu button it took off
 // screen, which only Home had brought back (rv10, rv11).
+//
+// Back whenever the focus moves on, unless what it moved to is past the edge itself: asked only
+// whether anything was typed into, a card in plain sight -- or a menu row -- kept the page
+// scrolled for the card before it (rv13). And the pointer is kept in step: it is held in page
+// coordinates, and a double-click after the page went back made its note a scroll's height
+// below the pointer (rv13).
 On.blur(document, ()=>{
     requestAnimationFrame( ()=>{
-        if ((window.scrollX || window.scrollY) && !Hud.isTyping()) window.scrollTo(0, 0);
+        const sx = window.scrollX, sy = window.scrollY;
+        if (!sx && !sy) return;
+
+        const at = document.activeElement;
+        const box = (at && at !== document.body) ? at.getBoundingClientRect() : null;
+        const needs = box && (box.bottom + sy > window.innerHeight || box.right + sx > window.innerWidth);
+        if (needs) return;
+
+        window.scrollTo(0, 0);
+        Graph.mousePos_setXY(Graph.mousePos.x - sx, Graph.mousePos.y - sy);
     });
 }, true);
