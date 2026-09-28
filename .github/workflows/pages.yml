@@ -15,10 +15,11 @@ permissions:
   pages: write
   id-token: write
 
-# One deploy at a time; a newer push replaces a deploy still waiting.
+# One deploy at a time. A newer push replaces a run still queued, but a deploy under way is let
+# finish, as GitHub's own Pages template does.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:

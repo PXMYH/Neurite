@@ -10,13 +10,25 @@ const checkoutRoot = dirname(fileURLToPath(import.meta.url));
 // between it and the files. Relative, like every other path in the build: the app is served
 // from a subpath (`/Neurite/` on GitHub Pages) and from `app://neurite` in the Mac app, where
 // the registration fails and is let go.
+//
+// On the first visit the worker takes control only after the page has fetched its first files --
+// the page itself, the libraries in index.html, the first scripts and partials -- so once the app
+// is up it is handed the list of everything this visit loaded, to keep. Without it, a first
+// visit left 31 of 126 of them out, and the app did not open offline until a second (rv15).
 const registerServiceWorker = {
     name: 'neurite-register-service-worker',
     apply: 'build',
     transformIndexHtml: () => [{
         tag: 'script',
         injectTo: 'body',
-        children: "if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});",
+        children: `if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then((registration) => {
+        const keep = () => registration.active?.postMessage({ keep: [location.href,
+            ...performance.getEntriesByType('resource').map((entry) => entry.name)] });
+        const whenUp = () => (window.appReady ? keep() : setTimeout(whenUp, 500));
+        whenUp();
+    }).catch(() => {});
+}`,
     }],
 };
 

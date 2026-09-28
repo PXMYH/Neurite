@@ -3,8 +3,8 @@
 //
 // Not file://, and not a localhost port:
 //
-// - file:// breaks the app outright. PageLoad fetches `/resources/*.html` by absolute
-//   path, and Chromium refuses fetch() on file: URLs.
+// - file:// breaks the app outright. PageLoad fetches its HTML partials
+//   (`resources/*.html`), and Chromium refuses fetch() on file: URLs.
 // - A port collides with the dev server on 8999, and anything else on the machine
 //   can read what a port serves.
 // - A standard, secure scheme is a real origin. IndexedDB and localStorage work, it

@@ -7,8 +7,9 @@
     <link rel="stylesheet" type="text/css" href="./resources/styles/styles.css">
     <meta charset="UTF-8">
     <!-- Without this, mobile Safari lays the page out at 980px and scales it down.
-         Zoom is deliberately left enabled: the fractal's touch handlers are pan-only,
-         so pinch is the only way to zoom on a touch screen today. -->
+         The page itself does not zoom: two fingers zoom the fractal (interface.js, #55),
+         and `touch-action` on the root and Safari's cancelled gesture events keep the
+         browser's own zoom out, which took the menu and tool bar off screen. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="description" content="Fractal Graph-of-Thought. Rhizomatic Mind-Mapping for Ai-Agents, Web-Links, Notes, and Code.">
 
