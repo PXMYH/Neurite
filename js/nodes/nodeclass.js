@@ -146,17 +146,19 @@ class Node {
 
     // `box` is the card's own box, when the caller measured it before this frame wrote anything
     // (`NodeSimulation.updateNodes`); it was measured at the scale the card was last drawn at.
-    // Without it the box is read here, after the transform below, at this frame's scale.
-    draw(box = null, svgbb = svg.getBoundingClientRect()) {
+    // Without it the box is read here, after the transform below, at this frame's scale -- or,
+    // given `later`, by the caller, which reads every such box at once after all its writes and
+    // hands each to `place`.
+    draw(box = null, svgbb = svg.getBoundingClientRect(), later = null) {
         const e = this.content;
         const s = this.intrinsicScale * this.scale * (Graph.zoom.mag2() ** -settings.zoomContentExp);
         // A box read before the card was ever drawn -- no transform yet, still in the flow -- or
         // while it was hidden, is not the box it is drawn with, and one frame of a new card, or
         // of one the view has just jumped onto, was drawn up to a card's width off its place
-        // (rv15). Those few are read again below, after the writes.
+        // (rv15). Those few are read again, after the writes.
         const drawnAt = parseFloat(e.style.transform.slice('scale('.length));
         if (box && (!(drawnAt > 0) || e.style.display === 'none' || !(box.width > 0))) box = null;
-        const measuredAt = box ? drawnAt : s;
+        this.#measuredAt = box ? drawnAt : s;
 
         e.style.position = 'absolute';
         e.style.transform = 'scale(' + s + ',' + s + ')';
@@ -175,11 +177,18 @@ class Node {
         const off = svgbb.width < svgbb.height ? svgbb.right : svgbb.bottom;
         p.x = w * p.x - (off - svgbb.right) / 2;
         p.y = w * p.y - (off - svgbb.bottom) / 2;
+        this.#centre = p;
 
-        const bb = box ?? e.getBoundingClientRect();
-        p = p.minus(new vec2(bb.width, bb.height).scale(0.5 / measuredAt));
-        e.style.left = p.x + 'px';
-        e.style.top = p.y + 'px';
+        if (!box && later) return void later.push(this);
+        this.place(box ?? e.getBoundingClientRect());
+    }
+    // The card put with its centre where `draw` worked it out, by its box as it is drawn.
+    #centre = null;
+    #measuredAt = 1;
+    place(bb){
+        const p = this.#centre.minus(new vec2(bb.width, bb.height).scale(0.5 / this.#measuredAt));
+        this.content.style.left = p.x + 'px';
+        this.content.style.top = p.y + 'px';
 
         //e.style['margin-top'] = "-"+(e.offsetHeight/2)+'px';//"-50%";
         //e.style['margin-left'] = "-"+(e.offsetWidth/2)+'px';//"-50%";
@@ -187,13 +196,13 @@ class Node {
         //e.style['text-align']= 'center';
     }
 
-    step(dt, box, svgbb) {
+    step(dt, box, svgbb, later) {
         dt = this.clampDt(dt);
         this.updatePosition(dt);
         this.applyMandelbrotForce();
         this.applyAnchorForce();
         this.handleMouseInteraction(dt);
-        this.draw(box, svgbb);
+        this.draw(box, svgbb, later);
         // Returns immediately unless this card's links changed since the last
         // frame. See linkstrip.js for why the row is polled and not pushed to.
         LinkStrip.refresh(this.view);
@@ -428,8 +437,15 @@ class Node {
 
         const id = e.pointerId, from = {x: e.pageX, y: e.pageY};
         let dragging = false;
+        // A pen the browser sends on as a mouse too -- Chromium does, while it moves -- is moved by
+        // `onMouseDown`, as a mouse is. Taken here as well, its drag swallowed the mouseup that
+        // ends that one (`swallowTheTap`), and the page was left under the grabbing overlay.
+        let mouseToo = false;
+        const onMouse = ()=>{ mouseToo = true };
         const move = (e)=>{
             if (e.pointerId !== id) return;
+            // A second finger made this one part of a pinch (interface.js), which the card sits out.
+            if (!dragging && (mouseToo || TouchOnPlane.points.has(id))) return end(e);
             if (!dragging) {
                 if (Math.hypot(e.pageX - from.x, e.pageY - from.y) <= Node.dragThreshold) return;
 
@@ -451,6 +467,7 @@ class Node {
             Off.pointermove(window, move);
             Off.pointerup(window, end);
             Off.pointercancel(window, end);
+            Off.mousedown(window, onMouse, true);
             if (!dragging) return;
 
             this.followingMouse = 0;
@@ -461,22 +478,31 @@ class Node {
         On.pointermove(window, move);
         On.pointerup(window, end);
         On.pointercancel(window, end);
+        On.mousedown(window, onMouse, true);
     }
     // A finger that moved a card past `dragThreshold` and lifted inside the browser's own slop
     // for a tap (about 15 px in Chromium) still has the tap sent on as mousedown, mouseup and
     // click -- which put the caret in the Title, and with the Connect tool on armed the card for
-    // an Edge no one asked for (rv14). They arrive at once after the lift, so the next few are
-    // taken out before anything else sees them.
+    // an Edge no one asked for (rv14). The finger's `touchend`, which comes straight after the
+    // `pointerup` this is called from, is cancelled, and a browser sends no tap for a cancelled
+    // one. The mouse events are taken out as well for the moment they would arrive in: a window
+    // of 400 ms did it alone, and took out a tap made straight after the drag too (rv15).
     static #tapSwallowedUntil = 0;
     static #swallowing = false;
     // Bound on first use, at the end of the first drag and so before its tap arrives, which
     // keeps this file free of anything that runs as it loads.
     static swallowTheTap(){
-        Node.#tapSwallowedUntil = performance.now() + 400;
+        Node.#tapSwallowedUntil = performance.now() + 100;
         if (Node.#swallowing) return;
 
         Node.#swallowing = true;
         for (const type of ['mousedown', 'mouseup', 'click']) On[type](window, Node.onCompatMouse, true);
+        On.touchend(window, Node.onLiftOfTheDrag, true);
+    }
+    static onLiftOfTheDrag(e){
+        if (performance.now() > Node.#tapSwallowedUntil) return;
+
+        if (e.cancelable) e.preventDefault();
     }
     static onCompatMouse(e){
         if (performance.now() > Node.#tapSwallowedUntil) return;
@@ -652,8 +678,11 @@ class Node {
     // the direction it is going. A body with more text than fits keeps the wheel; one
     // already at its end hands it to the canvas, so a short note does not trap the
     // gesture at all and a long one stops trapping it once it is read to the bottom.
-    static wheelScrollsContent(e){
-        for (let el = e.target; el && el !== document.body; el = el.parentElement) {
+    static wheelScrollsContent(e){ return Boolean(Node.scrollerFor(e.target, e.deltaY)) }
+    // The box at or above `el` that can scroll the way `deltaY` goes (down when positive), or
+    // null. A finger on a card asks it too (interface.js).
+    static scrollerFor(el, deltaY){
+        for (; el && el !== document.body; el = el.parentElement) {
             const canScroll = el.scrollHeight - el.clientHeight > 1;
             if (!canScroll) continue;
             const style = getComputedStyle(el);
@@ -661,10 +690,10 @@ class Node {
 
             const atTop = el.scrollTop <= 0;
             const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-            if (e.deltaY < 0 && !atTop) return true;
-            if (e.deltaY > 0 && !atBottom) return true;
+            if (deltaY < 0 && !atTop) return el;
+            if (deltaY > 0 && !atBottom) return el;
         }
-        return false;
+        return null;
     }
 
     static remove(node){ node.remove() }

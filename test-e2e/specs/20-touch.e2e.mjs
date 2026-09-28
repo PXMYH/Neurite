@@ -578,9 +578,9 @@ test('a new card is drawn in its place from its first frame', async () => {
         const r = n.content.getBoundingClientRect(), p = Hud.toScreen(n.pos);
         return Math.hypot(r.left + r.width / 2 - p.x, r.top + r.height / 2 - p.y);
     });
-    // Main draws it 13 px off in Chromium and 22 px in WebKit, as the card's text settles; the
-    // regression was 424–1096 px.
-    assert.ok(off < 40, `the first frame drew the card ${Math.round(off)} px off its place`);
+    // Main draws it 13 px off, as the card's text settles; the regression was 424–1096 px. Read
+    // after the frame's writes, the box is the one it is drawn with, and the card is on its place.
+    assert.ok(off < 2, `the first frame drew the card ${Math.round(off)} px off its place`);
 });
 
 test("the Pane keeps where it was scrolled to through a window's resize", { skip: isIPad && 'the iPad window does not resize' }, async () => {
@@ -602,4 +602,283 @@ test("the Pane keeps where it was scrolled to through a window's resize", { skip
     await page.waitForTimeout(500);
     const after = await page.evaluate(() => window.currentActiveZettelkastenMirror.getScrollInfo().top);
     assert.ok(top > 500 && Math.abs(after - top) < 2, `the Pane went from ${top} to ${after}`);
+});
+
+// Every finger on the map (rv15): the cards are part of it. Zoomed in to read, cards are most
+// of the screen, and a pinch taken from the Fractal alone slid the map when a finger was on one
+// -- 62-85% of pinches -- while a finger on a card could not pan the map at all.
+const noteBody = (page, title) => page.evaluate((t) => {
+    const n = Object.values(Graph.nodes).find((x) => x.getTitle() === t);
+    const r = n.contentEditableDiv.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, top: r.top, h: r.height, pos: [n.pos.x, n.pos.y], scrollTop: n.contentEditableDiv.scrollTop };
+}, title);
+const planeAt = (page, p) => page.evaluate(([x, y]) => { const z = Graph.xyToZ(x, y); return [z.x, z.y]; }, [p.x, p.y]);
+const apart = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+test('two fingers with one on a card zoom about them, and the card stays put', { skip: isIPad && 'needs real touches' }, async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const body = await noteBody(page, 'Alpha');
+    const other = await openFractal(page);
+    assert.ok(other, 'no bare Fractal for the second finger');
+    const a = { x: Math.round(body.x), y: Math.round(body.y) };
+    const m = { x: (a.x + other.x) / 2, y: (a.y + other.y) / 2 };
+    const held = await planeAt(page, m);
+    const v0 = await viewNow(page);
+    await cdpTouch(page, 'touchStart', [[a.x, a.y], [other.x, other.y]]);
+    for (let k = 1; k <= 10; k++) {
+        const s = 1 + 0.6 * k / 10;
+        await cdpTouch(page, 'touchMove', [[m.x + (a.x - m.x) * s, m.y + (a.y - m.y) * s], [m.x + (other.x - m.x) * s, m.y + (other.y - m.y) * s]]);
+    }
+    await cdpTouch(page, 'touchEnd', []);
+    await page.waitForTimeout(300);
+    const v1 = await viewNow(page);
+    assert.ok(Math.abs(v0.mag / v1.mag - 1.6) < 0.01, `a spread to 1.6x zoomed ${v0.mag / v1.mag}x`);
+    assert.ok(apart(held, await planeAt(page, m)) < 1e-3 * v1.mag, 'the point between the fingers moved');
+    assert.deepEqual((await noteBody(page, 'Alpha')).pos, body.pos, 'the card moved on the Plane');
+    assert.notEqual(await page.evaluate(() => document.activeElement?.tagName), 'TEXTAREA', 'the pinch was also a tap');
+});
+
+test('a finger on a header, then one on the fractal, is a pinch and no drag', { skip: isIPad && 'needs real touches' }, async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const a = await card(page, 'Alpha');
+    const pos = (await noteBody(page, 'Alpha')).pos;
+    const other = await openFractal(page);
+    const v0 = await viewNow(page);
+    await cdpTouch(page, 'touchStart', [[a.head.x, a.head.y]]);
+    await page.waitForTimeout(60);
+    await cdpTouch(page, 'touchStart', [[a.head.x, a.head.y], [other.x, other.y]]);
+    const m = { x: (a.head.x + other.x) / 2, y: (a.head.y + other.y) / 2 };
+    for (let k = 1; k <= 10; k++) {
+        const s = 1 + 0.5 * k / 10;
+        await cdpTouch(page, 'touchMove', [[m.x + (a.head.x - m.x) * s, m.y + (a.head.y - m.y) * s], [m.x + (other.x - m.x) * s, m.y + (other.y - m.y) * s]]);
+    }
+    await cdpTouch(page, 'touchEnd', []);
+    await page.waitForTimeout(300);
+    const v1 = await viewNow(page);
+    assert.ok(Math.abs(v0.mag / v1.mag - 1.5) < 0.01, `a spread to 1.5x zoomed ${v0.mag / v1.mag}x`);
+    assert.deepEqual((await noteBody(page, 'Alpha')).pos, pos, 'the header finger dragged the card as well');
+});
+
+test('one finger on a card pans the map, and a tap on it still puts the caret there', { skip: isIPad && 'needs real touches' }, async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const body = await noteBody(page, 'Alpha');
+    const from = { x: Math.round(body.x), y: Math.round(body.y) };
+    const pressed = await planeAt(page, from);
+    await fingerDrag(page, from, [140, 50]);
+    const zoom = (await viewNow(page)).mag;
+    assert.ok(apart(pressed, await planeAt(page, { x: from.x + 140, y: from.y + 50 })) < 1e-3 * zoom, 'the point pressed is not under the finger');
+    assert.deepEqual((await noteBody(page, 'Alpha')).pos, body.pos, 'the card moved on the Plane');
+    assert.equal(await page.evaluate(() => document.activeElement === document.body), true, 'the pan was also a tap');
+    assert.deepEqual(await page.evaluate(() => [visualViewport.offsetLeft, visualViewport.offsetTop, scrollX, scrollY]), [0, 0, 0, 0], 'the page slid');
+
+    const moved = await noteBody(page, 'Alpha');
+    const pan = (await viewNow(page)).pan;
+    await page.touchscreen.tap(moved.x, moved.y);
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('editable-div')), true, 'the tap did not put the caret in the note');
+    assert.deepEqual((await viewNow(page)).pan, pan, 'the tap moved the map');
+});
+
+test('one finger scrolls a long note\'s text, and pans the map sideways or past its end', { skip: isIPad && 'needs real touches' }, async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\nFirst.\n\n## Long\n' + 'A line of the long note.\n'.repeat(60)));
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 2, undefined, { timeout: 5000 });
+    await page.evaluate(() => Hud.fitAll());
+    await page.waitForTimeout(900);
+    let long = await noteBody(page, 'Long');
+    const pan0 = (await viewNow(page)).pan;
+    await fingerDrag(page, { x: Math.round(long.x), y: Math.round(long.top + long.h * 0.8) }, [0, -120], 12);
+    await page.waitForTimeout(1500);   // the fling, if there is one, is over
+    long = await noteBody(page, 'Long');
+    assert.ok(long.scrollTop > 60, `the text scrolled ${long.scrollTop}px`);
+    assert.deepEqual((await viewNow(page)).pan, pan0, 'the map panned under a scroll of the text');
+
+    await fingerDrag(page, { x: Math.round(long.x - 60), y: Math.round(long.y) }, [140, 0]);
+    assert.equal((await noteBody(page, 'Long')).scrollTop, long.scrollTop, 'a sideways drag scrolled the text');
+    assert.notDeepEqual((await viewNow(page)).pan, pan0, 'a sideways drag did not pan the map');
+
+    // Back at its top, a drag down has nothing to scroll: it pans the map.
+    await page.evaluate(() => { Object.values(Graph.nodes).find((x) => x.getTitle() === 'Long').contentEditableDiv.scrollTop = 0; });
+    long = await noteBody(page, 'Long');
+    const pan1 = (await viewNow(page)).pan;
+    await fingerDrag(page, { x: Math.round(long.x), y: Math.round(long.top + 30) }, [0, 120]);
+    assert.equal((await noteBody(page, 'Long')).scrollTop, 0);
+    assert.notDeepEqual((await viewNow(page)).pan, pan1, 'a drag down from the top of the text did not pan the map');
+});
+
+test('a finger whose lift never came is dropped when the next gesture begins', async () => {
+    // Read with it, the next one-finger drag was a pinch that flung the view (rv14).
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const at = await openFractal(page);
+    const result = await page.evaluate(({ x, y }) => {
+        const fire = (type, id, primary, px, py) => svg.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: primary, clientX: px, clientY: py, bubbles: true, cancelable: true }));
+        fire('pointerdown', 77, false, x - 90, y);
+        const phantom = TouchOnPlane.points.size;
+        const zoom0 = Graph.zoom.mag(), at0 = Graph.xyToZ(x, y);
+        fire('pointerdown', 7, true, x, y);
+        for (let k = 1; k <= 6; k++) fire('pointermove', 7, true, x + 15 * k, y);
+        const held = Graph.xyToZ(x + 90, y).minus(at0).mag() / Graph.zoom.mag();
+        fire('pointerup', 7, true, x + 90, y);
+        return { phantom, zoomKept: Graph.zoom.mag() === zoom0, held, left: TouchOnPlane.points.size };
+    }, at);
+    assert.equal(result.phantom, 1, 'the lost finger was never held, so this proves nothing');
+    assert.equal(result.zoomKept, true, 'the drag was read as a pinch with the lost finger');
+    assert.ok(result.held < 1e-3, 'the point pressed is not under the finger');
+    assert.equal(result.left, 0);
+});
+
+test('a card past the window\'s edge leaves the page the window\'s size', { skip: isIPad && 'needs real touches' }, async () => {
+    // It made the page wider, and a finger on the tool bar slid it, the chrome with it (rv15).
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    await page.evaluate(() => Graph.zoom_set(Graph.zoom.scale(0.3)));
+    await page.waitForTimeout(900);
+    const wide = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+    assert.ok(wide[0] > wide[1], 'no card hangs past the edge, so this proves nothing');
+    assert.equal(wide[1], 1194, 'the page grew wider than the window');
+    const bar = await page.evaluate(() => { const r = document.querySelector('.tool-bar').getBoundingClientRect(); return { x: r.left + 6, y: r.top + r.height / 2 }; });
+    await fingerDrag(page, bar, [-300, -200]);
+    assert.deepEqual(await page.evaluate(() => [visualViewport.offsetLeft, visualViewport.offsetTop, scrollX, scrollY]), [0, 0, 0, 0], 'the page slid');
+});
+
+test('the New note tool and a tap on a card: the note lands clear of it, with the caret in it', async () => {
+    // The tap focused the card under it -- the keyboard for a card now hidden -- and the note
+    // was put down on top of it (rv15).
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const beta = await noteBody(page, 'Beta');
+    const tool = await page.evaluate(() => { const r = document.querySelector('.panel-icon.note-icon').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    await page.touchscreen.tap(tool.x, tool.y);
+    await page.waitForTimeout(400);
+    await page.touchscreen.tap(beta.x, beta.y);
+    await page.waitForTimeout(1200);
+    const made = await page.evaluate(() => {
+        const ns = Object.values(Graph.nodes), made = ns.find((n) => !['Alpha', 'Beta'].includes(n.getTitle()));
+        const a = made.view.div.getBoundingClientRect(), b = ns.find((n) => n.getTitle() === 'Beta').view.div.getBoundingClientRect();
+        const overlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        return { overlap, caret: document.activeElement === made.contentEditableDiv, following: made.followingMouse };
+    });
+    assert.deepEqual(made, { overlap: 0, caret: true, following: 0 });
+});
+
+test('a turned view has Upright, which straightens it where it is', async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const upright = () => page.evaluate(() => { const b = document.querySelector('.hud-btn[data-act="upright"]'); return !b.hidden && b.offsetParent !== null; });
+    assert.equal(await upright(), false, 'Upright is shown for a view that is upright');
+    const before = await page.evaluate(async () => {
+        Graph.zoom_cmultWith(new vec2(Math.cos(0.6), Math.sin(0.6)));
+        await new Promise((r) => setTimeout(r, 400));
+        return { pan: [Graph.pan.x, Graph.pan.y], mag: Graph.zoom.mag() };
+    });
+    assert.equal(await upright(), true, 'a turned view has no Upright');
+    const b = await page.evaluate(() => { const r = document.querySelector('.hud-btn[data-act="upright"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    await page.touchscreen.tap(b.x, b.y);
+    await page.waitForTimeout(400);
+    const after = await page.evaluate(() => ({ pan: [Graph.pan.x, Graph.pan.y], mag: Graph.zoom.mag(), arg: Math.atan2(Graph.zoom.y, Graph.zoom.x) }));
+    assert.equal(after.arg, 0, 'the view is still turned');
+    assert.deepEqual(after.pan, before.pan, 'Upright moved the view');
+    assert.ok(Math.abs(after.mag - before.mag) < 1e-12, 'Upright zoomed');
+    assert.equal(await upright(), false, 'Upright stays after the view is upright');
+});
+
+test('the overview scrubs under a finger', async () => {
+    // A drag across it went nowhere: only a mouse's moves were read (rv15).
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await twoNotes(page);
+    const map = await page.evaluate(() => { const r = Hud.canvas.getBoundingClientRect(); return { x: r.left, y: r.top + r.height / 2, w: r.width }; });
+    const panX = () => page.evaluate(() => Graph.pan.x);
+    let down, scrubbed;
+    if (!isIPad) {
+        await cdpTouch(page, 'touchStart', [[map.x + map.w * 0.2, map.y]]);
+        down = await panX();
+        for (let k = 1; k <= 6; k++) await cdpTouch(page, 'touchMove', [[map.x + map.w * (0.2 + 0.1 * k), map.y]]);
+        scrubbed = await panX();
+        await cdpTouch(page, 'touchEnd', []);
+    } else {
+        [down, scrubbed] = await page.evaluate(({ x, y, w }) => {
+            const fire = (type, f) => Hud.canvas.dispatchEvent(new PointerEvent(type, { pointerId: 9, pointerType: 'touch', isPrimary: true, clientX: x + w * f, clientY: y, bubbles: true, cancelable: true }));
+            fire('pointerdown', 0.2);
+            const down = Graph.pan.x;
+            for (let k = 1; k <= 6; k++) fire('pointermove', 0.2 + 0.1 * k);
+            const scrubbed = Graph.pan.x;
+            fire('pointerup', 0.8);
+            return [down, scrubbed];
+        }, map);
+    }
+    assert.ok(scrubbed > down, `a scrub to the right took the view from ${down} to ${scrubbed}`);
+});
+
+test('the first screen speaks to a finger', async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    const shown = await page.evaluate(() => [...document.querySelectorAll('.canvas-hint span')].filter((e) => e.offsetParent !== null && !e.querySelector('span')).map((e) => e.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+    assert.match(shown, /Tap .*then where the note goes/);
+    assert.match(shown, /two zoom it/);
+    assert.doesNotMatch(shown, /Double-click|scroll to zoom/, 'it asks a finger for a mouse and keys');
+});
+
+test('a card typed into is brought above the keyboard', async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    const placed = await page.evaluate(async () => {
+        const node = await window.createNote('Low', 'A body.');
+        await new Promise((r) => setTimeout(r, 600));
+        node.pos = Graph.xyToZ(innerWidth / 2, innerHeight - 90);
+        node.anchor = node.pos;
+        await new Promise((r) => setTimeout(r, 300));
+        node.view.titleInput.focus({ preventScroll: true });
+        return node.view.titleInput.getBoundingClientRect().bottom;
+    });
+    const keys = Math.round(placed - 150);
+    await keyboardUpTo(page, keys);
+    await page.waitForTimeout(300);
+    const bottom = await page.evaluate(() => document.activeElement.getBoundingClientRect().bottom);
+    assert.ok(bottom <= keys, `the Title ends at ${Math.round(bottom)}, under a keyboard whose top is at ${keys}`);
+    await keyboardUpTo(page, null);
+});
+
+test('with a keyboard short of room, the Archive controls give way to the Pane', async () => {
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    const room = await page.evaluate(async () => {
+        window.currentActiveZettelkastenMirror.setValue(Array.from({ length: 40 }, (_, i) => `## Note ${i + 1}\nLine ${i + 1}.\n`).join('\n'));
+        await new Promise((r) => setTimeout(r, 1500));
+        Hud.openNotes();
+        await new Promise((r) => setTimeout(r, 600));
+        const cm = window.currentActiveZettelkastenMirror;
+        cm.focus();
+        cm.setCursor(cm.lastLine(), 0);
+        return App.zetPanes.container.getBoundingClientRect().height;
+    });
+    await keyboardUpTo(page, 470);
+    await page.waitForTimeout(400);
+    const up = await page.evaluate(() => ({ bar: document.querySelector('.archive-bar').offsetHeight, pane: App.zetPanes.container.getBoundingClientRect(), caret: window.currentActiveZettelkastenMirror.cursorCoords(null, 'window').bottom }));
+    assert.equal(up.bar, 0, 'the Archive controls stayed above the Pane');
+    assert.ok(up.pane.height >= 240, `the Pane is ${Math.round(up.pane.height)}px tall above the keys`);
+    assert.ok(up.pane.bottom <= 470 && up.caret <= 470, 'the Pane or its caret is under the keys');
+    await keyboardUpTo(page, null);
+    await page.waitForTimeout(400);
+    assert.ok(await page.evaluate(() => document.querySelector('.archive-bar').offsetHeight) > 0, 'the Archive controls did not come back');
+    assert.ok(room > 0);
+});
+
+test('a pen in Chromium, which it sends as a mouse too, moves a card once and lets go', { skip: isIPad && 'Chromium sends a pen as a mouse; Safari does not' }, async () => {
+    // Taken by the Pointer Events path as well, its drag swallowed the mouseup that ends the
+    // mouse's, and the page was left under the grabbing overlay.
+    ({ context, page } = await openNeurite(browser));
+    await twoNotes(page);
+    const cdp = await page.context().newCDPSession(page);
+    const pen = (type, x, y, buttons = 1) => cdp.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' && !buttons ? 'none' : 'left', buttons, clickCount: type === 'mouseMoved' ? 0 : 1, pointerType: 'pen' });
+    const a = await card(page, 'Alpha');
+    await pen('mouseMoved', a.head.x, a.head.y, 0);
+    await pen('mousePressed', a.head.x, a.head.y);
+    for (let k = 1; k <= 10; k++) await pen('mouseMoved', a.head.x + 10 * k, a.head.y + 6 * k);
+    await pen('mouseReleased', a.head.x + 100, a.head.y + 60, 0);
+    await page.waitForTimeout(300);
+    const b = await card(page, 'Alpha');
+    assert.ok(Math.abs(b.x - a.x - 100) <= 2 && Math.abs(b.y - a.y - 60) <= 2, `the card moved (${b.x - a.x}, ${b.y - a.y}), not (100, 60)`);
+    assert.deepEqual(await page.evaluate(() => ({ overlay: Boolean(OverlayHelper.overlay), following: Object.values(Graph.nodes).some((n) => n.followingMouse), fingers: TouchOnPlane.points.size })),
+        { overlay: false, following: false, fingers: 0 });
 });

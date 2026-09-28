@@ -51,9 +51,21 @@ check below that needs one of those is marked as a device check.
   - no tooltip on a tap;
   - Titles typed as spelled.
 - **Edges by touch** (same file): the Connect tool and two taps, and **+ link** and ×.
-- **Placing a note** (same file): the Note tool and a tap put the note where the tap was.
+- **Placing a note** (same file): the Note tool and a tap put the note where the tap was. On a
+  card, the note is moved clear of it and takes the caret, rather than the card underneath.
+- **Every finger on the map** (same file). The cards are part of the map for touch, as the Fractal is:
+  - a pinch with one finger or both on a card, or one on a header, zooms about the fingers;
+  - one finger on a card's body pans the map, and a tap on it still puts the caret there;
+  - one finger on a long note's text scrolls it, with a fling, and pans the map sideways or past the
+    text's end;
+  - a finger whose lift never arrived is dropped when the next gesture begins;
+  - a card past the window's edge no longer makes the page wider than the window;
+  - a turned view shows **Upright**, which straightens it in place;
+  - the overview scrubs under a finger;
+  - the first screen gives touch instructions under a coarse pointer.
 - **The keyboard** (same file): the Pane, the menu and the dialogs stay above it, with the keyboard
-  simulated as `visualViewport` reports it.
+  simulated as `visualViewport` reports it. A card typed into is moved above the keys. When the
+  keyboard leaves little room, as in landscape, the Archive controls give their room to the Pane.
 - **Save and Open** (`test-e2e/specs/21-durability.e2e.mjs`):
   - a round trip of one Node of every type, through a reload and through a file;
   - the Save row's note;
@@ -66,28 +78,35 @@ check below that needs one of those is marked as a device check.
 **Device checks:** run each on the iPad, record what happens, and say which iPadOS version.
 
 1. **Pinch.** Two fingers on the fractal: the zoom follows the fingers, a clear twist turns the view, and the page
-   itself never zooms. Then pinch over a card and over the Pane. Nothing should zoom there, because
-   Safari's gesture events are cancelled.
-2. **Header.** A finger on a card's header drags the card. A tap on the Title opens the keyboard. A
+   itself never zooms. Then pinch with a finger on a card, and with both on one: the map zooms the
+   same way. Over the Pane, nothing zooms. After a twist, **Upright** straightens the view in place.
+2. **One finger on a note.** On a short note it pans the map. On a long note it scrolls the text,
+   and a flick carries on after the lift. A long press on the text still selects it. A short pan
+   followed at once by a tap: the tap still puts the caret where it lands.
+3. **Header.** A finger on a card's header drags the card. A tap on the Title opens the keyboard. A
    long press on the Title selects text rather than starting a drag.
-3. **Small targets.** The grip resizes under a finger. Say whether the three 20 px header buttons can
+4. **Small targets.** The grip resizes under a finger. Say whether the three 20 px header buttons can
    be hit without missing.
-4. **Tools.** Each tool in the bar acts on the first tap, not on a second one.
-5. **Keyboard.** Type at the end of a long note in the Pane. The caret stays above the keys, the
-   Pane shrinks while the keyboard is up, and it comes back when the keyboard goes.
-6. **CodeMirror.** Typing, selection handles, autocorrect staying off, and dictation into the Pane,
+5. **Tools.** Each tool in the bar acts on the first tap, not on a second one. New note and a tap on
+   a card: the keyboard comes up for the new note, not for the card under it.
+6. **Keyboard.** Type at the end of a long note in the Pane. The caret stays above the keys, the
+   Pane shrinks while the keyboard is up, and it comes back when the keyboard goes. In landscape the
+   Archive controls step aside while the Pane is typed into. Tap the Title of a card low on the
+   screen: the card comes up above the keys.
+7. **CodeMirror.** Typing, selection handles, autocorrect staying off, and dictation into the Pane,
    all on CodeMirror's `contenteditable` input.
-7. **Install.** Add to Home Screen from https://pxmyh.github.io/Neurite/. The app opens offline after
+8. **Install.** Add to Home Screen from https://pxmyh.github.io/Neurite/. The app opens offline after
    one online visit. Record `navigator.storage.persisted()` in the installed app, and whether clearing
    Safari's website data takes the installed app's Graph with it.
-8. **Save and Open.** In the installed app, Save to… opens the share sheet. Save to Files puts the
+9. **Save and Open.** In the installed app, Save to… opens the share sheet. Save to Files puts the
    file in iCloud Drive, and Open… on the Mac reads it back.
-9. **Double tap.** A double tap on a card toggles its pin. This checks whether WebKit sends the
-   `dblclick`.
-10. **Apple Pencil.** The Pencil drags a card by its header.
-11. **Long press.** Say whether iPadOS sends `contextmenu`, which is the route to the Node and Edge
+10. **Double tap.** A double tap on a card toggles its pin. This checks whether WebKit sends the
+    `dblclick`.
+11. **Apple Pencil.** The Pencil drags a card by its header, and pans the map from the fractal or
+    from a note's body.
+12. **Long press.** Say whether iPadOS sends `contextmenu`, which is the route to the Node and Edge
     menus.
-12. **Frame rate.** Read the FPS during a pan and during a pinch at the default settings. It is shown
+13. **Frame rate.** Read the FPS during a pan and during a pinch at the default settings. It is shown
     in the Fractal panel.
 
 ## The ticket's premise has moved since it was written

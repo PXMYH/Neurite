@@ -2930,6 +2930,16 @@ input[type="checkbox"] {
     width: 100%;
 }
 
+/* Hidden while the Pane is typed into with a keyboard taking most of the window (hud.js),
+   and the room they took is the Pane's. */
+html.short-of-room .submenu:has(.CodeMirror-focused) .archive-bar {
+    display: none;
+}
+
+html.short-of-room .submenu:has(.CodeMirror-focused) .zet-pane-container {
+    --archive-bar-space: 0px !important;
+}
+
 /* The Archive controls above the text (#64): the select across the full width, the three
    acts under it, one row wherever they fit. */
 .archive-bar {

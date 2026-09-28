@@ -28,28 +28,28 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   <!-- Touch -->
   <tr>
     <td rowspan="6"><strong>Touch</strong></td>
-    <td><code>One finger on the fractal</code></td>
-    <td>Move around</td>
+    <td><code>One finger on the fractal or a note</code></td>
+    <td>Move around. On a note whose text runs past its card, the text scrolls instead.</td>
   </tr>
   <tr>
-    <td><code>Two fingers on the fractal</code></td>
-    <td>Zoom, with the fractal under your fingers. A clear twist turns the view as well, and Home puts it upright.</td>
+    <td><code>Two fingers, on the fractal or a note</code></td>
+    <td>Zoom, with the fractal under your fingers. A clear twist turns the view as well, and Upright, beside Home, turns it back where you are.</td>
   </tr>
   <tr>
-    <td><code>The Note tool, then a tap</code></td>
-    <td>A note where you tap. Typing a <code>## Title</code> line in the Notes panel makes one too.</td>
+    <td><code>New note, then a tap</code></td>
+    <td>A note where you tap, with the caret in it. Typing a <code>## Title</code> line in the Notes panel makes one too.</td>
   </tr>
   <tr>
     <td><code>A finger on a title</code></td>
     <td>Move the card. A tap puts the caret in the title instead.</td>
   </tr>
   <tr>
-    <td><code>A finger on a card's corner</code></td>
+    <td><code>A finger on a card's bottom-right corner</code></td>
     <td>Resize the card</td>
   </tr>
   <tr>
-    <td><code>Connect tool, then two taps</code></td>
-    <td>Link two notes: tap the tool, then one note and then the other. <code>+ link</code> on each card links from a list, and the × beside a link cuts it.</td>
+    <td><code>Connect, then two taps</code></td>
+    <td>Link two notes: tap Connect, then one note and then the other. It stays on for the next link until you tap it again. <code>+ link</code> on each card links from a list, and the × beside a link cuts it.</td>
   </tr>
   <!-- Node Management -->
   <tr>

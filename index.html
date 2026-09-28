@@ -9,8 +9,11 @@
     <!-- Without this, mobile Safari lays the page out at 980px and scales it down.
          The page itself does not zoom: two fingers zoom the fractal (interface.js, #55),
          and `touch-action` on the root and Safari's cancelled gesture events keep the
-         browser's own zoom out, which took the menu and tool bar off screen. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+         browser's own zoom out, which took the menu and tool bar off screen.
+         `minimum-scale=1` keeps the page as wide as the window: a card past the window's
+         edge made it wider, by 295px zoomed in, and a finger on the tool bar slid the page
+         that far, the menu button and the overview with it (rv15). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
     <meta name="description" content="Fractal Graph-of-Thought. Rhizomatic Mind-Mapping for Ai-Agents, Web-Links, Notes, and Code.">
 
     <!-- Home Screen install. The manifest carries name, icons and standalone display;

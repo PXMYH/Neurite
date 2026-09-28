@@ -138,7 +138,12 @@ class NodeSimulation {
         Graph.forEachNode(Array.prototype.push, nodes);
         const svgbb = svg.getBoundingClientRect();
         const boxes = nodes.map(Node.boxOf);
-        nodes.forEach( (node, i)=> node.step(dt, boxes[i], svgbb) );
+        const later = [];
+        nodes.forEach( (node, i)=> node.step(dt, boxes[i], svgbb, later) );
+        // The cards whose box could not be read before the writes -- new ones, or ones just shown
+        // -- read after them, all at once. Read one by one between the writes, each was a layout
+        // of its own: a hundred notes arriving together stalled WebKit for over a second (rv15).
+        later.map(Node.boxOf).forEach( (box, i)=>later[i].place(box) );
         return this;
     }
     updateForThisDt(item){

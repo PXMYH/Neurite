@@ -75,11 +75,27 @@ const ToolArm = {
         ToolArm.release();
     },
 
+    // The press that puts a Node down is for that and nothing else. It landed on whatever was
+    // under it, and a tap -- which a Node in flight does not follow to, as it follows a mouse --
+    // put the caret, and an iPad's keyboard, in the card underneath, with the new note on top
+    // of it (rv15). The note takes the caret instead, as a double-click's does, and is moved
+    // off any card it came down on, as a new note always is (`settlePlacement`).
+    landing: [],
+    onMouseDown: (e)=>{
+        ToolArm.landing = Object.values(Graph.nodes).filter( (node)=>node.followingMouse );
+        if (ToolArm.landing.length) e.preventDefault();
+    },
     onMouseUp: ()=>{
+        for (const node of ToolArm.landing) {
+            NodeView.settlePlacement(node);
+            if (node.isTextNode) NodeView.focusBodyOf(node);
+        }
+        ToolArm.landing = [];
         if (ToolArm.el) setTimeout(ToolArm.releaseIfNothingInFlight, 0);
     }
 };
 
+On.mousedown(document, ToolArm.onMouseDown, true);
 On.mouseup(document, ToolArm.onMouseUp);
 
 function makeIconDraggable(iconDiv) {

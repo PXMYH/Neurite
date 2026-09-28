@@ -355,9 +355,16 @@ class Interface {
 
 
 
-// Touch on the Fractal (#55), through Pointer Events: one finger pans, two pinch.
+// Touch on the map (#55), through Pointer Events: one finger pans it, two pinch it. The map is
+// the Fractal and the cards on it. Taken from the Fractal alone, a pinch with a finger on a card
+// slid the map instead -- zoomed in to read, 62-85% of pinches had one there -- and a finger on a
+// card could not pan it at all (rv15). So a finger anywhere on the map counts, except on a card's
+// handles while it is the only one down: the header and the circle move the card, and the grip
+// resizes it. A second finger makes a pinch of every finger on the map, provided the one on the
+// header has not yet gone past `Node.dragThreshold` and so begun to move the card. A card whose
+// text has more than fits scrolls it under one finger, as it does under the wheel.
 //
-// Every touch pointer is captured to the Fractal as it lands. Left to the browser, a pointer is
+// Every finger that moves the map is captured to the Fractal. Left to the browser, a pointer is
 // captured to whatever it landed on -- often one of the Fractal's lines, which the renderer takes
 // away as it redraws -- and a capture lost with its element sent the finger's lift somewhere
 // else. The finger stayed down here, so the next one-finger drag was read as a pinch with a
@@ -384,9 +391,14 @@ function turnedAboutMidpoint(a1, b1, angle){
     return [m.plus(a1.minus(m).cmult(unit)), m.plus(b1.minus(m).cmult(unit))];
 }
 const TouchOnPlane = {
-    // Where each finger is, in screen pixels, in the order the fingers came down.
+    // The map's fingers, in the order they came down: where each is and came down, in screen
+    // pixels, and whether it has begun to move anything.
     points: new Map(),
+    // Fingers on a card's header or circle: the card's, unless a second finger makes a pinch.
+    pending: new Map(),
     pinch: null,
+    // The fling a card's text is scrolling by, if any.
+    flung: null,
     // A pinch turns the view only once the fingers have turned this far (radians, about 11
     // degrees): no two fingers spread without turning a little, and a map that turned with
     // every zoom ended up at an angle nobody chose.
@@ -402,25 +414,98 @@ const TouchOnPlane = {
             zoom: Graph.zoom, pan: Graph.pan, turning
         };
     },
+    // What a finger landing on `el` is for. Null off the map, and on a control with a drag of
+    // its own.
+    placeOf(el){
+        if (!el?.closest) return null;
+        if (el.closest('#svg_bg')) return 'fractal';
+        if (!el.closest('#nodes')) return null;
+        if (el.closest('.resize-handle')) return 'grip';
+        if (el.closest('.header-container, .collapsed-circle')) return 'handle';
+        return el.closest('input, select, video, audio') ? null : 'body';
+    },
     // A finger or a pen; a mouse has handlers of its own. The touch events this replaced were
     // sent for an Apple Pencil too.
     onDown(e){
         if (e.pointerType === 'mouse') return;
+        this.flung = null;
+        // The first finger of a gesture: one still held here is a finger whose lift never
+        // arrived, and read with it the next drag was a pinch that flung the view (rv14).
+        if (e.isPrimary) this.forget(e.pointerType);
 
-        try { svg.setPointerCapture(e.pointerId) } catch (err) { Logger.debug("No capture:", err) }
-        this.points.set(e.pointerId, {x: e.clientX, y: e.clientY});
+        const place = this.placeOf(e.target);
+        const joins = (this.points.size + this.pending.size > 0);
+        if (!place || (place === 'grip' && !joins)) return;
+
+        const at = {x: e.clientX, y: e.clientY, t: e.timeStamp, type: e.pointerType};
+        const finger = {...at, from: at, el: e.target, moving: (place === 'fractal')};
+        if (place === 'handle' && !joins) return void this.pending.set(e.pointerId, finger);
+
+        for (const [id, p] of this.pending) this.points.set(id, p);
+        this.pending.clear();
+        this.points.set(e.pointerId, finger);
+        if (this.points.size > 1) {
+            this.points.forEach( (p, id)=>{ p.moving = true; p.scroller = null; this.hold(id) } );
+        } else if (place === 'fractal') {
+            this.hold(e.pointerId);
+        }
         this.restartPinch();
-        Autopilot.stop();
+        if (place === 'fractal' || joins) Autopilot.stop();
     },
     onMove(e){
+        const held = this.pending.get(e.pointerId);
+        if (held) {
+            Object.assign(held, {x: e.clientX, y: e.clientY, t: e.timeStamp});
+            // Past the threshold a finger on a handle is moving its card, and stays out of a pinch.
+            if (Math.hypot(held.x - held.from.x, held.y - held.from.y) > Node.dragThreshold) this.pending.delete(e.pointerId);
+        }
+
         const was = this.points.get(e.pointerId);
         if (!was) return;
 
-        const now = {x: e.clientX, y: e.clientY};
+        const now = {...was, x: e.clientX, y: e.clientY, t: e.timeStamp};
+        now.travelled ||= Math.hypot(now.x - now.from.x, now.y - now.from.y) > Node.dragThreshold;
         this.points.set(e.pointerId, now);
+        let from = was;
+        if (!now.moving) {
+            // A finger on a card moves nothing short of the threshold: that is a tap, for the caret
+            // or a button. Past it, it moves from where it came down, so the point it pressed stays
+            // under it -- the text it is on, if that can scroll the way it goes, or else the map.
+            if (!now.travelled) return;
+
+            now.moving = true;
+            const dx = now.x - now.from.x, dy = now.y - now.from.y;
+            now.scroller = (Math.abs(dy) >= Math.abs(dx)) ? Node.scrollerFor(now.el, -dy) : null;
+            this.hold(e.pointerId);
+            Autopilot.stop();
+            from = now.from;
+        }
         App.interface.coordsLive = true;
-        if (this.points.size === 1) return this.pan(was, now);
+        if (this.points.size === 1) return (now.scroller ? this.scroll(now, from) : this.pan(from, now));
         if (this.pinch) this.pinchTo([...this.points.values()]);
+    },
+    scroll(now, was){
+        now.scroller.scrollTop += was.y - now.y;
+        // Pixels a millisecond, smoothed, for the fling when it lets go.
+        const v = (was.y - now.y) / Math.max(now.t - was.t, 1);
+        now.v = (was.v === undefined ? v : 0.6 * v + 0.4 * was.v);
+    },
+    // Let go while moving, the text goes on and slows to a stop, as a scroll of the browser's own
+    // does. A finger coming down stops it.
+    fling(el, v){
+        let last = performance.now();
+        const step = (t)=>{
+            if (this.flung !== step) return;
+
+            const top = el.scrollTop, dy = v * (t - last);
+            el.scrollTop += dy;
+            v *= Math.pow(0.95, (t - last) / 16);
+            last = t;
+            const stuck = (Math.abs(dy) >= 1 && el.scrollTop === top);
+            if (Math.abs(v) > 0.02 && !stuck) requestAnimationFrame(step);
+        };
+        this.flung = step;
+        requestAnimationFrame(step);
     },
     pan(was, now){
         const delta = new vec2(was.x - now.x, was.y - now.y);
@@ -449,13 +534,39 @@ const TouchOnPlane = {
         Graph.pan_set(view.pan);
     },
     onEnd(e){
-        if (this.points.delete(e.pointerId)) this.restartPinch();
+        this.pending.delete(e.pointerId);
+        const was = this.points.get(e.pointerId);
+        if (!was) return;
+
+        this.points.delete(e.pointerId);
+        // Past the threshold it was no tap, whatever the browser's own slop for one makes of the
+        // lift: a short pan on a card put the caret in its text, and with the Note tool on, one
+        // on the Fractal made a note.
+        const lifted = (e.type === 'pointerup');
+        if (was.travelled && lifted) Node.swallowTheTap();
+        if (lifted && was.scroller && e.timeStamp - was.t < 60 && Math.abs(was.v) > 0.2) this.fling(was.scroller, was.v);
+        this.restartPinch();
+    },
+    forget(type){
+        for (const map of [this.points, this.pending]) map.forEach( (p, id)=>{ if (p.type === type) map.delete(id) } );
+    },
+    // A pen that the browser sends on as a mouse as well -- Chromium does, while it moves; Safari
+    // sends a Pencil's taps only, as a finger's -- is the mouse's. The mouse's own handlers pan
+    // the Fractal and move a card, and this moved the map beside them.
+    onCompatMouse(){
+        this.points.forEach( (p, id)=>{ if (p.type === 'pen' && !p.travelled) this.points.delete(id) } );
+        this.restartPinch();
+    },
+    hold(id){
+        try { svg.setPointerCapture(id) } catch (err) { Logger.debug("No capture:", err) }
     }
 };
-On.pointerdown(svg, TouchOnPlane.onDown.bind(TouchOnPlane));
-On.pointermove(svg, TouchOnPlane.onMove.bind(TouchOnPlane));
-On.pointerup(svg, TouchOnPlane.onEnd.bind(TouchOnPlane));
-On.pointercancel(svg, TouchOnPlane.onEnd.bind(TouchOnPlane));
+// Taken as they come down, before a card's own handlers see them.
+On.pointerdown(document, TouchOnPlane.onDown.bind(TouchOnPlane), true);
+On.pointermove(document, TouchOnPlane.onMove.bind(TouchOnPlane), true);
+On.pointerup(document, TouchOnPlane.onEnd.bind(TouchOnPlane), true);
+On.pointercancel(document, TouchOnPlane.onEnd.bind(TouchOnPlane), true);
+On.mousedown(document, TouchOnPlane.onCompatMouse.bind(TouchOnPlane), true);
 
 // Every finger on the page, wherever it landed. Captured, so that no card's handler can hide one.
 const FingersDown = new Set();

@@ -52,6 +52,11 @@ class Hud {
                         data-tooltip="Push overlapping notes apart, without rearranging the map (T)">Tidy</button>
                 <button type="button" class="hud-btn" data-act="home"
                         data-tooltip="Back to the start: pan 0, zoom 1, upright (Home)">Home</button>
+                <!-- Only while the view is turned, which a twist of a pinch does (#55). Home
+                     puts it upright as well, but back at the start, and a reader straightening
+                     a tilt lost their place (rv15). -->
+                <button type="button" class="hud-btn" data-act="upright" hidden
+                        data-tooltip="Turn the view upright, and stay where you are">Upright</button>
             </div>`;
         root.appendChild(panel);
 
@@ -67,6 +72,8 @@ class Hud {
         On.click(panel.querySelector('[data-act="fit"]'), ()=>Hud.fitAll());
         On.click(panel.querySelector('[data-act="tidy"]'), ()=>Hud.tidy());
         On.click(panel.querySelector('[data-act="home"]'), ()=>Hud.home());
+        this.elemUpright = panel.querySelector('[data-act="upright"]');
+        On.click(this.elemUpright, ()=>Hud.upright());
         this.bindMapDragging();
         this.bindKeys();
         this.buildEmptyHint(root);
@@ -87,8 +94,13 @@ class Hud {
     // double-click the space it occupies.
     static buildEmptyHint(root){
         const hint = Html.make.div('canvas-hint');
+        // Said to the hand it is read with (rv15): an iPad has no double-click, no keys and no
+        // wheel to offer, and a first screen that asked for all three told it nothing.
         hint.innerHTML = `
-            <p class="canvas-hint-lead">Double-click anywhere to write a note</p>
+            <p class="canvas-hint-lead">
+                <span class="for-pointer">Double-click anywhere to write a note</span>
+                <span class="for-touch">Tap <svg class="inline-icon" aria-label="the Note tool" role="img"><use xlink:href="#note-icon-symbol"></use></svg>, then where the note goes</span>
+            </p>
             <!-- What the app actually does, checked against the handlers rather than
                  written from memory. This said "Shift + drag a note onto another to link
                  them", which is not a gesture Neurite has: a Shift + press on the first
@@ -102,7 +114,8 @@ class Hud {
                  Zettelkasten rather than a diagram. -->
             <p class="canvas-hint-keys">
                 <span>Write <kbd>[[</kbd>another note's title<kbd>]]</kbd> in a note to link them</span>
-                <span><kbd>0</kbd> fit &middot; <kbd>T</kbd> tidy &middot; <kbd>Home</kbd> reset &middot; scroll to zoom</span>
+                <span class="for-pointer"><kbd>0</kbd> fit &middot; <kbd>T</kbd> tidy &middot; <kbd>Home</kbd> reset &middot; scroll to zoom</span>
+                <span class="for-touch">One finger moves the view, two zoom it &middot; Help has the rest</span>
             </p>`;
         root.appendChild(hint);
         this.hint = hint;
@@ -171,6 +184,8 @@ class Hud {
         Hud.elemCount.title = selected ? 'Esc, or a click on bare canvas, clears the selection' : '';
 
         if (Hud.hint) Hud.hint.classList.toggle('is-hidden', frame.count > 0);
+        const turned = Math.abs(Math.atan2(Graph.zoom.y, Graph.zoom.x)) > 1e-3;
+        if (Hud.elemUpright.hidden === turned) Hud.elemUpright.hidden = !turned;
         Hud.updateArchive();
         Hud.updateUnderMenu();
     }
@@ -292,6 +307,21 @@ class Hud {
         On.mousemove(canvas, (e)=>{ if (dragging) goTo(e) });
         On.mouseup(window, ()=>{ dragging = false });
         On.mouseleave(canvas, ()=>{ dragging = false });
+
+        // A finger or a pen scrubs it too: a touch sends no mousemove while it moves, and a
+        // drag across the overview went nowhere (rv15). Held to it while down, so a scrub that
+        // runs off its edge keeps going.
+        let finger = null;
+        On.pointerdown(canvas, (e)=>{
+            if (e.pointerType === 'mouse') return;
+
+            finger = e.pointerId;
+            try { canvas.setPointerCapture(e.pointerId) } catch (err) { Logger.debug("No capture:", err) }
+            goTo(e);
+        });
+        On.pointermove(canvas, (e)=>{ if (e.pointerId === finger) goTo(e) });
+        On.pointerup(canvas, (e)=>{ if (e.pointerId === finger) finger = null });
+        On.pointercancel(canvas, (e)=>{ if (e.pointerId === finger) finger = null });
     }
 
     // Put every note on screen.
@@ -341,14 +371,18 @@ class Hud {
     // the page shows where it was last drawn, before the separation moved it and before the
     // pan this makes, so asked again in the same task it moved the view as far again.
     static reveal(node){
-        const rect = Hud.usableRect();
         const half = node && Graph.planeHalfExtent(node);
-        if (!rect || !half) return;
+        if (!half) return;
 
         const perPx = 2 * Graph.zoom.mag() / Svg.windowScale();
         const c = Hud.toScreen(node.pos);
-        const box = {left: c.x - half.hw / perPx, right: c.x + half.hw / perPx,
-                     top: c.y - half.hh / perPx, bottom: c.y + half.hh / perPx};
+        return Hud.revealBox({left: c.x - half.hw / perPx, right: c.x + half.hw / perPx,
+                              top: c.y - half.hh / perPx, bottom: c.y + half.hh / perPx});
+    }
+    // The view moved just enough to bring a box of the screen into `rect`.
+    static revealBox(box, rect = Hud.usableRect()){
+        if (!rect) return;
+
         const margin = 8;
         const shift = (lo, hi, from, to)=>((hi - lo > to - from - 2 * margin || lo < from + margin)
             ? (from + margin - lo) : (hi > to - margin ? (to - margin - hi) : 0));
@@ -402,6 +436,12 @@ class Hud {
         if (!vw || !vh) return null;
         const {top, bottom, left, right} = Hud.chromeInsets();
         return {top, left, right: vw - right, bottom: vh - bottom};
+    }
+    // And less what an on-screen keyboard covers, which covers the window without resizing it.
+    static visibleRect(){
+        const rect = Hud.usableRect(), seen = window.visualViewport;
+        if (!rect || !seen) return rect;
+        return {...rect, top: Math.max(rect.top, seen.offsetTop), bottom: Math.min(rect.bottom, seen.offsetTop + seen.height)};
     }
 
     // How much bigger the view has to be for the chrome not to cover the edges of it.
@@ -483,6 +523,11 @@ class Hud {
         Autopilot.stop();
         Graph.pan_set(new vec2(0, 0));
         Graph.zoom_set(new vec2(1, 0));
+    }
+    // The same view, upright: turned about the middle of the screen, which is the pan.
+    static upright(){
+        Autopilot.stop();
+        Graph.zoom_set(new vec2(Graph.zoom.mag(), 0));
     }
 
     // Push overlapping notes apart, and nothing else.
@@ -582,6 +627,8 @@ On.blur(document, ()=>{
 // lines -- and the caret typing them -- under the keys. `visualViewport` is the part on screen:
 // the menu, the Pane and the dialogs are clamped to it (`--visible-height`), and the Pane's
 // CodeMirror, which measures its box only when told to, is told, with the caret kept in sight.
+// A card typed into is brought above the keys by moving the view: it stayed under them, where
+// nothing but the keys could be seen (rv15).
 if (window.visualViewport) {
     // Only when a keyboard comes up is the caret brought back into sight: on every resize it
     // threw away where the Pane had been scrolled to (rv15). A keyboard shrinks the visible
@@ -592,6 +639,14 @@ if (window.visualViewport) {
         visibleHeight = visualViewport.height;
         windowHeight = window.innerHeight;
         document.documentElement.style.setProperty('--visible-height', visibleHeight + 'px');
+        // A keyboard that leaves little of the window -- an iPad's leaves some 470px in
+        // landscape -- is short of room for the Archive controls above the Pane as well, and
+        // under them the Pane was four to nine lines tall (rv15). They give way to it while it
+        // is typed into (styles.css).
+        document.documentElement.classList.toggle('short-of-room', visibleHeight < windowHeight - 120 && visibleHeight < 640);
+
+        const typing = document.activeElement;
+        if (keyboardCameUp && typing?.closest?.('#nodes')) Hud.revealBox(typing.getBoundingClientRect(), Hud.visibleRect());
 
         const cm = window.currentActiveZettelkastenMirror;
         if (!cm) return;

@@ -140,7 +140,8 @@ test('a small turn of the fingers does not turn the view', ()=>{
     near(onPlane(m, view), onPlane(a0.plus(b0).scale(0.5), view0), "the midpoint's point moved");
 });
 
-test('the Fractal keeps a pinch from the browser', ()=>{
-    // Without it Chromium zoomed the page under the pinch and cancelled the pointers.
-    assert.match(read('resources/styles/foundation.css'), /#svg_bg\s*\{\s*touch-action:\s*none;\s*\}/);
+test('the map keeps a pinch from the browser, on the Fractal and on the cards', ()=>{
+    // Without it Chromium zoomed the page under the pinch and cancelled the pointers, and a
+    // finger on a card hanging past the window's edge slid the whole page (rv15).
+    assert.match(read('resources/styles/foundation.css'), /#svg_bg, \.window, \.window \*\s*\{\s*touch-action:\s*none;\s*\}/);
 });

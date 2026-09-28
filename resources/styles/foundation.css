@@ -385,6 +385,8 @@ body.connect-mode .window textarea {
 
 .hud-map {
     display: block;
+    /* A finger scrubs it (hud.js), rather than panning the page. */
+    touch-action: none;
     border-radius: var(--radius-sm);
     /* Darker than the island so the overview reads as a window onto the canvas
        rather than another panel surface. */
@@ -872,16 +874,43 @@ body.connect-mode .window textarea {
     background-color: rgba(51, 51, 51, 0.3);
 }
 
-/* The Fractal takes every touch itself -- one finger pans it and two pinch it (#55) -- and a
-   browser left to pan or zoom the page would cancel the pinch's pointers part way through. */
-#svg_bg {
+/* The map takes every touch itself -- one finger pans it and two pinch it (#55), on the Fractal
+   and on the cards -- and a browser left to pan or zoom the page would cancel the pinch's
+   pointers part way through. A card's text that has more than fits is scrolled by the same
+   handler (interface.js). Left to the browser, a finger on a card hanging past the window's edge
+   slid the whole page, the tool bar and the menu button with it (rv15). */
+#svg_bg, .window, .window * {
     touch-action: none;
 }
 
-/* And nowhere does the page itself zoom. A pinch that began on a card, or on a panel, zoomed the
-   page to 5x in Chromium: the menu, the tool bar and the overview went off screen and the page
-   stayed there (rv14). Panning is left alone, so a card's text still scrolls under a finger.
-   Safari takes its page zoom from gesture events, which interface.js cancels. */
+/* And nowhere does the page itself zoom. A pinch that began on a panel zoomed the page to 5x in
+   Chromium: the menu, the tool bar and the overview went off screen and the page stayed there
+   (rv14). Panning is left alone, so the menu and the Pane still scroll under a finger. Safari
+   takes its page zoom from gesture events, which interface.js cancels. */
 html {
     touch-action: pan-x pan-y;
+    /* Safari flashed a grey box over every control a finger tapped, the tools, the menu button
+       and each card's header among them, over the app's own pressed states (rv15). */
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* The empty canvas's hint, said to the hand it is read with (hud.js): the primary pointer, as
+   an iPad with a trackpad is still read by its fingers. */
+@media (pointer: coarse) {
+    .canvas-hint .for-pointer {
+        display: none;
+    }
+}
+
+@media not all and (pointer: coarse) {
+    .canvas-hint .for-touch {
+        display: none;
+    }
+}
+
+/* A tool's icon inside a line of text, at the text's size and in its colour. */
+.inline-icon {
+    width: 1.15em;
+    height: 1.15em;
+    vertical-align: -0.2em;
 }

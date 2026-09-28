@@ -931,6 +931,8 @@ class NodeView {
         const onResizePointerEnd = (e) => { if (e.pointerId === resizingPointer) handleMouseUp() };
         On.pointerdown(this.resizeHandle, (e) => {
             if (e.pointerType === 'mouse' || resizingPointer !== null) return;
+            // A finger that came down while another was on the map is a pinch's (interface.js).
+            if (TouchOnPlane.points.has(e.pointerId)) return;
 
             startResize(e);
             resizingPointer = e.pointerId;
