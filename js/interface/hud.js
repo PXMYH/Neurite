@@ -583,13 +583,20 @@ On.blur(document, ()=>{
 // the menu, the Pane and the dialogs are clamped to it (`--visible-height`), and the Pane's
 // CodeMirror, which measures its box only when told to, is told, with the caret kept in sight.
 if (window.visualViewport) {
+    // Only when a keyboard comes up is the caret brought back into sight: on every resize it
+    // threw away where the Pane had been scrolled to (rv15). A keyboard shrinks the visible
+    // height and leaves the window's alone; a window made smaller shrinks both.
+    let visibleHeight = visualViewport.height, windowHeight = window.innerHeight;
     const keepVisibleHeight = ()=>{
-        document.documentElement.style.setProperty('--visible-height', visualViewport.height + 'px');
+        const keyboardCameUp = visualViewport.height < visibleHeight && window.innerHeight === windowHeight;
+        visibleHeight = visualViewport.height;
+        windowHeight = window.innerHeight;
+        document.documentElement.style.setProperty('--visible-height', visibleHeight + 'px');
 
         const cm = window.currentActiveZettelkastenMirror;
         if (!cm) return;
         cm.refresh();
-        if (cm.hasFocus()) cm.scrollIntoView(null, 24);
+        if (keyboardCameUp && cm.hasFocus()) cm.scrollIntoView(null, 24);
     };
     On.resize(visualViewport, keepVisibleHeight);
     keepVisibleHeight();

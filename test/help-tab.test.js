@@ -150,7 +150,7 @@ const CLAIMS = [
      file: 'js/nodes/nodeclass.js', code: /this\.pos = Graph\.vecToZ\(\)\.minus\(this\.mouseAnchor\);/,
      why: 'a note put down by a click lands where the last frame drew it, which a tap never moved: under the tool bar'},
     {row: /<td>A finger on a title<\/td>/, says: /Move the card/,
-     file: 'js/nodes/createnodes/window.js', code: /On\.pointerdown\(this\.headerContainer, this\.model\.onHeaderPointerDown\)/,
+     file: 'js/nodes/createnodes/window.js', code: /On\.pointerdown\(this\.div, this\.model\.onHeaderPointerDown\)/,
      why: 'the header takes no finger, so a card cannot be moved by touch'},
     {row: /<td>A finger on a card's corner<\/td>/, says: /Resize/,
      file: 'js/nodes/createnodes/window.js', code: /On\.pointerdown\(this\.resizeHandle,/,

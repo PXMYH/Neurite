@@ -249,7 +249,7 @@ class NodeView {
         this.model.wrapperDivs = document.getElementsByClassName('wrapperDiv');
 
         On.mousedown(this.headerContainer, NodeView.onHeaderContainerMouseDown);
-        On.pointerdown(this.headerContainer, this.model.onHeaderPointerDown);
+        On.pointerdown(this.div, this.model.onHeaderPointerDown);
         this.setWindowDivListeners();
         this.setTitleInputListeners();
         this.setResizeEventListeners();
@@ -458,12 +458,12 @@ class NodeView {
         const container = this.headerContainer;
 
         if (copyBtn && container) {
-            container.addEventListener('mouseenter', () => {
-                copyBtn.style.visibility = 'visible';
-            });
-            container.addEventListener('mouseleave', () => {
-                copyBtn.style.visibility = 'hidden';
-            });
+            // Shown by the stylesheet -- a mouse over the header, or the Title being edited
+            // (styles.css, `.copy-button`) -- and not by a mouseenter, which a tap sends too
+            // and which iOS reads as a hover menu, holding the tap's click back (#57). A Saved
+            // Graph carries the inline visibility the old handlers wrote; it is cleared here,
+            // where both new and restored cards pass.
+            copyBtn.style.visibility = '';
 
             On.click(copyBtn, async () => {
                 try {
@@ -923,22 +923,30 @@ class NodeView {
         });
         // A finger or a pen (#57): a touch sends no mousemove while it moves. The same move
         // handler, since a pointer event carries the same `pageX`, `pageY` and `buttons`.
+        //
+        // That finger's events only: a second finger landing on the overlay while the first held
+        // the grip resized the card with its own moves, and ended the resize when it lifted (rv14).
+        let resizingPointer = null;
+        const onResizePointerMove = (e) => { if (e.pointerId === resizingPointer) handleMouseMove(e) };
+        const onResizePointerEnd = (e) => { if (e.pointerId === resizingPointer) handleMouseUp() };
         On.pointerdown(this.resizeHandle, (e) => {
-            if (e.pointerType === 'mouse') return;
+            if (e.pointerType === 'mouse' || resizingPointer !== null) return;
 
             startResize(e);
-            On.pointermove(document, handleMouseMove);
-            On.pointerup(document, handleMouseUp);
-            On.pointercancel(document, handleMouseUp);
+            resizingPointer = e.pointerId;
+            On.pointermove(document, onResizePointerMove);
+            On.pointerup(document, onResizePointerEnd);
+            On.pointercancel(document, onResizePointerEnd);
         });
 
         const handleMouseUp = () => {
             isMouseMoving = false;
+            resizingPointer = null;
             Off.mousemove(document, handleMouseMove);
             Off.mouseup(document, handleMouseUp);
-            Off.pointermove(document, handleMouseMove);
-            Off.pointerup(document, handleMouseUp);
-            Off.pointercancel(document, handleMouseUp);
+            Off.pointermove(document, onResizePointerMove);
+            Off.pointerup(document, onResizePointerEnd);
+            Off.pointercancel(document, onResizePointerEnd);
             // Remove the overlay via the helper
             OverlayHelper.remove();
         };

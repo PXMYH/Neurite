@@ -371,7 +371,7 @@ function screenUnits(x, y){ return Graph.xyToZ(x, y).minus(Graph.pan).cdiv(Graph
 // midpoint's point where it was. Null for two fingers on one spot.
 function pinchView(zoom0, pan0, a0, b0, a1, b1){
     const span1 = a1.minus(b1);
-    if (!(span1.mag() > 0)) return null;
+    if (!(span1.mag() > 0) || !(a0.minus(b0).mag() > 0)) return null;
 
     const zoom = zoom0.cmult(a0.minus(b0)).cdiv(span1);
     const m0 = a0.plus(b0).scale(0.5), m1 = a1.plus(b1).scale(0.5);
@@ -402,8 +402,10 @@ const TouchOnPlane = {
             zoom: Graph.zoom, pan: Graph.pan, turning
         };
     },
+    // A finger or a pen; a mouse has handlers of its own. The touch events this replaced were
+    // sent for an Apple Pencil too.
     onDown(e){
-        if (e.pointerType !== 'touch') return;
+        if (e.pointerType === 'mouse') return;
 
         try { svg.setPointerCapture(e.pointerId) } catch (err) { Logger.debug("No capture:", err) }
         this.points.set(e.pointerId, {x: e.clientX, y: e.clientY});
@@ -412,7 +414,7 @@ const TouchOnPlane = {
     },
     onMove(e){
         const was = this.points.get(e.pointerId);
-        if (e.pointerType !== 'touch' || !was) return;
+        if (!was) return;
 
         const now = {x: e.clientX, y: e.clientY};
         this.points.set(e.pointerId, now);
@@ -428,6 +430,9 @@ const TouchOnPlane = {
     pinchTo(points){
         const pinch = this.pinch;
         let [a, b] = points.map( (p)=>screenUnits(p.x, p.y) );
+        // Two fingers that came down on one point have no span to scale from: it zeroed the
+        // zoom for good (rv14). The pinch starts once they part.
+        if (!(pinch.a.minus(pinch.b).mag() > 0)) return this.restartPinch(pinch.turning);
         if (!pinch.turning) {
             const turn = Math.atan2(...(({x, y})=>[y, x])(a.minus(b).cdiv(pinch.a.minus(pinch.b))));
             // Past the dead zone the pinch starts over from here, turning, so the view picks

@@ -150,7 +150,13 @@ class Node {
     draw(box = null, svgbb = svg.getBoundingClientRect()) {
         const e = this.content;
         const s = this.intrinsicScale * this.scale * (Graph.zoom.mag2() ** -settings.zoomContentExp);
-        const measuredAt = box ? (parseFloat(e.style.transform.slice('scale('.length)) || s) : s;
+        // A box read before the card was ever drawn -- no transform yet, still in the flow -- or
+        // while it was hidden, is not the box it is drawn with, and one frame of a new card, or
+        // of one the view has just jumped onto, was drawn up to a card's width off its place
+        // (rv15). Those few are read again below, after the writes.
+        const drawnAt = parseFloat(e.style.transform.slice('scale('.length));
+        if (box && (!(drawnAt > 0) || e.style.display === 'none' || !(box.width > 0))) box = null;
+        const measuredAt = box ? drawnAt : s;
 
         e.style.position = 'absolute';
         e.style.transform = 'scale(' + s + ',' + s + ')';
@@ -412,8 +418,12 @@ class Node {
     // past `dragThreshold`, so a tap's wobble moves nothing, and the point pressed stays under
     // the finger. Page coordinates for both ends, as `Graph.mousePos` is kept in them: the
     // page may be scrolled while the keyboard is up.
+    //
+    // Bound on the card, for its header -- and for the circle a collapsed card is, which is
+    // outside the header and moved by a mouse and not by a finger (rv15).
     onHeaderPointerDown = (e)=>{
         if (e.pointerType === 'mouse' || !e.isPrimary) return;
+        if (!e.target.closest?.('.header-container, .collapsed-circle')) return;
         if (e.target.closest('[role="button"]')) return;
 
         const id = e.pointerId, from = {x: e.pageX, y: e.pageY};
@@ -446,10 +456,33 @@ class Node {
             this.followingMouse = 0;
             Graph.draggedNode = undefined;
             Graph.movingNode = undefined;
+            Node.swallowTheTap();
         };
         On.pointermove(window, move);
         On.pointerup(window, end);
         On.pointercancel(window, end);
+    }
+    // A finger that moved a card past `dragThreshold` and lifted inside the browser's own slop
+    // for a tap (about 15 px in Chromium) still has the tap sent on as mousedown, mouseup and
+    // click -- which put the caret in the Title, and with the Connect tool on armed the card for
+    // an Edge no one asked for (rv14). They arrive at once after the lift, so the next few are
+    // taken out before anything else sees them.
+    static #tapSwallowedUntil = 0;
+    static #swallowing = false;
+    // Bound on first use, at the end of the first drag and so before its tap arrives, which
+    // keeps this file free of anything that runs as it loads.
+    static swallowTheTap(){
+        Node.#tapSwallowedUntil = performance.now() + 400;
+        if (Node.#swallowing) return;
+
+        Node.#swallowing = true;
+        for (const type of ['mousedown', 'mouseup', 'click']) On[type](window, Node.onCompatMouse, true);
+    }
+    static onCompatMouse(e){
+        if (performance.now() > Node.#tapSwallowedUntil) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
     }
 
     disableEmbedPointerEvents(){this.setEmbedPointerEvents('none')};

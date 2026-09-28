@@ -205,6 +205,12 @@ body {
     overflow: hidden;
 }
 
+/* A finger on the circle moves the collapsed card, as on its header (#57), so the browser must
+   not take the drag for a pan and cancel it. */
+.collapsed-circle {
+    touch-action: none;
+}
+
 .collapsed-circle {
     display: relative;
     cursor: pointer;
@@ -979,6 +985,27 @@ textarea.title-input.title-input-stowed {
     align-items: center;
     justify-content: center;
 }
+
+/* Where the title is being worked on: under a mouse on the header, or while it has the caret.
+   Not on a tap -- `(hover: hover)` keeps an iPad's finger from lighting it through `:hover`,
+   which iOS reads as a hover menu and holds the tap's click back for (#57). Opacity rather than
+   `visibility`, which is inherited and is how the closed menu keeps its rows out of reach. */
+.copy-button {
+    opacity: 0;
+    pointer-events: none;
+}
+
+    @media (hover: hover) {
+        .header-container:hover .copy-button {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    }
+
+    .header-container:focus-within .copy-button {
+        opacity: 1;
+        pointer-events: auto;
+    }
 
 /* Color and scale on hover */
 .copy-button:hover svg {
