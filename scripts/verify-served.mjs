@@ -14,13 +14,17 @@
 // classic script and `.mjs` for a `:MODULE` entry, which is the same distinction
 // `loadScript` makes when it sets `script.type`.
 //
-//   node scripts/verify-served.mjs                 # against the dev server on :8999
-//   node scripts/verify-served.mjs --base http://localhost:8998
-//   node scripts/verify-served.mjs --dist          # against the built copy on disk
+//   node scripts/verify-served.mjs --base http://localhost:9123   # a server of this checkout
+//   node scripts/verify-served.mjs --dist                         # the built copy on disk
+//
+// There is no default server. The one on :8999 is usually the primary checkout's, which is
+// the reader's and not the checkout being converted (CLAUDE.md): checked against it, a
+// worktree's conversion passed or failed on files it had not touched. Serve the checkout on a
+// port of its own -- `vite --port 9123 --strictPort` from its root -- and name it.
 //
 // Note for whoever runs this: the dev server binds `localhost`, which on macOS can resolve
-// to `::1` only. `http://127.0.0.1:8999` then fails to connect while `http://localhost:8999`
-// answers 200, so the default below is deliberately the name and not the literal address.
+// to `::1` only. `http://127.0.0.1:9123` then fails to connect while `http://localhost:9123`
+// answers 200, so name the host rather than the literal address.
 
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -29,7 +33,15 @@ import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 const useDist = args.includes('--dist');
-const base = (args[args.indexOf('--base') + 1] || 'http://localhost:8999').replace(/\/$/, '');
+// The argument after `--base`, and only that one: `args[indexOf + 1]` with no `--base` at all
+// read the first argument instead.
+const baseAt = args.indexOf('--base');
+const base = (baseAt >= 0 ? args[baseAt + 1] ?? '' : '').replace(/\/$/, '');
+if (!useDist && !/^https?:\/\//.test(base)) {
+    console.error('verify-served: name the server with --base http://localhost:<port>, a server of this '
+        + 'checkout on a port of its own, or check the build with --dist.');
+    process.exit(2);
+}
 
 const root = new URL('../', import.meta.url);
 const src = readFileSync(new URL('js/main.js', root), 'utf8');
