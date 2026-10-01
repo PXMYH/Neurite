@@ -5,6 +5,10 @@ file and stopped. This document records the groundwork that makes the next conve
 and the rules a conversion keeps; every number in it was measured in this tree rather than
 estimated. It is not a schedule for converting the rest (§6).
 
+The numbers in §1, the line references and the entry counts were measured again on
+2026-10-01, on the tree this lands on (13603c4), and §3 gives that tree's two numbers beside
+its table. The rest were measured at fbffb03 and are kept as the record of what was found then.
+
 Read [ADR-0001](adr/0001-keep-the-hand-ordered-script-array.md) and
 [ADR-0002](adr/0002-typescript-in-the-load-path.md) first. They set the two constraints
 that make this migration unlike the usual one.
@@ -23,10 +27,10 @@ file and checks none of them. The real workload only appears when checking is fo
 
 ```
 $ npx tsc -p tsconfig.json --checkJs --noEmit | grep -c 'error TS'
-5675          # in 80 of 82 files -- tsc 5.9.3, strict: true
+6530          # in 83 of 88 files -- tsc 5.9.3, strict: true
 ```
 
-**5,675.** That is the size of the job. `npm run typecheck` will keep printing nothing
+**6,530.** That is the size of the job. `npm run typecheck` will keep printing nothing
 until the last file is converted, because a converted file is checked whether `checkJs` is
 set or not — which is exactly the property that makes file-by-file conversion possible
 here. It also means `npm run typecheck` measures *progress*, never *remaining work*. Use
@@ -59,7 +63,9 @@ free.** The corollary is the useful part:
 Everything below was measured the same way: change one thing, run
 `tsc --checkJs --noEmit`, count `error TS`. Four deliberate typos (`Graph.zooom`,
 `settings.nonsense`, `window.whatever`, a misspelled method) were planted and re-checked
-each time, because an error count that only goes down is not evidence of anything.
+each time, because an error count that only goes down is not evidence of anything. The
+table was measured at fbffb03. On the tree this lands on (13603c4) the baseline is 6,530 and
+`js/types/app.d.ts` takes it to 5,761 (−769), the four typos still caught.
 
 | Variant | Errors | Δ | Planted typos still caught |
 |---|---|---|---|
@@ -97,7 +103,7 @@ so nobody rediscovers it as a win. The ~335 "possibly null" errors `byId` leaves
 are the migration's findings: fix each at the call site, or `Elem.byId('x')!` where the
 element is in `index.html` and the code runs after load.
 
-**`Graph` and `App`.** `js/main.js:304-305` does:
+**`Graph` and `App`.** `js/main.js:330-331` does:
 
 ```js
 Graph = new Graph();
@@ -172,7 +178,7 @@ Node.prototype                     6
 'Node' in index.html               0
 ```
 
-`Node` is 75 of the 5,675 errors — **1.3%**. Rename it because it makes the file readable
+`Node` is 75 of the 5,675 errors measured at fbffb03 — **1.3%**. Rename it because it makes the file readable
 and the collision unfixable-by-declaration, not because it is where the errors are.
 
 ## 5. Phase 0: the gates
@@ -185,13 +191,13 @@ detector that has never fired is not a detector.
 | Load path | `npm test` | array/disk disagreement, double-load, `.ts` spelling, `.d.ts` in the array |
 | Conversion rules | `npm test` | dev-vs-release emit divergence, `!:`, `.js` beside `.ts`, orphaned `window.` globals |
 | Type check | `npm run typecheck` | TS2564, TS2610, everything in a converted file |
-| Dev server | `npm run verify:served` | every one of the 81 entries returns parseable JavaScript |
+| Dev server | `npm run verify:served` | every one of the 87 entries returns parseable JavaScript |
 | Release build | `npm run build && npm run verify:dist` | same, against `dist/` |
 | Boot | Playwright: navigate, assert `pageerror` set | the app still starts |
 
 `npm test` is 64 tests. All 64 pass on this branch, `npm run verify:served` and
-`npm run verify:dist` both clear all 81 entries, `dist/` contains no `.ts`, and the boot
-probe reports 81 loaded scripts with every global present:
+`npm run verify:dist` both clear all 87 entries, `dist/` contains no `.ts`, and the boot
+probe reports 87 loaded scripts with every global present:
 
 ```
 Graph object   App object   Elem function   Html object   On function   Off function
@@ -300,7 +306,7 @@ in the order they apply, and not a plan to convert the other files.
 
 - **Gates — done.** `test/load-path.test.js`, `test/ts-conversion.test.js`,
   `scripts/verify-served.mjs`, ADR-0002. Each was proved by planting its fault.
-- **Declarations — done.** `js/types/app.d.ts`. Zero files renamed, 5,675 → 4,946.
+- **Declarations — done.** `js/types/app.d.ts`. Zero files renamed, 6,530 → 5,761.
 - **Before a file that uses one of these is converted, pin its behaviour** with a unit test in
   `test/`, green before the conversion and after it: `On`/`Off` add + remove and passive or
   not, `Logger.level` gating, `Request.send` on success, failure and throw,

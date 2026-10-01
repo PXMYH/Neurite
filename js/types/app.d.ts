@@ -6,7 +6,7 @@
 //   whose result type is already known exactly.
 //
 // That is exactly the set of facts a reader can see and the checker cannot. `On.click`
-// exists because `js/main.js` binds one static per name over a 42-entry array; `Html.new.div`
+// exists because `js/main.js` binds one static per name over a 48-entry array; `Html.new.div`
 // exists because `js/globals.js` binds `document.createElement` over a 21-entry array. No
 // annotation inside those files can express that, because the names are strings at runtime.
 //
@@ -22,8 +22,9 @@
 //     it out; a wrong declaration is worse than no declaration, because it silences the
 //     checker at the one place it was right.
 //
-// Measured effect of this file as written: 5,675 -> 4,943 errors under `tsc --checkJs`
-// (-732), with all four planted typos still caught and zero collision diagnostics.
+// Measured effect of this file as written: 6,530 -> 5,761 errors under `tsc --checkJs`
+// (-769) on the tree it lands on, with all four planted typos still caught and zero
+// collision diagnostics.
 
 // ---------------------------------------------------------------------------
 // `js/main.js`: On/Off get one static per event name, from two `forEach` loops over the
@@ -52,6 +53,8 @@ declare namespace On {
     var message: EvBinder; var mousedown: EvBinder; var mouseenter: EvBinder;
     var mouseleave: EvBinder; var mousemove: EvBinder; var mouseout: EvBinder;
     var mouseover: EvBinder; var mouseup: EvBinder; var paste: EvBinder;
+    var pointercancel: EvBinder; var pointerdown: EvBinder; var pointermove: EvBinder;
+    var pointerout: EvBinder; var pointerover: EvBinder; var pointerup: EvBinder;
     var resize: EvBinder; var scroll: EvBinder; var touchcancel: EvBinder;
     var touchend: EvBinder; var transitionend: EvBinder;
     var visibilitychange: EvBinder;
@@ -59,7 +62,7 @@ declare namespace On {
     var wheel: EvBinder;
 }
 // `Off` binds every name through `removeEventListener`, which has no passive variant, so
-// all 42 take the same shape.
+// all 48 take the same shape.
 declare namespace Off {
     var animationend: EvBinder; var blur: EvBinder; var change: EvBinder;
     var click: EvBinder; var contextmenu: EvBinder; var dblclick: EvBinder;
@@ -72,6 +75,8 @@ declare namespace Off {
     var message: EvBinder; var mousedown: EvBinder; var mouseenter: EvBinder;
     var mouseleave: EvBinder; var mousemove: EvBinder; var mouseout: EvBinder;
     var mouseover: EvBinder; var mouseup: EvBinder; var paste: EvBinder;
+    var pointercancel: EvBinder; var pointerdown: EvBinder; var pointermove: EvBinder;
+    var pointerout: EvBinder; var pointerover: EvBinder; var pointerup: EvBinder;
     var resize: EvBinder; var scroll: EvBinder; var touchcancel: EvBinder;
     var touchend: EvBinder; var touchmove: EvBinder; var touchstart: EvBinder;
     var transitionend: EvBinder; var visibilitychange: EvBinder; var wheel: EvBinder;

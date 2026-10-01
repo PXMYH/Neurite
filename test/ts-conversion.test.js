@@ -142,10 +142,33 @@ test('no .js file sits beside a .ts file of the same name', ()=>{
 const EXTERNALLY_PROVIDED = new Set([
     'addEventListener', 'clipboardData', 'getComputedStyle', 'getSelection',
     'innerHeight', 'innerWidth', 'location', 'open', 'requestAnimationFrame',
-    'showOpenFilePicker', 'showSaveFilePicker',
+    'ResizeObserver', 'scrollTo', 'scrollX', 'scrollY',
+    'showOpenFilePicker', 'showSaveFilePicker', 'visualViewport',
     'electronAPI',              // Electron preload
     'js', 'zettelkastenProcessor'
 ]);
+
+// `On` and `Off` get one static per name in the array js/main.js loops over, which no
+// annotation can say, so js/types/app.d.ts lists them by hand. The list drifted: six Pointer
+// Events names were added to the array and not to the declaration, and a converted file
+// calling `On.pointerdown` would have failed the typecheck for a name that works.
+test('app.d.ts declares every event name On and Off are given', ()=>{
+    const main = read('js/main.js');
+    const at = main.indexOf("[\n    'animationend'");
+    assert.notEqual(at, -1, 'the event-name array in js/main.js moved; this test reads nothing');
+    const names = [...main.slice(at, main.indexOf('].forEach', at)).matchAll(/'([a-z]+)'/g)].map( (m)=> m[1] );
+    assert.ok(names.length > 40, `only parsed ${names.length} event names`);
+
+    const dts = read('js/types/app.d.ts');
+    for (const ns of ['On', 'Off']) {
+        const from = dts.indexOf(`declare namespace ${ns} {`);
+        assert.notEqual(from, -1, `no namespace ${ns} in app.d.ts`);
+        const body = dts.slice(from, dts.indexOf('}', from));
+        const declared = new Set([...body.matchAll(/var ([a-z]+):/g)].map( (m)=> m[1] ));
+        assert.deepEqual(names.filter( (n)=> !declared.has(n) ), [], `${ns} is missing these in app.d.ts`);
+        assert.deepEqual([...declared].filter( (n)=> !names.includes(n) ), [], `${ns} declares names main.js does not bind`);
+    }
+});
 
 test('every window global that is read is also assigned somewhere', ()=>{
     const files = allCode();
