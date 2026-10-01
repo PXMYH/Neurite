@@ -330,7 +330,7 @@ const viewNow = (page) => page.evaluate(() => ({ mag: Graph.zoom.mag(), arg: Mat
 // A point on one of the Fractal's lines (a <path>, which the renderer removes as it redraws),
 // with bare Fractal where a drag from it goes. The lines come and go, so asked for a while.
 const bareFractal = (page) => page.evaluate(async () => {
-    for (let tries = 0; tries < 25; tries++) {
+    for (let tries = 0; tries < 50; tries++) {
         for (let y = 150; y < innerHeight - 150; y += 7) {
             for (let x = 150; x < innerWidth - 250; x += 7) {
                 const el = document.elementFromPoint(x, y);
@@ -960,7 +960,6 @@ test('a tap that stops a fling is no tap', { skip: isIPad && 'needs real touches
     await cdpTouch(page, 'touchStart', [[from.x, from.y]]);
     for (let k = 1; k <= 6; k++) { await cdpTouch(page, 'touchMove', [[from.x, from.y - 25 * k]]); await page.waitForTimeout(8); }
     await cdpTouch(page, 'touchEnd', []);
-    await page.waitForTimeout(60);
     assert.ok(await page.evaluate(() => Boolean(TouchOnPlane.flung)), 'no fling was running, so this proves nothing');
     await cdpTouch(page, 'touchStart', [[from.x, from.y - 40]]);
     await page.waitForTimeout(50);
@@ -1058,4 +1057,107 @@ test('a second tap on the lit New note takes its note back', async () => {
     await page.waitForTimeout(600);
     assert.deepEqual(await page.evaluate(() => ({ notes: Object.keys(Graph.nodes).length, lit: document.querySelector('.panel-icon.note-icon').getAttribute('aria-pressed'),
         pane: window.currentActiveZettelkastenMirror.getValue().trim() })), { notes: 0, lit: null, pane: '' });
+});
+
+// A fourth look (rv17).
+test('text follows a slow finger, a pixel a move', async () => {
+    // WebKit drops the fraction of a `scrollTop` it is given, and added a move at a time the
+    // text did not move at all under a slow finger (rv17). Synthetic pointers, in both engines.
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Long\n' + 'A line of the long note.\n'.repeat(80)));
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 1, undefined, { timeout: 5000 });
+    const moved = await page.evaluate(async () => {
+        Hud.fitAll();
+        Hud.setZoomMag(Graph.zoom.mag() / 2);
+        await new Promise((r) => setTimeout(r, 900));
+        const t = Object.values(Graph.nodes)[0].contentEditableDiv;
+        const r = t.getBoundingClientRect(), scale = r.height / t.offsetHeight;
+        const x = r.left + r.width / 2, y0 = Math.min(r.top + r.height * 0.8, innerHeight - 60);
+        const fire = (type, y) => t.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+        fire('pointerdown', y0);
+        fire('pointermove', y0 - 12);   // past the threshold, which latches the scroll
+        let y = y0 - 12;
+        for (let k = 0; k < 60; k++) { y -= 1; fire('pointermove', y); await new Promise((r) => setTimeout(r, 4)); }
+        await new Promise((r) => setTimeout(r, 150));   // still, so no fling
+        fire('pointerup', y);
+        return { scrolled: t.scrollTop * scale, finger: y0 - y, scale };
+    });
+    assert.ok(moved.scale > 1.2, 'the card is not zoomed in, so this proves nothing');
+    assert.ok(Math.abs(moved.scrolled / moved.finger - 1) < 0.1, `the text moved ${Math.round(moved.scrolled)} px under ${moved.finger} px of finger`);
+});
+
+test('a tap elsewhere while a note\'s text flings is a tap', { skip: isIPad && 'needs real touches' }, async () => {
+    // It was taken for the tap that stops the fling, and lost (rv17).
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Long\n' + 'A line of the long note.\n'.repeat(120) + '\n## Short\nA body.\n'));
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 2, undefined, { timeout: 5000 });
+    await page.evaluate(() => Hud.fitAll());
+    await page.waitForTimeout(900);
+    const long = await noteBody(page, 'Long'), short = await noteBody(page, 'Short');
+    const from = { x: Math.round(long.x), y: Math.round(long.top + long.h * 0.8) };
+    await cdpTouch(page, 'touchStart', [[from.x, from.y]]);
+    for (let k = 1; k <= 6; k++) { await cdpTouch(page, 'touchMove', [[from.x, from.y - 25 * k]]); await page.waitForTimeout(8); }
+    await cdpTouch(page, 'touchEnd', []);
+    // As a person would, a moment after the flick: the flick's own tap is taken out for 100 ms.
+    await page.waitForTimeout(200);
+    assert.ok(await page.evaluate(() => Boolean(TouchOnPlane.flung)), 'no fling was running, so this proves nothing');
+    await page.touchscreen.tap(short.x, short.y);
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate(() => document.activeElement === Object.values(Graph.nodes).find((n) => n.getTitle() === 'Short').contentEditableDiv), true,
+        'the tap on another note while the text flung put no caret there');
+});
+
+test('a card arriving under the chrome is moved clear of it', async () => {
+    // Held only to the window, it came to rest under the tool bar or the overview (rv17).
+    ({ context, page } = await openNeurite(browser, { touch: true }));
+    const overlaps = await page.evaluate(async () => {
+        const node = await window.createNote('Arrival', 'A body.');
+        await new Promise((r) => setTimeout(r, 600));
+        const result = {};
+        for (const [name, sel] of [['tools', '.tool-bar'], ['overview', '.hud-panel']]) {
+            const b = document.querySelector(sel).getBoundingClientRect();
+            node.pos = Graph.xyToZ((b.left + b.right) / 2, (b.top + b.bottom) / 2);
+            Graph.keepInView(node);
+            node.draw();
+            const c = node.view.div.getBoundingClientRect();
+            result[name] = Math.max(0, Math.min(c.right, b.right) - Math.max(c.left, b.left)) * Math.max(0, Math.min(c.bottom, b.bottom) - Math.max(c.top, b.top));
+        }
+        return result;
+    });
+    assert.deepEqual(overlaps, { tools: 0, overview: 0 });
+});
+
+test('a drag from the lit New note puts its note down where it is let go', { skip: isIPad && 'needs a mouse' }, async () => {
+    // Taken back on the press, the note was gone and nothing was put down (rv17).
+    ({ context, page } = await openNeurite(browser));
+    const tool = await page.evaluate(() => { const r = document.querySelector('.panel-icon.note-icon').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    await page.mouse.click(tool.x, tool.y);
+    await page.waitForTimeout(300);
+    await page.mouse.move(tool.x, tool.y);
+    await page.mouse.down();
+    for (let k = 1; k <= 12; k++) { await page.mouse.move(tool.x + (800 - tool.x) * k / 12, tool.y + (500 - tool.y) * k / 12); await page.waitForTimeout(16); }
+    await page.mouse.up();
+    await page.waitForTimeout(800);
+    const notes = await page.evaluate(() => Object.values(Graph.nodes).map((n) => { const r = n.view.div.getBoundingClientRect(); return { following: n.followingMouse, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; }));
+    assert.equal(notes.length, 1, `${notes.length} notes`);
+    assert.equal(notes[0].following, 0, 'the note is still following');
+    assert.ok(Math.hypot(notes[0].cx - 800, notes[0].cy - 500) < 3, `the note is at (${Math.round(notes[0].cx)}, ${Math.round(notes[0].cy)})`);
+});
+
+test('a mouse scrub across the overview goes on past the Upright arrow', { skip: isIPad && 'needs a mouse' }, async () => {
+    // The arrow over the overview's corner ended the drag that reached it (rv17).
+    ({ context, page } = await openNeurite(browser));
+    await twoNotes(page);
+    await page.evaluate(async () => { Graph.zoom_cmultWith(new vec2(Math.cos(0.6), Math.sin(0.6))); await new Promise((r) => setTimeout(r, 300)); });
+    const { map, arrow } = await page.evaluate(() => ({ map: document.querySelector('.hud-map').getBoundingClientRect().toJSON(), arrow: document.querySelector('.hud-upright').getBoundingClientRect().toJSON() }));
+    const y = arrow.y + arrow.height / 2;
+    await page.mouse.move(map.x + 10, y);
+    await page.mouse.down();
+    for (let x = map.x + 10; x <= arrow.x - 4; x += 8) await page.mouse.move(x, y);
+    await page.mouse.move(arrow.x + arrow.width / 2, y);   // over the arrow
+    const before = await page.evaluate(() => Graph.pan.x);
+    await page.mouse.move(map.x + map.width - 4, y + 30);   // back on the map, past the arrow
+    const after = await page.evaluate(() => Graph.pan.x);
+    await page.mouse.up();
+    assert.notEqual(after, before, 'the scrub stopped at the arrow');
 });

@@ -397,8 +397,9 @@ const TouchOnPlane = {
     // Fingers on a card's header or circle: the card's, unless a second finger makes a pinch.
     pending: new Map(),
     pinch: null,
-    // The fling a card's text is scrolling by, if any.
+    // The fling a card's text is scrolling by, if any, and that text.
     flung: null,
+    flinging: null,
     // A pinch turns the view only once the fingers have turned this far (radians, about 11
     // degrees): no two fingers spread without turning a little, and a map that turned with
     // every zoom ended up at an angle nobody chose.
@@ -415,8 +416,9 @@ const TouchOnPlane = {
         };
     },
     // What a finger landing on `el` is for, or null off the map. A card's controls with a drag
-    // of their own -- a slider, a video's -- keep a finger that is alone on them, as its header
-    // and its grip do.
+    // of their own -- a slider, a field -- keep a finger that is alone on them, as its header and
+    // its grip do. A video's own controls take its fingers before the page sees them, as a page
+    // embedded in a card does.
     placeOf(el){
         if (!el?.closest) return null;
         if (el.closest('#svg_bg')) return 'fractal';
@@ -429,10 +431,11 @@ const TouchOnPlane = {
     // sent for an Apple Pencil too.
     onDown(e){
         if (e.pointerType === 'mouse') return;
-        // A finger that lands on text still scrolling from a fling stops it, and is no tap:
-        // the caret it put in the note opened an iPad's keyboard (rv16).
-        const stops = Boolean(this.flung);
-        this.flung = null;
+        // A finger that lands on text still scrolling from a fling stops it, and is no tap: the
+        // caret it put in the note opened an iPad's keyboard (rv16). Only on that text: a tap
+        // anywhere else while it ran was eaten as well (rv17).
+        const stops = Boolean(this.flung) && Boolean(this.flinging?.contains(e.target));
+        if (stops) this.flung = null;
         // The first finger of a gesture: one still held here is a finger whose lift never
         // arrived, and read with it the next drag was a pinch that flung the view (rv14).
         if (e.isPrimary) this.forget(e.pointerType);
@@ -443,8 +446,7 @@ const TouchOnPlane = {
 
         const at = {x: e.clientX, y: e.clientY, t: e.timeStamp, type: e.pointerType};
         const finger = {...at, from: at, el: e.target, moving: (place === 'fractal'), stops};
-        // A control's finger joins a pinch as a header's does: on a video filling the screen, a
-        // pinch slid the map (rv16).
+        // A control's finger joins a pinch as a header's does: on one, a pinch slid the map (rv16).
         if ((place === 'handle' || place === 'control') && !joins) return void this.pending.set(e.pointerId, finger);
 
         for (const [id, p] of this.pending) this.points.set(id, p);
@@ -483,7 +485,10 @@ const TouchOnPlane = {
             const dx = now.x - now.from.x, dy = now.y - now.from.y;
             now.axis = (Math.abs(dx) > Math.abs(dy) ? 'x' : 'y');
             now.scroller = Node.scrollerFor(now.el, (now.axis === 'x' ? -dx : -dy), now.axis);
-            if (now.scroller) now.scale = this.drawnScaleOf(now.scroller, now.axis);
+            if (now.scroller) {
+                now.scale = this.drawnScaleOf(now.scroller, now.axis);
+                now.at = now.scroller[now.axis === 'x' ? 'scrollLeft' : 'scrollTop'];
+            }
             this.hold(e.pointerId);
             Autopilot.stop();
             from = now.from;
@@ -495,13 +500,21 @@ const TouchOnPlane = {
     // In the text's own pixels, which the card is drawn at a scale of: taken in the screen's,
     // the text ran ahead of the finger zoomed in -- three times as far at 4x -- and behind it
     // zoomed out (rv16). Down or across, whichever way the drag set out (`Node.scrollerFor`).
+    //
+    // Kept in a number of its own and written whole: WebKit drops the fraction of a `scrollTop`
+    // it is given, so added a move at a time, a slow finger moved the text not at all (rv17).
     scroll(now, was){
         const across = (now.axis === 'x');
         const d = (across ? was.x - now.x : was.y - now.y) / now.scale;
-        now.scroller[across ? 'scrollLeft' : 'scrollTop'] += d;
+        now.at = Math.min(Math.max(now.at + d, 0), this.reachOf(now.scroller, now.axis));
+        now.scroller[across ? 'scrollLeft' : 'scrollTop'] = now.at;
         // Pixels a millisecond, smoothed, for the fling when it lets go.
         const v = d / Math.max(now.t - was.t, 1);
         now.v = (was.v === undefined ? v : 0.6 * v + 0.4 * was.v);
+    },
+    // How far a box can scroll, one axis.
+    reachOf(el, axis){
+        return Math.max(0, (axis === 'x') ? el.scrollWidth - el.clientWidth : el.scrollHeight - el.clientHeight);
     },
     // Screen pixels to the box's own, one axis: the card's transform scales one to the other.
     drawnScaleOf(el, axis){
@@ -509,22 +522,25 @@ const TouchOnPlane = {
         return (axis === 'x' ? box.width / el.offsetWidth : box.height / el.offsetHeight) || 1;
     },
     // Let go while moving, the text goes on and slows to a stop, as a scroll of the browser's own
-    // does. A finger coming down stops it.
-    fling(el, v, axis){
-        const offset = (axis === 'x' ? 'scrollLeft' : 'scrollTop');
-        let last = performance.now();
+    // does. A finger coming down on it stops it. It stops by itself at the text's end, and once it
+    // moves less than half a pixel of the screen a frame -- past that it ran on unseen, and a tap
+    // a moment after the text stood still was taken for one that stopped it (rv17).
+    fling(el, v, axis, scale){
+        const offset = (axis === 'x' ? 'scrollLeft' : 'scrollTop'), reach = this.reachOf(el, axis);
+        let last = performance.now(), at = el[offset];
         const step = (t)=>{
             if (this.flung !== step) return;
 
-            const was = el[offset], d = v * (t - last);
-            el[offset] += d;
+            at = Math.min(Math.max(at + v * (t - last), 0), reach);
+            el[offset] = at;
             v *= Math.pow(0.95, (t - last) / 16);
             last = t;
-            const stuck = (Math.abs(d) >= 1 && el[offset] === was);
-            if (Math.abs(v) > 0.02 && !stuck) requestAnimationFrame(step);
-            else this.flung = null;
+            const going = (Math.abs(v) * 16 * scale >= 0.5) && at > 0 && at < reach;
+            if (going) requestAnimationFrame(step);
+            else this.flung = this.flinging = null;
         };
         this.flung = step;
+        this.flinging = el;
         requestAnimationFrame(step);
     },
     pan(was, now){
@@ -564,7 +580,7 @@ const TouchOnPlane = {
         // on the Fractal made a note.
         const lifted = (e.type === 'pointerup');
         if ((was.travelled || was.stops) && lifted) Node.swallowTheTap();
-        if (lifted && was.scroller && e.timeStamp - was.t < 60 && Math.abs(was.v) > 0.2) this.fling(was.scroller, was.v, was.axis);
+        if (lifted && was.scroller && e.timeStamp - was.t < 100 && Math.abs(was.v) > 0.2) this.fling(was.scroller, was.v, was.axis, was.scale);
         this.restartPinch();
     },
     forget(type){

@@ -314,7 +314,8 @@ class Hud {
         On.mousedown(canvas, (e)=>{ dragging = true; goTo(e); e.preventDefault() });
         On.mousemove(canvas, (e)=>{ if (dragging) goTo(e) });
         On.mouseup(window, ()=>{ dragging = false });
-        On.mouseleave(canvas, ()=>{ dragging = false });
+        // Not into the Upright arrow over its corner: a scrub crossing it stopped there (rv17).
+        On.mouseleave(canvas, (e)=>{ if (!e.relatedTarget?.closest?.('.hud-upright')) dragging = false });
 
         // A finger or a pen scrubs it too: a touch sends no mousemove while it moves, and a
         // drag across the overview went nowhere (rv15). Held to it while down, so a scrub that
@@ -410,30 +411,35 @@ class Hud {
                            top: caret.top + top, bottom: caret.bottom + top}, Hud.visibleRect());
         });
     }
-    // Where a text field's caret is on the screen, a line tall: a hidden copy of the text up to it,
-    // laid out as the field lays it out, gives its line, and the field's drawn scale takes that
-    // to the screen. Any other element is its own box.
+    // Where a text field's caret is on the screen, a line tall and as wide as the caret: a hidden
+    // copy of the text up to it, laid out as the field lays it out, gives its place, and the
+    // field's drawn scale takes that to the screen. As wide as the field, a caret on the right of a
+    // card wider than the window went off its edge (rv17). Any other element is its own box.
     static caretBoxOf(el){
         const box = el.getBoundingClientRect();
         if (el.tagName !== 'TEXTAREA' || typeof el.selectionEnd !== 'number') return box;
 
         const style = getComputedStyle(el), copy = Html.new.div(), mark = Html.new.span();
-        for (const name of ['boxSizing', 'width', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-                            'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+        for (const name of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
                             'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight',
-                            'textTransform', 'wordSpacing', 'tabSize']) copy.style[name] = style[name];
+                            'textTransform', 'wordSpacing', 'tabSize', 'whiteSpace', 'wordBreak', 'overflowWrap']) copy.style[name] = style[name];
+        // As wide as the field's text runs: its box less a scrollbar, which a copy without one
+        // would have wrapped the lines past, putting the caret on the wrong one (rv17).
+        const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
         Object.assign(copy.style, {position: 'absolute', visibility: 'hidden', top: '0', left: '0',
-                                   whiteSpace: 'pre-wrap', overflowWrap: 'break-word'});
+                                   boxSizing: 'content-box', border: '0', width: (el.clientWidth - padX) + 'px'});
         copy.textContent = el.value.slice(0, el.selectionEnd);
         mark.textContent = '\u200b';
         copy.append(mark);
         document.body.append(copy);
         const top = mark.offsetTop - el.scrollTop, height = mark.offsetHeight;
+        const left = mark.offsetLeft - el.scrollLeft;
         copy.remove();
 
         const scale = (box.height / el.offsetHeight) || 1;
-        const lineTop = box.top + Math.min(Math.max(top, 0), el.clientHeight) * scale;
-        return {left: box.left, right: box.right, top: lineTop, bottom: lineTop + height * scale};
+        const lineTop = box.top + (el.clientTop + Math.min(Math.max(top, 0), el.clientHeight)) * scale;
+        const caretLeft = box.left + (el.clientLeft + Math.min(Math.max(left, 0), el.clientWidth)) * scale;
+        return {left: caretLeft, right: caretLeft + 2 * scale, top: lineTop, bottom: lineTop + height * scale};
     }
     // The view moved just enough to bring a box of the screen into `rect`.
     static revealBox(box, rect = Hud.usableRect()){

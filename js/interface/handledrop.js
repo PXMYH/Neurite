@@ -81,29 +81,36 @@ const ToolArm = {
     // of it (rv15). The note takes the caret instead, as a double-click's does, and is moved
     // off any card it came down on, as a new note always is (`settlePlacement`).
     landing: [],
-    // A press on the lit tool takes back the Node it made, as a second tap on Connect turns
+    // A click on the lit tool takes back the Node it made, as a second tap on Connect turns
     // Connect off: it put the Node down under the tool and made another, with the caret in the
-    // first (rv16).
-    takenBack: false,
+    // first (rv16). A press there that is let go somewhere else puts the Node down there, as
+    // before: taking it back on the press placed nothing (rv17). And only a pointer's click: a
+    // key that clicks the tool makes a note as ever.
+    takeBack: [],
     onMouseDown: (e)=>{
-        ToolArm.takenBack = false;
+        ToolArm.takeBack = [];
         ToolArm.landing = Object.values(Graph.nodes).filter( (node)=>node.followingMouse );
-        if (!ToolArm.landing.length) return;
-
-        e.preventDefault();
-        if (!ToolArm.el || e.target.closest?.('.node-add-item') !== ToolArm.el) return;
-
-        ToolArm.landing.forEach(deleteNodeAndItsZetText);
-        ToolArm.landing = [];
-        ToolArm.takenBack = true;
+        if (ToolArm.landing.length) e.preventDefault();
     },
-    onMouseUp: ()=>{
-        for (const node of ToolArm.landing) {
+    onMouseUp: (e)=>{
+        const onLitTool = Boolean(ToolArm.el) && e.target.closest?.('.node-add-item') === ToolArm.el;
+        if (onLitTool) ToolArm.takeBack = ToolArm.landing;
+        else for (const node of ToolArm.landing) {
             NodeView.settlePlacement(node);
             if (node.isTextNode) NodeView.focusBodyOf(node);
         }
         ToolArm.landing = [];
         if (ToolArm.el) setTimeout(ToolArm.releaseIfNothingInFlight, 0);
+    },
+    // Whether this click on a tool is the one that takes its Node back.
+    takesBack(e){
+        const nodes = ToolArm.takeBack;
+        ToolArm.takeBack = [];
+        if (!nodes.length || !(e.detail > 0)) return false;
+
+        nodes.forEach(deleteNodeAndItsZetText);
+        ToolArm.release();
+        return true;
     }
 };
 
@@ -132,6 +139,7 @@ function makeIconDraggable(iconDiv) {
             iconName: iconDiv.classList[1]
         };
         e.dataTransfer.setData('text/plain', JSON.stringify(draggableData));
+        ToolArm.takeBack = [];
         // The drag path ends in a Node following the mouse exactly as the click path
         // does, so it lights the same tool. `classList[1]` above still reads the icon's
         // own name: nothing was added to the class list to carry this state, which is an
@@ -140,10 +148,7 @@ function makeIconDraggable(iconDiv) {
     });
 
     On.click(iconDiv, (e) => {
-        if (ToolArm.takenBack) {
-            ToolArm.takenBack = false;
-            return ToolArm.release();
-        }
+        if (ToolArm.takesBack(e)) return;
         if (!Mouse.isDragging) {
             // Lit before the action runs, so the three tools that open a modal first are
             // lit while it is open -- the tool is engaged from the press, whatever it is

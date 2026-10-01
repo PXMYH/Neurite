@@ -59,7 +59,8 @@ check below that needs one of those is marked as a device check.
   - one finger on a long note's text scrolls it at the finger's own pace at any zoom, with a
     fling, and pans the map past the text's end; content wider than its card scrolls sideways;
   - a tap that stops a fling is no tap;
-  - a finger on a card's video, slider or field joins a pinch;
+  - a finger on a card's slider or field joins a pinch (a video's own controls keep their fingers,
+    as a page embedded in a card does);
   - a finger whose lift never arrived is dropped when the next gesture begins;
   - a card past the window's edge no longer makes the page wider than the window;
   - a turned view shows an arrow over the overview, pointing the way the Plane's up is, which

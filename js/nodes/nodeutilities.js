@@ -342,8 +342,31 @@ class Graph {
             const lo = 0.5 - reachOfSide + margin, hi = 0.5 + reachOfSide - margin;
             return Math.min(Math.max(v, lo + h), Math.max(hi - h, lo + h));
         };
-        const targetU = clampIn(uv.x, halfUvX, reach(box.width));
-        const targetV = clampIn(uv.y, halfUvY, reach(box.height));
+        let targetU = clampIn(uv.x, halfUvX, reach(box.width));
+        let targetV = clampIn(uv.y, halfUvY, reach(box.height));
+
+        // And off the chrome. Held only to the window, a card arriving off screen came to rest in
+        // its corner, under the menu button or half under the overview, where the square had kept
+        // it clear by chance (rv17). Each island it overlaps it leaves the shorter way that keeps
+        // it in the window.
+        const toPx = (u, v)=> ({x: box.left + (u - 0.5) * short + box.width / 2, y: box.top + (v - 0.5) * short + box.height / 2});
+        const hw = halfUvX * short, hh = halfUvY * short;
+        for (const island of document.querySelectorAll('.tool-bar, .menu-button, .hud-panel')) {
+            const b = island.getBoundingClientRect();
+            if (!b.width || !b.height || island.classList.contains('is-under-menu')) continue;
+
+            const c = toPx(targetU, targetV);
+            if (c.x + hw <= b.left || c.x - hw >= b.right || c.y + hh <= b.top || c.y - hh >= b.bottom) continue;
+            const moves = [
+                {dx: b.left - (c.x + hw), dy: 0}, {dx: b.right - (c.x - hw), dy: 0},
+                {dx: 0, dy: b.top - (c.y + hh)}, {dx: 0, dy: b.bottom - (c.y - hh)},
+            ].filter( ({dx, dy})=> c.x - hw + dx >= box.left && c.x + hw + dx <= box.right
+                                && c.y - hh + dy >= box.top && c.y + hh + dy <= box.bottom );
+            if (!moves.length) continue;
+            const {dx, dy} = moves.reduce( (best, m)=> (Math.hypot(m.dx, m.dy) < Math.hypot(best.dx, best.dy) ? m : best) );
+            targetU += dx / short;
+            targetV += dy / short;
+        }
         if (targetU === uv.x && targetV === uv.y) return;
 
         // uv -> z is the inverse of fromZtoUV: ((uv - 0.5) * 2) * zoom + pan.
