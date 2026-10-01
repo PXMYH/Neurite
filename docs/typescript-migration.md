@@ -1,8 +1,9 @@
 # Migrating `js/` to TypeScript
 
 Issue [#48](https://github.com/PXMYH/Neurite/issues/48). A previous attempt converted one
-file and stopped. This document is the plan for the rest, and every number in it was
-measured in this tree rather than estimated.
+file and stopped. This document records the groundwork that makes the next conversion safe,
+and the rules a conversion keeps; every number in it was measured in this tree rather than
+estimated. It is not a schedule for converting the rest (§6).
 
 Read [ADR-0001](adr/0001-keep-the-hand-ordered-script-array.md) and
 [ADR-0002](adr/0002-typescript-in-the-load-path.md) first. They set the two constraints
@@ -290,26 +291,34 @@ every normalisation is a place a real divergence hides. It cannot be both accura
 safe, so the four bans above stand in for it. **Documented gap:** a divergence from a
 construct not on the ban list is unobserved. Add to the list when one is found.
 
-## 6. Phases
+## 6. What is done, and the rules for what comes after
 
-Phase 0 is done on this branch. Phases 1-4 are one commit per step, gates green before each.
+The gates and the declarations are done. Nothing after them is scheduled. ADR-0001 keeps
+conversion opportunistic ("Do not plan a migration"), and ADR-0002 converts one file at a
+time, when it is open for another reason. So what follows are the rules a conversion keeps,
+in the order they apply, and not a plan to convert the other files.
 
-- **Phase 0 — gates.** `test/load-path.test.js`, `test/ts-conversion.test.js`,
-  `scripts/verify-served.mjs`, ADR-0002. Each fault-proved. **Done.**
-- **Phase 1 — declarations.** `js/types/app.d.ts`. Zero files renamed, 5,675 → 4,946.
-  **Done.**
-- **Phase 2 — behaviour pins**, before any rename touches them: `On`/`Off` add + remove and
-  passive-vs-not, `Logger.level` gating, `Request.send` on success/failure/throw,
+- **Gates — done.** `test/load-path.test.js`, `test/ts-conversion.test.js`,
+  `scripts/verify-served.mjs`, ADR-0002. Each was proved by planting its fault.
+- **Declarations — done.** `js/types/app.d.ts`. Zero files renamed, 5,675 → 4,946.
+- **Before a file that uses one of these is converted, pin its behaviour** with a unit test in
+  `test/`, green before the conversion and after it: `On`/`Off` add + remove and passive or
+  not, `Logger.level` gating, `Request.send` on success, failure and throw,
   `Elem.byId`/`hide`/`displayBlock` against a missing id, `Html.new.div()` and
   `Html.make.div('x')`, `Tag.node`/`Tag.ref`/`getClosingBracket`.
-- **Phase 3 — renames.** `Node` → `GraphNode`, `Animation` → `NodeAnimation`, `Event`,
-  `Request`, and `Graph`/`App` class-vs-instance. Mechanical, one name per commit, gates
-  between. This is the only phase where a mistake is silent, which is why Phase 2 comes
+- **A name that collides with `lib.dom` is renamed when the file that defines it is
+  converted, and not before** (§4): `Node` → `GraphNode`, `Animation` → `NodeAnimation`,
+  `Event`, `Request`, and the `Graph`/`App` class-vs-instance. One name per commit, with the
+  gates between. This is the one step where a mistake is silent, which is why the pins come
   first.
-- **Phase 4 — file-by-file conversion.** Order is free (§2), so take leaf-first for
-  reviewability: `js/utils` and `js/types` before `js/nodes` and `js/interface`. Each
-  commit: `git mv x.js x.ts`, leave the `PageLoad.scripts` entry spelled `.js`, fix that
-  file's errors without `as any` and without touching another file's types, run the gates.
+- **Converting one file:** `git mv x.js x.ts`, leave the `PageLoad.scripts` entry spelled
+  `.js`, fix that file's errors without `as any` and without touching another file's types,
+  and run the gates. Order is free (§2). A leaf is the cheapest, because nothing else reads its
+  types.
+
+Converting all of `js/` would buy whole-program checking for about 5,000 mostly mechanical
+fixes. That is a decision for an ADR-0003 that supersedes ADR-0001's "Do not plan a
+migration", before any plan for it.
 
 ## 7. Unrelated bug found on the way
 
