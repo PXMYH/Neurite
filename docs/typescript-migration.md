@@ -189,13 +189,13 @@ detector that has never fired is not a detector.
 | Gate | Command | Catches |
 |---|---|---|
 | Load path | `npm test` | array/disk disagreement, double-load, `.ts` spelling, `.d.ts` in the array |
-| Conversion rules | `npm test` | dev-vs-release emit divergence, `!:`, `.js` beside `.ts`, orphaned `window.` globals |
+| Conversion rules | `npm test` | dev-vs-release emit divergence, `!:`, `.js` beside `.ts`, orphaned `window.` globals, `On`/`Off` names undeclared |
 | Type check | `npm run typecheck` | TS2564, TS2610, everything in a converted file |
-| Dev server | `npm run verify:served` | every one of the 87 entries returns parseable JavaScript |
+| Dev server | `npm run verify:served -- --base http://localhost:9123` (a server of this checkout) | every one of the 87 entries returns parseable JavaScript |
 | Release build | `npm run build && npm run verify:dist` | same, against `dist/` |
 | Boot | Playwright: navigate, assert `pageerror` set | the app still starts |
 
-`npm test` is 64 tests. All 64 pass on this branch, `npm run verify:served` and
+`npm test` is 376 tests on the tree this lands on, and all of them pass. `npm run verify:served` and
 `npm run verify:dist` both clear all 87 entries, `dist/` contains no `.ts`, and the boot
 probe reports 87 loaded scripts with every global present:
 
