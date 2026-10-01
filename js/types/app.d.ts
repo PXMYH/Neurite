@@ -34,11 +34,11 @@ type EvBinder = (
     cb: EventListenerOrEventListenerObject,
     options?: AddEventListenerOptions | boolean
 ) => void;
-// `touchmove`, `touchstart` and `wheel` are bound to `thisPassiveEvent`, which takes no
-// options and hardcodes `{passive: true}`. Passing options to those three is a real
-// mistake -- the argument is dropped and the listener is passive anyway -- so they get a
-// narrower type rather than being folded in with the rest.
-type PassiveEvBinder = (target: EventTarget, cb: EventListenerOrEventListenerObject) => void;
+// `touchmove`, `touchstart` and `wheel` are bound to `thisPassiveEvent`, which is passive
+// by default and takes options like the rest: `nodeclass.js` passes `{passive: false}` to the
+// wheel on purpose, to cancel the page's own response to it. A narrower type for those three
+// would report that call as a mistake, and its obvious fix -- dropping the argument -- would
+// bring back the passive wheel that could not cancel anything.
 
 declare namespace On {
     var animationend: EvBinder; var blur: EvBinder; var change: EvBinder;
@@ -55,8 +55,8 @@ declare namespace On {
     var resize: EvBinder; var scroll: EvBinder; var touchcancel: EvBinder;
     var touchend: EvBinder; var transitionend: EvBinder;
     var visibilitychange: EvBinder;
-    var touchmove: PassiveEvBinder; var touchstart: PassiveEvBinder;
-    var wheel: PassiveEvBinder;
+    var touchmove: EvBinder; var touchstart: EvBinder;
+    var wheel: EvBinder;
 }
 // `Off` binds every name through `removeEventListener`, which has no passive variant, so
 // all 42 take the same shape.
