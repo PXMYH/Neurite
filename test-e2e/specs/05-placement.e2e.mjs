@@ -13,19 +13,23 @@ afterEach(async () => { await context?.close(); });
 // was legible enough to notice they overlapped, and they drifted along the fractal
 // gradient, so one created off screen wandered into view and looked placed.
 
-// UV is the renderer's own screen space -- 0..1 across the viewport on both axes,
-// at any zoom -- so this asks the question the reader asks: can I see the note I
-// just made?
-const uvOf = (page, uuid) => page.evaluate((id) => {
-    const uv = fromZtoUV(Graph.nodes[id].pos);
-    return { u: uv.x, v: uv.y };
+// The question the reader asks: can I see the whole of the note I just made? Asked of the card's
+// box on the screen. It was asked in UV, taken for 0..1 across the window, which is only the
+// square its short side spans: a card in full view near the long side's ends read as out of it,
+// and the clamp that answered to that pulled such cards toward the middle (rv16).
+const inWindow = (page, uuid) => page.evaluate((id) => {
+    const b = Graph.nodes[id].view.div.getBoundingClientRect();
+    return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, w: innerWidth, h: innerHeight };
 }, uuid);
+const assertInWindow = (box) => {
+    assert.ok(box.left >= 0 && box.right <= box.w, `horizontally in view: ${Math.round(box.left)}..${Math.round(box.right)} of ${box.w}`);
+    assert.ok(box.top >= 0 && box.bottom <= box.h, `vertically in view: ${Math.round(box.top)}..${Math.round(box.bottom)} of ${box.h}`);
+};
 
 test('a new note lands inside the viewport', async () => {
     const uuid = await addNote(page, 'Arrival', 'body');
-    const { u, v } = await uvOf(page, uuid);
-    assert.ok(u > 0 && u < 1, `horizontally in view, got u=${u.toFixed(3)}`);
-    assert.ok(v > 0 && v < 1, `vertically in view, got v=${v.toFixed(3)}`);
+    await page.waitForTimeout(400);
+    assertInWindow(await inWindow(page, uuid));
 });
 
 // An Ai node's spawn point is a random draw over `(random - 0.5) * 1.8` per axis
@@ -33,9 +37,8 @@ test('a new note lands inside the viewport', async () => {
 // arrived out of sight roughly a third of the time before the clamp.
 test('a new AI note lands inside the viewport', async () => {
     const uuid = await addAiNote(page, 'Ai Arrival');
-    const { u, v } = await uvOf(page, uuid);
-    assert.ok(u > 0 && u < 1, `horizontally in view, got u=${u.toFixed(3)}`);
-    assert.ok(v > 0 && v < 1, `vertically in view, got v=${v.toFixed(3)}`);
+    await page.waitForTimeout(400);
+    assertInWindow(await inWindow(page, uuid));
 });
 
 // Ten, not five. Five notes can be separated by moving only the newest one; ten cannot
