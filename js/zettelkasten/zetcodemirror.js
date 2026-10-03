@@ -567,21 +567,21 @@ function getZetNodeCMInstance(nodeOrTitle) {
 // text node, one action class cleaned up the text and left the node to the sync, and
 // every other node type cleaned up nothing at all.
 //
-// getZetNodeCMInstance cannot be used to find the pane: it looks the title up in the
-// Tag.node title map, so it answers null for an AI note. deleteNodeByTitle reports
-// whether the section was in that pane, which is what picks the pane here.
-//
-// The Pane holding the Title goes first, before `node.remove()` lets it go: a Pane before
-// it can carry the same heading as a taken copy, whose section is not this Node's (#64).
+// The pane is the one whose map holds this Node -- the Node, not its Title -- read before
+// `node.remove()` lets it go. By the Title, a Pane before it could carry the same heading as
+// a taken copy, whose section is not this Node's (#64); and a Node the text never made, an
+// image or a Link Node, can carry a note's Title: its delete took that note's text, and the
+// next pass took the note for having none. getZetNodeCMInstance looks titles up the same
+// way, and answers null for an AI note besides.
+function paneHoldingNode(node){
+    return window.zetPaneList.find( (pane)=>Object.values(pane.processor.wrapPerTitle)
+        .some( (wrap)=>(wrap.node === node) ) ) ?? null;
+}
 function deleteNodeAndItsZetText(node){
     const title = node.getTitle?.();
-    const holder = title && paneHoldingTitle(title);
+    const holder = paneHoldingNode(node);
     node.remove();
-    if (!title) return;
-
-    for (const pane of (holder ? [holder, ...window.zetPaneList] : window.zetPaneList)) {
-        if (pane.parser.deleteNodeByTitle(title, Boolean(node.isLLM))) return;
-    }
+    if (title && holder) holder.parser.deleteNodeByTitle(title, Boolean(node.isLLM));
 }
 
 // What a delete asks first, from a Node's × and from its menu alike. A × on a window reads
@@ -589,7 +589,7 @@ function deleteNodeAndItsZetText(node){
 // the text goes too -- where there is text to go: a Link Node or an image has none.
 function confirmNodeDelete(nodes){
     const titles = nodes.map( (node)=>node.getTitle?.()?.trim() );
-    const written = titles.some( (title)=>(title && paneHoldingTitle(title)) );
+    const written = nodes.some(paneHoldingNode);
     const many = (nodes.length > 1);
     const question = many ? `Delete the ${nodes.length} selected nodes?`
                    : titles[0] ? `Delete “${titles[0]}”?` : 'Delete this note?';

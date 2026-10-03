@@ -143,3 +143,29 @@ test('deleting a note leaves the AI note below it alone', async () => {
     assert.ok(text.includes('Below'), `the AI section below survived -- pane is now ${JSON.stringify(text)}`);
     assert.equal(await page.evaluate((id) => id in Graph.nodes, spared), true, 'and its node survived');
 });
+
+// A Node the text never made can carry a note's Title: an image is named after its file. Its
+// delete went by the Title, so it took the note's section -- and the next pass took the note,
+// for having none -- while the question said "This also deletes its text in the Notes panel".
+test('deleting an image named like a note leaves the note and its text, and says nothing of text', async () => {
+    const note = await addNote(page, 'Screenshot', 'my notes about the screenshot');
+    const image = await page.evaluate(async () => {
+        const img = new Image();
+        img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="red"/></svg>');
+        await img.decode();
+        const before = new Set(Object.keys(Graph.nodes));
+        NodeView.addForImage(img, 'Screenshot');
+        return Object.keys(Graph.nodes).find((k) => !before.has(k)) ?? null;
+    });
+    assert.equal(await page.evaluate((id) => Graph.nodes[id]?.getTitle(), image), 'Screenshot', 'the image is not named like the note');
+
+    await page.evaluate((id) => { NodeActions.forNode(Graph.nodes[id]).delete(); }, image);
+    await page.waitForFunction(() => Modal.current?.id === 'confirmModal');
+    assert.deepEqual(await page.evaluate(() => ['.modal-title', '.confirm-message'].map((s) => Modal.div.querySelector(s).textContent)),
+        ['Delete “Screenshot”?', ''], 'the question promises to delete text the image does not have');
+    await page.click('#customModal .modal-ok');
+    await page.waitForFunction((id) => !(id in Graph.nodes), image, { timeout: 5000 });
+    await page.waitForTimeout(500);
+    assert.equal(await page.evaluate((id) => id in Graph.nodes, note), true, 'the note went with the image');
+    assert.ok((await paneText(page)).includes('my notes about the screenshot'), 'the note\'s text went with the image');
+});
