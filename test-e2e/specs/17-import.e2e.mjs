@@ -23,7 +23,8 @@ async function importBundle(page, { answer } = {}) {
     await (await chooser).setFiles(BUNDLE);
     if (answer) {
         await page.waitForFunction(() => Modal.current?.id === 'confirmModal', undefined, { timeout: 15000 });
-        const question = await page.evaluate(() => document.querySelector('#customModal .confirm-message').textContent);
+        const question = await page.evaluate(() => ['.modal-title', '.confirm-message']
+            .map((s) => document.querySelector(`#customModal ${s}`).textContent).join(' '));
         await page.click(`#customModal ${answer === 'yes' ? '.modal-ok' : '.modal-cancel'}`);
         if (answer !== 'yes') return question;
     }
@@ -112,7 +113,7 @@ test('with notes on screen the import asks first, and fills a graph of its own',
     await page.evaluate(() => window.createNote('Mine', 'A note already here.'));
     await page.waitForTimeout(600);
     const question = await importBundle(page, { answer: 'no' });
-    assert.match(question, /^Import 6 notes from “notes-bundle” into a new graph, an Archive for each of its 4 folders\?/);
+    assert.match(question, /^Import 6 notes from “notes-bundle” into a new graph\? Each of its 4 folders becomes an Archive\./);
     assert.deepEqual((await state(page)).titles, ['Mine'], 'No imported something');
 
     await page.click('.menu-button');   // the menu closed with the dialog

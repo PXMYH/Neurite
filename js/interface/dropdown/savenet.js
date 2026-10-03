@@ -701,10 +701,10 @@ View.Graphs = class {
         // It says what is true now that there is no list: the graph is banked, so a
         // refresh reopens it, but nothing in the interface reaches it after the next one.
         // Save to… is what makes a graph you can come back to.
-        const msg = "Start an empty graph? Use Save to… first if you want to keep this "
-                  + "one -- a graph you have not saved to disk cannot be reopened once "
-                  + "you start another.";
-        window.confirm(msg).then(this.#handleConfirmClear);
+        const msg = "Use Save to… first if you want to keep this one -- a graph you have "
+                  + "not saved to disk cannot be reopened once you start another.";
+        window.confirm(msg, {title: "Start an empty graph?", ok: "Clear", danger: true})
+            .then(this.#handleConfirmClear);
     }
     #handleConfirmClear = (confirmed)=>{
         if (!confirmed) return;

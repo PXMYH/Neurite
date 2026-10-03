@@ -232,10 +232,10 @@ class ZetImport {
         const app = App as any;
         const written = ((window as any).zetPaneList as any[]).some( (pane)=>pane.cm.getValue().trim() );
         if (Object.keys((Graph as any).nodes).length > 0 || written) {
-            const question = `Import ${plan.notes.length} notes from “${plan.root}” into a new graph, `
-                + `an Archive for each of its ${plan.areas.length} folders? The graph on screen is put away `
-                + 'first, as Clear puts it away: use Save to… first to keep a copy of it on disk.';
-            if (!await ui.confirm(question)) return;
+            const question = `Import ${plan.notes.length} notes from “${plan.root}” into a new graph?`;
+            const detail = `Each of its ${plan.areas.length} folders becomes an Archive. The graph on screen is put `
+                + 'away first, as Clear puts it away: use Save to… first to keep a copy of it on disk.';
+            if (!await ui.confirm(detail, {title: question, ok: 'Import', danger: true})) return;
 
             await app.viewGraphs.startNewGraph();
         }

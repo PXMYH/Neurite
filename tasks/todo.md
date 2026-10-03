@@ -173,8 +173,11 @@ buttons, a maroon Yes and a grey No. The alert and the prompt share the same she
       A click on the dimmed page is Escape for an alert or a confirm; a prompt keeps it.
 - [x] Phase 1b -- a note's delete is asked by its Title and answered Delete in red, and says
       when its text in the Notes panel goes too (`confirmNodeDelete`, zetcodemirror.js).
-- [ ] Phase 2 -- the other deletes say what they delete the same way: an Archive, documents
-      in the Vector Database, this site's storage, a Neurite account.
+- [x] Phase 1c -- a delete takes the text of its own Node, found by the Node and not its
+      Title: an image named like a note took that note's text, and then the note.
+- [x] Phase 2 -- the other deletes say what they delete the same way: an Archive, documents
+      in the Vector Database, this site's storage, a Neurite account; and the two questions
+      that put a graph away or take a Ref out (Clear, an import, Turn the arrow) are red too.
 
 Not done, and why: an Undo in place of the question. The Notes panel's own undo already brings
 a deleted note back (measured: section, Node and Edge), but it is an editor's history, not a
@@ -182,4 +185,19 @@ promise the dialog can make, so the dialog makes no claim about undo either way.
 
 ## Review
 
-(filled in as phases land)
+- Browser first, in Chromium, WebKit and WebKit as an iPad: before and after screenshots of
+  every dialog that asks, the accessibility tree through CDP, and a script for Escape, Tab,
+  Enter, the wheel, a finger, a pinch, a drag, long titles and messages, the keyboard's
+  `--visible-height` and reduced motion. Pinned by 22-dialogs.e2e.mjs.
+- An adversarial review found eleven things, ten measured. Fixed: keys and a double-click
+  reaching the Graph through the dialog, a press taking the keyboard out of it, a dialog
+  raised mid-drag, a stale explanation overlay over the question (`Modal.closeOverlay;`
+  was never called), a Safari pinch zooming behind it, a long title in a short window, a
+  file dropped on it, the misplaced comment, the image named like a note, and the other
+  destructive confirms that lost their red. The backdrop click that closed a question was
+  taken out rather than patched: system alerts wait for an answer, and a double-click's
+  second click made a note.
+- A trap of my own on the way: `Modal.onBehind = function(){...}` followed by a line that
+  opened with `[` -- no semicolon in this codebase's style -- read as an index into the
+  function, threw at load, and took the rest of custommodal.js with it. The behaviour
+  script's page-error check caught it; a `for` loop cannot be glued on that way.

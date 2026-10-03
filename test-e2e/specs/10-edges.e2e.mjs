@@ -206,7 +206,7 @@ test('a click, a double-click or a pan on an Edge change nothing; its menu turns
             .find((li) => li.textContent.trim() === 'Turn the arrow').click());
         await page.waitForTimeout(250);
         const asked = await page.evaluate(() => (Modal.current?.id === 'confirmModal'
-            ? document.querySelector('.modal-content .confirm-message').textContent : null));
+            ? ['.modal-title', '.confirm-message', '.modal-ok'].map((s) => document.querySelector(`.modal-content ${s}`).textContent).join(' ') : null));
         if (asked) await page.click(answer ? '.modal-content .modal-ok' : '.modal-content .modal-cancel');
         await page.waitForTimeout(900);
         await page.keyboard.press('Escape');
@@ -219,7 +219,7 @@ test('a click, a double-click or a pan on an Edge change nothing; its menu turns
         if (asked) assert.deepEqual(await state(), before, 'No turned the arrow anyway');
         else assert.notEqual((await state()).tip, before.tip, 'a turn that only adds a Ref did not turn');
     }
-    assert.match(asked ?? '', /^Turn the arrow\? That takes \[\[\w+\]\] out of "\w+"\.$/);
+    assert.match(asked ?? '', /^Turn the arrow\? That takes \[\[\w+\]\] out of “\w+”\. Turn$/);
     const before = await state();
     assert.equal(await turn(true), asked);
     assert.notEqual((await state()).tip, before.tip, 'Yes did not turn the arrow');

@@ -306,6 +306,7 @@ test('Clear is a command row that asks through the modal', ()=>{
     // not a Graph, and banking it wrote the empty canvas over the one that failed (rv15).
     assert.match(savenet, /#bankScreen\(\)\{ return \(this\.#restoreFailed \? Promise\.resolve\(\) : this\.#autosave\(\)\) \}/,
         'the screen is banked some other way, or banked after a failed restore');
-    assert.match(savenet, /window\.confirm\(msg\)\.then\(this\.#handleConfirmClear\)/,
-        'nothing asks the question that #handleConfirmClear answers');
+    // In red: the graph on screen is put away by the answer, out of reach if it was not saved.
+    assert.match(savenet, /window\.confirm\(msg, \{[^}]*danger: true[^}]*\}\)\s*\.then\(this\.#handleConfirmClear\)/,
+        'nothing asks the question that #handleConfirmClear answers, or its answer is not marked as the one that puts the graph away');
 });

@@ -94,8 +94,8 @@ Menu.Context = class {
             if (from) {
                 const other = edge.pts.find( (pt)=>(pt !== from) ).getTitle();
                 const ref = Tag.ref + other + (bracketsMap[Tag.ref] ?? '');
-                const question = `Turn the arrow? That takes ${ref} out of "${from.getTitle()}".`;
-                if (!await window.confirm(question)) return;
+                const takes = `That takes ${ref} out of “${from.getTitle()}”.`;
+                if (!await window.confirm(takes, {title: 'Turn the arrow?', ok: 'Turn', danger: true})) return;
             }
             edge.toggleDirection();
         };
