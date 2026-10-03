@@ -766,8 +766,8 @@ View.Graphs = class {
         const shared = /\.github\.io$/.test(location.hostname)
             ? " This address is shared with the other GitHub Pages sites under "
               + location.hostname + ", and what they keep in it goes too." : "";
-        const confirmed = await window.confirm("Clear this browser's local storage for this site? "
-            + "Settings, API keys and view history go; your graphs are kept." + shared);
+        const confirmed = await window.confirm("Settings, API keys and view history go; your graphs are kept." + shared,
+            {title: "Clear this browser's local storage for this site?", ok: "Clear", danger: true});
         if (!confirmed) return;
 
         localStorage.clear();

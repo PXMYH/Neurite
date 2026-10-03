@@ -29,7 +29,8 @@ const saveNote = (page) => page.evaluate(() => {
     const n = document.getElementById('save-note');
     return { text: n.textContent, warning: n.classList.contains('is-warning') };
 });
-const dialogText = (page) => page.evaluate(() => (Modal.current ? document.querySelector('.modal-body').innerText : null));
+// The title too: a question a caller names is the dialog's title, and its message what the answer does.
+const dialogText = (page) => page.evaluate(() => (Modal.current ? document.querySelector('#customModal .modal-content').innerText : null));
 const answer = (page, ok) => page.evaluate((ok) => document.querySelector(ok ? '.modal-body .modal-ok' : '.modal-body .modal-cancel').click(), ok);
 const openMenu = (page) => page.evaluate(() => { if (!dropdownContent.classList.contains('open')) menuButton.click(); });
 const titles = (page) => page.evaluate(() => Object.values(Graph.nodes).map((n) => n.getTitle()).sort());
@@ -167,7 +168,7 @@ test('Clear Local Storage keeps the Graphs', async () => {
     await page.evaluate(() => document.getElementById('clearLocalStorage').click());
     // Asked first now: API keys go with it (rv15).
     await page.waitForFunction(() => Boolean(Modal.current), undefined, { timeout: 5000 });
-    assert.match(await dialogText(page), /Clear this browser's local storage for this site\? Settings, API keys and view history go; your graphs are kept\./);
+    assert.match(await dialogText(page), /^Clear this browser's local storage for this site\?\s+Settings, API keys and view history go; your graphs are kept\.\s+Cancel\s+Clear$/);
     await answer(page, true);
     await page.waitForFunction(() => Boolean(Modal.current) && /Your graphs are kept/.test(document.querySelector('.modal-body').innerText), undefined, { timeout: 5000 });
     await answer(page, true);

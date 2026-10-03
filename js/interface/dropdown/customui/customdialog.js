@@ -70,8 +70,10 @@ window.prompt = async (message, defaultValue = '', title = null) => {
         inputEl.addEventListener('keydown', handleKey);
     });
 }
-window.alert = async (message) => {
+// Named after what it is about, when its caller says (`title`): "Alert" names nothing.
+window.alert = async (message, options) => {
     Modal.open('alertModal');
+    if (options?.title) Modal.div.querySelector('.modal-title').textContent = options.title;
     const modalBody = Modal.div.querySelector('.modal-body');
     const messageEl = modalBody.querySelector('.alert-message');
     const okBtn = modalBody.querySelector('.modal-ok');

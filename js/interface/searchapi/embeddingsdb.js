@@ -351,9 +351,12 @@ Keys.deleteSelected = async function(){
         }
     }
 
-    const confirmMessage = "Are you sure you want to delete the following keys?\n\n"
-                         + keysToDelete.join('\n') + "\n\nThis action cannot be undone.";
-    const userConfirmed = await window.confirm(confirmMessage);
+    // One document to a line: the dialog keeps the breaks.
+    const many = (keysToDelete.length > 1);
+    const userConfirmed = await window.confirm(keysToDelete.join('\n') + "\n\nThis cannot be undone.", {
+        title: `Delete ${many ? keysToDelete.length + ' documents' : 'this document'} from the Vector Database?`,
+        ok: 'Delete', danger: true
+    });
     if (userConfirmed) {
         await Promise.all(keysToDelete.map(Keys.deleteKey));
         await Keys.fetchAndDisplayAll();

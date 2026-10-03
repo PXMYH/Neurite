@@ -21,9 +21,12 @@ const state = (page) => page.evaluate(() => ({
     status: document.getElementById('archiveStatus').textContent || null,
     notes: Object.values(Graph.nodes).filter((n) => !n.removed).map((n) => n.getTitle()).sort(),
 }));
-// What the app's own dialog says, when one is open.
+// What the app's own dialog says, when one is open; and what it asks, which is its title.
 const dialog = (page) => page.evaluate(() => (Modal.current
     ? Modal.div.querySelector('.alert-message, .confirm-message, .modal-prompt-message')?.textContent : null));
+const asked = (page) => page.evaluate(() => (Modal.current
+    ? [Modal.div.querySelector('.modal-title').textContent, Modal.div.querySelector('.alert-message, .confirm-message')?.textContent,
+       Modal.div.querySelector('.modal-ok').textContent] : null));
 const answer = (page, button) => page.click(`#customModal .modal-body ${button}`);
 
 async function openNotes(page) {
@@ -79,11 +82,12 @@ test('delete says how many notes go with the Archive, and the last one says why 
     assert.equal((await state(page)).shown, 'Archive 1 · 2 notes');
 
     await page.click('#archiveDelete');
-    assert.equal(await dialog(page), 'Delete the Archive “Archive 1” and the 2 notes written in it?');
+    assert.deepEqual(await asked(page), ['Delete the Archive “Archive 1”?', 'This also deletes the 2 notes written in it.', 'Delete']);
     assert.deepEqual(await page.evaluate(() => {
         const m = document.getElementById('customModal');
-        return [m.getAttribute('role'), document.getElementById(m.getAttribute('aria-describedby'))?.textContent];
-    }), ['alertdialog', 'Delete the Archive “Archive 1” and the 2 notes written in it?'], 'the question is not what describes the dialog');
+        return [m.getAttribute('role'), document.getElementById(m.getAttribute('aria-describedby'))?.textContent,
+                m.querySelector('.modal-ok').classList.contains('danger')];
+    }), ['alertdialog', 'This also deletes the 2 notes written in it.', true], 'what goes with it is not what describes the dialog');
     await answer(page, '.modal-ok');
     await page.waitForTimeout(500);
     const s = await state(page);
@@ -91,7 +95,8 @@ test('delete says how many notes go with the Archive, and the last one says why 
     assert.deepEqual(s.archives, ['Archive 2 · 1 note']);
 
     await page.click('#archiveDelete');
-    assert.match(await dialog(page) ?? '', /only Archive.*cannot be deleted/, 'the last Archive gave no reason');
+    assert.deepEqual(await asked(page), ['“Archive 2” cannot be deleted',
+        'It is the only Archive, and new notes are written into the one shown. Make another first.', 'OK'], 'the last Archive gave no reason');
     await answer(page, '.modal-ok');
     assert.deepEqual((await state(page)).archives, ['Archive 2 · 1 note']);
 
@@ -291,7 +296,7 @@ test('Delete says an Archive of text will go, when none of it is a note', async 
     await page.keyboard.type('## Alpha\ntaken, and some prose\n');
     await page.waitForTimeout(300);
     await page.click('#archiveDelete');
-    assert.equal(await dialog(page), 'Delete the Archive “Archive 2” and its text? None of it is a note yet.');
+    assert.deepEqual(await asked(page), ['Delete the Archive “Archive 2”?', 'This also deletes its text. None of it is a note yet.', 'Delete']);
 });
 
 // ---- found by the Phase 3 UX review ----

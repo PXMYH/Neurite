@@ -343,15 +343,18 @@ class ZetPanes {
 
         const name = this.getPaneName(pane.paneId);
         if (window.zetPaneList.length === 1) {
-            return window.alert(`“${name}” is the only Archive, and new notes are written into the one shown, so it cannot be deleted. Make another first.`);
+            return window.alert('It is the only Archive, and new notes are written into the one shown. Make another first.',
+                {title: `“${name}” cannot be deleted`});
         }
         // Said from the text as well as from the notes: an Archive of taken Title lines and
         // prose makes no note, and "It holds no notes." read as nothing to lose.
         const count = ZetPanes.noteCount(pane);
-        const question = (count > 0) ? `Delete the Archive “${name}” and the ${count === 1 ? 'note' : count + ' notes'} written in it?`
-            : pane.cm.getValue().trim() ? `Delete the Archive “${name}” and its text? None of it is a note yet.`
-            : `Delete the empty Archive “${name}”?`;
-        if (!await window.confirm(question)) return;
+        const written = Boolean(pane.cm.getValue().trim());
+        const detail = (count > 0) ? `This also deletes the ${count === 1 ? 'note' : count + ' notes'} written in it.`
+            : written ? 'This also deletes its text. None of it is a note yet.'
+            : '';
+        const title = (count > 0 || written) ? `Delete the Archive “${name}”?` : `Delete the empty Archive “${name}”?`;
+        if (!await window.confirm(detail, {title, ok: 'Delete', danger: true})) return;
 
         this.removePane(pane.paneId);
     }
