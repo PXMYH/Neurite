@@ -282,17 +282,17 @@ test('an alert that comes up while the reader writes beside an open modal gives 
     assert.equal(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), '## AlphaX');
 });
 
-// Left by Escape or the ×, an alert, a confirm or a prompt settled nothing: `await
-// confirm(...)` never returned.
-test('a dialog left by Escape or its × still answers its caller', async () => {
+// Left by Escape, or replaced by another dialog, an alert, a confirm or a prompt settled
+// nothing: `await confirm(...)` never returned. (They had a × then; Cancel and OK answer now.)
+test('a dialog left by Escape or replaced by another still answers its caller', async () => {
     for (const [ask, leave, expected] of [['confirm', 'Escape', false], ['prompt', 'Escape', null],
-                                          ['alert', 'Escape', 'answered'], ['confirm', 'x', false]]) {
+                                          ['alert', 'Escape', 'answered'], ['confirm', 'replaced', false]]) {
         await page.evaluate((ask) => {
             window.answer = 'pending';
             window[ask]('A question?').then((value) => { window.answer = (value === undefined ? 'answered' : value); });
         }, ask);
         await page.waitForTimeout(100);
-        if (leave === 'x') await page.click('#customModal .close');
+        if (leave === 'replaced') await page.evaluate(() => { window.alert('Something else.'); });
         else {
             await page.focus('#customModal .modal-ok');   // on a button, where the prompt's own Escape is not
             await page.keyboard.press('Escape');

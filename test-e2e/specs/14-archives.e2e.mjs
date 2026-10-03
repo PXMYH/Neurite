@@ -359,7 +359,9 @@ test('a Tab in the note behind an open dialog types nothing and goes into the di
     await type(page, '## Alpha\nbody\n');
     await page.focus('#archiveRename');
     await page.keyboard.press('Enter');
-    await page.click('#zetPaneContainer .zet-pane.active .CodeMirror-lines');
+    // A click no longer reaches the note: the dialog's dimmed page takes it (22-dialogs). The
+    // keyboard is put back in the note as a script that moved it there would leave it.
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.focus());
     await page.keyboard.press('Tab');
     assert.deepEqual(await page.evaluate(() => [window.currentActiveZettelkastenMirror.getValue(),
         document.getElementById('customModal').contains(document.activeElement)]), ['## Alpha\nbody\n', true]);

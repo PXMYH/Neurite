@@ -154,3 +154,32 @@ a feature lands.
       186ms at 50, 60fps steady at 200, and 0 overlapping pairs after bursts of 5 to 100.
 - [x] Packaged arm64 `.app` (ad-hoc signed, valid) and `.dmg`; the smoke test passes against
       the app inside the mounted DMG.
+
+# The delete dialog, polished (2026-10-02)
+
+Asked: "improve the delete experience, the modal looks not beautiful, iterate until it's
+polished, use playwright to verify". Tier T2, brownfield.
+
+Measured first, in Chromium, WebKit and WebKit as an iPad: the delete of a note opened a
+280x125 box under the tool pill, not over the middle of the window; nothing behind it was
+dimmed and every click still reached the Graph; the box was 75% see-through with square bottom
+corners; it was titled "Confirm" and asked `Delete "Chunking"?` on two bevelled half-width
+buttons, a maroon Yes and a grey No. The alert and the prompt share the same shell.
+
+- [x] Phase 1a -- the three dialogs that ask (alert, confirm, prompt): a dimmed page that takes
+      the clicks, the card in the middle of the window (of what the keyboard leaves, on an
+      iPad), the question as the title, no ×, buttons in one row at the right with Cancel
+      first, 44px tall under a coarse pointer, a 180ms rise that reduced motion turns off.
+      A click on the dimmed page is Escape for an alert or a confirm; a prompt keeps it.
+- [ ] Phase 1b -- a note's delete is asked by its Title and answered Delete in red, and says
+      when its text in the Notes panel goes too (`confirmNodeDelete`, zetcodemirror.js).
+- [ ] Phase 2 -- the other deletes say what they delete the same way: an Archive, documents
+      in the Vector Database, this site's storage, a Neurite account.
+
+Not done, and why: an Undo in place of the question. The Notes panel's own undo already brings
+a deleted note back (measured: section, Node and Edge), but it is an editor's history, not a
+promise the dialog can make, so the dialog makes no claim about undo either way.
+
+## Review
+
+(filled in as phases land)

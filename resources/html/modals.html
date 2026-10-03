@@ -1,7 +1,8 @@
     <!-- Default Modal Structure -->
 <!-- A dialog to a screen reader, named by its title. `aria-modal` is set per dialog in
-     `Modal.open`: only the three that wait for an answer hold the keyboard. -->
-<div id="customModal" class="modal" style="display: none;" role="dialog" aria-labelledby="modal-title">
+     `Modal.open`: only the three that wait for an answer hold the keyboard. `tabindex="-1"`
+     keeps the focus of a press on a dialog's text in the dialog, not on `body`. -->
+<div id="customModal" class="modal" style="display: none;" role="dialog" aria-labelledby="modal-title" tabindex="-1">
     <div class="modal-content">
         <div class="modal-header" id="modal-header">
             <h2 class="modal-title" id="modal-title"></h2>
@@ -399,11 +400,18 @@
 
     </div>
 </div>
+<!-- The three dialogs that wait for an answer. Their buttons sit in one row at the right,
+     Cancel before the answer that acts, as macOS and iPadOS place them; the confirm's OK is
+     renamed for what it does by its caller ("Delete"), where "Yes" answered a question the
+     reader had to read again to be sure of. -->
+
 <!-- Alert Modal -->
 <div id="alertModal" style="display: none;">
     <div class="alert-modal-content">
         <p class="alert-message"></p>
-        <button class="modal-ok linkbuttons">OK</button>
+        <div class="modal-actions">
+            <button class="modal-ok">OK</button>
+        </div>
     </div>
 </div>
 
@@ -411,8 +419,10 @@
 <div id="confirmModal" style="display: none;">
     <div class="confirm-modal-content">
         <p class="confirm-message"></p>
-        <button class="modal-ok linkbuttons">Yes</button>
-        <button class="modal-cancel linkbuttons">No</button>
+        <div class="modal-actions">
+            <button class="modal-cancel">Cancel</button>
+            <button class="modal-ok">OK</button>
+        </div>
     </div>
 </div>
 
@@ -420,8 +430,10 @@
 <div id="promptModal" style="display: none;">
     <div class="prompt-modal-content">
         <div class="modal-prompt-message custom-scrollbar"></div>
-        <textarea class="modal-prompt-textarea custom-scrollbar"></textarea> <!-- Updated to textarea -->
-        <button class="modal-ok linkbuttons">OK</button>
-        <button class="modal-cancel linkbuttons">Cancel</button>
+        <textarea class="modal-prompt-textarea custom-scrollbar"></textarea>
+        <div class="modal-actions">
+            <button class="modal-cancel">Cancel</button>
+            <button class="modal-ok">OK</button>
+        </div>
     </div>
 </div>

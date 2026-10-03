@@ -896,6 +896,180 @@ body.connect-mode .window textarea {
     max-height: calc(var(--visible-height, 100dvh) - 100px);
 }
 
+/* The three dialogs that wait for an answer -- an alert, a confirm and a prompt (`Modal.asks`,
+   customdialog.js) -- are where the app stops and asks, and now they look it. They opened under
+   the tool pill like the tool modals, over a page that went on taking clicks, in a see-through
+   box with square bottom corners, answered on two bevelled half-width buttons: the delete of a
+   note looked like a tool left open. Now they sit in the middle of a dimmed page that takes no
+   clicks, the question is the title, and the buttons say what they do.
+
+   The modal frame is the dimmed page: it covers the window already, and centres what is in
+   it. Not a `position: fixed` layer of its own -- the body carries a transform (dropdown.js),
+   so a fixed box is placed against the body, which is 0px tall, and a backdrop at `inset: 0`
+   came out 0px tall and dimmed nothing. The frame stops at the keyboard (`--visible-height`,
+   hud.js), so a prompt on an iPad is centred in the part of the window the keys leave. */
+.modal.asks {
+    height: var(--visible-height, 100vh);
+    /* Dim enough to say the page waits, light enough to still show which note is asked about. */
+    background-color: rgb(6 6 10 / 45%);
+    pointer-events: auto;
+    animation: asks-dim 140ms ease-out;
+}
+
+.modal.asks .modal-content {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: min(400px, calc(100vw - 2 * var(--space-4)));
+    max-height: calc(var(--visible-height, 100dvh) - 2 * var(--space-4));
+    /* A long message scrolls on its own (below); a long title in a short window scrolls the
+       box, where it ran out of it and the focus on Cancel scrolled the frame to follow. */
+    overflow-y: auto;
+    gap: var(--space-2);
+    padding: var(--space-5);
+    background-color: var(--ui-chrome);
+    backdrop-filter: none;
+    border: 1px solid rgb(255 255 255 / 9%);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgb(0 0 0 / 45%), inset 0 1px 0 rgb(255 255 255 / 4%);
+    cursor: auto;
+    animation: asks-rise-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+    /* The title is the question, inside the box rather than on a bar of its own. No ×:
+       Cancel, OK and Escape answer, and a closed dialog answered nothing. */
+    .modal.asks .modal-header {
+        padding: 0;
+        background: none;
+        box-shadow: none;
+    }
+
+    .modal.asks .modal-title {
+        font-size: var(--text-lg);
+        font-weight: var(--weight-semibold);
+        line-height: var(--leading-tight);
+        color: var(--text-primary);
+        overflow-wrap: anywhere;
+    }
+
+    .modal.asks .close {
+        display: none;
+    }
+
+    /* A column whose message scrolls when it is long (a list of keys to delete), so the
+       buttons under it stay on screen. */
+    .modal.asks .modal-body,
+    .modal.asks .modal-body > * {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 0;
+    }
+
+    /* Line breaks kept, as the alert's were (styles.css): the documents a Vector Database
+       delete names are one to a line, and ran together into one paragraph. */
+    .modal.asks :is(.alert-message, .confirm-message, .modal-prompt-message) {
+        margin: 0;
+        padding: 0;
+        max-height: none;
+        overflow-y: auto;
+        font-size: var(--text-md);
+        line-height: var(--leading-normal);
+        color: var(--text-secondary);
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+    }
+
+    .modal.asks .confirm-message:empty {
+        display: none;
+    }
+
+    .modal.asks .modal-prompt-textarea {
+        flex: none;
+        height: 88px;
+        margin: var(--space-3) 0 0;
+        padding: var(--space-2) var(--space-3);
+        font-size: var(--text-md);
+        line-height: var(--leading-normal);
+        color: var(--text-primary);
+        background-color: rgb(0 0 0 / 22%);
+        border: 1px solid rgb(255 255 255 / 12%);
+        border-radius: var(--ui-radius);
+    }
+
+.modal-actions {
+    display: flex;
+    flex: none;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-5);
+}
+
+    .modal-actions button {
+        min-width: 84px;
+        height: 32px;
+        padding: 0 var(--space-4);
+        font-size: var(--text-base);
+        font-weight: var(--weight-medium);
+        color: var(--text-primary);
+        border: 1px solid transparent;
+        border-radius: var(--ui-radius);
+        cursor: pointer;
+        transition: background-color var(--ui-transition), border-color var(--ui-transition);
+    }
+
+    .modal-actions .modal-cancel {
+        background-color: rgb(255 255 255 / 6%);
+        border-color: rgb(255 255 255 / 12%);
+    }
+
+        .modal-actions .modal-cancel:hover {
+            background-color: rgb(255 255 255 / 11%);
+        }
+
+    /* White on each fill is 6.9:1 and 5.4:1 hovered; on the danger red, 4.9:1 and 4.6:1. */
+    .modal-actions .modal-ok {
+        color: #fff;
+        background-color: var(--ui-accent-solid);
+    }
+
+        .modal-actions .modal-ok:hover {
+            background-color: #4a6aa3;
+        }
+
+    .modal-actions .modal-ok.danger {
+        background-color: #c4473f;
+    }
+
+        .modal-actions .modal-ok.danger:hover {
+            background-color: #d0453c;
+        }
+
+/* A finger's target, as the tool bar's are. */
+@media (pointer: coarse) {
+    .modal-actions button {
+        height: 44px;
+        min-width: 96px;
+        font-size: var(--text-md);
+    }
+}
+
+@keyframes asks-dim {
+    from { background-color: transparent; }
+}
+
+@keyframes asks-rise-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal.asks,
+    .modal.asks .modal-content {
+        animation: none;
+    }
+}
+
 /* A light-theme leftover that was forced into the dark editor with !important at
    z-index 1000: a white block with a #ccc border and black line numbers, sitting
    inside the note body. */

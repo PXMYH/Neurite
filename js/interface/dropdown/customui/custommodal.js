@@ -25,7 +25,7 @@ const Modals = {
     // (`Modal.holdTab`). The others are tools used beside the Graph, which stays in reach.
     // An alert or a confirm is an `alertdialog`, described by its message
     // (`customdialog.js`); a prompt names its box with the message instead.
-    alertModal: Object.assign(new Modal('alertModal', 'Alert'), { customClass: 'alert-modal', asks: true, role: 'alertdialog' }),
+    alertModal: Object.assign(new Modal('alertModal', 'Alert'), { asks: true, role: 'alertdialog' }),
     confirmModal: Object.assign(new Modal('confirmModal', 'Confirm'), { asks: true, role: 'alertdialog' }),
     // "Question", not "Prompt": a caller that names it nothing is asking the reader
     // something, and in this app a prompt is what is sent to a model.
@@ -68,6 +68,9 @@ Modal.open = function (contentId) {
     // Clear filepath input from header.
     const existingInput = document.querySelector('.modal-filepath-input');
     if (existingInput) existingInput.remove();
+    // And an explanation left open in the modal this one replaces: it covered the next
+    // dialog's question and its buttons.
+    Modal.closeOverlay();
 
     const content = Elem.byId(contentId);
     if (!content) {
@@ -90,6 +93,15 @@ Modal.open = function (contentId) {
 
     Modal.div.setAttribute('role', modal?.role ?? 'dialog');
     Modal.div.setAttribute('aria-modal', String(Boolean(modal?.asks)));
+    // Centred on a dimmed page that takes no clicks (foundation.css), as `aria-modal` says. The
+    // page is the frame a tool modal is dragged by, so where one was dragged to is let go, and a
+    // drag still under way stops: the dimmed page went with it, and left a strip of the Graph
+    // undimmed and in reach -- an alert raised mid-drag followed the mouse.
+    Modal.div.classList.toggle('asks', Boolean(modal?.asks));
+    if (modal?.asks) {
+        Modal.div.style.left = Modal.div.style.top = '';
+        Modal.isDragging = false;
+    }
 
     Modal.current = modal;
     Modal.div.style.display = 'flex';
@@ -174,7 +186,7 @@ Modal.close = function () {
             break;
     }
     Modal.div.style.display = 'none';
-    Modal.closeOverlay;
+    Modal.closeOverlay();
     Modal.current = null;
     Modal.settleUnanswered();
 
@@ -268,8 +280,44 @@ On.click(Modal.overlayCloseBtn, Modal.closeOverlay);
     'touchend', 'wheel', 'dragstart', 'drag', 'drop'
 ].forEach(Event.stopPropagationByNameForThis, Modal.content);
 
+// The dimmed page behind a dialog that asks is the frame itself, and only takes events while
+// one asks (foundation.css). What lands there answers nothing -- as on macOS and iPadOS, the
+// question waits for Cancel, OK or Escape: a click there that closed it let the second click
+// of a double-click make a note on the Graph -- and goes no further. A click went on to close
+// the menu the question came from, a right-click opened the context menu over the dialog, and
+// a press took the keyboard out of it, to `body`, where the Graph's own keys answered.
+Modal.onBehind = function (e) {
+    if (e.target !== Modal.div) return;
+
+    e.stopPropagation();
+    if (e.type === 'mousedown' || e.type === 'contextmenu') e.preventDefault();
+}
+for (const name of ['mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'touchstart', 'touchend', 'wheel']) {
+    On[name](Modal.div, Modal.onBehind);
+}
+
+// And the keys pressed in one are its own: with the focus on Cancel, `1` made a note behind the
+// question and `2` replaced it with another. Escape goes on to the handler below, which closes
+// the dialog, and a chord with Ctrl or Cmd to the page's guard on browser zoom; what a key does
+// in the dialog -- Enter on a button, a letter in the prompt -- is its default and still happens.
+// The frame takes the focus of a press on the dialog's text (`tabindex="-1"`), which went to
+// `body`, out of reach of this.
+On.keydown(Modal.div, (e)=>{
+    if (Modal.current?.asks && e.key !== 'Escape' && !e.ctrlKey && !e.metaKey) e.stopPropagation();
+});
+
+// A file let go over a dialog that asks is no drop on the Graph behind it, and the browser's own
+// answer to a drop nobody takes is to open the file in place of the app. Captured, so it comes
+// before the dialog's own `drop` stops at its box.
+const onFileOverQuestion = (e)=>{
+    if (Modal.current?.asks && e.dataTransfer?.types?.includes('Files')) e.preventDefault();
+};
+On.dragover(Modal.div, onFileOverQuestion, true);
+On.drop(Modal.div, onFileOverQuestion, true);
+
 Modal.startDragging = function (e) {
-    if (isInputElement(e.target)) return;
+    // A dialog that asks stays where it opened, in the middle of the window.
+    if (Modal.current?.asks || isInputElement(e.target)) return;
 
     Modal.isDragging = true;
     Modal.mouseOffsetX = e.clientX - Modal.div.offsetLeft;

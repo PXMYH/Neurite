@@ -84,17 +84,25 @@ window.alert = async (message) => {
             Modal.close();
         }, { once: true });
         Modal.unanswered = resolve;
-        okBtn.focus();
+        okBtn.focus({preventScroll: true});
     });
 }
-window.confirm = async (message) => {
+// A caller that can say more names the dialog after its question (`title`) and its OK after
+// what it does (`ok`), and marks an answer that destroys something (`danger`); the message is
+// then what the answer does, and may be empty. Without them it is a native confirm: the
+// message under "Confirm", answered OK or Cancel.
+window.confirm = async (message, options) => {
+    const {title, ok, danger} = options ?? {};
     Modal.open('confirmModal');
+    if (title) Modal.div.querySelector('.modal-title').textContent = title;
     const modalBody = Modal.div.querySelector('.modal-body');
     const messageEl = modalBody.querySelector('.confirm-message');
     const okBtn = modalBody.querySelector('.modal-ok');
     const cancelBtn = modalBody.querySelector('.modal-cancel');
     messageEl.textContent = message;
-    Modal.describeBy(messageEl);
+    if (message) Modal.describeBy(messageEl);
+    if (ok) okBtn.textContent = ok;
+    okBtn.classList.toggle('danger', Boolean(danger));
 
     return new Promise((resolve) => {
         const cleanup = (result) => {
@@ -105,8 +113,9 @@ window.confirm = async (message) => {
         okBtn.addEventListener('click', () => cleanup(true), { once: true });
         cancelBtn.addEventListener('click', () => cleanup(false), { once: true });
         // The keyboard starts on the answer that changes nothing: the dialog opened with focus
-        // on the page behind it, where Enter did nothing and no Tab led into the dialog.
-        cancelBtn.focus();
+        // on the page behind it, where Enter did nothing and no Tab led into the dialog. Not
+        // scrolled to: a question too long for a short window is read from its top.
+        cancelBtn.focus({preventScroll: true});
     });
 }
 
