@@ -171,7 +171,7 @@ buttons, a maroon Yes and a grey No. The alert and the prompt share the same she
       iPad), the question as the title, no ×, buttons in one row at the right with Cancel
       first, 44px tall under a coarse pointer, a 180ms rise that reduced motion turns off.
       A click on the dimmed page is Escape for an alert or a confirm; a prompt keeps it.
-- [ ] Phase 1b -- a note's delete is asked by its Title and answered Delete in red, and says
+- [x] Phase 1b -- a note's delete is asked by its Title and answered Delete in red, and says
       when its text in the Notes panel goes too (`confirmNodeDelete`, zetcodemirror.js).
 - [ ] Phase 2 -- the other deletes say what they delete the same way: an Archive, documents
       in the Vector Database, this site's storage, a Neurite account.

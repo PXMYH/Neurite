@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, nodeDiv, paneText, isIPad } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -33,6 +33,47 @@ const titles = (page) => page.evaluate(() => Object.values(Graph.nodes).map((n) 
 // A press on the dimmed page, at the window's left edge, where no dialog reaches.
 const pressBehind = (page) => page.evaluate(() => innerHeight / 2)
     .then((y) => (isIPad ? page.touchscreen.tap(8, y) : page.mouse.click(8, y)));
+
+test("a note's × asks in the middle of a dimmed page, by its Title, and is answered Cancel or Delete", async () => {
+    const uuid = await addNote(page, 'Chunking', 'Cutting documents into pieces.');
+    await addNote(page, 'Evaluation', 'Judging the answers.');
+    const ask = async () => {
+        await (await (await nodeDiv(page, uuid)).$('#button-delete')).click();
+        await page.waitForFunction(() => Modal.current?.id === 'confirmModal');
+        await page.waitForTimeout(250);
+        return dialog(page);
+    };
+    const d = await ask();
+    assert.deepEqual({ ...d, centre: undefined }, {
+        id: 'confirmModal',
+        title: 'Delete “Chunking”?',
+        message: 'This also deletes its text in the Notes panel.',
+        buttons: ['Cancel', 'Delete'],
+        danger: true,
+        // The answer that changes nothing has the keyboard, and Enter.
+        focused: 'Cancel',
+        centre: undefined,
+        behind: true,
+        describedBy: 'This also deletes its text in the Notes panel.',
+    });
+    assert.ok(Math.abs(d.centre[0]) <= 1 && Math.abs(d.centre[1]) <= 1, `off centre by ${d.centre}`);
+    // No ×: Cancel and Escape answer, and the × answered nothing a reader could see.
+    assert.equal(await page.evaluate(() => getComputedStyle(Modal.div.querySelector('.close')).display), 'none');
+    // A finger's target on a touch screen.
+    const heights = await page.evaluate(() => [...Modal.div.querySelectorAll('.modal-actions button')].map((b) => b.getBoundingClientRect().height));
+    for (const h of heights) assert.ok(h >= (isIPad ? 44 : 32), `a button is ${h}px tall`);
+
+    await page.click('#customModal .modal-cancel');
+    await page.waitForTimeout(200);
+    assert.deepEqual(await titles(page), ['Chunking', 'Evaluation'], 'Cancel deleted the note');
+
+    await ask();
+    await page.click('#customModal .modal-ok');
+    await page.waitForFunction((id) => !(id in Graph.nodes), uuid, { timeout: 5000 });
+    assert.deepEqual(await titles(page), ['Evaluation']);
+    assert.ok(!(await paneText(page)).includes('Chunking'), 'the text in the Notes panel stayed');
+    assert.deepEqual(errors, []);
+});
 
 // The page behind a question answers nothing while it waits, as on macOS and iPadOS. A click
 // there that closed the question let the second click of a double-click make a note on the

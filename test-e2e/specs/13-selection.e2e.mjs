@@ -128,12 +128,13 @@ test("Delete in a selected Node's menu asks first, and says how many", async () 
     const askDelete = async () => {
         await page.evaluate((id) => { App.menuContext.runAction('delete', NodeActions.forNode(Graph.nodes[id])); }, a);
         await page.waitForFunction(() => Modal.current?.id === 'confirmModal');
-        return page.evaluate(() => document.querySelector('.modal-content .confirm-message').textContent);
+        return page.evaluate(() => ['.modal-title', '.confirm-message', '.modal-ok']
+            .map((s) => document.querySelector(`.modal-content ${s}`).textContent));
     };
-    assert.equal(await askDelete(), 'Delete the 2 selected nodes?');
+    assert.deepEqual(await askDelete(), ['Delete the 2 selected nodes?', 'This also deletes their text in the Notes panel.', 'Delete']);
     // The keyboard starts on the answer that changes nothing; it started on the page behind.
     assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('modal-cancel')), true,
-        'the question opened without focus on No');
+        'the question opened without focus on Cancel');
     await page.click('.modal-content .modal-cancel');
     await page.waitForTimeout(200);
     assert.equal(await page.evaluate(() => Object.keys(Graph.nodes).length), 3, 'No deleted something');

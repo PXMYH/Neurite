@@ -584,6 +584,21 @@ function deleteNodeAndItsZetText(node){
     }
 }
 
+// What a delete asks first, from a Node's × and from its menu alike. A × on a window reads
+// as Close, and this one deletes the Node and its Node Section both, so the question says
+// the text goes too -- where there is text to go: a Link Node or an image has none.
+function confirmNodeDelete(nodes){
+    const titles = nodes.map( (node)=>node.getTitle?.()?.trim() );
+    const written = titles.some( (title)=>(title && paneHoldingTitle(title)) );
+    const many = (nodes.length > 1);
+    const question = many ? `Delete the ${nodes.length} selected nodes?`
+                   : titles[0] ? `Delete “${titles[0]}”?` : 'Delete this note?';
+    const detail = !written ? ''
+                 : many ? 'This also deletes their text in the Notes panel.'
+                 : 'This also deletes its text in the Notes panel.';
+    return window.confirm(detail, {title: question, ok: 'Delete', danger: true});
+}
+
 function escapeRegExp(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

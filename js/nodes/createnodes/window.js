@@ -546,12 +546,10 @@ class NodeView {
         // is finally recoloured through one code path.
         this.svgButtons.push([btnDel, "stroke"]);
         this.applySvgButtonUI(btnDel, async () => {
-            // A card carries everything typed into it and there is no undo, so
-            // one mis-aimed click while dragging used to lose that work outright.
-            // `window.confirm` is the app's own modal (`customdialog.js`), not the
-            // browser's, and it resolves to a boolean.
-            const named = node.getTitle()?.trim();
-            if (!await window.confirm(`Delete ${named ? `"${named}"` : 'this note'}?`)) return;
+            // A card carries everything typed into it, so one mis-aimed click while
+            // dragging used to lose that work outright. The app's own modal
+            // (`confirmNodeDelete`, zetcodemirror.js), not the browser's.
+            if (!await confirmNodeDelete([node])) return;
 
             if (Node.prev === node) {
                 Node.prev = null;
