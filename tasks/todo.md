@@ -178,6 +178,10 @@ buttons, a maroon Yes and a grey No. The alert and the prompt share the same she
 - [x] Phase 2 -- the other deletes say what they delete the same way: an Archive, documents
       in the Vector Database, this site's storage, a Neurite account; and the two questions
       that put a graph away or take a Ref out (Clear, an import, Turn the arrow) are red too.
+- [x] Phase 3 (asked after 1.5.1: "Click beside a dialog should dismiss the delete dialog") --
+      a click beside a confirm is its Cancel, and beside an alert its OK; a prompt keeps what was
+      typed and stays. The rest of a double-click there is the dialog's: measured without that,
+      its second click landed on the Graph, made a note and cleared the selection.
 
 Not done, and why: an Undo in place of the question. The Notes panel's own undo already brings
 a deleted note back (measured: section, Node and Edge), but it is an editor's history, not a
@@ -195,8 +199,8 @@ promise the dialog can make, so the dialog makes no claim about undo either way.
   was never called), a Safari pinch zooming behind it, a long title in a short window, a
   file dropped on it, the misplaced comment, the image named like a note, and the other
   destructive confirms that lost their red. The backdrop click that closed a question was
-  taken out rather than patched: system alerts wait for an answer, and a double-click's
-  second click made a note.
+  taken out at first, because a double-click's second click made a note; it is back in Phase 3,
+  with the rest of the double-click taken out instead.
 - A trap of my own on the way: `Modal.onBehind = function(){...}` followed by a line that
   opened with `[` -- no semicolon in this codebase's style -- read as an index into the
   function, threw at load, and took the rest of custommodal.js with it. The behaviour

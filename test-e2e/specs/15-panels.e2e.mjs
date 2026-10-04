@@ -282,17 +282,20 @@ test('an alert that comes up while the reader writes beside an open modal gives 
     assert.equal(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), '## AlphaX');
 });
 
-// Left by Escape, or replaced by another dialog, an alert, a confirm or a prompt settled
-// nothing: `await confirm(...)` never returned. (They had a × then; Cancel and OK answer now.)
-test('a dialog left by Escape or replaced by another still answers its caller', async () => {
+// Left by Escape, by a click beside it, or replaced by another dialog, an alert, a confirm or a
+// prompt settled nothing: `await confirm(...)` never returned. (They had a × then.)
+test('a dialog left by Escape, a click beside it, or another dialog still answers its caller', async () => {
     for (const [ask, leave, expected] of [['confirm', 'Escape', false], ['prompt', 'Escape', null],
-                                          ['alert', 'Escape', 'answered'], ['confirm', 'replaced', false]]) {
+                                          ['alert', 'Escape', 'answered'], ['confirm', 'beside', false],
+                                          ['confirm', 'replaced', false], ['alert', 'beside', 'answered']]) {
         await page.evaluate((ask) => {
             window.answer = 'pending';
             window[ask]('A question?').then((value) => { window.answer = (value === undefined ? 'answered' : value); });
         }, ask);
         await page.waitForTimeout(100);
-        if (leave === 'replaced') await page.evaluate(() => { window.alert('Something else.'); });
+        // Not twice on one spot: a second click there so soon is the rest of a double-click.
+        if (leave === 'beside') await page.mouse.click(8, ask === 'alert' ? 300 : 500);
+        else if (leave === 'replaced') await page.evaluate(() => { window.alert('Something else.'); });
         else {
             await page.focus('#customModal .modal-ok');   // on a button, where the prompt's own Escape is not
             await page.keyboard.press('Escape');

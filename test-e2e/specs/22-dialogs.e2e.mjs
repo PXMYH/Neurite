@@ -75,29 +75,38 @@ test("a note's × asks in the middle of a dimmed page, by its Title, and is answ
     assert.deepEqual(errors, []);
 });
 
-// The page behind a question answers nothing while it waits, as on macOS and iPadOS. A click
-// there that closed the question let the second click of a double-click make a note on the
-// Graph; a right-click opened the context menu over the dialog; a press took the keyboard to
-// `body`, and with the focus even on Cancel, `1` made a note behind the question.
-test('the dimmed page answers no question and reaches nothing behind it, and the keys stay the dialog\'s', async () => {
+// A click beside a question is Cancel for a confirm and OK for an alert. Nothing else reaches the
+// page behind: a right-click there opened the context menu over the dialog, a press took the
+// keyboard to `body`, and with the focus even on Cancel, `1` made a note behind the question.
+test('a click beside a confirm or an alert answers it, and nothing else reaches the page behind', async () => {
     const at = await page.evaluate(() => [8, innerHeight / 2]);
-    await page.evaluate(() => { window.answer = 'pending'; window.confirm('A question?').then((v) => { window.answer = v; }); });
-    await page.waitForTimeout(250);
-    assert.equal((await dialog(page)).behind, true, 'the page behind the confirm is not covered');
-    if (isIPad) await page.touchscreen.tap(at[0], at[1]);
-    else {
-        await page.mouse.dblclick(at[0], at[1]);
-        await page.mouse.click(at[0], at[1], { button: 'right' });
-    }
-    await page.keyboard.press('1');
-    await page.waitForTimeout(300);
-    assert.deepEqual(await page.evaluate(() => ({
+    const ask = (kind) => page.evaluate((kind) => {
+        window.answer = 'pending';
+        window[kind]('A question?').then((v) => { window.answer = (v === undefined ? 'answered' : v); });
+    }, kind);
+    const now = () => page.evaluate(() => ({
         open: Modal.current?.id ?? null, answer: window.answer, nodes: Object.keys(Graph.nodes).length,
         menu: getComputedStyle(document.getElementById('customContextMenu')).display,
         focused: document.activeElement?.textContent?.trim(),
-    })), { open: 'confirmModal', answer: 'pending', nodes: 0, menu: 'none', focused: 'Cancel' });
-    await page.keyboard.press('Escape');
-    assert.equal(await page.evaluate(() => window.answer), false);
+    }));
+
+    await ask('confirm');
+    await page.waitForTimeout(250);
+    assert.equal((await dialog(page)).behind, true, 'the page behind the confirm is not covered');
+    if (!isIPad) await page.mouse.click(at[0], at[1], { button: 'right' });
+    await page.keyboard.press('1');
+    await page.waitForTimeout(300);
+    assert.deepEqual(await now(), { open: 'confirmModal', answer: 'pending', nodes: 0, menu: 'none', focused: 'Cancel' },
+        'a right-click or a key reached the page behind the question');
+    await pressBehind(page);
+    await page.waitForTimeout(600);   // past a double-click's interval: the next click is one of its own
+    assert.deepEqual([(await now()).open, (await now()).answer], [null, false], 'a click beside the confirm is no Cancel');
+
+    await ask('alert');
+    await page.waitForTimeout(250);
+    await pressBehind(page);
+    await page.waitForTimeout(600);
+    assert.deepEqual([(await now()).open, (await now()).answer], [null, 'answered'], 'a click beside the alert does not answer it');
 
     // A prompt keeps what is typed into it, and the caret, through a press beside it.
     await page.evaluate(() => { window.answer = 'pending'; window.prompt('Save this graph as:', 'Draft', 'Save Graph').then((v) => { window.answer = v; }); });
@@ -121,6 +130,44 @@ test('the dimmed page answers no question and reaches nothing behind it, and the
     assert.deepEqual(await page.evaluate(() => [Modal.div.contains(document.activeElement), Graph.zoom.mag(), Object.keys(Graph.nodes).length]),
         [true, zoom, 0], 'the keys reached the Graph behind the dialog');
     assert.deepEqual(errors, []);
+});
+
+// The first click of a double-click beside the question closes it, so the second came down on
+// the Graph behind it, where a double-click makes a note and a click on bare Graph clears the
+// selection. The rest of a double-click is the dialog's; a click elsewhere straight after lands.
+test('a double-click beside the delete question closes it, and leaves the Graph and the selection alone', async () => {
+    const a = await addNote(page, 'Alpha', 'a');
+    const b = await addNote(page, 'Beta', 'b');
+    await page.evaluate((id) => App.selectedNodes.toggleNode(Graph.nodes[id]), a);
+    const ask = () => page.evaluate((id) => {
+        window.answer = 'pending';
+        confirmNodeDelete([Graph.nodes[id]]).then((v) => { window.answer = v; });
+    }, b);
+    const at = await page.evaluate(() => [8, Math.round(innerHeight / 2)]);
+    await ask();
+    await page.waitForTimeout(250);
+    if (isIPad) {
+        await page.touchscreen.tap(at[0], at[1]);
+        await page.touchscreen.tap(at[0] + 1, at[1] + 1);
+    } else await page.mouse.dblclick(at[0], at[1]);
+    await page.waitForTimeout(600);
+    assert.deepEqual(await page.evaluate(() => [Modal.current?.id ?? null, window.answer, Object.keys(Graph.nodes).length, App.selectedNodes.uuids.size]),
+        [null, false, 2, 1], 'the rest of the double-click reached the Graph behind the question');
+
+    if (isIPad) return;
+    await page.evaluate(() => Hud.zoomBy(1.6));
+    await page.waitForTimeout(300);
+    await ask();
+    await page.waitForTimeout(250);
+    await page.mouse.click(at[0], at[1]);
+    const home = await page.evaluate(() => {
+        const r = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Home' && x.offsetParent).getBoundingClientRect();
+        return [r.left + r.width / 2, r.top + r.height / 2];
+    });
+    const zoom = await page.evaluate(() => Graph.zoom.mag());
+    await page.mouse.click(home[0], home[1]);
+    await page.waitForTimeout(800);
+    assert.notEqual(await page.evaluate(() => Graph.zoom.mag()), zoom, 'a click on Home straight after was taken for the rest of a double-click');
 });
 
 // A drag that selects the message and is let go past the dialog's edge sends its click to the

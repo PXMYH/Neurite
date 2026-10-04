@@ -281,19 +281,49 @@ On.click(Modal.overlayCloseBtn, Modal.closeOverlay);
 ].forEach(Event.stopPropagationByNameForThis, Modal.content);
 
 // The dimmed page behind a dialog that asks is the frame itself, and only takes events while
-// one asks (foundation.css). What lands there answers nothing -- as on macOS and iPadOS, the
-// question waits for Cancel, OK or Escape: a click there that closed it let the second click
-// of a double-click make a note on the Graph -- and goes no further. A click went on to close
-// the menu the question came from, a right-click opened the context menu over the dialog, and
-// a press took the keyboard out of it, to `body`, where the Graph's own keys answered.
+// one asks (foundation.css). What lands there goes no further: a click went on to close the
+// menu the question came from, a right-click opened the context menu over the dialog, and a
+// press took the keyboard out of it, to `body`, where the Graph's own keys answered.
+//
+// A click there is Cancel for a confirm, and OK for an alert: neither holds anything a stray
+// click could lose. A prompt holds what was typed into it, and stays. Only for a press that came
+// down there as well: a drag that selects the message and is let go past the dialog's edge sends
+// its click to the common ancestor of its two ends, which is the frame.
+Modal.pressedBehind = false;
+On.pointerdown(Modal.div, (e)=>{ Modal.pressedBehind = (e.target === Modal.div) });
 Modal.onBehind = function (e) {
     if (e.target !== Modal.div) return;
 
     e.stopPropagation();
     if (e.type === 'mousedown' || e.type === 'contextmenu') e.preventDefault();
+    if (e.type !== 'click' || !Modal.pressedBehind || Modal.current?.role !== 'alertdialog') return;
+
+    Modal.close();
+    Modal.closedBehind = {x: e.clientX, y: e.clientY, until: performance.now() + 500};
 }
 for (const name of ['mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'touchstart', 'touchend', 'wheel']) {
     On[name](Modal.div, Modal.onBehind);
+}
+
+// And the rest of a double-click there. Its first click closes the dialog, so the second came
+// down on the Graph behind it, and a double-click on the Graph makes a note. Taken out as it
+// comes, as `Node.swallowTheTap` takes the tap after a drag: only near the first click, and only
+// as soon after it as a double-click follows, so a click meant for something else still lands.
+Modal.closedBehind = null;
+Modal.onRestOfDoubleClick = function (e) {
+    const at = Modal.closedBehind;
+    if (!at) return;
+
+    if (performance.now() > at.until || Math.hypot(e.clientX - at.x, e.clientY - at.y) > 8) {
+        Modal.closedBehind = null;
+        return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.type === 'dblclick') Modal.closedBehind = null;
+}
+for (const name of ['mousedown', 'mouseup', 'click', 'dblclick']) {
+    On[name](window, Modal.onRestOfDoubleClick, true);
 }
 
 // And the keys pressed in one are its own: with the focus on Cancel, `1` made a note behind the
