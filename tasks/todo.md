@@ -239,6 +239,6 @@ Decisions:
   and the overview's marks. The selection ring keeps the accent.
 
 - [x] Phase 1 -- the universe layer, its switch, reduced motion, the frame budget.
-- [ ] Phase 2 -- slim, colourful Edges.
+- [x] Phase 2 -- slim, colourful Edges.
 - [ ] Phase 3 -- vivid Nodes, and the overview following them.
 - [ ] Review, full e2e in Chromium and the iPad specs, a release.

@@ -487,7 +487,7 @@ class Svg {
     static create = document.createElementNS.bind(document, 'http://www.w3.org/2000/svg');
     static new = {};
 }
-['circle', 'path', 'svg', 'use']
+['circle', 'defs', 'linearGradient', 'path', 'stop', 'svg', 'use']
 .forEach( (name)=>{ Svg.new[name] = Svg.create.bind(Elem, name) } );
 
 //ai.js

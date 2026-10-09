@@ -857,7 +857,23 @@ body.connect-mode .window textarea {
    border behind it stays the cooler blue, so direction reads at rest and brightens
    on hover instead of changing to the colour it already was. */
 .edge-arrow {
-    fill: var(--ui-accent);
+    fill: var(--edge-tip, var(--ui-accent));
+}
+
+/* The halo round the arrowhead (`makeBorderPath`), in the arrow's own colour and faint. It is
+   painted over the arrow, so at styles.css's 80% blue it was the arrowhead a reader saw. */
+.edge-border {
+    fill: var(--edge-tip, rgb(127 186 223));
+    opacity: 0.3;
+}
+
+/* The ribbon, in its gradient (`EdgeView.paint`) and a third of its old width, outlined by a
+   hairline that keeps a thin Edge in sight when the Graph is zoomed far out. `non-scaling` so
+   the line is the same at any zoom; the width attribute an Edge was saved with is in the
+   Plane's units, and this rule outranks it. */
+.edge-link {
+    stroke-width: 0.75px;
+    vector-effect: non-scaling-stroke;
 }
 
 .edge-arrow-hover {

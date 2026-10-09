@@ -396,6 +396,7 @@ class Graph {
         edgeView.svgBorder.remove();
         edgeView.svgLink.remove();
         edgeView.svgHalo.remove();
+        edgeView.gradient.remove();
         delete this.edgeViews[edgeView.id];
     }
     deleteNode(target){

@@ -649,6 +649,19 @@ class Node {
     remove(){ Graph.deleteNode(this) }
 
     static byUuid(uuid){ return Graph.nodes[uuid] }
+    // A vivid colour for each Node, the same every time it is drawn -- its card's edge and glow,
+    // the ends of its Edges and its mark on the overview read it -- so a Graph over the universe
+    // reads as stars of seven colours rather than one brown. Picked from the uuid, a counter, by
+    // the golden ratio, so Nodes made one after another come out far apart; a uuid that is not a
+    // number is hashed. Nothing of it is saved: it is worked out again wherever it is needed.
+    static PALETTE = ['#2fe6c0', '#a8f04a', '#ffc94f', '#ff7a6e', '#ff5ec8', '#a98bff', '#48c2ff'];
+    static colourOf(node){
+        let n = Number(node?.uuid);
+        if (!Number.isFinite(n)) {
+            n = [...String(node?.uuid ?? '')].reduce( (h, ch)=>((Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0), 7 );
+        }
+        return Node.PALETTE[Math.floor(((n * 0.6180339887498949) % 1) * Node.PALETTE.length)];
+    }
     static filterEdgesToThis(node){
         node.edges = node.edges.filter( (edge)=>!edge.pts.includes(this) )
     }

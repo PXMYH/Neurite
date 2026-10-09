@@ -186,10 +186,16 @@ class EdgeView {
     funcPopulate = 'populateForEdge';
     maxWidth = 0.05;
     mouseIsOver = false;
+    // How much of the width the ribbon used to be drawn at. It was too thick: about 5 CSS px
+    // at x0.4, where the Graph is a map of notes and the Edges should be the threads between
+    // them, as the hairlines between the stars are in the universe under it. The arrowhead keeps
+    // its own size (`makeSvgArrow` is given the full width): a third of it was a speck.
+    static slim = 0.32;
     constructor(model, id, style){
         this.model = model;
         this.id = id;
         this.style = style;
+        this.gradient = this.makeGradient();
         this.svgArrow = this.makePath('edge-arrow');
         this.svgBorder = this.makePath('edge-border');
         this.svgLink = this.makeLink();
@@ -204,9 +210,10 @@ class EdgeView {
     }
     draw(){
         const mouseIsOver = this.mouseIsOver;
-        // The hover colour is the stylesheet's (`.edge-link-hover`), with the arrow's.
-        this.svgLink.setAttribute('stroke', this.style.stroke);
-        this.svgLink.setAttribute('fill', this.style.fill);
+        // In the colours of the two Nodes it joins, whatever colour it was saved with: the style
+        // an Edge carries in a Saved Graph is the one blue every Edge had. The hover colour is the
+        // stylesheet's (`.edge-link-hover`), with the arrow's.
+        this.paint();
 
         const stressValue = Math.max(this.model.stress(), 0.01);
         let wscale = this.style['stroke-width'] / (0.5 + stressValue) * (mouseIsOver ? 2 : 1.6);
@@ -216,7 +223,7 @@ class EdgeView {
         const hasDirection = (direction.start && direction.end);
 
         const funcMakePath = (hasDirection ? 'makeStraightPath' : 'makeCurvedPath');
-        const path = this[funcMakePath](this.model.pts, wscale);
+        const path = this[funcMakePath](this.model.pts, wscale * EdgeView.slim);
         if (!path) return;
         this.svgLink.setAttribute('d', path);
         this.svgHalo.setAttribute('d', this.centreLine);
@@ -241,6 +248,52 @@ class EdgeView {
         this.svgBorder.setAttribute('d', borderPath);
         this.svgBorder.style.display = '';
     }
+    // One gradient per Edge, from the colour of the Node at one end to the other's
+    // (`Node.colourOf`), laid along the line between them in the Plane's own units, so it
+    // moves with the Nodes. The colours are written only when they change.
+    static paints = null;
+    makeGradient(){
+        EdgeView.paints ||= svg.insertBefore(Svg.new.defs(), svg.firstChild);
+        const gradient = Svg.new.linearGradient();
+        gradient.id = 'edge-paint-' + this.id;
+        gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+        for (const offset of ['0', '1']) {
+            const stop = Svg.new.stop();
+            stop.setAttribute('offset', offset);
+            gradient.append(stop);
+        }
+        EdgeView.paints.append(gradient);
+        return gradient;
+    }
+    paint(){
+        const [a, b] = this.model.pts;
+        if (!a || !b) return;
+
+        const from = a.pos.toSvg(), to = b.pos.toSvg();
+        const g = this.gradient;
+        g.setAttribute('x1', from.x);
+        g.setAttribute('y1', from.y);
+        g.setAttribute('x2', to.x);
+        g.setAttribute('y2', to.y);
+        const colours = Node.colourOf(a) + ' ' + Node.colourOf(b);
+        if (colours !== this.colours) {
+            this.colours = colours;
+            const [ca, cb] = colours.split(' ');
+            g.firstChild.setAttribute('stop-color', ca);
+            g.lastChild.setAttribute('stop-color', cb);
+            const url = 'url(#' + g.id + ')';
+            this.svgLink.setAttribute('fill', url);
+            this.svgLink.setAttribute('stroke', url);
+        }
+        // The arrowhead in the colour of the Node it points at.
+        const end = this.model.directionality.end;
+        const tip = end ? Node.colourOf(end) : '';
+        if (tip !== this.tip) {
+            this.tip = tip;
+            this.svgArrow.style.setProperty('--edge-tip', tip);
+            this.svgBorder.style.setProperty('--edge-tip', tip);
+        }
+    }
     toggleMouseOver(status){
         this.mouseIsOver = status;
         this.svgLink.classList.toggle('edge-link-hover', status);
@@ -253,6 +306,7 @@ class EdgeView {
         for (const [key, value] of Object.entries(this.style)) {
             path.setAttribute(key, value)
         }
+        path.classList.add('edge-link');
         path.dataset.viewType = 'edgeViews';
         path.dataset.viewId = this.id;
         this.attachEventListeners(path);
