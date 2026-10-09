@@ -205,3 +205,40 @@ promise the dialog can make, so the dialog makes no claim about undo either way.
   opened with `[` -- no semicolon in this codebase's style -- read as an index into the
   function, threw at load, and took the rest of custommodal.js with it. The behaviour
   script's page-error check caught it; a `for` loop cannot be glued on that way.
+
+# The universe behind the Graph (2026-10-09)
+
+Asked: "I want the effect in 我把claude画成了一片星空 … as the universe as background, also the link
+between knowledge node make it slimmer, now it's too thick. The color of nodes links etc should be
+more vivid and colorful." The reference is the RedNote video of Terse: a galaxy seen almost edge on,
+its disc of glowing green, teal, gold and pink stars around a warm core, on black, with hairline
+filaments between the stars. Tier T3, brownfield.
+
+Measured first, in Chromium and WebKit as an iPad, with nine notes and eleven Edges: the page is
+black (`document.body.style.backgroundColor` from the BG picker), the Fractal's lines are faint
+orange hairs, every Edge is a #8fb4e8 ribbon about 5 CSS px wide at ×0.4, and every card is the same
+brown with the same #d49454 outline. 60 fps in both.
+
+Decisions:
+- The Fractal stays. It is the coordinate system (CONTEXT.md), so the universe is a layer under
+  it, not a replacement: one WebGL canvas `#universe` before `#neurite-workspace`, sized in vw/vh
+  (the body carries a transform and is 0px tall), `pointer-events: none`, so input still lands on
+  `#svg_bg` and nothing in a Saved Graph changes.
+- Drawn from `NodeSimulation.nodeStep` right after `Svg.updateViewbox`, so it moves in the same
+  frame as the view and keeps the `framesDelay` throttle. Its pan is the screen distance the plane
+  moved, accumulated (deep zoom never reaches it as a huge number); far stars move at a fraction of
+  it and wrap, the galaxy barely moves; the sky turns with the view.
+- Motion is slow (the disc turns, inner faster; stars twinkle) and stops under
+  `prefers-reduced-motion`, with no parallax. Still, it redraws at half rate. A frame budget steps
+  the canvas resolution down on a slow GPU; without WebGL the page stays black, as now.
+- A switch in the Fractal panel turns it off, for a slow machine or a reader who wants black.
+- Edges: much thinner ribbons with the arrowhead kept at its size, coloured from the two Nodes'
+  colours; set in `EdgeView.draw`/CSS so saved Edges follow (their style is saved per Edge).
+- Nodes: a vivid colour per Node from a stable hash of its uuid, as a custom property written in
+  `rewindowify` (create and restore both run it), read by the card's outline and glow, the header,
+  and the overview's marks. The selection ring keeps the accent.
+
+- [x] Phase 1 -- the universe layer, its switch, reduced motion, the frame budget.
+- [ ] Phase 2 -- slim, colourful Edges.
+- [ ] Phase 3 -- vivid Nodes, and the overview following them.
+- [ ] Review, full e2e in Chromium and the iPad specs, a release.

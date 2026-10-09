@@ -112,7 +112,7 @@ class On {
     'paste', 'pointercancel', 'pointerdown', 'pointermove', 'pointerout', 'pointerover',
     'pointerup', 'resize', 'scroll',
     'touchcancel', 'touchend', 'touchmove', 'touchstart', 'transitionend',
-    'visibilitychange', 'wheel'
+    'visibilitychange', 'webglcontextlost', 'webglcontextrestored', 'wheel'
 ].forEach( (eName)=>{
     On[eName] = On.thisEvent.bind(eName);
     Off[eName] = Off.thisEvent.bind(eName);
@@ -234,6 +234,8 @@ class PageLoad {
         'js/interface/dropdown/signin.js',
         'js/mandelbrot/mandelbrot.js',
         'js/mandelbrot/updatefractal.js',
+        // The sky under the Fractal. Drawn by `nodeStep`; reads `Graph` and `settings` only then.
+        'js/mandelbrot/universe.js',
         'js/interface/interface.js',
         // After interface.js, which defines Autopilot -- the Hud stops it before
         // moving the camera, so a click on the overview is not fought by a chase

@@ -1096,6 +1096,29 @@ body.connect-mode .window textarea {
    pointers part way through. A card's text that has more than fits is scrolled by the same
    handler (interface.js). Left to the browser, a finger on a card hanging past the window's edge
    slid the whole page, the tool bar and the menu button with it (rv15). */
+/* The universe under the Fractal (universe.ts). In vw and vh, as every fixed layer here is: the
+   body carries a transform and is 0px tall, so a fixed box placed with `inset: 0` would be too. It
+   comes before `#neurite-workspace`, so it paints under `#svg_bg`, and takes no input: a press
+   still lands on the Fractal, which is where every handler waits for it. */
+#universe {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    pointer-events: none;
+}
+
+#universe[hidden] {
+    display: none;
+}
+
+/* One switch, so the row needs none of the AI panel's three-to-a-line widths. */
+.universe-switch div {
+    width: auto;
+}
+
 #svg_bg, .window, .window * {
     touch-action: none;
 }

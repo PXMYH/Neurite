@@ -200,6 +200,7 @@ class NodeSimulation {
 
         Autopilot.update(time);
         Svg.updateViewbox();
+        Universe.draw(time);
         this.updateMousePath();
         this.updateMousePathWidth();
         const dt = this.updateFPS(time);

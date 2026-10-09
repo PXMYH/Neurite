@@ -6,7 +6,7 @@
 //   whose result type is already known exactly.
 //
 // That is exactly the set of facts a reader can see and the checker cannot. `On.click`
-// exists because `js/main.js` binds one static per name over a 48-entry array; `Html.new.div`
+// exists because `js/main.js` binds one static per name over a 50-entry array; `Html.new.div`
 // exists because `js/globals.js` binds `document.createElement` over a 21-entry array. No
 // annotation inside those files can express that, because the names are strings at runtime.
 //
@@ -58,11 +58,12 @@ declare namespace On {
     var resize: EvBinder; var scroll: EvBinder; var touchcancel: EvBinder;
     var touchend: EvBinder; var transitionend: EvBinder;
     var visibilitychange: EvBinder;
+    var webglcontextlost: EvBinder; var webglcontextrestored: EvBinder;
     var touchmove: EvBinder; var touchstart: EvBinder;
     var wheel: EvBinder;
 }
 // `Off` binds every name through `removeEventListener`, which has no passive variant, so
-// all 48 take the same shape.
+// all 50 take the same shape.
 declare namespace Off {
     var animationend: EvBinder; var blur: EvBinder; var change: EvBinder;
     var click: EvBinder; var contextmenu: EvBinder; var dblclick: EvBinder;
@@ -80,6 +81,7 @@ declare namespace Off {
     var resize: EvBinder; var scroll: EvBinder; var touchcancel: EvBinder;
     var touchend: EvBinder; var touchmove: EvBinder; var touchstart: EvBinder;
     var transitionend: EvBinder; var visibilitychange: EvBinder; var wheel: EvBinder;
+    var webglcontextlost: EvBinder; var webglcontextrestored: EvBinder;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +103,15 @@ interface LoggerShape {
     addLevel(prefix: string, funcName: 'error' | 'warn' | 'info' | 'log', id?: string): LoggerShape;
 }
 declare var Logger: LoggerShape;
+
+// ---------------------------------------------------------------------------
+// `js/globals.js:166`: `Settings` defines one accessor per key of `Settings.default`, in a
+// `for...in` with `Object.defineProperty`, so the checker sees none of them. Each declared
+// here has the type of its default in that literal. Only the ones a `.ts` file reads.
+// ---------------------------------------------------------------------------
+interface Settings {
+    framesDelay: number;
+}
 
 // ---------------------------------------------------------------------------
 // `js/globals.js:387`: `Html.new.<tag>` is `document.createElement.bind(Elem, tag)` over a
