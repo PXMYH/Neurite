@@ -234,8 +234,11 @@ textarea.title-input {
    card keeps the accent ring and a card with a link armed from it the dashed accent edge, so
    neither state is read as a colour. */
 :root {
-    --ui-surface: rgb(16 18 34 / 86%);
-    --ui-surface-anchored: rgb(14 16 30 / 90%);
+    /* Loose and pinned apart by 1.4:1, as the brown pair were by 1.5:1: two near-black glasses
+       measured 1.01:1, and a pinned card had only its 2px edge to say so, which zoomed out is
+       less than a pixel. The text is on `--ui-note-surface` in both, so neither changes it. */
+    --ui-surface: rgb(58 66 104 / 70%);
+    --ui-surface-anchored: rgb(12 14 28 / 92%);
     --ui-note-surface: #161a2e;
 }
 
@@ -898,14 +901,6 @@ body.connect-mode .window textarea {
     opacity: 0.3;
 }
 
-/* The ribbon, in its gradient (`EdgeView.paint`) and a third of its old width, outlined by a
-   hairline that keeps a thin Edge in sight when the Graph is zoomed far out. `non-scaling` so
-   the line is the same at any zoom; the width attribute an Edge was saved with is in the
-   Plane's units, and this rule outranks it. */
-.edge-link {
-    stroke-width: 0.75px;
-    vector-effect: non-scaling-stroke;
-}
 
 .edge-arrow-hover {
     fill: #b9cdf0;

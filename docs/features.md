@@ -14,13 +14,17 @@ Every capability, by category.
   </thead>
   <tbody>
     <tr>
-      <td rowspan="2"><strong>Fractal Navigation</strong></td>
+      <td rowspan="3"><strong>Fractal Navigation</strong></td>
       <td>Real-time Fractal Zoom</td>
       <td>Navigate and explore iterative equations in real time. Evolve and organize an <code>infinite digital garden</code> with the help of <code>fractal mathematics</code>.</td>
     </tr>
     <tr>
       <td>Fractal Customization</td>
       <td>Display the <code>Mandelbrot set</code>, the <code>Burning Ship</code> fractal, the <code>Julia set</code>, and more. Customize the <code>color</code>, <code>quality</code>, and <code>speed</code> of generation—among other <code>unique fractal controls</code>, such as <code>generating the fractal according to your current mouse position.</code></td>
+    </tr>
+    <tr>
+      <td>The Universe</td>
+      <td>A sky of stars, a galaxy seen almost edge on and a nebula, under the Fractal, moving with every <code>pan</code>, <code>zoom</code> and <code>turn</code> and still under reduced motion. Each note is drawn in a <code>colour of its own</code>, and every link as a thread in the colours of the two notes it joins. Switch the universe off with <code>Universe</code> in the Fractal panel's Color section; choosing a BG colour there does too.</td>
     </tr>
     <tr>
       <td rowspan="1"><strong>Multi-Agent UI</strong></td>

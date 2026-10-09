@@ -15,7 +15,7 @@ afterEach(async () => { await context?.close(); });
 const pixels = (page) => page.evaluate(() => {
     Universe.moved = true;
     Universe.draw(performance.now());
-    const gl = Universe.gl, c = Universe.canvas;
+    const gl = Universe.built.gl, c = Universe.canvas;
     const px = new Uint8Array(c.width * c.height * 4);
     gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
     let lit = 0, hash = 0;
@@ -34,7 +34,7 @@ test('the universe is drawn under the Fractal, and a press still lands on the Fr
     assert.deepEqual(await page.evaluate(() => {
         const canvas = document.getElementById('universe');
         return {
-            shown: !canvas.hidden && document.body.classList.contains('universe'),
+            shown: !canvas.hidden,
             // `document.` rather than `Node.`: the app's own `class Node` is the global of that name.
             under: canvas.compareDocumentPosition(document.getElementById('svg_bg')) === document.DOCUMENT_POSITION_FOLLOWING,
             pressed: document.elementFromPoint(20, innerHeight / 2)?.id,
@@ -81,7 +81,7 @@ test('the Fractal panel switches it off, and the page keeps the choice', async (
 
 test('a lost WebGL context shows the page colour, and a restored one the sky again', async () => {
     const lost = await page.evaluate(async () => {
-        const ext = Universe.gl.getExtension('WEBGL_lose_context');
+        const ext = Universe.built.gl.getExtension('WEBGL_lose_context');
         ext.loseContext();
         await new Promise((r) => setTimeout(r, 200));
         const hidden = document.getElementById('universe').hidden;
@@ -92,4 +92,50 @@ test('a lost WebGL context shows the page colour, and a restored one the sky aga
     assert.deepEqual(lost, [true, false]);
     assert.ok((await pixels(page)).lit > 300, 'nothing is drawn after the context came back');
     assert.deepEqual(errors, []);
+});
+
+// A build that fails half way -- iOS caps canvas memory, and a refused 2D canvas made the nebula
+// throw -- left half a universe whose first draw threw inside `nodeStep`, the app's one frame
+// loop: Edges stopped being drawn and the fps read "??".
+test('a universe that fails to build is put away, and the Graph goes on drawing', async () => {
+    await context.close();
+    ({ context, page, errors } = await openNeurite(browser, { setup: (ctx) => ctx.addInitScript(() => {
+        const real = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
+            return (kind === '2d' && this.width === 1024 && this.height === 1024) ? null : real.call(this, kind, ...rest);
+        };
+    }) }));
+    const s = await page.evaluate(async () => {
+        window.currentActiveZettelkastenMirror.setValue('## One\na [[Two]]\n\n## Two\nb\n');
+        await new Promise((r) => setTimeout(r, 1500));
+        const edge = [...new Set(Object.values(Graph.nodes).flatMap((n) => n.edges))][0];
+        return { built: Boolean(Universe.built), hidden: document.getElementById('universe').hidden,
+                 edgeDrawn: Boolean(edge?.view.svgLink.getAttribute('d')) };
+    });
+    assert.deepEqual(s, { built: false, hidden: true, edgeDrawn: true });
+    assert.deepEqual(errors, []);
+});
+
+// A reader who had chosen a colour for the page with the BG picker kept a dark sky over it.
+test('a page colour already chosen keeps it off, and picking one turns it off', async () => {
+    await context.close();
+    ({ context, page, errors } = await openNeurite(browser, { setup: (ctx) => ctx.addInitScript(() => {
+        if (sessionStorage.getItem('seeded')) return;
+        sessionStorage.setItem('seeded', '1');
+        localStorage.setItem('inputValues', JSON.stringify({ colorPicker: '#203040' }));
+    }) }));
+    assert.deepEqual(await page.evaluate(() => ({ on: Universe.enabled, built: Boolean(Universe.built),
+        bg: getComputedStyle(document.body).backgroundColor })), { on: false, built: false, bg: 'rgb(32, 48, 64)' },
+        'a chosen page colour is hidden under the sky, or the sky was built for nothing');
+
+    await page.evaluate(() => { localStorage.removeItem('universe'); localStorage.removeItem('inputValues'); });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
+    assert.equal(await page.evaluate(() => Universe.enabled), true);
+    // The panel's replay of the saved colour at boot is an `input` event, and no choice.
+    await page.evaluate(() => document.getElementById('colorPicker').dispatchEvent(new Event('input')));
+    assert.equal(await page.evaluate(() => Universe.enabled), true, 'a replayed colour turned it off');
+    await page.evaluate(() => { const p = document.getElementById('colorPicker'); p.value = '#334455'; p.dispatchEvent(new Event('change')); });
+    assert.deepEqual(await page.evaluate(() => [Universe.enabled, document.getElementById('universe').hidden, localStorage.getItem('universe')]),
+        [false, true, 'off']);
 });

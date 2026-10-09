@@ -51,12 +51,15 @@ test("an Edge is a thread in its two Nodes' colours, its arrowhead in the colour
             ends: pts.map((p) => Node.colourOf(p)),
             painted: v.svgLink.getAttribute('fill') === `url(#${v.gradient.id})`,
             tip: [getComputedStyle(v.svgArrow).fill, edge.directionality.start?.getTitle(), Node.colourOf(edge.directionality.start)],
-            width: 2 * widest * Math.min(wscale * EdgeView.slim, EdgeView.threadPx / (2 * widest * px)) * px,
+            width: 2 * widest * Math.max(EdgeView.hairPx / (2 * widest * px), Math.min(wscale * EdgeView.slim, EdgeView.threadPx / (2 * widest * px))) * px,
+            painted2: v.svgLink.getAttribute('stroke'),
         };
     });
     assert.deepEqual(e.stops, e.ends, "the Edge's gradient is not its two Nodes' colours");
     assert.equal(e.painted, true, 'the ribbon is not painted with its gradient');
     assert.equal(e.tip[1], 'Right', 'the arrow does not point at the Node the Ref names');
     assert.equal(e.tip[0], rgb(e.tip[2]), 'the arrowhead is not the colour of the Node it points at');
-    assert.ok(e.width <= 2.5 + 1e-9, `the ribbon is ${e.width} px wide`);
+    assert.ok(e.width >= 1 - 1e-9 && e.width <= 2.5 + 1e-9, `the ribbon is ${e.width} px wide`);
+    // Filled only: WebKit paints a non-scaling stroke's gradient in its last colour.
+    assert.equal(e.painted2, 'none');
 });

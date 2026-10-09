@@ -241,4 +241,18 @@ Decisions:
 - [x] Phase 1 -- the universe layer, its switch, reduced motion, the frame budget.
 - [x] Phase 2 -- slim, colourful Edges.
 - [x] Phase 3 -- vivid Nodes, and the overview following them.
-- [ ] Review, full e2e in Chromium and the iPad specs, a release.
+- [x] Review, full e2e in Chromium and the iPad specs, a release.
+
+## Review
+
+- An adversarial review found ten things, eight measured. Fixed: a universe build that failed half
+  way (iOS refuses canvas memory past a cap) threw on its first draw inside `nodeStep` and stopped
+  the app's one frame loop -- it is built whole or not at all now, and a draw that throws puts it
+  away; WebKit painted a `non-scaling-stroke` gradient in its last colour, so the hairline floor
+  of an Edge is geometry now; the resolution ceiling only ever went down, so a stall of the page's
+  own cost a step for good -- it retries after a wait that doubles; a chosen BG colour was hidden
+  under the sky -- a saved one keeps the universe off, and picking one turns it off; parallax died
+  below |zoom| 1e-153, where the zoom squared is 0; the collapsed disc copied the card's computed
+  glow into its inline style, which a Saved Graph kept; a pinned card and a loose one measured
+  1.01:1; switched off it was still built; the gradient ends were rewritten every frame; the dither
+  overflowed half precision. A zoom jump no longer flies through the stars.

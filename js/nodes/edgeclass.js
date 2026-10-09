@@ -193,8 +193,12 @@ class EdgeView {
     static slim = 0.32;
     // And never wider on screen than a thread, however far in the view is: the ribbon is drawn in
     // the Plane's units, so it grows with the zoom like a card does, and at x1 a third of its old
-    // width was still 5 px. The widest it may be, in CSS px, at its wider end.
+    // width was still 5 px. Nor narrower than a hairline, however far out: a ribbon thinner than a
+    // pixel fades out of sight. In CSS px, at its wider end. The floor is geometry, not a stroke:
+    // a `non-scaling-stroke` outline was the first way, and WebKit painted it in the gradient's
+    // last colour from end to end.
     static threadPx = 2.5;
+    static hairPx = 1;
     constructor(model, id, style){
         this.model = model;
         this.id = id;
@@ -230,7 +234,8 @@ class EdgeView {
         const pts = this.model.pts;
         const pxPerUnit = Math.min(innerWidth, innerHeight) / 2 / Graph.zoom.mag();
         const widest = Math.max(pts[0]?.scale || 1, pts[1]?.scale || 1);
-        const ribbon = Math.min(wscale * EdgeView.slim, EdgeView.threadPx / (2 * widest * pxPerUnit));
+        const toUnits = 1 / (2 * widest * pxPerUnit);
+        const ribbon = Math.max(EdgeView.hairPx * toUnits, Math.min(wscale * EdgeView.slim, EdgeView.threadPx * toUnits));
         const path = this[funcMakePath](pts, ribbon);
         if (!path) return;
         this.svgLink.setAttribute('d', path);
@@ -279,19 +284,22 @@ class EdgeView {
 
         const from = a.pos.toSvg(), to = b.pos.toSvg();
         const g = this.gradient;
-        g.setAttribute('x1', from.x);
-        g.setAttribute('y1', from.y);
-        g.setAttribute('x2', to.x);
-        g.setAttribute('y2', to.y);
+        const ends = from.x + ' ' + from.y + ' ' + to.x + ' ' + to.y;
+        if (ends !== this.ends) {
+            this.ends = ends;
+            g.setAttribute('x1', from.x);
+            g.setAttribute('y1', from.y);
+            g.setAttribute('x2', to.x);
+            g.setAttribute('y2', to.y);
+        }
         const colours = Node.colourOf(a) + ' ' + Node.colourOf(b);
         if (colours !== this.colours) {
             this.colours = colours;
             const [ca, cb] = colours.split(' ');
             g.firstChild.setAttribute('stop-color', ca);
             g.lastChild.setAttribute('stop-color', cb);
-            const url = 'url(#' + g.id + ')';
-            this.svgLink.setAttribute('fill', url);
-            this.svgLink.setAttribute('stroke', url);
+            this.svgLink.setAttribute('fill', 'url(#' + g.id + ')');
+            this.svgLink.setAttribute('stroke', 'none');
         }
         // The arrowhead in the colour of the Node it points at, which is `start`: the arrow is
         // turned about its middle (`rotatePoint`), so its tip lands at the start of its direction.

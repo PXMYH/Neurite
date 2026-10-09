@@ -106,7 +106,9 @@ NodeView.prototype.collapse = function () {
 NodeView.prototype.makeCircleCollapsed = function(){
     const circle = Html.make.div('collapsed-circle');
     circle.style.borderRadius = '50%';
-    circle.style.boxShadow = getComputedStyle(this.div).boxShadow;
+    // Its shadow is its own (foundation.css), in the Node's colour. Copied from the card's
+    // computed style it was the card's glow caught mid-transition, written inline -- so it
+    // outranked the disc's rule, and a Saved Graph kept it.
     return circle;
 }
 NodeView.prototype.onCircleDoubleClicked = function(e){
