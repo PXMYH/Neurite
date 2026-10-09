@@ -191,6 +191,10 @@ class EdgeView {
     // them, as the hairlines between the stars are in the universe under it. The arrowhead keeps
     // its own size (`makeSvgArrow` is given the full width): a third of it was a speck.
     static slim = 0.32;
+    // And never wider on screen than a thread, however far in the view is: the ribbon is drawn in
+    // the Plane's units, so it grows with the zoom like a card does, and at x1 a third of its old
+    // width was still 5 px. The widest it may be, in CSS px, at its wider end.
+    static threadPx = 2.5;
     constructor(model, id, style){
         this.model = model;
         this.id = id;
@@ -223,7 +227,11 @@ class EdgeView {
         const hasDirection = (direction.start && direction.end);
 
         const funcMakePath = (hasDirection ? 'makeStraightPath' : 'makeCurvedPath');
-        const path = this[funcMakePath](this.model.pts, wscale * EdgeView.slim);
+        const pts = this.model.pts;
+        const pxPerUnit = Math.min(innerWidth, innerHeight) / 2 / Graph.zoom.mag();
+        const widest = Math.max(pts[0]?.scale || 1, pts[1]?.scale || 1);
+        const ribbon = Math.min(wscale * EdgeView.slim, EdgeView.threadPx / (2 * widest * pxPerUnit));
+        const path = this[funcMakePath](pts, ribbon);
         if (!path) return;
         this.svgLink.setAttribute('d', path);
         this.svgHalo.setAttribute('d', this.centreLine);
@@ -285,9 +293,10 @@ class EdgeView {
             this.svgLink.setAttribute('fill', url);
             this.svgLink.setAttribute('stroke', url);
         }
-        // The arrowhead in the colour of the Node it points at.
-        const end = this.model.directionality.end;
-        const tip = end ? Node.colourOf(end) : '';
+        // The arrowhead in the colour of the Node it points at, which is `start`: the arrow is
+        // turned about its middle (`rotatePoint`), so its tip lands at the start of its direction.
+        const at = this.model.directionality.start;
+        const tip = at ? Node.colourOf(at) : '';
         if (tip !== this.tip) {
             this.tip = tip;
             this.svgArrow.style.setProperty('--edge-tip', tip);

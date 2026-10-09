@@ -97,7 +97,9 @@ class NodeSimulation {
             const m = Node.prev.pos.toSvg();
             const l = Graph.vecToZ().toSvg();
             svg_mousePath.setAttribute('d', "M " + m + " L " + l);
-            width *= 50;
+            // As slim as an Edge now is (`EdgeView.slim`): at 50 it was an 11 px band in a
+            // 900 px window, beside threads of 2.
+            width *= 16;
         } else {
             svg_mousePath.setAttribute('d', this.mousePath.join(''));
         }
