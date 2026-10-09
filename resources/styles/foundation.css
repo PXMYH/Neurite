@@ -224,6 +224,31 @@ textarea.title-input {
         display: none;
     }
 
+/* Nodes in their own colours over the universe (`Node.colourOf`, written as `--node-colour` on
+   each card by `NodeView.rewindowify`, which creating and restoring a card both run).
+
+   Every card was one brown -- a #d49454 edge round a 70% brown surface -- and over a galaxy that
+   read as mud. The surface is a dark ink glass now, so the text keeps its contrast whatever
+   shines behind it (a note's body 6.3:1 and a Ref 5.8:1 on it, where the brown gave 5.0 and
+   4.5), and the Node's colour is the edge, a glow round it and a tint on the header. A selected
+   card keeps the accent ring and a card with a link armed from it the dashed accent edge, so
+   neither state is read as a colour. */
+:root {
+    --ui-surface: rgb(16 18 34 / 86%);
+    --ui-surface-anchored: rgb(14 16 30 / 90%);
+    --ui-note-surface: #161a2e;
+}
+
+.window {
+    border-color: var(--node-colour, var(--ui-card-outline));
+    box-shadow: 0 0 24px -6px color-mix(in srgb, var(--node-colour, transparent) 55%, transparent), var(--ui-shadow);
+}
+
+.header-container {
+    background-color: color-mix(in srgb, var(--node-colour, transparent) 12%, rgb(255 255 255 / 3%));
+    border-bottom-color: color-mix(in srgb, var(--node-colour, white) 28%, transparent);
+}
+
 /* The card responds to the pointer.
 
    .window declared transitions for box-shadow, background-color and border-color
@@ -232,8 +257,8 @@ textarea.title-input {
    content, so this lifts the shadow and warms the outline rather than tinting
    the surface, which is what .selected does. */
 .window:hover:not(.collapsed) {
-    box-shadow: var(--ui-shadow-raised);
-    border-color: #e3aa70;
+    box-shadow: 0 0 30px -4px color-mix(in srgb, var(--node-colour, transparent) 60%, transparent), var(--ui-shadow-raised);
+    border-color: color-mix(in srgb, var(--node-colour, #d49454) 70%, white);
 }
 
 /* Selection still outranks hover: a hovered selected card keeps its ring and its
@@ -312,8 +337,14 @@ body.connect-mode .window textarea {
     position: relative;
     /* And an edge, at 3:1 against the canvas. The disc was rgb(50 51 62 / 50%) with a
        transparent border, measuring 1.21:1 -- an invisible target that is the only thing
-       representing a whole note. */
-    border: 1px solid #6f7488;
+       representing a whole note. Now in its Node's colour, with its glow. */
+    border: 1px solid var(--node-colour, #6f7488);
+    box-shadow: 0 0 16px -4px color-mix(in srgb, var(--node-colour, transparent) 60%, transparent);
+}
+
+/* A pinned disc had no edge at all: styles.css gave it a transparent one. */
+.collapsed-circle.collapsed-anchor {
+    border-color: var(--node-colour, transparent);
 }
 
 /* The card header buttons are NOT fixed here, and the reason belongs in the file

@@ -525,6 +525,10 @@ class NodeView {
     rewindowify() {
         const node = this.model;
         this.init();
+        // The Node's colour (`Node.colourOf`), for the card's edge, glow and header. Here because
+        // creating a card and restoring one both come through: an attribute written once when a
+        // card is built comes back from a Saved Graph as it was, whatever the palette is by then.
+        this.div.style.setProperty('--node-colour', Node.colourOf(node));
 
         node.push_extra("window");
         const buttons = this.buttons || this.headerContainer;

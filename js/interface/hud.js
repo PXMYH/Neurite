@@ -276,7 +276,8 @@ class Hud {
             const half = Graph.planeHalfExtent(node) || {hw: 0, hh: 0};
             const bw = half.hw * 2 * scale, bh = half.hh * 2 * scale;
             const selected = App.selectedNodes.hasNode(node);
-            ctx.fillStyle = selected ? '#7396d4' : 'rgba(212, 148, 84, 0.9)';
+            // Each in its Node's own colour, as its card is; a selected one white, which no Node is.
+            ctx.fillStyle = selected ? '#ffffff' : Node.colourOf(node);
             if (bw >= 3 && bh >= 3) {
                 ctx.fillRect(toMapX(node.pos.x - half.hw), toMapY(node.pos.y - half.hh), bw, bh);
             } else {
