@@ -9,6 +9,16 @@ class TextNode {
     // text colour is near-invisible by design.
     static PLACEHOLDER = 'Write here.';
 
+    static makeKindChip(){
+        const chip = Svg.new.svg();
+        chip.setAttribute('class', 'card-kind');
+        chip.setAttribute('aria-hidden', 'true');
+        const glyph = Svg.new.use();
+        glyph.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#note-icon-symbol');
+        chip.append(glyph);
+        return chip;
+    }
+
     static create(name = '', text = '', sx, sy, x, y){
         const textarea = Html.make.textarea('custom-scrollbar node-textarea');
         On.mousedown(textarea, Event.stopPropagation);
@@ -103,6 +113,15 @@ class TextNode {
             const line = Html.make.div('card-description');
             line.hidden = true;
             node.textNodeSyntaxWrapper.before(line);
+        }
+
+        // The card's kind before its title (#77, `.card-kind` in foundation.css). Made anew
+        // rather than found: a restored card brings the chip it was saved with, and the sprite
+        // is the one place its glyph is drawn.
+        const titleRow = content.querySelector('.title-input-wrapper');
+        if (titleRow) {
+            titleRow.querySelector(':scope > .card-kind')?.remove();
+            titleRow.prepend(TextNode.makeKindChip());
         }
 
         // Attach events for contentEditable and textarea

@@ -385,3 +385,42 @@ Decisions:
   marker stays. Accepted, and said in docs/desktop.md: a power cut between the two renames
   leaves no app at the path (the old one is beside it as `.replaced-<pid>`); and media a new
   version fails to load are blank in it, but kept, since it writes nothing it did not read.
+
+# Text cards: Pletor's anatomy, a HUD's finish (#77, 2026-10-10)
+
+Asked (#77): "text node need aesthetic upgrade", pointing at the GIF on
+docs.pletor.ai/build-your-system/nodes/brand-nodes; then, in chat, a sheet of futuristic HUD
+panels: "make sure the color scheme is consistent but style can adapt". Tier T2/T3, brownfield.
+
+Read from the GIF (24 s, 393 frames): each node is a quiet rounded card with its kind as a tinted
+square chip and its name beside it; the content sits in an inset well; no window chrome until a
+node is chosen; thin grey curves between nodes. Read from the HUD sheet: thin luminous outlines
+with a glow, corner brackets, square indicators, monospace uppercase labels, hatching and
+scanlines, one accent colour per panel.
+
+Measured on the cards as they are (1.6.0): a header bar tinted with the note's colour and three
+25px controls always drawn, the prose flush with the card's edges, links as pale pills.
+
+Decisions:
+- The title stays on the card, not above it as Pletor puts it: Edges run from Node to Node and
+  are drawn under the cards, so a label on the canvas would have them cross it, and every
+  measurement of a card (placement, overview, Edges) reads `.window`'s box.
+- The colour scheme is Neurite's: everything that is coloured takes the Node's own colour
+  (`--node-colour`), the outline stays that colour in full, and the accent stays the selection.
+- CSS only, scoped to text cards (`.window:has(.editor-wrapper)`), except two pieces of markup
+  made where both creating and restoring a card run: the kind chip (`TextNode.init`, the sprite's
+  note glyph, rebuilt each time so a Saved Graph never keeps an old one), and each link tag's
+  colour, the colour of the Node it names (`LinkStrip`).
+- The window controls are drawn on hover, focus and selection, and always where there is no
+  hover. The resize grip becomes the bottom-right bracket.
+
+- [x] The card: chip, title row, tags, well, brackets, controls, grip.
+- [x] Chromium and WebKit, at x1 and zoomed out, loose, pinned, selected, collapsed, link armed.
+- [x] Tests: a spec for the card's anatomy through a reload; the colours spec still green.
+
+Found on the way: the well's floor at 60px was shorter than a note of one line and the empty
+line after it, so a new card grew a frame after it was drawn and stood 3 px off its place (the
+touch spec's first-frame test), and an imported note's centre fell on its first line. The well
+keeps the 72px floor it had. And the import test put the caret at the end with
+ControlOrMeta+End, which on a Mac is Meta+End and moves nothing (measured: 0 of 43); it had
+passed only while the click landed on the last line.

@@ -88,6 +88,8 @@ class LinkStrip {
         On.click(cut, ()=>LinkStrip.#unlink(node, other));
 
         chip.append(label, cut);
+        // In the colour of the Node it names, as the Edge to that Node is at its end (#77).
+        chip.style.setProperty('--chip-colour', Node.colourOf(other));
         LinkStrip.#dontDragTheCard(chip);
         return chip;
     }

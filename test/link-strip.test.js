@@ -32,7 +32,7 @@ function makeElem(tag, className){
         tag,
         className: className ?? '',
         children: [],
-        style: {},
+        style: { setProperty(k, v){ el.style[k] = v } },
         attrs: {},
         title: '',
         parent: null,
@@ -131,6 +131,7 @@ function makeCard({title = 'This note', links = []} = {}){
         Animation: {zoomToNodeTitle: (n)=>{ zoomed.push(n) }},
         Modal: {Connect: class { constructor(n){ connectOpened.push(n) } }},
         findExistingEdge: (a, b)=>(a.edges.find((e)=>e.pts.includes(b)) ?? null),
+        Node: {colourOf: (n)=>'colour of ' + n.uuid},
         Logger: {debug(){}, info(){}, warn(...a){ warnings.push(a.join(' ')) }, err(){}}
     };
 
@@ -168,6 +169,16 @@ test('a card shows one chip per note it links to', ()=>{
     // Chips first, then the control that adds one: the row reads as content
     // followed by an affordance, not the other way round.
     assert.deepEqual(classesOf(strip), ['link-chip', 'link-chip', 'link-add']);
+});
+
+// A tag is in the colour of the Node it names, as the Edge to that Node is at its end (#77).
+test('each chip carries the colour of the note it names', ()=>{
+    const card = makeCard({links: ['Fractal geometry', 'Zettelkasten']});
+
+    const {strip} = paint(card);
+
+    const chips = strip.children.filter((c)=>(c.className === 'link-chip'));
+    assert.deepEqual(chips.map((c)=>c.style['--chip-colour']), ['colour of u-0', 'colour of u-1']);
 });
 
 test('the strip sits between the header and the note body', ()=>{

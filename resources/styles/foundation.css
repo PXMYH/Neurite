@@ -324,6 +324,212 @@ body.connect-mode .window textarea {
     border-width: calc(2 * var(--ring));
 }
 
+/* A note's card: Pletor's anatomy with a HUD's finish (#77).
+
+   From Pletor's nodes: the kind of card as a tinted square chip before its name, the prose in a
+   well inset from the card's edges, and no window controls until the card is wanted. From the
+   HUD sheet: a thin luminous outline and glow, targeting brackets at the corners, square chip
+   and tags, monospace tags, faint scanlines in the well. Every colour is the Node's own
+   (`--node-colour`), so the scheme is the one the Edges, the overview and the collapsed disc
+   already use; the accent stays the selection.
+
+   Text cards only: `.editor-wrapper` is made by `TextNode.create` and nothing else. The title
+   stays on the card rather than above it as Pletor has it: Edges are drawn under the cards from
+   Node to Node, so a label on the canvas would have them cross it, and every measurement of a
+   card (placement, the overview, the Edges' ends) reads this box.
+
+   The brackets are background layers, so they cost no markup and none of the pseudo-elements
+   the selection ring and the arrival halo already use. Three corners; the fourth bracket is the
+   resize grip. */
+.window:has(.editor-wrapper) {
+    --card-radius: 5px;
+    --hud-bright: color-mix(in srgb, var(--node-colour, var(--ui-accent)) 80%, white);
+    --bracket: linear-gradient(var(--hud-bright) 0 0);
+    border-radius: var(--card-radius);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--node-colour, transparent) 12%, transparent),
+                0 0 22px -6px color-mix(in srgb, var(--node-colour, transparent) 55%, transparent),
+                var(--ui-shadow);
+    background-image: var(--bracket), var(--bracket), var(--bracket), var(--bracket), var(--bracket), var(--bracket);
+    background-repeat: no-repeat;
+    background-size: 12px 2px, 2px 12px, 12px 2px, 2px 12px, 12px 2px, 2px 12px;
+    background-position: left 2px top 2px, left 2px top 2px, right 2px top 2px, right 2px top 2px,
+                         left 2px bottom 2px, left 2px bottom 2px;
+}
+
+    .window:has(.editor-wrapper):hover:not(.collapsed) {
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--node-colour, transparent) 24%, transparent),
+                    0 0 28px -4px color-mix(in srgb, var(--node-colour, transparent) 70%, transparent),
+                    var(--ui-shadow-raised);
+    }
+
+    /* The selection's tint is a background layer of its own (styles.css, `.window.selected`),
+       which the brackets' layers would otherwise replace. */
+    .window.selected:has(.editor-wrapper) {
+        background-image: var(--bracket), var(--bracket), var(--bracket), var(--bracket), var(--bracket), var(--bracket),
+                          linear-gradient(var(--ui-accent-dim), var(--ui-accent-dim));
+        background-size: 12px 2px, 2px 12px, 12px 2px, 2px 12px, 12px 2px, 2px 12px, 100% 100%;
+        background-position: left 2px top 2px, left 2px top 2px, right 2px top 2px, right 2px top 2px,
+                             left 2px bottom 2px, left 2px bottom 2px, 0 0;
+    }
+
+        .window.selected:has(.editor-wrapper)::before {
+            border-radius: calc(var(--card-radius) + var(--ring));
+        }
+
+    .window.collapsed:has(.editor-wrapper) {
+        background-image: none;
+    }
+
+    .window:has(.editor-wrapper) > .header-container {
+        padding: 10px 10px 4px 12px;
+        background: none;
+        border-bottom-color: transparent;
+        border-radius: var(--card-radius) var(--card-radius) 0 0;
+    }
+
+        /* The rule under the title is still what says the title has the caret. */
+        .window:has(.editor-wrapper) > .header-container:focus-within {
+            border-bottom-color: var(--ui-accent);
+        }
+
+    .window:has(.editor-wrapper) .title-input-wrapper {
+        align-items: flex-start;
+        gap: 9px;
+    }
+
+    /* One line of the title is the chip's height, so a one-line title sits on its centre. */
+    .window:has(.editor-wrapper) textarea.title-input {
+        line-height: 22px;
+        letter-spacing: 0.01em;
+    }
+
+    .window:has(.editor-wrapper) .button-container {
+        opacity: 0;
+        transition: opacity var(--ui-transition);
+    }
+
+        .window:has(.editor-wrapper):hover .button-container,
+        .window:has(.editor-wrapper):focus-within .button-container,
+        .window.selected:has(.editor-wrapper) .button-container {
+            opacity: 0.8;
+        }
+
+        /* Where nothing hovers, a control that waits for a hover is a control that is not
+           there. */
+        @media (hover: none) {
+            .window:has(.editor-wrapper) .button-container {
+                opacity: 0.8;
+            }
+        }
+
+    .window:has(.editor-wrapper) > .link-strip {
+        padding: 2px 10px 8px 12px;
+        column-gap: 5px;
+    }
+
+        /* Where the pointer is a finger the strip spaces its rows for 44px targets
+           (styles.css), and keeps doing so here. */
+        @media (pointer: coarse) {
+            .window:has(.editor-wrapper) > .link-strip {
+                padding-block: calc((44px - 18px) / 2);
+            }
+        }
+
+    /* A link's tag is in the colour of the Node it names (`--chip-colour`, linkstrip.js), as the
+       Edge to that Node is at its end. */
+    .window:has(.editor-wrapper) .link-chip {
+        --chip-hud: var(--chip-colour, var(--node-colour, var(--ui-accent)));
+        padding: 1px 5px 1px 6px;
+        border-radius: 3px;
+        background-color: color-mix(in srgb, var(--chip-hud) 10%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip-hud) 34%, transparent);
+    }
+
+    .window:has(.editor-wrapper) .link-chip-label,
+    .window:has(.editor-wrapper) .link-add {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .window:has(.editor-wrapper) .link-chip-label {
+        color: color-mix(in srgb, var(--chip-hud) 80%, white);
+    }
+
+    /* The well. Inset from the card on three sides and opaque, so an Edge drawn under the card
+       never shows through the prose. The scanlines are 2% white on one line in four. */
+    .window:has(.editor-wrapper) .editor-wrapper {
+        align-self: stretch;
+        min-width: 272px;
+        margin: 0 8px 8px;
+        padding: 7px 4px 6px 12px;
+        border: none;
+        border-radius: 3px;
+        background-color: var(--ui-note-surface);
+        background-image: repeating-linear-gradient(0deg, rgb(255 255 255 / 2%) 0 1px, transparent 1px 4px);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--node-colour, transparent) 16%, transparent);
+    }
+
+    /* The grip is the fourth bracket: two bars meeting at the corner instead of two ticks. */
+    .window:has(.editor-wrapper) .resize-handle::before,
+    .window:has(.editor-wrapper) .resize-handle::after {
+        right: 2px;
+        bottom: 2px;
+        border-radius: 0;
+        transform: none;
+        background-color: var(--hud-bright);
+    }
+
+        .window:has(.editor-wrapper) .resize-handle::before {
+            width: 12px;
+            height: 2px;
+        }
+
+        .window:has(.editor-wrapper) .resize-handle::after {
+            width: 2px;
+            height: 12px;
+        }
+
+        .window:has(.editor-wrapper) .resize-handle.focused::before,
+        .window:has(.editor-wrapper) .resize-handle.focused::after {
+            background-color: white;
+        }
+
+        /* The finger's grip hangs 7px past the corner (styles.css), so the bars move in by as
+           much to stay on it. */
+        @media (pointer: coarse) {
+            .window:has(.editor-wrapper) .resize-handle::before,
+            .window:has(.editor-wrapper) .resize-handle::after {
+                right: 9px;
+                bottom: 9px;
+            }
+        }
+
+/* The card's kind, before its title (`TextNode.init`): the sprite's note glyph on a square chip.
+   The glyph is drawn by `<use>`, whose copy of the symbol takes its colour from the universal
+   rule in styles.css rather than from the chip, so the symbol's stroke reads a property the
+   chip sets -- and every other `<use>` of it, which sets none, keeps `currentColor`. */
+#note-icon-symbol {
+    stroke: var(--icon-stroke, currentColor);
+}
+
+.card-kind {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    padding: 4px;
+    border-radius: 3px;
+    --icon-stroke: var(--node-colour, var(--ui-accent));
+    background-color: color-mix(in srgb, var(--node-colour, var(--ui-accent)) 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--node-colour, var(--ui-accent)) 45%, transparent),
+                0 0 10px -3px color-mix(in srgb, var(--node-colour, var(--ui-accent)) 60%, transparent);
+}
+
+    .window.collapsed .card-kind {
+        display: none;
+    }
+
 /* The box a Mod + drag draws, in the accent and with nothing blurred behind it: its 1px blur
    made the Nodes being chosen unreadable while they were being chosen (#46). */
 .drag-box {

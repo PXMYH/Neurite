@@ -90,7 +90,10 @@ test('an imported note\'s card starts at its text, and typing in it keeps the fr
     });
     await page.waitForTimeout(600);
     await handle.asElement().click();
-    await page.keyboard.press('ControlOrMeta+End');
+    // The caret to the end by hand: on a Mac, ControlOrMeta+End is Meta+End, which leaves the
+    // caret where it is (measured: 0 of 43), so this passed only while the click landed on the
+    // last line -- and a card whose prose column is a few px narrower wraps it onto a second.
+    await handle.evaluate((el) => el.setSelectionRange(el.value.length, el.value.length));
     await page.keyboard.type(' More.');
     await page.waitForTimeout(500);
     const pane = await page.evaluate(() => window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Learning').cm.getValue());

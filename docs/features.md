@@ -24,7 +24,7 @@ Every capability, by category.
     </tr>
     <tr>
       <td>The Universe</td>
-      <td>A sky of stars, a galaxy seen almost edge on and a nebula, under the Fractal, moving with every <code>pan</code>, <code>zoom</code> and <code>turn</code> and still under reduced motion. Each note is drawn in a <code>colour of its own</code>, and every link as a thread in the colours of the two notes it joins. Switch the universe off with <code>Universe</code> in the Fractal panel's Color section; choosing a BG colour there does too.</td>
+      <td>A sky of stars, a galaxy seen almost edge on and a nebula, under the Fractal, moving with every <code>pan</code>, <code>zoom</code> and <code>turn</code> and still under reduced motion. Each note is drawn in a <code>colour of its own</code>, and every link as a thread in the colours of the two notes it joins. A note's card has its kind as a chip before its title, its prose in an inset well under corner brackets, and its links as tags in the colours of the notes they name; its controls show when the card is pointed at, focused or selected. Switch the universe off with <code>Universe</code> in the Fractal panel's Color section; choosing a BG colour there does too.</td>
     </tr>
     <tr>
       <td rowspan="1"><strong>Multi-Agent UI</strong></td>
