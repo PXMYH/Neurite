@@ -9,7 +9,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createReadStream, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -105,15 +105,20 @@ async function feed({ next, dmg }, digest) {
     return `http://127.0.0.1:${server.address().port}/latest`;
 }
 
+// The first profile's CDN cache, copied into each fresh one: a fresh profile fetches its two dozen
+// libraries from the network once, and twice in twenty launches that took past two minutes.
+let warmCache = null;
+
 async function launch(app, userData, feedUrl) {
+    if (warmCache && !existsSync(join(userData, 'cdn-cache'))) cpSync(warmCache, join(userData, 'cdn-cache'), { recursive: true });
     const handle = await electron.launch({
         executablePath: join(app, 'Contents', 'MacOS', 'Neurite'),
         args: [`--user-data-dir=${userData}`],
         env: { ...process.env, NEURITE_UPDATE_FEED: feedUrl },
     });
     const page = await handle.firstWindow();
-    // A fresh profile's first launch went past a minute here once in eight.
     await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 120000 });
+    warmCache ??= join(userData, 'cdn-cache');
     return { handle, page };
 }
 
