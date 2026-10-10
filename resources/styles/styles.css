@@ -82,11 +82,12 @@
     --ui-chrome-border: transparent;
     /* The hairline inside an island: a divider between tool groups, not an edge. */
     --ui-chrome-rule: #8883;
-    /* The menu's one width, for its list and for every panel (#32). Each sized the menu to
-       itself -- measured 312, 382, 339, 343, 971, 312 and 502px -- so it changed width
-       under the pointer from one panel to the next, and at 312px a two-column grid of
-       sliders was two cramped columns. The Notes panel's side handle is the one thing
-       that changes it (`zetHandleHorizMouseMove`), for all of them. */
+    /* The menu's one width for every panel (#32). Each sized the menu to itself --
+       measured 312, 382, 339, 343, 971, 312 and 502px -- so it changed width under the
+       pointer from one panel to the next, and at 312px a two-column grid of sliders was
+       two cramped columns. The Notes panel's side handle is the one thing that changes
+       it (`zetHandleHorizMouseMove`), for all of them. The list of rows is not a panel
+       and is as wide as its words (`.dropdown-content:has(...)`). */
     --ui-panel-width: 480px;
     /* The section rule each side of a panel heading. `#8882` rendered as faint broken
        stubs rather than a rule (#32). */
@@ -1695,8 +1696,8 @@ textarea.title-input.title-input-stowed {
        outgrew the window ran off the top, where nothing could. */
     max-height: calc(var(--visible-height, 100dvh) - 88px);
     overflow-y: auto;
-    /* One width for the list and every panel, and never wider than the window leaves
-       room for (the 16px gutter each side). */
+    /* One width for every panel, and never wider than the window leaves room for (the
+       16px gutter each side). The list is narrower: see the rule below. */
     width: min(var(--ui-panel-width), calc(100vw - 32px));
     box-sizing: border-box;
     /* A horizontal scrollbar here could only ever come from something spilling sideways
@@ -1734,6 +1735,25 @@ textarea.title-input.title-input-stowed {
     .dropdown-content.open {
         transform: translateY(0);
         visibility: visible;
+    }
+
+    /* The list is as wide as its rows. At the panels' 480px its longest label ended 152px
+       in, and the chevrons stood 300px away from the words they belong to. The floor keeps
+       "Not saved to a file yet." on one line under Save to…; the save note itself and the
+       folded function console are `contain: inline-size`, or the longest note (120
+       characters) or the console's editor would set the width instead of the rows. */
+    .dropdown-content:has(> .menu-panel:not(.detail-open)) {
+        width: max-content;
+        min-width: min(220px, calc(100vw - 32px));
+        max-width: calc(100vw - 32px);
+    }
+
+    /* The console opened under the list takes the panels' width, as it has under a panel:
+       its prompt, three buttons and editor do not fit in the list's. Keyed on `.hidden`,
+       which `togglePanel` takes off before the console unfolds and puts back only once it
+       has folded, so the menu is wide for the whole of both. */
+    body:not(.ai-disabled) .dropdown-content:has(.function-call-panel:not(.hidden)) {
+        width: min(var(--ui-panel-width), calc(100vw - 32px));
     }
 
         .submenu {
@@ -1835,6 +1855,12 @@ textarea.title-input.title-input-stowed {
                 /* A line under a row, in line with its label: 12px of row padding, the
                    16px icon and the 10px gap. Quiet unless it has to be read (#59). */
                 .menu-note {
+                    /* It wraps to the rows' width rather than widening the list, and a
+                       file's name breaks anywhere: the note names the file a stopped
+                       mirror wrote to, and 40 letters with no space ran 195px past the
+                       list's edge, where `overflow-x: hidden` cut them off. */
+                    contain: inline-size;
+                    overflow-wrap: anywhere;
                     margin: -4px 0 4px;
                     padding: 0 12px 0 38px;
                     font-size: 12px;
@@ -2682,8 +2708,7 @@ input[type="checkbox"] {
             flex-direction: column;
             gap: 2px;
             padding: 8px;
-            /* As wide as every panel it opens (`--ui-panel-width`), so opening one is
-               neither a step nor a jump. */
+            /* As wide as its rows (`.dropdown-content`), not as the panels it opens. */
             box-sizing: border-box;
         }
 
@@ -4944,6 +4969,9 @@ code.language-markdown {
     flex-direction: column;
     align-items: center;
     width: 100%;
+    /* Takes the menu's width and gives it none: folded to 0px tall, it still made the
+       list 312px wide (340px in WebKit). */
+    contain: inline-size;
 }
 
     /* `.toggle-panel` is `width: 100%` with 10px of side padding, so it measured

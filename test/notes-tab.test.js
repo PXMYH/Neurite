@@ -226,7 +226,11 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
     // `max-height` cannot undo any of this, and would still fail here. That is the safe
     // direction -- it fails loudly and reads its own fix -- so the message says what to do
     // rather than claiming the new rule must be a bug.
-    assert.deepEqual(selectors, ['.dropdown-content', '.dropdown-content.open'],
+    // The last two size the list and the console opened under it, and are held to widths
+    // below.
+    assert.deepEqual(selectors, ['.dropdown-content', '.dropdown-content.open',
+        '.dropdown-content:has(> .menu-panel:not(.detail-open))',
+        'body:not(.ai-disabled) .dropdown-content:has(.function-call-panel:not(.hidden))'],
         'another rule reaches the menu panel. If it cannot change the visibility or display '
         + 'read below, add its selector to this list; if it can, that is the bug');
 
@@ -237,6 +241,11 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
         assert.notEqual(i, -1, selector + ' is gone; this test reads nothing');
         return cssCode.slice(i, cssCode.indexOf('}', i));
     };
+
+    for (const selector of selectors.slice(2)) {
+        assert.doesNotMatch(ruleFor(selector), /\b(display|visibility)\s*:/,
+            selector + ' sizes the menu, and may not show or hide it');
+    }
 
     const closed = ruleFor('.dropdown-content');
     assert.match(closed, /visibility:\s*hidden/,

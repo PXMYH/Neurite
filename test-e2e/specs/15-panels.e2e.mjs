@@ -27,12 +27,25 @@ const menuBox = (page) => page.evaluate(() => {
     return { width: Math.round(menu.getBoundingClientRect().width), spill: menu.scrollWidth - menu.clientWidth };
 });
 
+// How far the menu's right edge stands past the end of its longest label.
+const listSlack = (page) => page.evaluate(() => {
+    const right = Math.max(...[...document.querySelectorAll('#menuList .menu-row-label')]
+        .filter((label) => label.getClientRects().length)
+        .map((label) => {
+            const range = document.createRange();
+            range.selectNodeContents(label);
+            return range.getBoundingClientRect().right;
+        }));
+    return Math.round(document.querySelector('.dropdown-content').getBoundingClientRect().right - right);
+});
+
 for (const [width, height] of [[1600, 1000], [1280, 800]]) {
-    test(`at ${width}x${height} the list and every panel are one width, and nothing spills sideways`, async () => {
+    test(`at ${width}x${height} every panel is one width, the list is as wide as its rows, and nothing spills sideways`, async () => {
         await page.setViewportSize({ width, height });
         await openMenu(page);
         const list = await menuBox(page);
-        const widths = { list: list.width };
+        assert.ok(list.spill <= 0, `the list spills ${list.spill}px sideways`);
+        const widths = {};
         for (const name of PANELS) {
             await openPanel(page, name);
             const box = await menuBox(page);
@@ -40,10 +53,46 @@ for (const [width, height] of [[1600, 1000], [1280, 800]]) {
             assert.ok(box.spill <= 0, `${name} spills ${box.spill}px sideways`);
             await page.click('#menuBackButton');
         }
-        assert.deepEqual(new Set(Object.values(widths)).size, 1, 'the menu changes width: ' + JSON.stringify(widths));
-        assert.ok(list.width >= 440, `the panels are ${list.width}px, too narrow for two columns`);
+        assert.deepEqual(new Set(Object.values(widths)).size, 1, 'the panels differ in width: ' + JSON.stringify(widths));
+        assert.ok(widths.Notes >= 440, `the panels are ${widths.Notes}px, too narrow for two columns`);
+        // At the panels' width the chevrons stood 328px past the longest label.
+        assert.ok(await listSlack(page) <= 80, `the list is ${list.width}px, ${await listSlack(page)}px past its longest label`);
+        assert.equal((await menuBox(page)).width, list.width, 'the list did not come back to its own width');
     });
 }
+
+// The list is sized by its rows, and two other things sit in it: the line under Save to…,
+// which runs to 120 characters, and the folded function console. Either one sized the list
+// instead (699 and 312px).
+test('a long save note wraps inside the list, and the console opened under it takes the panels\' width', async () => {
+    await openMenu(page);
+    const list = (await menuBox(page)).width;
+    const width = await page.evaluate(() => {
+        document.getElementById('save-note').textContent = 'The last graph did not reopen, and it is kept as it was: '
+            + 'Save to… saves it to a file as it is, and a reload tries again.';
+        return Math.round(document.querySelector('.dropdown-content').getBoundingClientRect().width);
+    });
+    assert.equal(width, list, 'the longest save note widened the list');
+    // A stopped mirror names its file, and a name has no spaces to wrap at.
+    const cut = await page.evaluate(() => {
+        const note = document.getElementById('save-note');
+        note.textContent = 'A'.repeat(40) + '.neurite was changed on another device, so it was not written over. '
+            + 'Save to… picks a file again.';
+        const range = document.createRange();
+        range.selectNodeContents(note);
+        return Math.round(range.getBoundingClientRect().right
+            - document.querySelector('.dropdown-content').getBoundingClientRect().right);
+    });
+    assert.ok(cut <= 0, `a long file name runs ${cut}px past the list, where it is cut off`);
+
+    await page.click('.function-call-container > .toggle-panel');
+    await page.waitForTimeout(700);
+    const open = (await menuBox(page)).width;
+    assert.ok(open >= 440, `the console opened in a ${open}px menu`);
+    await page.click('.function-call-container > .toggle-panel');
+    await page.waitForTimeout(700);
+    assert.equal((await menuBox(page)).width, list, 'the list stayed wide once the console folded');
+});
 
 // WebKit's Tab, like Safari's by default, passes over buttons and checkboxes (Option+Tab
 // reaches them), so the walk is a desktop one.

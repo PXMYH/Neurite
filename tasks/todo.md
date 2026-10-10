@@ -256,3 +256,30 @@ Decisions:
   glow into its inline style, which a Saved Graph kept; a pinned card and a loose one measured
   1.01:1; switched off it was still built; the gradient ends were rewritten every frame; the dither
   overflowed half precision. A zoom jump no longer flies through the stars.
+
+# The menu list as wide as its words (2026-10-10)
+
+Asked, with a screenshot of the open menu: "width too much, more align with text". Tier T2,
+brownfield. Measured: the list is 480px (`--ui-panel-width`, the one width #32 gave the list and
+every panel), its longest label ends 152px in, and the chevrons stand 328px past it.
+
+Decisions:
+- The panels keep their one width (#32 was about them: a 290px column of sliders). The list is
+  not a panel, so it is `width: max-content` with a 220px floor, which keeps "Not saved to a file
+  yet." on one line, and opening a panel widens the menu to the panels' width.
+- Two things in the list are not rows and must not size it: the save note (up to 120 characters)
+  and the folded function console. Both are `contain: inline-size`; without it they made the list
+  699 and 312px. The console opened under the list takes the panels' width, keyed on `.hidden`
+  so the menu stays wide until it has folded.
+
+- [x] The list hugs its rows; panels, the console and narrow windows keep their widths.
+- [x] Chromium, WebKit and an iPad measured: 220px list, 480px panels and console, 0 spill.
+- [x] Tests: the panels spec reads the list's slack and the note and console cases; the
+  selector guard in notes-tab.test.js admits the two width-only rules and holds them to widths.
+
+## Review
+
+- An adversarial review found one thing: the save note names the file a stopped mirror wrote
+  to, and a name has no space to wrap at, so 40 letters ran 194px past the narrow list and
+  `overflow-x: hidden` cut them off. The note breaks anywhere now; the panels spec writes that
+  note and fails without the fix.
