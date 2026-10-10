@@ -360,3 +360,14 @@ Decisions:
   25 seconds on it is taken back, and the swap script, finding no marker and no stage, changes
   nothing when the app does quit; a block found only at install did not reach the row; the docs
   said 30 seconds.
+- A fourth round found eight, answered: a blob that failed to save was swallowed without a
+  word (`lastSaveError` now covers it, and is cleared as each save begins rather than after);
+  an edit typed while the last save wrote could be lost, so the page is held (`inert`) from that
+  save to the quit and let go if the update is taken back; a graph restored with a card fewer
+  than the old copy managed counted as started -- the marker carries the old copy's count; the
+  in-bundle profile check compared text, which a symlink or another casing passes -- it compares
+  real paths; any copy reading the marker counted as the new one starting, an older copy
+  included -- the new one now writes its version to `update-started`, which is what the script
+  waits on; a swap stopped half way (a reboot) stranded the old bundle -- the copy that starts
+  clears it when no script came for its started file; `hdiutil` and the other tools had no
+  deadline; and the in-bundle profile's advice would have lost it.

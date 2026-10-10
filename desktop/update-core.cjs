@@ -72,8 +72,8 @@ function placeProblem(bundle) {
     return null;
 }
 
-// Run as `/bin/sh -c SWAP_SCRIPT neurite-update <pid> <bundle> <staged> <marker> <log> <exe>
-// <opener> [args...]`, detached, by the app just before it quits. It waits up to a minute for
+// Run as `/bin/sh -c SWAP_SCRIPT neurite-update <pid> <bundle> <staged> <marker> <started>
+// <version> <log> <exe> <opener> [args...]`, detached, by the app just before it quits. It waits up to a minute for
 // that process to end, moves the old bundle aside and the new one in -- or the old one back, if
 // that fails -- and opens whichever is in place with the arguments the app ran with. `<opener>`
 // is /usr/bin/open, and `-n` because macOS would otherwise bring forward any running copy with
@@ -81,8 +81,10 @@ function placeProblem(bundle) {
 // app took the update back -- its quit failed or was cancelled -- and a later quit, the reader's
 // own, is not the update's: nothing is touched. The marker goes first, being one unlink.
 //
-// The old bundle is kept until the new one has started: the new copy removes `<marker>` once its
-// page is up (`updater.cjs`, `confirmStarted`), and one that has not within a minute -- it
+// The old bundle is kept until the new one has started: the new copy writes its version to
+// `<started>` once its page is up and its graph back (`updater.cjs`, `confirmStarted`) -- the
+// marker going was the signal once, and an older copy opened on the same profile took it away
+// too. One that has not within a minute -- it
 // crashed, hung, or its page never came up -- is stopped (TERM, then KILL three seconds on: it
 // holds the profile's single-instance lock, and the old copy opened beside it would quit at
 // once) and the old bundle put back and opened,
@@ -93,8 +95,8 @@ function placeProblem(bundle) {
 // it, and a `sleep` not found turned the minute's wait into 0.4 seconds. The tests shorten the
 // minute with NEURITE_SWAP_START_TICKS (tenths of a second).
 const SWAP_SCRIPT = `
-pid=$1; app=$2; staged=$3; marker=$4; log=$5; exe=$6; opener=$7
-shift 7
+pid=$1; app=$2; staged=$3; marker=$4; started=$5; version=$6; log=$7; exe=$8; opener=$9
+shift 9
 say() { printf '%s %s\\n' "$(/bin/date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$log"; }
 reopen() { if [ -d "$app" ]; then "$opener" -n "$app" --args "$@"; fi; }
 i=0
@@ -121,7 +123,7 @@ if ! /bin/mv "$staged" "$app"; then
 fi
 reopen "$@"
 i=0
-while [ -e "$marker" ]; do
+while [ "$(/bin/cat "$started" 2>/dev/null)" != "$version" ]; do
     i=$((i + 1))
     if [ "$i" -gt "\${NEURITE_SWAP_START_TICKS:-600}" ]; then
         /bin/ps -axo pid=,comm= | while read -r p c; do
@@ -145,6 +147,7 @@ while [ -e "$marker" ]; do
     /bin/sleep 0.1
 done
 /bin/rm -rf "$old"
+/bin/rm -f "$started"
 say "updated"
 `;
 
@@ -152,6 +155,12 @@ say "updated"
 // and nothing but this app's own stages is ever taken for one -- not another app's, and not the
 // running bundle, whatever it is called.
 const stagedName = (bundleName, version) => `.${bundleName.replace(/\.app$/, '')}-${version}-update.app`;
+// The old bundle the swap moved aside, left there if the swap was stopped half way (a reboot):
+// the copy that starts cleanly clears it.
+function isReplacedFor(name, bundleName) {
+    return name.startsWith(`${bundleName}.replaced-`) && /^\d+$/.test(name.slice(bundleName.length + '.replaced-'.length));
+}
+
 function isStagedFor(name, bundleName) {
     const base = bundleName.replace(/\.app$/, '');
     if (name === bundleName || !name.startsWith(`.${base}-`)) return false;
@@ -169,5 +178,5 @@ function afterUpdate(marker, current) {
 
 module.exports = {
     RELEASES, parseVersion, isNewer, pickUpdate, bundleOf, placeProblem, profileInside, SWAP_SCRIPT, stagedName,
-    isStagedFor, afterUpdate,
+    isStagedFor, isReplacedFor, afterUpdate,
 };

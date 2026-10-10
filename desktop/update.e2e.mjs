@@ -266,6 +266,8 @@ test('an update whose graph cannot be kept changes nothing, however the save fai
         assert.equal(versionOf(built.app), built.current, `the bundle changed over "${why}"`);
         assert.deepEqual(readdirSync(built.apps), ['Neurite.app'], `a staged copy was left beside it after "${why}"`);
         assert.equal(handle.process().exitCode, null, `the app closed over "${why}"`);
+        // Held still through the last save, and let go again when the update was taken back.
+        assert.equal(await page.evaluate(() => document.body.inert), false, `the page stayed held after "${why}"`);
     };
     try {
         await page.click('.menu-button');

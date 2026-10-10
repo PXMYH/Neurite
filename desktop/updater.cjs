@@ -21,7 +21,10 @@ const { pipeline } = require('node:stream/promises');
 const { promisify } = require('node:util');
 const core = require('./update-core.cjs');
 
-const run = promisify(execFile);
+const execFileP = promisify(execFile);
+// Every tool with a deadline: one that hung (a stuck `hdiutil`) kept the row "installing" for
+// good, the quit's own watchdog not having started yet.
+const run = (cmd, args) => execFileP(cmd, args, { timeout: 120 * 1000 });
 // Another feed for the tests: a local server standing in for the releases API.
 const FEED = process.env.NEURITE_UPDATE_FEED || core.RELEASES;
 const FIRST_CHECK_MS = 20 * 1000;
@@ -61,6 +64,8 @@ const bundle = () => core.bundleOf(app.getPath('exe'));
 // is the version it is, or the swap did not happen. The swap script waits on it too.
 const markerFile = () => path.join(app.getPath('userData'), 'update-pending.json');
 const logFile = () => path.join(app.getPath('userData'), 'update.log');
+// Written by the new copy, with its version, once it is up: what the swap script waits on.
+const startedFile = () => path.join(app.getPath('userData'), 'update-started');
 
 // Why this copy cannot install what was found, or null. The way out of each is the release page.
 async function blocked(update) {
@@ -68,7 +73,10 @@ async function blocked(update) {
     if (!update.asset.sha256) return 'unverified';
     const problem = core.placeProblem(bundle());
     if (problem) return problem;
-    if (core.profileInside(app.getPath('userData'), bundle())) return 'profile-inside';
+    // On the real paths: a symlink, or another casing on APFS, put a profile inside the bundle
+    // past a comparison of the text.
+    const real = (p) => { try { return fs.realpathSync.native(p) } catch { return p } };
+    if (core.profileInside(real(app.getPath('userData')), real(bundle()))) return 'profile-inside';
     try { await fsp.access(path.dirname(bundle()), fs.constants.W_OK) }
     catch { return 'read-only' }
     return null;
@@ -147,23 +155,29 @@ async function install(choice) {
         }
         await checkBundle(staged, version, target);
 
-        // Saved here, where a failure can still stop the update. The window's close saves
-        // again, but it closes whatever its save does, which is right for a quit and not for
-        // a quit the app chose.
+        // Saved here, where a failure can still stop the update, with the page held still from
+        // now: a save takes its copy of the graph before it writes it, so an edit typed during
+        // the write would go with the old app.
+        await hold(true);
         if (!await saveGraph()) throw new Error('the graph could not be saved first');
 
-        await fsp.writeFile(markerFile(), JSON.stringify({ version, from: app.getVersion() }));
+        // How many saved cards this copy could not rebuild: the new one must not lose more.
+        const skipped = await restoreSkipped();
+        await fsp.rm(startedFile(), { force: true });
+        await fsp.writeFile(markerFile(), JSON.stringify({ version, from: app.getVersion(), skipped }));
         // The profile it ran with, so the new copy opens the same graphs: a test's, or the
         // reader's own when there is no such argument.
         const args = process.argv.slice(1).filter((arg) => arg.startsWith('--user-data-dir='));
         spawn('/bin/sh', ['-c', core.SWAP_SCRIPT, 'neurite-update', String(process.pid), target, staged,
-                          markerFile(), logFile(), path.basename(app.getPath('exe')), '/usr/bin/open', ...args],
+                          markerFile(), startedFile(), version, logFile(), path.basename(app.getPath('exe')),
+                          '/usr/bin/open', ...args],
               { detached: true, stdio: 'ignore' }).unref();
         pending = { staged, version };
         setTimeout(() => stayOpen('Neurite did not close'), QUIT_MS).unref?.();
         app.quit();
     } catch (err) {
         installing = false;
+        await hold(false);
         await bundleFs.rm(staged, { recursive: true, force: true }).catch(() => {});
         publish({ phase: 'failed', version,
                   error: `${version} did not install: ${reason(err)}. Neurite ${app.getVersion()} is unchanged.` });
@@ -240,37 +254,72 @@ async function stayOpen(why) {
     pending = null;
     await fsp.rm(markerFile(), { force: true }).catch(() => {});
     await bundleFs.rm(staged, { recursive: true, force: true }).catch(() => {});
+    await hold(false);
     installing = false;
     publish({ phase: 'failed', version, error: `${version} did not install: ${why}. Neurite ${app.getVersion()} is unchanged.` });
+}
+
+// The page held still (`inert`) through the last save and the quit, or let go again.
+async function hold(on, win = BrowserWindow.getAllWindows()[0]) {
+    if (!win || win.isDestroyed()) return;
+    await win.webContents.executeJavaScript(`document.body.inert = ${on === true}`).catch(() => {});
+}
+
+async function restoreSkipped(win = BrowserWindow.getAllWindows()[0]) {
+    if (!win || win.isDestroyed()) return 0;
+    return win.webContents.executeJavaScript('App.viewGraphs?.restoreSkipped ?? 0').catch(() => 0);
 }
 
 // Asked by the window's close (main.cjs): is this a quit for an update.
 const quitting = () => Boolean(pending);
 
 // After an update, once the window's page is up (`watch`): say whether the update happened, and
-// so tell the swap script, which waits on the marker, that this copy started. Up means the page
-// says so (`appReady`, the last line of App.init), not that the main process got this far: a
-// release whose frontend throws on load is rolled back as well.
-async function confirmStarted() {
-    try {
-        const told = core.afterUpdate(JSON.parse(await fsp.readFile(markerFile(), 'utf8')), app.getVersion());
-        await fsp.rm(markerFile(), { force: true });
-        if (told) publish(told);
-    } catch { /* no update was under way */ }
+// tell the swap script this copy started by writing its version where the script waits for it.
+// Up means the page says so and its graph is back (`appReady`, then `whenRestored`) with no
+// more of its cards lost than the old copy lost (the marker's `skipped`): the main process
+// getting this far was the signal once, and a release whose frontend throws on load, or that
+// cannot rebuild a kind of card, then took the old bundle with it. Only the version the update
+// went for says it started; an older copy opened on the profile meanwhile reads the marker and
+// says the update did not install, and the script, still waiting, puts the old bundle back.
+async function confirmStarted(marker) {
+    const told = core.afterUpdate(marker, app.getVersion());
+    await fsp.rm(markerFile(), { force: true }).catch(() => {});
+    if (told?.phase === 'updated') {
+        const said = await fsp.writeFile(startedFile(), app.getVersion()).then(() => true, () => false);
+        // A swap script still waiting takes the file and clears its own backup within a tenth of
+        // a second. One stopped half way (a reboot) leaves both, and the backup is cleared here --
+        // never sooner: the backup is what a live script would put back.
+        if (said) setTimeout(clearStranded, 15000).unref?.();
+    }
+    if (told) publish(told);
 }
-
-// Up, and with the graph back: `appReady` comes before the saved graph is restored, and a
-// release that could not restore it would otherwise have taken the old bundle with it.
-const UP = 'window.appReady === true && Promise.resolve(App.viewGraphs?.whenRestored).then((ok) => ok === true)';
 
 function watch(win) {
     if (!app.isPackaged) return;
     win.webContents.once('did-finish-load', async () => {
+        let marker;
+        try { marker = JSON.parse(await fsp.readFile(markerFile(), 'utf8')) }
+        catch { return }                               // no update under way
+        const up = `window.appReady === true && Promise.resolve(App.viewGraphs?.whenRestored)
+            .then((ok) => ok === true && (App.viewGraphs?.restoreSkipped ?? 0) <= ${Number(marker.skipped) || 0})`;
         for (let tries = 0; tries < 120 && !win.isDestroyed(); tries++) {
-            if (await win.webContents.executeJavaScript(UP).catch(() => false)) return confirmStarted();
+            if (await win.webContents.executeJavaScript(up).catch(() => false)) return confirmStarted(marker);
             await new Promise((resolve) => setTimeout(resolve, 500));
         }
     });
+}
+
+// The bundle an interrupted swap left beside this one (a reboot half way), once this copy has
+// started and no script came for the started file: an old copy kept for nothing.
+async function clearStranded() {
+    try { await fsp.access(startedFile()) } catch { return }   // a live script took it
+    await fsp.rm(startedFile(), { force: true }).catch(() => {});
+    const target = bundle();
+    const dir = path.dirname(target);
+    for (const name of await fsp.readdir(dir).catch(() => [])) {
+        if (!core.isReplacedFor(name, path.basename(target))) continue;
+        await bundleFs.rm(path.join(dir, name), { recursive: true, force: true }).catch(() => {});
+    }
 }
 
 // A copy staged by an update that never swapped (the app did not quit within a minute) is

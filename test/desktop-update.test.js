@@ -78,6 +78,10 @@ test('only this bundle\'s own stages are taken for stages', () => {
     assert.equal(core.isStagedFor('.Neurite-1.7.0-update.app', '.Neurite-1.7.0-update.app'), false, 'the running bundle');
     assert.equal(core.isStagedFor('Neurite.app', 'Neurite.app'), false);
     assert.equal(core.isStagedFor('.Neurite-latest-update.app', 'Neurite.app'), false);
+    // And a backup an interrupted swap left, by the same rule.
+    assert.equal(core.isReplacedFor('Neurite.app.replaced-4242', 'Neurite.app'), true);
+    assert.equal(core.isReplacedFor('Neurite.app.replaced-x', 'Neurite.app'), false);
+    assert.equal(core.isReplacedFor('Other.app.replaced-4242', 'Neurite.app'), false);
 });
 
 // A folder standing for each bundle, with a file saying which version it is; the marker the
@@ -95,15 +99,18 @@ function bundles() {
     writeFileSync(path.join(staged, 'version'), '1.7.0');
     const marker = path.join(dir, 'update-pending.json');
     writeFileSync(marker, '{"version":"1.7.0","from":"1.6.0"}');
+    const started = path.join(dir, 'update-started');
     const opener = path.join(dir, 'open');
-    writeFileSync(opener, '#!/bin/sh\necho "$@" >> "$OPENED"\nif [ "$STARTS" = 1 ]; then /bin/cat "$2/version" >> "$OPENED"; /bin/rm -f "$MARKER"; fi\n', { mode: 0o755 });
-    return { dir, apps, app, staged, marker, opener, log: path.join(dir, 'update.log'), opened: path.join(dir, 'opened') };
+    // As the real new copy does: it reads the marker and, being the version it names, says so.
+    writeFileSync(opener, '#!/bin/sh\necho "$@" >> "$OPENED"\nif [ "$STARTS" = 1 ]; then /bin/cat "$2/version" >> "$OPENED"; '
+        + '/bin/rm -f "$MARKER"; /bin/cat "$2/version" > "$STARTED"; fi\n', { mode: 0o755 });
+    return { dir, apps, app, staged, marker, started, opener, log: path.join(dir, 'update.log'), opened: path.join(dir, 'opened') };
 }
 const exited = () => spawnSync('/usr/bin/true').pid;
-const swapArgs = (b, pid) => ['-c', core.SWAP_SCRIPT, 'neurite-update', String(pid), b.app, b.staged, b.marker, b.log,
-                              'Neurite', b.opener, '--user-data-dir=/tmp/x y'];
-const swapEnv = (b, starts) => ({ ...process.env, PATH: '/usr/bin', OPENED: b.opened, MARKER: b.marker, STARTS: starts ? '1' : '0',
-                                  NEURITE_SWAP_START_TICKS: '10' });
+const swapArgs = (b, pid) => ['-c', core.SWAP_SCRIPT, 'neurite-update', String(pid), b.app, b.staged, b.marker, b.started,
+                              '1.7.0', b.log, 'Neurite', b.opener, '--user-data-dir=/tmp/x y'];
+const swapEnv = (b, starts) => ({ ...process.env, PATH: '/usr/bin', OPENED: b.opened, MARKER: b.marker, STARTED: b.started,
+                                  STARTS: starts ? '1' : '0', NEURITE_SWAP_START_TICKS: '10' });
 const swap = (b, { pid = exited(), starts = true } = {}) => spawnSync('/bin/sh', swapArgs(b, pid), { env: swapEnv(b, starts) });
 const text = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 
@@ -117,6 +124,7 @@ test('the swap puts the new bundle where the old one was, opens it, and leaves n
         // as an app's can be: the script names its tools.
         assert.equal(text(b.opened), `-n ${b.app} --args --user-data-dir=/tmp/x y\n1.7.0`);
         assert.match(text(b.log), /updated\n$/);
+        assert.equal(existsSync(b.started), false, 'the started file was left for a later swap to read');
     } finally { rmSync(b.dir, { recursive: true, force: true }) }
 });
 
@@ -185,6 +193,18 @@ test('a new copy that ignores TERM is killed before the old one is opened', () =
             .filter((c) => c === path.join(b.app, 'Contents', 'MacOS', 'Neurite') || c === path.join(b.staged, 'Contents', 'MacOS', 'Neurite'));
         assert.deepEqual(left, [], 'the stuck copy is still running');
         assert.equal(readFileSync(path.join(b.app, 'version'), 'utf8'), '1.6.0');
+        assert.match(text(b.log), /the old one is back/);
+    } finally { rmSync(b.dir, { recursive: true, force: true }) }
+});
+
+// A fourth review: the marker going was taken for the new copy starting, and an older copy
+// opened on the same profile reads the marker too. Only the version the update went for counts.
+test('a copy of another version taking the marker does not count as the new one starting', () => {
+    const b = bundles();
+    try {
+        writeFileSync(b.opener, '#!/bin/sh\necho "$@" >> "$OPENED"\n/bin/rm -f "$MARKER"; echo 1.5.0 > "$STARTED"\n', { mode: 0o755 });
+        assert.equal(swap(b).status, 1);
+        assert.equal(readFileSync(path.join(b.app, 'version'), 'utf8'), '1.6.0', 'the old bundle was not put back');
         assert.match(text(b.log), /the old one is back/);
     } finally { rmSync(b.dir, { recursive: true, force: true }) }
 });

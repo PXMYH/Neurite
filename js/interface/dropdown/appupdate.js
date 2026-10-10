@@ -32,8 +32,8 @@ const AppUpdate = {
         'unverified': "This release's Mac app has no checksum to check a download against, so it is "
                     + "not installed from here. Its page has the download.",
         'not-bundled': "This copy runs from a checkout, which updates with git.",
-        'profile-inside': "This copy keeps its graphs inside the app, and replacing the app would take "
-                        + "them with it. Install the new version by hand.",
+        'profile-inside': "This copy keeps its graphs inside the app, so it does not replace itself. "
+                        + "Save each graph to a file with Save to… before you replace it.",
     },
 
     // The row's label, the note under it, and whether the note is a warning.

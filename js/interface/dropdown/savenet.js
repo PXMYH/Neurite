@@ -459,11 +459,13 @@ View.Graphs = class {
     // could not be; `init` replaces it.
     #whenRestored = Promise.resolve(false);
     // For the Mac app's update (#76, desktop/updater.cjs), which closes the app only over a
-    // graph that is kept: whether this session's graph came back, and the error of the last
-    // write that failed, cleared by the next that works. A failed first write of a new graph
-    // is logged and swallowed (`#onSaveError`, so the eight-second timer never asks anything),
-    // so `saveNow` alone resolves the same whether it was kept or not.
+    // graph that is kept: whether this session's graph came back and how many of its cards
+    // could not be, and the error of a write that failed during the last save. A failed first
+    // write of a new graph, and a failed blob, are logged and swallowed (`#onSaveError`,
+    // `#saveBlobForNode`, so the eight-second timer never asks anything), so `saveNow` alone
+    // resolves the same whether the graph was kept or not.
     get whenRestored(){ return this.#whenRestored }
+    restoreSkipped = 0;
     lastSaveError = null;
     #maxBlobId = 0;
     #maxGraphId = 0;
@@ -792,6 +794,9 @@ View.Graphs = class {
         }
 
         save(){
+            // Cleared as a save begins, so what it holds after is about this one: a blob saved
+            // first and failing is not cleared by the graph's own write working after it.
+            this.mom.lastSaveError = null;
             const len = this.mom.#graphs
                         .filter(Object.hasTitleThis, this.title).length;
             return (len < 1) ? this.addSaveAndSelectIt("new") : this.#overwrite();
@@ -808,10 +813,7 @@ View.Graphs = class {
             Logger.debug("Overwrite graph", meta.graphId);
             return this.#makeAndStoreDataForMeta(meta);
         }
-        #afterOverwrite = ()=>{
-            this.mom.lastSaveError = null;
-            Logger.info(this.#msgOverwrite, this.title);
-        }
+        #afterOverwrite = ()=>{ Logger.info(this.#msgOverwrite, this.title) }
         #msgOverwrite = "Updated all saves of title:";
 
         #makeAndStoreDataForMeta(meta){
@@ -829,8 +831,7 @@ View.Graphs = class {
                 .then(this.#afterAddSave, this.#onSaveError);
         }
         #afterAddSave = ()=>{
-            this.mom.lastSaveError = null;
-            Logger.info("Added", this.#type, "save:", this.title);
+            Logger.info("Added", this.#type, "save:", this.title)
         }
         // Autosave runs on a timer, so this must not ask the user anything -- a
         // prompt here would reappear every eight seconds. The disk file is the
@@ -1061,7 +1062,10 @@ View.Graphs = class {
             return fetch(node.view.innerContent.firstChild.src)
                 .then( (res)=>res.blob() )
                 .then(this.saveNodeItsBlob.bind(this, node))
-                .catch(Logger.err.bind(Logger, "Failed to save blob:"))
+                .catch( (err)=>{
+                    this.mom.lastSaveError = err;
+                    Logger.err("Failed to save blob:", err);
+                });
         }
 
         saveNodeItsBlob(node, blob){
@@ -1138,6 +1142,7 @@ View.Graphs = class {
             }
         }
 
+        this.restoreSkipped = skipped.length;
         if (skipped.length > 0) {
             Logger.warn(skipped.length, "of", div.children.length,
                         "cards could not be restored:", skipped.join(', '));
