@@ -14,12 +14,15 @@
 // Deliberately not exposed: `window.electronAPI`. Setting `startedViaElectron`
 // switches link nodes to <webview> and routes neurite.network calls through an IPC
 // proxy that lives on upstream's `electron` branch, not here. Without it the page
-// runs as it does in a browser tab, which is what the e2e suite checks.
+// runs as it does in a browser tab, which is what the e2e suite checks. The one
+// thing the page can reach is the app's own updates (`window.neuriteDesktop`,
+// preload.cjs and updater.cjs).
 const { app, BrowserWindow, Menu, desktopCapturer, protocol, net, session, shell } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const updater = require('./updater.cjs');
 
 const ORIGIN = 'app://neurite';
 const WEB_ROOT = app.isPackaged
@@ -164,6 +167,7 @@ function createWindow() {
         minWidth: 720,
         minHeight: 480,
         backgroundColor: '#000000',     // the canvas colour: no white flash before paint
+        webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
     });
     const contents = win.webContents;
 
@@ -171,6 +175,17 @@ function createWindow() {
     win.on('close', (event) => {
         if (saved || contents.isCrashed()) return;
         event.preventDefault();
+        // A quit the app chose, for an update, closes only over a graph that is kept: what was
+        // made after the update's own save would otherwise go with the old app. Any other quit
+        // closes whatever its save did, as it always has.
+        if (updater.quitting()) {
+            updater.saveGraph(win).then((kept) => {
+                if (!kept) return updater.stayOpen('the graph could not be saved as Neurite closed');
+                saved = true;
+                win.close();
+            });
+            return;
+        }
         const save = contents.executeJavaScript(
             'Promise.resolve(App.viewGraphs?.saveNow?.()).then(() => true)');
         const limit = new Promise((resolve) => setTimeout(resolve, SAVE_ON_CLOSE_MS));
@@ -178,6 +193,8 @@ function createWindow() {
             .catch((err) => console.warn('[neurite] save on close failed:', err.message))
             .finally(() => { saved = true; win.close() });
     });
+    // The page's `beforeunload` kept the window open, so the next close saves again.
+    contents.on('will-prevent-unload', () => { saved = false });
 
     // A crashed page is a blank window, so bring it back -- once in any ten seconds, so
     // a page that crashes as it loads cannot spin. The graph returns from its last save.
@@ -188,6 +205,8 @@ function createWindow() {
         contents.reload();
     });
 
+    // Tells an update under way that this copy came up (updater.cjs).
+    updater.watch(win);
     win.loadURL(ORIGIN + '/');
 }
 
@@ -246,6 +265,7 @@ if (!app.requestSingleInstanceLock()) {
                 .then(([screen]) => callback(screen ? { video: screen } : {}), () => callback({}));
         }, { useSystemPicker: true });
 
+        updater.init();
         createWindow();
     });
 }

@@ -458,6 +458,13 @@ View.Graphs = class {
     // Settles true once the previous session's graph is back on screen, false if it
     // could not be; `init` replaces it.
     #whenRestored = Promise.resolve(false);
+    // For the Mac app's update (#76, desktop/updater.cjs), which closes the app only over a
+    // graph that is kept: whether this session's graph came back, and the error of the last
+    // write that failed, cleared by the next that works. A failed first write of a new graph
+    // is logged and swallowed (`#onSaveError`, so the eight-second timer never asks anything),
+    // so `saveNow` alone resolves the same whether it was kept or not.
+    get whenRestored(){ return this.#whenRestored }
+    lastSaveError = null;
     #maxBlobId = 0;
     #maxGraphId = 0;
     #saver = new View.Graphs.Saver(this);
@@ -801,7 +808,10 @@ View.Graphs = class {
             Logger.debug("Overwrite graph", meta.graphId);
             return this.#makeAndStoreDataForMeta(meta);
         }
-        #afterOverwrite = ()=>{ Logger.info(this.#msgOverwrite, this.title) }
+        #afterOverwrite = ()=>{
+            this.mom.lastSaveError = null;
+            Logger.info(this.#msgOverwrite, this.title);
+        }
         #msgOverwrite = "Updated all saves of title:";
 
         #makeAndStoreDataForMeta(meta){
@@ -819,13 +829,15 @@ View.Graphs = class {
                 .then(this.#afterAddSave, this.#onSaveError);
         }
         #afterAddSave = ()=>{
-            Logger.info("Added", this.#type, "save:", this.title)
+            this.mom.lastSaveError = null;
+            Logger.info("Added", this.#type, "save:", this.title);
         }
         // Autosave runs on a timer, so this must not ask the user anything -- a
         // prompt here would reappear every eight seconds. The disk file is the
         // way out of a full store, and the button that picks one stays visible.
         #onSaveError = (err)=>{
-            Logger.err("Failed to save:", this.title, err)
+            this.mom.lastSaveError = err;
+            Logger.err("Failed to save:", this.title, err);
         }
     }
 

@@ -37,6 +37,20 @@ What to know:
   uses `Neurite Dev` instead, so a checkout never writes into the installed app's graphs.
 - **Quitting keeps your work.** The app waits for the graph to finish saving before it closes,
   which a browser tab cannot do.
+- **Updates.** The app looks for a newer release 20 seconds after it opens and every six hours
+  after, and the menu's **Check for updates** row asks again. When one is out, the menu button
+  shows a dot and the row reads **Update to x.y.z**: it downloads the release's DMG, checks it
+  against the SHA-256 GitHub took when it was uploaded, saves your graph, closes, puts the new
+  app where the old one was, and opens it again. A graph that cannot be saved first stops the
+  update, and a new version that has not started -- its window up and your graph back -- within a
+  minute is taken out and the old one
+  put back and opened, saying the update did not install; `update.log` in the app's support
+  folder says what happened. Run from the disk image, or from a copy macOS made where it was
+  downloaded, it cannot replace itself, and the row opens the release page instead. It is not
+  Squirrel (Electron's `autoUpdater`): that only takes an
+  update that satisfies the running app's designated requirement, and an ad hoc requirement is
+  the build's own hash. `desktop/updater.cjs`; `npm test` here drives a real update of a
+  packaged build when `NEURITE_APP` is set.
 - **Offline.** index.html loads its libraries from two CDNs. The app keeps a copy of each the
   first time it arrives, so after one launch with a network it opens with none.
 - **AI.** OpenAI, Groq and Ollama work directly. Claude and the other gateway features need the

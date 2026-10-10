@@ -276,6 +276,13 @@ builds `dist/`, packs an arm64 `.app` (ad-hoc signed) and a `.dmg`; `npm test` t
 real Electron (`smoke.e2e.mjs`, named so the root `npm test` never finds it). On quit it awaits
 `App.viewGraphs.saveNow()` (savenet.js) before the window closes.
 
+The app updates itself (#76): `updater.cjs` reads the latest GitHub release, checks the DMG against
+the asset's `digest`, copies the app beside the running one, quits, and a detached `/bin/sh` swaps
+the bundles and reopens it (Squirrel cannot take an ad-hoc-signed update). The parts with no
+Electron in them are `update-core.cjs`, run by the root `npm test`. The page's one bridge is
+`window.neuriteDesktop.update` from `preload.cjs`, read only by `appupdate.js`'s menu row;
+`update.e2e.mjs` updates a packaged build for real in a scratch folder (`NEURITE_APP`).
+
 ## Conventions
 
 These are consistent across the codebase and easy to violate by habit:

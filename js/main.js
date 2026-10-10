@@ -230,6 +230,8 @@ class PageLoad {
         'js/interface/dropdown/tabs/datatab.js',
         'js/interface/dropdown/tabs/edittab.js',
         'js/interface/dropdown/dropdown.js',
+        // After dropdown.js, whose `menuButton` it marks when an update is ready.
+        'js/interface/dropdown/appupdate.js',
         'js/interface/dropdown/neuritepanel.js',
         'js/interface/dropdown/signin.js',
         'js/mandelbrot/mandelbrot.js',

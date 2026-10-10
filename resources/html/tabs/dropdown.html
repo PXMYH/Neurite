@@ -265,6 +265,16 @@
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-video-icon"></use></svg>
                     <span class="menu-row-label">Record</span>
                 </button>
+                <!-- The Mac app's own updates (#76), and only there: `appupdate.js` shows the
+                     row when the app's bridge (`window.neuriteDesktop`) is present, so a browser
+                     never draws it. It checks, and once a newer release is found it installs
+                     it; the note under it says which, and how far along. -->
+                <button type="button" class="menu-row" id="update-button" aria-describedby="update-note" hidden
+                        title="Look for a newer Neurite, and install it when there is one: the graph is saved, and the app closes and opens again as the new version.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#refresh-icon"></use></svg>
+                    <span class="menu-row-label">Check for updates</span>
+                </button>
+                <p class="menu-note" id="update-note" hidden></p>
 
                 <div class="menu-separator" role="separator"></div>
 

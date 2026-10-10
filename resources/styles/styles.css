@@ -1599,6 +1599,19 @@ textarea.title-input.title-input-stowed {
                 background-color: var(--ui-chrome-hover);
             }
 
+            /* An update the app found on its own is waiting in the menu (`appupdate.js`). */
+            .menu-button.update-ready::after {
+                content: "";
+                position: absolute;
+                top: 7px;
+                right: 7px;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background-color: var(--ui-accent);
+                box-shadow: 0 0 0 2px var(--ui-chrome);
+            }
+
         .menu-icon {
             position: absolute;
             top: 50%;
@@ -1818,6 +1831,13 @@ textarea.title-input.title-input-stowed {
                     .menu-row:hover {
                         background-color: var(--ui-chrome-hover);
                         color: var(--ui-chrome-text-strong);
+                    }
+
+                    /* `display: flex` above outranks the `hidden` attribute's own
+                       `display: none`, so a row that is not there (`#update-button` in a
+                       browser) said so only to scripts. */
+                    .menu-row[hidden] {
+                        display: none;
                     }
 
                     /* Keyboard users get the accent rather than the hover grey: a

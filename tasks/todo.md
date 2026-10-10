@@ -283,3 +283,80 @@ Decisions:
   to, and a name has no space to wrap at, so 40 letters ran 194px past the narrow list and
   `overflow-x: hidden` cut them off. The note breaks anywhere now; the panels spec writes that
   note and fails without the fix.
+
+# The Mac app updates itself (#76, 2026-10-10)
+
+Asked (#76): "auto detect there's a new release and auto update the mac version, there should be
+a refresh button and click update to download and close and install and reopen the app". Tier T3,
+brownfield: the desktop main process, a new preload, a menu row in the page, docs.
+
+Measured first: the app is ad-hoc signed (`codesign --sign -`), so Squirrel.Mac, and with it
+Electron's `autoUpdater` and electron-updater, cannot validate an update: they compare the new
+bundle's designated requirement against the running one, and an ad-hoc requirement is its own
+cdhash. The releases API gives each asset a `digest` (`sha256:...`); v1.6.0's DMG reads
+b19bb76e..., the hash taken when it was published. The DMG is the only Mac asset.
+
+Decisions:
+- The main process owns it (`desktop/updater.cjs`), with the parts that need no Electron in
+  `desktop/update-core.cjs`, so the root `npm test` can run them: version order, the asset, where
+  the bundle is and whether it can be replaced, and the swap.
+- Check 20 s after launch and every 6 hours, against `releases/latest` (drafts and pre-releases
+  never), and when asked. `NEURITE_UPDATE_FEED` points it at another feed, for the tests.
+- Update: download the DMG, check it against the asset's digest (none: refuse), mount it
+  read-only off Finder, copy the app next to the running one (same volume, so the swap is a
+  rename), check its seal, bundle id and version, then quit -- the window's close already saves
+  the Graph -- and a detached `/bin/sh` waits for the process to end, swaps the bundles (the old
+  one comes back if the second rename fails) and opens the new one with the same profile.
+- Refused, with a way out (the release page in the browser): running from the disk image or a
+  translocated copy, or from a folder that cannot be written.
+- The page gets one narrow bridge, `window.neuriteDesktop.update` (state, check, install,
+  onState), from a preload; still no `electronAPI` and no `startedViaElectron`, so link nodes
+  and everything else run as in a tab. The menu gains one command row, desktop only: "Check for
+  updates" with its state in a note under it, "Update to x.y.z" once one is found, and a dot on
+  the menu button while one waits.
+
+- [x] Phase 1 -- update-core.cjs and its unit tests (order, asset, place, swap in a temp dir).
+- [x] Phase 2 -- updater.cjs, preload.cjs, main.cjs wiring.
+- [x] Phase 3 -- the menu row, its states and the dot; an e2e spec with a stand-in bridge.
+- [x] Phase 4a -- a packaged build updates itself to the next patch from a local feed, in a scratch
+  folder (desktop/update.e2e.mjs), and refuses a DMG whose hash does not match.
+- [ ] Phase 4b -- the real one, from GitHub, after the next release.
+
+## Review
+
+- An adversarial review found eleven things, all answered. The old bundle went before the new
+  one had started, so a release that hashed right and would not open left no app: the old one
+  is kept until the new copy removes the marker, and one that has not within 30 seconds is
+  stopped, the old put back and opened (a hanging build, for real, in update.e2e.mjs). The
+  window's close saves and then closes whatever the save did: the update saves first and stops
+  if that fails. A six-hourly check in flight could put "Update to x" back over a download and
+  let a second install start: one check at a time, its answer dropped once an install began,
+  and the install takes the version the reader confirmed. Launch cleared any
+  `.x-1.2.3-update.app` beside the bundle: only its own stages now. A feed or download that
+  stalled kept the row busy for good: 30 seconds of nothing gives up. The DMG was checked
+  against Info.plist and run by package.json: both. The script's `sleep` came from PATH, which
+  turned the minute's wait into 0.4 s with PATH=/usr/bin: every tool by its path. A failed IPC
+  call said nothing; a confirm the page skipped on stale state could install; a DMG without a
+  digest was called "no Mac app".
+- Mine, found by the rollback test: the launch that should clear the put-back stage could not,
+  because Electron's fs reads app.asar as a folder and its `rm` failed inside it, silently.
+  Bundles are removed with `original-fs`.
+- A second round found five, in what the first round's answers added, and they are answered:
+  "started" was the main process reaching its updater, so a release whose page throws on load
+  still cost the old app -- it is the page saying `appReady` now, and such a build is rolled
+  back, for real, in update.e2e.mjs; `saveNow`'s own `false` (the last graph did not reopen) was
+  taken for a save; two installs in one tick both passed the guard, which is now taken before
+  the first await; a check could still publish "available" over a download that began during
+  its last await; and the way back said "the old one is back" before either rename, then
+  reopened whatever was at the path -- each rename is checked now, a failure says where the old
+  bundle is, and the copy that would not start is never reopened. The watchdog waits a minute.
+- A third round found eight, answered: `saveNow` resolves after a first write that failed, which
+  savenet logs and swallows, so `lastSaveError` now says so; an edit after the update's own save
+  rode on the window's, which closes whatever happens -- for an update it closes only over a
+  save that worked, and stays open otherwise; `appReady` comes before the graph is restored, so
+  started is now the graph back (`whenRestored`); one TERM and a second let a copy deaf to TERM
+  keep the profile's lock -- it is KILLed three seconds on; a profile inside the bundle would go
+  with it, so such a copy is not updated in place; a cancelled quit left the row "installing" --
+  25 seconds on it is taken back, and the swap script, finding no marker and no stage, changes
+  nothing when the app does quit; a block found only at install did not reach the row; the docs
+  said 30 seconds.

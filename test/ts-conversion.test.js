@@ -145,6 +145,7 @@ const EXTERNALLY_PROVIDED = new Set([
     'ResizeObserver', 'scrollTo', 'scrollX', 'scrollY',
     'showOpenFilePicker', 'showSaveFilePicker', 'visualViewport',
     'electronAPI',              // Electron preload
+    'neuriteDesktop',           // the Mac app's preload, desktop/preload.cjs (#76)
     'js', 'zettelkastenProcessor'
 ]);
 
