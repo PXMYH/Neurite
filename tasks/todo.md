@@ -424,3 +424,13 @@ touch spec's first-frame test), and an imported note's centre fell on its first 
 keeps the 72px floor it had. And the import test put the caret at the end with
 ControlOrMeta+End, which on a Mac is Meta+End and moves nothing (measured: 0 of 43); it had
 passed only while the click landed on the last line.
+
+## Review
+
+- An adversarial review found four, and a test gap. A resize writes `width: 100%` on the well,
+  which with its inset ran 16px past the card, and a Saved Graph kept the write -- the well is
+  `width: auto !important`; a selected collapsed card took the card's corner radius over its
+  disc's circle; an imported note's description sat outside the well's line; a tag's hover no
+  longer showed. And 26-text-card read the custom properties rather than what is drawn: it now
+  photographs the chip and finds a pixel of the Node's colour, and reads the tag's computed
+  colour; switching each consumer rule off fails it.

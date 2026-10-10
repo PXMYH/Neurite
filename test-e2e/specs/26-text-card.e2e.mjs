@@ -33,12 +33,48 @@ const card = (title) => page.evaluate((t) => {
     };
 }, title);
 
+// What is on screen, not what a property says: a property can be right while the rule that reads
+// it is gone (a review: switching the consumer off left an earlier version of these green). The
+// chip is photographed and decoded in the page, and the pixel most like a colour is returned.
+const nearestPixel = async (selector, title) => {
+    const box = await page.evaluate(([sel, t]) => {
+        const node = Object.values(Graph.nodes).find((n) => n.getTitle() === t);
+        const r = node.view.div.querySelector(sel).getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }, [selector, title]);
+    const png = (await page.screenshot({ clip: box })).toString('base64');
+    return page.evaluate(async ([data, t]) => {
+        const node = Object.values(Graph.nodes).find((n) => n.getTitle() === t);
+        const want = Node.colourOf(node).slice(1).match(/../g).map((h) => parseInt(h, 16));
+        const bmp = await createImageBitmap(await (await fetch('data:image/png;base64,' + data)).blob());
+        const canvas = Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bmp, 0, 0);
+        const px = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
+        let best = Infinity;
+        for (let i = 0; i < px.length; i += 4) {
+            best = Math.min(best, Math.hypot(px[i] - want[0], px[i + 1] - want[1], px[i + 2] - want[2]));
+        }
+        return Math.round(best);
+    }, [png, title]);
+};
+// `rgb(…)` or `color(srgb …)` -> [r, g, b] in 0-255.
+const channels = (css) => {
+    const srgb = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(css);
+    if (srgb) return srgb.slice(1).map((v) => Math.round(Number(v) * 255));
+    return /rgba?\((\d+), (\d+), (\d+)/.exec(css).slice(1).map(Number);
+};
+
 test('a card shows its kind before its title, in its colour, and keeps one chip through a reload', async () => {
     await addNote(page, 'Alpha', 'alpha');
     const first = await card('Alpha');
     assert.deepEqual([first.chips, first.first, first.glyph], [1, 'card-kind', '#note-icon-symbol']);
-    // The glyph's copy of the symbol takes its stroke from this property (foundation.css).
+    // The glyph's copy of the symbol takes its stroke from this property (foundation.css), and
+    // the glyph is drawn in it: some pixel of the chip is the Node's colour, give or take its
+    // edges' blending.
     assert.equal(first.stroke, first.colour);
+    const off = await nearestPixel('.card-kind', 'Alpha');
+    assert.ok(off < 40, `no pixel of the chip is near ${first.colour}: the nearest is ${off} away`);
 
     // A Saved Graph brings back the chip it was saved with; the card makes its own anew.
     await page.evaluate(() => App.viewGraphs.saveNow());
@@ -67,6 +103,8 @@ test('a card\'s controls wait until it is wanted, where there is a pointer to wa
 
 test('the prose sits in an opaque well inset from the card, under three brackets and the grip', async () => {
     await addNote(page, 'Alpha', 'alpha');
+    // A resize writes `width: 100%` on the well, which ran it past the card (a review).
+    await page.evaluate(() => { Object.values(Graph.nodes)[0].textNodeSyntaxWrapper.style.width = '100%' });
     const c = await card('Alpha');
     for (const side of ['left', 'bottom']) assert.ok(Math.abs(c.well[side] - c.card[side]) >= 8, `the well is flush with the card's ${side}`);
     assert.ok(c.card.right - c.well.right >= 8, "the well is flush with the card's right");
@@ -83,6 +121,11 @@ test('a link\'s tag is in the colour of the Node it names', async () => {
     const target = await card('Target');
     assert.deepEqual(source.tags, [['Target', target.colour]]);
     assert.deepEqual(target.tags, [['Source', source.colour]]);
+    // And the label is drawn in it: 80% of the named Node's colour, 20% white.
+    const drawn = await page.evaluate(() => getComputedStyle(document.querySelector('.link-chip-label')).color);
+    const [first] = await page.evaluate(() => [...document.querySelectorAll('.link-chip')].map((c) => c.style.getPropertyValue('--chip-colour')));
+    const want = first.slice(1).match(/../g).map((h) => Math.round(parseInt(h, 16) * 0.8 + 255 * 0.2));
+    channels(drawn).forEach((v, i) => assert.ok(Math.abs(v - want[i]) <= 2, `the tag's label is ${drawn}, not ${want}`));
 });
 
 test('a collapsed card is its disc, with no chip and no brackets', async () => {
