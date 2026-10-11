@@ -108,6 +108,9 @@ Modal.open = function (contentId) {
 
     Modal.current = modal;
     Modal.div.style.display = 'flex';
+    // The tooltip of what opened it, which Enter on a focused tool leaves up: it is drawn over
+    // the dialogs (panels.css, #83), and stood over this one.
+    HoverTooltip.hide();
 
     // Remove any previously applied custom class automatically.
     if (Modal.currentCustomClass) {

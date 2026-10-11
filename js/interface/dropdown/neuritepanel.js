@@ -226,6 +226,15 @@ class NeuritePanel {
         panels.forEach(({ labelId, panel }) => {
             const labelElement = document.querySelector(`label[for="${labelId}"]`);
             if (labelElement) {
+                // A fold's row, drawn as one (#83): Tab reaches it, Enter and Space open it, and
+                // it says whether it is open. It took a click and nothing else.
+                labelElement.tabIndex = 0;
+                labelElement.setAttribute('role', 'button');
+                labelElement.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    labelElement.click();
+                });
                 labelElement.addEventListener('click', async () => {
                     togglePanel(panel);
                     panels.forEach(({ panel: otherPanel }) => {
@@ -233,6 +242,7 @@ class NeuritePanel {
                             togglePanel(otherPanel);
                         }
                     });
+                    this.syncFolds();
                 });
             } else {
                 Logger.err(`Label for ${labelId} not found.`);
@@ -240,10 +250,26 @@ class NeuritePanel {
         });
     }
 
-    open(refresh = false) {
+    // Each fold's row says whether it is open (`aria-expanded`), however it was opened: by
+    // `panel-open`, which `togglePanel` sets and clears at once, where `hidden` waits for the fold's
+    // transition to end.
+    syncFolds() {
+        for (const [id, panel] of [['profilePanel', this.profilePanel], ['usagePanel', this.usagePanel],
+                                   ['modelsPanel', this.modelsPanel]]) {
+            document.querySelector(`label[for="${id}"]`)?.setAttribute('aria-expanded', String(Boolean(panel?.classList.contains('panel-open'))));
+        }
+    }
+
+    // The window, wired and open on Usage; `open` asks for the balance as well.
+    show() {
         Modal.open(this.modalId);
         this.initializeElements();
         togglePanel(this.usagePanel);
+        this.syncFolds();
+    }
+
+    open(refresh = false) {
+        this.show();
         this.fetchUserBalance(refresh);
     }
 

@@ -45,6 +45,7 @@ function renderPromptList() {
         const listItem = Html.new.div();
         const className = (index === promptLibrary.currentPromptIndex ? 'selected' : '');
         const input = Html.make.input(className);
+        input.type = 'text';
         input.value = prompt.title;
         On.click(input, selectPrompt.bind(null, index));
         On.change(input, (e)=>updatePromptTitle(index, e.target.value) );

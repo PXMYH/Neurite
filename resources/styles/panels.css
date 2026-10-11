@@ -2071,9 +2071,10 @@
 }
 
     .options-replacer div {
-        min-height: 28px;
+        min-height: var(--menu-item-h);
+        box-sizing: border-box;
         align-items: center;
-        padding: 4px 10px;
+        padding: 0 10px;
         border-radius: var(--menu-item-radius);
         color: var(--text-primary);
         font-size: 13px;
@@ -2331,5 +2332,26 @@
     #customModal .modal-footer > * {
         height: 44px;
         min-width: 96px;
+    }
+
+    .menu-row,
+    .settings-nav-item {
+        height: auto;
+        min-height: var(--menu-item-h);
+    }
+
+    .ai-node-button {
+        width: var(--control-h);
+        height: var(--control-h);
+    }
+
+    #customModal .question-button {
+        width: 32px;
+        height: 32px;
+    }
+
+    #customModal .modal-overlay-close {
+        width: 40px;
+        height: 40px;
     }
 }

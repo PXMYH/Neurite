@@ -199,3 +199,60 @@ test('the AI node\'s buttons and settings are the Settings controls, even on a c
     });
     assert.deepEqual(gear, ['true', 'grid']);
 });
+
+// Found by the second review: Escape while Adjust Controls waited for a key bound "Escape" and
+// closed the dialog, and a key pressed after its close button bound that key; a tool opened from
+// the keyboard left its tooltip up over the dialog; Neurite's folds took no key at all.
+test('the dialogs answer the keyboard: a key being bound, a tool\'s tooltip, a fold', async () => {
+    await page.evaluate(() => openControlsModal());
+    const was = await page.evaluate(() => controls.shiftKey.value || controls.shiftKey.default);
+    await page.click('#customModal #shiftKeyInput');
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await page.evaluate(() => [Modal.current?.id, controls.shiftKey.value || controls.shiftKey.default,
+        document.querySelector('#customModal #shiftKeyInput').innerText]), ['controls-modal', was, was],
+        'Escape was bound, or closed the dialog');
+    await page.click('#customModal #shiftKeyInput');
+    await page.click('#customModal .close');
+    await page.keyboard.press('k');
+    assert.equal(await page.evaluate(() => controls.shiftKey.value || controls.shiftKey.default), was,
+        'a key pressed after the dialog closed was bound');
+
+    await page.focus('.tool-bar .ai-icon');
+    await page.waitForTimeout(200);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(200);
+    assert.deepEqual(await page.evaluate(() => [Modal.current?.id,
+        document.querySelector('.ui-tooltip')?.classList.contains('ui-tooltip-visible') ?? false]), ['aiModal', false],
+        "the tool's tooltip stayed up over its dialog");
+    await page.click('#customModal .close');
+
+    // Opened and wired as `neuritePanel.open` does it, short of asking the server for a balance:
+    // off neurite.network that ends in an alert in its place. It opens on Usage.
+    await page.evaluate(() => neuritePanel.show());
+    const folds = () => page.evaluate(() => ['profilePanel', 'usagePanel'].map((id) => {
+        const label = document.querySelector(`#customModal label[for="${id}"]`);
+        return [label.tabIndex, label.getAttribute('role'), label.getAttribute('aria-expanded')];
+    }));
+    assert.deepEqual(await folds(), [[0, 'button', 'false'], [0, 'button', 'true']]);
+    await page.focus('#customModal label[for="profilePanel"]');
+    await page.keyboard.press('Enter');
+    assert.deepEqual(await folds(), [[0, 'button', 'true'], [0, 'button', 'false']], 'Enter did not open the fold');
+});
+
+test('menu rows and buttons are a finger\'s size under a coarse pointer, and a select\'s rows are menu rows', async () => {
+    const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+    const row = coarse ? 40 : 32;
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    assert.equal(await page.evaluate(() => Math.round(document.querySelector('#menuList .menu-row').getBoundingClientRect().height)), row);
+    await page.click('.menu-button');
+    await openSettings(page, 'editing');
+    if (coarse) {
+        assert.equal(await page.evaluate(() => Math.round(document.querySelector('.settings-nav-item').getBoundingClientRect().height)), 40);
+    }
+    await page.click('#controls-button');
+    await page.click('#customModal .select-replacer');
+    await page.waitForSelector('.options-replacer.show');
+    assert.equal(await page.evaluate(() => Math.round(document.querySelector('.options-replacer.show div').getBoundingClientRect().height)), row,
+        "a select's row is not a menu row");
+});
