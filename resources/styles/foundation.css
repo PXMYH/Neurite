@@ -388,6 +388,12 @@ body.connect-mode .window textarea {
         border-radius: var(--card-radius) var(--card-radius) 0 0;
     }
 
+        /* A collapsed card is its disc under the header, so the header keeps the padding it
+           had: with this one the disc sat 22 px below the card's centre (5 px before). */
+        .window.collapsed:has(.editor-wrapper) > .header-container {
+            padding: 2px 8px 2px 10px;
+        }
+
         /* The rule under the title is still what says the title has the caret. */
         .window:has(.editor-wrapper) > .header-container:focus-within {
             border-bottom-color: var(--ui-accent);

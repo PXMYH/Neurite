@@ -434,3 +434,9 @@ passed only while the click landed on the last line.
   longer showed. And 26-text-card read the custom properties rather than what is drawn: it now
   photographs the chip and finds a pixel of the Node's colour, and reads the tag's computed
   colour; switching each consumer rule off fails it.
+- A second round found two: the collapsed card kept the header's new padding, which sat its disc
+  22 px below the card's centre (5 px on main) -- the collapsed header keeps the old padding; and
+  the well stayed 284-340 px whatever the card was resized to, a strip of card beside it when
+  wider and running out of it when narrower -- on main too, but the inset well made it show. A
+  resize now lets the well follow the card both ways (NodeView's resize writes `min-width: 0`
+  and `max-width: none` with its `width: 100%`). Measured before and after, and in 26-text-card.

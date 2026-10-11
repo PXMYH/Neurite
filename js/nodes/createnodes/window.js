@@ -874,12 +874,17 @@ class NodeView {
                 }
             }
 
+            // The prose follows the card both ways: capped at its natural 340px and floored at
+            // 284px, it left a strip of card beside it when the card was dragged wider and ran
+            // out of it when dragged narrower (#77, where the inset well made both show).
             if (node.textNodeSyntaxWrapper?.style)
                 setStyles(node.textNodeSyntaxWrapper.style, {
                     flexGrow: '1',
                     minHeight: '0px',
                     maxHeight: '100%',
                     width: '100%',
+                    minWidth: '0px',
+                    maxWidth: 'none',
                 });
 
             if (node.htmlView?.style)

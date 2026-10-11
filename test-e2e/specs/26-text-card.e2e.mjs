@@ -138,3 +138,37 @@ test('a collapsed card is its disc, with no chip and no brackets', async () => {
     });
     assert.deepEqual(state, ['none', 'none']);
 });
+
+// A second review: the well stayed 284-340px whatever the card was resized to, leaving a strip
+// of card beside it or running out of it; and the collapsed disc sat 22 px below the card's
+// centre under the new header's padding (5 px on main).
+test('the well follows a resized card both ways, and a collapsed card keeps its disc centred', { skip: isIPad && 'drags the grip with a mouse' }, async () => {
+    await addNote(page, 'Alpha', 'alpha');
+    const insets = () => page.evaluate(() => {
+        const d = Object.values(Graph.nodes)[0].view.div;
+        const c = d.getBoundingClientRect(), w = d.querySelector('.editor-wrapper').getBoundingClientRect();
+        return [Math.round(w.left - c.left), Math.round(c.right - w.right)];
+    });
+    const drag = async (dx) => {
+        const g = await page.evaluate(() => { const r = Object.values(Graph.nodes)[0].view.div.querySelector('.resize-handle').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+        await page.mouse.move(g.x, g.y);
+        await page.mouse.down();
+        await page.mouse.move(g.x + dx, g.y, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(300);
+    };
+    const [left] = await insets();
+    await drag(150);
+    assert.deepEqual(await insets(), [left, left], 'a wider card left a strip beside its well');
+    await drag(-300);
+    assert.deepEqual(await insets(), [left, left], 'a narrower card ran out of its well');
+
+    await page.evaluate(() => Object.values(Graph.nodes)[0].view.toggleCollapse());
+    await page.waitForTimeout(500);
+    const dy = await page.evaluate(() => {
+        const d = Object.values(Graph.nodes)[0].view.div;
+        const c = d.getBoundingClientRect(), disc = d.querySelector('.collapsed-circle').getBoundingClientRect();
+        return Math.round((disc.top + disc.height / 2) - (c.top + c.height / 2));
+    });
+    assert.ok(Math.abs(dy) <= 8, `the collapsed disc is ${dy} px off the card's centre`);
+});
