@@ -572,3 +572,14 @@ by `PageLoad.loadTabs`, which keeps `PageLoad.tabs` the one list the tests read.
   - 28-panels let a control past the row's edge pass, and a blank value pass for a slider at 0.
 - Full suite after C: Chromium 298 of 299 (1 skipped); as an iPad 256 passed, 40 skipped, and the
   3 that fail on main.
+- A second round found nothing.
+- Released as 1.9.0 (ec9687a; the asset's digest matches the DMG's SHA-256). desktop/update.e2e.mjs
+  had reached Check for updates through the menu's list, where it was a row until #78, so all
+  seven of its tests failed against the new app; it opens Settings first now, and passes 7/7.
+  The real thing, from GitHub: the scratch 1.8.0 found 1.9.0 by itself in 20 s, downloaded,
+  swapped, sealed and reopened as 1.9.0 with its note, its Updates in Settings, and its menu as
+  above.
+- Found after 1.9.0 shipped, on the real app's Settings: the universal `* { font-size: 16px }`
+  held the update button's label, the theme names and a dozen more words at 16px in rows of 12
+  and 13. They take their row's size now, 28-panels checks for any word left at 16px (failing on
+  1.9.0), and 1.9.1 carries it.

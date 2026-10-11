@@ -1,7 +1,7 @@
 {
   "name": "neurite-desktop",
   "productName": "Neurite",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "Neurite as a macOS app",
   "private": true,
   "main": "main.cjs",
