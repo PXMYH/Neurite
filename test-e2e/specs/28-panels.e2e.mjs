@@ -189,3 +189,29 @@ test('a Tab onto the segments leaves the panel where the segments are',
     });
     assert.deepEqual(s, { onSegment: true, inView: true });
 });
+
+// The universal `* { font-size: 16px }` reaches every element, so a span or a label inside a row
+// kept 16px where its row was 12 or 13: the update button's label, the theme names, the Ai panel's
+// slider labels and key names (found after 1.9.0 shipped). No words in a panel are that size now.
+test('no words in a panel are left at the universal 16px', async () => {
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    const found = [];
+    for (const [tab, row] of [['tab5', '#tablink-settings'], ['tab4', '#tablink-ai'], ['tab3', '#menuList .tablink:has-text("Help")']]) {
+        await page.click(row);
+        await page.waitForTimeout(250);
+        found.push(...await page.evaluate((tab) => {
+            const panel = document.getElementById(tab);
+            panel.querySelectorAll('details').forEach((d) => { d.open = true; });
+            document.getElementById('updateSettings').hidden = false;
+            return [...panel.querySelectorAll('*')]
+                .filter((el) => el.getClientRects().length && !el.closest('.visually-hidden, .CodeMirror')
+                    && [...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()))
+                .filter((el) => getComputedStyle(el).fontSize === '16px')
+                .map((el) => `${tab}: ${el.tagName.toLowerCase()} "${el.textContent.trim().slice(0, 24)}"`);
+        }, tab));
+        await page.click('#menuBackButton');
+        await page.waitForTimeout(150);
+    }
+    assert.deepEqual(found, []);
+});

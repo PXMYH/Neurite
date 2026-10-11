@@ -1167,3 +1167,28 @@
 .tool-bar svg use {
     color: inherit;
 }
+
+/* The universal `* { font-size: 16px }` in styles.css reaches every element, so a span or a label
+   inside a row does not take its row's size: these were 16px in rows of 12 and 13 (measured
+   across the four panels after 1.9.0 shipped). They take their row's now. */
+.menu-detail .key-button .menu-row-label,
+.menu-detail .theme-name,
+.menu-detail .color-picker-item label,
+#tab5 .fractal-equation #equation,
+#tab4 #aiParameterGrid label,
+#tab4 #aiParameterGrid span,
+#tab4 .api-inputs label,
+#howto .howto-controls b,
+#howto a {
+    font-size: inherit;
+}
+
+    /* And the exponent smaller than its z, as a superscript is everywhere else. */
+    #tab5 .fractal-equation #equation sup {
+        font-size: 0.7em;
+    }
+
+#tab4 #aiParameterGrid label,
+#tab4 #aiParameterGrid span {
+    color: inherit;
+}
