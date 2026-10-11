@@ -20,6 +20,10 @@ const updateValueSlider = (value, slider) => {
     value.value = newValue;
     slider.value = newValue;
     setSliderBackground(slider);
+    // Told, as a drag of it would be: the save of the Fractal's sliders and the theme's mark both
+    // listen to the slider, and a number typed in the box beside it reached neither (#79). Its own
+    // handlers only copy the value back into the box, and set again what the box just set.
+    slider.dispatchEvent(new Event('input'));
 }
 
 const aiTab = new AiTab();

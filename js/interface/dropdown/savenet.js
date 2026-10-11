@@ -760,10 +760,13 @@ View.Graphs = class {
         this.#updateDiskFileButton();
     }
 
+    // The look as well since #79, as the row promises: back to the Neurite theme, with a look of
+    // the reader's own kept as Custom (`Themes.apply`).
     #onBtnResetSettingsClicked(e){
         settings.clear();
         settings.init();
         editTab.init();
+        Themes.apply(Themes.list[0].look);
     }
     // Settings, keys and view history, as the button says -- and not the Graphs. It dropped
     // the `graphs` and `blobs` stores and the record of which Graph to reopen, under a
@@ -891,8 +894,14 @@ View.Graphs = class {
             // The Proposed Edges the reader dismissed, so they stay dismissed (#72).
             const dismissedEdges = `<div id="dismissed-edges" style="display:none;">${encodeURIComponent(JSON.stringify(ZetProposals.dismissedForSave()))}</div>`;
 
+            // Whether the universe shows, which a theme sets with the colours above (#79): a graph
+            // kept in Paper, which has none, came back with the colours and the universe on.
+            const universe = Elem.byId('universe-checkbox').checked ? 'on' : 'off';
+            const universeElement = `<div id="saved-universe" style="display:none;">${universe}</div>`;
+
             // Combine both slider values and saved views in one string
-            return savedInputValues + savedViewsElement + mandelbrotSaveElement + fractalTypeSaveElement + dismissedEdges;
+            return savedInputValues + savedViewsElement + mandelbrotSaveElement + fractalTypeSaveElement + dismissedEdges
+                 + universeElement;
         }
         // One damaged part costs itself, not the Graph. A saved-views block that did not decode
         // threw here -- after the screen was cleared and before any card was built -- so a file
@@ -942,6 +951,16 @@ View.Graphs = class {
 
             this.#restorePart(d, "#dismissed-edges", (elem)=>{
                 ZetProposals.restoreDismissed(JSON.parse(decodeURIComponent(elem.textContent)));
+            });
+
+            // A graph saved before #79 has none, and leaves the universe as it is.
+            this.#restorePart(d, "#saved-universe", (elem)=>{
+                const toggle = Elem.byId('universe-checkbox');
+                const on = (elem.textContent === 'on');
+                if (toggle.checked === on) return;
+
+                toggle.checked = on;
+                toggle.dispatchEvent(new Event('change'));
             });
         }
 

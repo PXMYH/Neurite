@@ -453,25 +453,32 @@ Fractal.trace_circle = function* (iters, z0, step = 0.5) {
     }
 };
 
-Fractal.color = function(iters, z){
-    let i = Fractal.dist(iters, z);
-    if (i < iters) return Color.strRgb(i);//outside set
-    //inside set
-    i = findInfimum(iters, z);
+// A line's colour in two steps (#79): what it is made from -- the escape value of the point it
+// starts at outside the set, the index of its orbit's infimum inside -- and that through the
+// palette. The first is the costly half, an orbit traced for every line, and it depends on the
+// equation the line was drawn under; the second is what a theme changes.
+Fractal.colourIndex = function(iters, z){
+    const i = Fractal.dist(iters, z);
+    if (i < iters) return {outside: true, i};
     //i = findPeriod(z);
-    return Color.strRgb(i.i * 123 + 2, (1 - nodeMode_v), 128, 32 + (1 - nodeMode_v) * 48);
+    return {outside: false, i: findInfimum(iters, z).i};
 }
+Fractal.colourOf = function(index){
+    if (index.outside) return Color.strRgb(index.i);
+    return Color.strRgb(index.i * 123 + 2, (1 - nodeMode_v), 128, 32 + (1 - nodeMode_v) * 48);
+}
+Fractal.color = function(iters, z){ return Fractal.colourOf(Fractal.colourIndex(iters, z)) }
 
 // Every line on screen in the colours as they are now (#79). A line takes its colour once, when it
-// is drawn, from the point it starts at -- the first of `data-original-points` -- so a new theme
-// reached the screen one new line at a time: measured, most lines still wore the old palette
-// 3.5 s after one was chosen. Read with a pattern rather than `JSON.parse`, which would read
-// every point of every line for the first. The Edges in `svg_bg` carry no such attribute.
+// is drawn, so a new theme reached the screen one new line at a time: measured, most lines still
+// wore the old palette 3.5 s after one was chosen. Repainted from the index each line keeps
+// (`data-colour`), not traced again: tracing every line's orbit was a million steps at 2048 lines,
+// and a line kept from another equation (Alt+F) would have been coloured as this one's. A line
+// with no index -- drawn by a build before this one -- is left to be drawn again.
 Fractal.recolour = function(){
-    const iters = settings.iterations;
-    for (const path of svg_bg.querySelectorAll('path[data-original-points]')) {
-        const start = path.dataset.originalPoints.match(/^\[\{"x":([^,]+),"y":([^}]+)\}/);
-        if (start) path.setAttribute('stroke', Fractal.color(iters, new vec2(Number(start[1]), Number(start[2]))));
+    for (const path of svg_bg.querySelectorAll('path[data-colour]')) {
+        const kept = path.dataset.colour;
+        path.setAttribute('stroke', Fractal.colourOf({outside: kept[0] === 'o', i: Number(kept.slice(1))}));
     }
 }
 
@@ -678,12 +685,14 @@ Fractal.generate_path_data = function(pt, num_pts_max) {
     if (length === 0) return null;
 
     const width = Math.min(settings.renderWidthMult * length / num_pts, 0.1);
-    color = Fractal.color(iters, opt);
+    const colourIndex = Fractal.colourIndex(iters, opt);
+    color = Fractal.colourOf(colourIndex);
 
     return {
         originalPoints,
         width,
         color,
+        colourIndex,
         opacity,
         length
     };
@@ -704,6 +713,10 @@ Fractal.build_path_d = function(points) {
     }
     return path;
 }
+// `o` or `i`, outside or inside, then the number: what `Fractal.recolour` reads back.
+Fractal.keepColourIndex = function(path, index){
+    path.setAttribute('data-colour', (index.outside ? 'o' : 'i') + index.i);
+}
 Fractal.hair_svg_path = function(pt, num_pts_max) {
     const pathData = Fractal.generate_path_data(pt, num_pts_max);
     if (!pathData) return null;
@@ -711,6 +724,7 @@ Fractal.hair_svg_path = function(pt, num_pts_max) {
     const path = Svg.new.path();
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', pathData.color);
+    Fractal.keepColourIndex(path, pathData.colourIndex);
     path.setAttribute('stroke-width', String(pathData.width * Svg.zoom));
     path.setAttribute('stroke-opacity', String(pathData.opacity));
     path.setAttribute('data-original-points', JSON.stringify(pathData.originalPoints));
@@ -724,6 +738,7 @@ Fractal.hair_svg_path_delayed = function(pt, num_pts_max) {
     const path = Svg.new.path();
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', pathData.color);
+    Fractal.keepColourIndex(path, pathData.colourIndex);
     path.setAttribute('stroke-width', String(pathData.width * Svg.zoom));
     path.setAttribute('stroke-opacity', pathData.opacity);
     path.setAttribute('data-original-points', JSON.stringify(pathData.originalPoints));

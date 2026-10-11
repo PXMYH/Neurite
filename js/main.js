@@ -360,7 +360,9 @@ class PageLoad {
         const ids = Object.keys(tabs);
         const now = ids.filter( (id)=>Elem.byId(id) );
         await Promise.all(now.map( (id)=>this.loadTab(id, tabs[id]) ));
-        await Promise.all(ids.filter( (id)=>!now.includes(id) ).map( (id)=>this.loadTab(id, tabs[id]) ));
+        const later = ids.filter( (id)=>!now.includes(id) );
+        for (const id of later.filter( (id)=>!Elem.byId(id) )) Logger.warn("No slot to load", tabs[id], "into:", id);
+        await Promise.all(later.filter( (id)=>Elem.byId(id) ).map( (id)=>this.loadTab(id, tabs[id]) ));
     }
     static tabs = {
         'function-call-slot': 'functioncallingpanel.html',

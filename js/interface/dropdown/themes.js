@@ -48,6 +48,8 @@ const Themes = {
             const value = Elem.byId(id).value;
             look[key] = (value.startsWith('#') ? value.toLowerCase() : Number(value));
         }
+        // The slider runs to 360, which turns the page as far as 0 does.
+        look.hue %= 360;
         return look;
     },
     same(a, b){ return Object.keys(Themes.list[0].look).every( (key)=>(a[key] === b[key]) ) },
@@ -159,11 +161,24 @@ const Themes = {
         Themes.sync();
     },
 
+    // The page's filters undone, as nearly as a filter can: `invert(p)` is `contrast(1 - 2p)`
+    // (it keeps 0.5 where it is and scales about it), so below 50% it is undone by the contrast
+    // that scales back, and above it by inverting first. Exact at 0 and 100%, which are a theme's;
+    // in between the page squeezes everything under it into a narrower band, and no picture under
+    // the filter can show more of the band than it lets through. 50% the slider skips.
+    undoFilter(look){
+        const p = look.inversion / 100;
+        const turn = `hue-rotate(${-look.hue}deg)`;
+        if (p === 0) return turn;
+        if (p === 1) return turn + ' invert(100%)';
+        return (p < 0.5) ? `${turn} contrast(${1 / (1 - 2 * p)})`
+                         : `${turn} invert(100%) contrast(${1 / (2 * p - 1)})`;
+    },
+
     // The card the controls are, checked, and Custom drawn when they are no theme or the reader
     // has a look of their own to come back to. Each preview is shown as its look would make the
     // page: the page's own filters lie over the menu too (`#invert-filter`), so a preview takes
-    // its look's filters and then undoes the page's -- exactly, for the inversions of 0 and 100%
-    // a theme uses, and near enough for a Custom one in between.
+    // its look's filters and then undoes the page's (`undoFilter`).
     sync(){
         const now = Themes.current();
         const theme = Themes.themeOf(now);
@@ -176,7 +191,7 @@ const Themes = {
         else if (custom) Themes.grid.append(Themes.card('custom', "Custom", custom));
         else customCard?.remove();
 
-        const undo = `hue-rotate(${-now.hue}deg) invert(${now.inversion}%)`;
+        const undo = Themes.undoFilter(now);
         for (const card of Themes.grid.children) {
             const input = card.querySelector('input');
             input.checked = (input.value === (theme?.id ?? 'custom'));

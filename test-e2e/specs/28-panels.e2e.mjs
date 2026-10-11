@@ -42,7 +42,10 @@ test('a section is a heading at the left over a group of rows', async () => {
     assert.match(s.fill, /rgba\(255, 255, 255, 0\.0[3-5]/, `the group has no fill of its own: ${s.fill}`);
     assert.equal(s.radius, '8px');
     assert.ok(s.rowHeight >= 36, `a row is ${s.rowHeight}px tall`);
-    assert.ok(s.labelLeft <= 13 && s.fieldRight <= 13, `the row is not label-left, field-right: ${JSON.stringify(s)}`);
+    // Inside the row as well as near its edges: a control that ran out past the row passed this
+    // while it read only `<= 13` (a review).
+    assert.ok(s.labelLeft >= 0 && s.labelLeft <= 13 && s.fieldRight >= 0 && s.fieldRight <= 13,
+        `the row is not label-left, field-right: ${JSON.stringify(s)}`);
     assert.deepEqual(errors, []);
 });
 
@@ -65,7 +68,8 @@ test('every slider in Settings is one row, and says its value', async () => {
         }));
     assert.ok(rows.length >= 20, `only ${rows.length} slider rows were found`);
     for (const row of rows) {
-        assert.ok(row.shown !== null, `${row.id} says nothing of its value`);
+        // Not blank either: `Number('')` is 0, which a slider at 0 would have matched (a review).
+        assert.ok(row.shown !== null && String(row.shown).trim() !== '', `${row.id} says nothing of its value`);
         assert.equal(Number(row.shown), Number(row.value), `${row.id} shows ${row.shown} for ${row.value}`);
         assert.ok(row.sameLine && row.height < 48, `${row.id} is not one row: ${JSON.stringify(row)}`);
     }
@@ -164,4 +168,24 @@ test('what cannot be undone is red, and still asks', async () => {
     await page.click('#clearLocalStorage');
     await page.waitForFunction(() => Modal.current?.id === 'confirmModal', undefined, { timeout: 5000 });
     await page.click('#customModal .modal-cancel');
+});
+
+// The segments' radios are out of sight and take the focus. Placed against the panel rather than
+// their own segment, a Tab onto them scrolled Settings to its top, with the ring off screen.
+test('a Tab onto the segments leaves the panel where the segments are',
+     { skip: isIPad && 'WebKit Tab skips radios by default' }, async () => {
+    await openPanel(page, '#tablink-settings');
+    await page.evaluate(() => document.getElementById('placementHeading').scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(100);
+    // From the field just before them, the Link tag.
+    await page.focus('#ref-tag');
+    await page.keyboard.press('Tab');
+    const s = await page.evaluate(() => {
+        const el = document.activeElement;
+        const panel = document.querySelector('.dropdown-content').getBoundingClientRect();
+        const option = el.closest('.segmented-option')?.getBoundingClientRect();
+        return { onSegment: el.name === 'zetPathTypeDropdown-segments',
+                 inView: Boolean(option) && option.top >= panel.top && option.bottom <= panel.bottom };
+    });
+    assert.deepEqual(s, { onSegment: true, inView: true });
 });

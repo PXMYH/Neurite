@@ -548,3 +548,27 @@ drawn, and most of them still wore the old palette 3.5 s after a theme was chose
 `Fractal.recolour` repaints the lines on screen. The page filters lie over the menu too, so each
 card's picture undoes them. And the slot inside another tab's markup is loaded in a second round
 by `PageLoad.loadTabs`, which keeps `PageLoad.tabs` the one list the tests read.
+
+## Review
+
+- An adversarial review (Codex, read-only) found seven, and two tests that could not fail. Each
+  answered, and each new test fails on the code before its fix:
+  - a graph kept its theme's colours and not its universe, so Paper came back as Custom with the
+    sky on: a graph saves the universe too (`#saved-universe`);
+  - a number typed beside a slider set the slider without telling it, so it was neither saved nor
+    seen by the theme's mark -- on main too, for every slider the panel saves with a graph:
+    `updateValueSlider` sends the slider's `input`;
+  - under a partial inversion the pictures were the page's filter applied twice: `invert(p)` is
+    `contrast(1 - 2p)`, so it is undone by the contrast that scales back, as far as the band the
+    page leaves can show;
+  - the recolour traced every line's orbit again, a million steps at 2048 lines, and coloured a
+    line kept from another equation as this one's: a line keeps its colour index (`data-colour`)
+    and is repainted from it;
+  - the segments' radios were placed against the panel, so a Tab onto them scrolled Settings to
+    its top: each segment is positioned;
+  - Reset left the theme as it was under a row that said "every setting": it puts the theme back
+    to Neurite, keeping a look of the reader's own as Custom, and says so;
+  - a hue of 360 read as a look of its own: the hue is taken round the wheel.
+  - 28-panels let a control past the row's edge pass, and a blank value pass for a slider at 0.
+- Full suite after C: Chromium 298 of 299 (1 skipped); as an iPad 256 passed, 40 skipped, and the
+  3 that fail on main.
