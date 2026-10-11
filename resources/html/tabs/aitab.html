@@ -265,4 +265,21 @@
             </div>
         </div>
     </details>
+
+    <!-- The function console (#78), which sat folded at the foot of the whole menu under a
+         strip that said only "Set Task...", where nothing told a reader what it was. It is
+         the one way to have the AI act on the canvas rather than write into a note: a task
+         goes to the model with the Neural API's description (`Prompt.neuralApi`), the
+         JavaScript that comes back is shown here and run, and each run stays in the list.
+         The Neural API's vision loop drives it too (`Animation.movementAi`).
+         Here, because it is an AI feature and does nothing without a model: under the Ai
+         row it is hidden with the rest of AI while AI features are off. Folded, as API Keys
+         is, by the same native `<details>`; `functioncallingpanel.js` refreshes its editor
+         when it opens. The console's markup is loaded into the slot after this panel's,
+         because the slot is in it (`PageLoad.mainLoad`). -->
+    <details class="settings-section settings-fold" id="functionConsoleFold">
+        <summary class="button-label settings-heading">Tasks <svg class="fold-mark" aria-hidden="true" viewBox="0 0 24 24"><use xlink:href="#chevron-down-icon"></use></svg></summary>
+        <p class="settings-note">Ask the AI to do something on the canvas: move the view, make notes, change the Fractal. It writes the JavaScript, shows it here, and runs it.</p>
+        <div id="function-call-slot"></div>
+    </details>
 </div>

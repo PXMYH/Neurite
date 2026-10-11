@@ -18,6 +18,8 @@ const BUNDLE = fileURLToPath(new URL('../fixtures/notes-bundle', import.meta.url
 
 async function importBundle(page, { answer } = {}) {
     await page.click('.menu-button');
+    // Under Import since #78, with the Neurite file beside it.
+    await page.click('#import-button');
     const chooser = page.waitForEvent('filechooser');
     await page.click('#import-notes-button');
     await (await chooser).setFiles(BUNDLE);

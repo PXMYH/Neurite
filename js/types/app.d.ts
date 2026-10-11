@@ -55,7 +55,7 @@ declare namespace On {
     var mouseover: EvBinder; var mouseup: EvBinder; var paste: EvBinder;
     var pointercancel: EvBinder; var pointerdown: EvBinder; var pointermove: EvBinder;
     var pointerout: EvBinder; var pointerover: EvBinder; var pointerup: EvBinder;
-    var resize: EvBinder; var scroll: EvBinder; var touchcancel: EvBinder;
+    var resize: EvBinder; var scroll: EvBinder; var toggle: EvBinder; var touchcancel: EvBinder;
     var touchend: EvBinder; var transitionend: EvBinder;
     var visibilitychange: EvBinder;
     var webglcontextlost: EvBinder; var webglcontextrestored: EvBinder;
@@ -78,7 +78,7 @@ declare namespace Off {
     var mouseover: EvBinder; var mouseup: EvBinder; var paste: EvBinder;
     var pointercancel: EvBinder; var pointerdown: EvBinder; var pointermove: EvBinder;
     var pointerout: EvBinder; var pointerover: EvBinder; var pointerup: EvBinder;
-    var resize: EvBinder; var scroll: EvBinder; var touchcancel: EvBinder;
+    var resize: EvBinder; var scroll: EvBinder; var toggle: EvBinder; var touchcancel: EvBinder;
     var touchend: EvBinder; var touchmove: EvBinder; var touchstart: EvBinder;
     var transitionend: EvBinder; var visibilitychange: EvBinder; var wheel: EvBinder;
     var webglcontextlost: EvBinder; var webglcontextrestored: EvBinder;

@@ -2,9 +2,9 @@
 
 <div class="function-call-container">
 
-    <!-- Sub-dropdown for function calls. `inert` while folded (`togglePanel`), or its
-         controls are Tab stops at height 0. -->
-    <div class="function-call-panel hidden" inert>
+    <!-- Folded by the `<details>` round it in the Ai panel (#78), which takes its controls
+         out of the Tab order while it is closed; the strip that folded it here is gone. -->
+    <div class="function-call-panel">
         <!-- Function call list -->
         <div class="function-call-list custom-scrollbar">
             <!-- Function call items will be added here dynamically -->
@@ -22,7 +22,7 @@
                 </button>
 
                 <div class="input-group" style="display: flex; position: relative; width: 60%;">
-                    <textarea id="function-prompt" class="custom-scrollbar function-prompt-textarea" rows="1" oninput="autoGrow(event);" placeholder="Set Task..." required></textarea>
+                    <textarea id="function-prompt" class="custom-scrollbar function-prompt-textarea" rows="1" oninput="autoGrow(event);" placeholder="Describe a task…" aria-label="Task for the AI" required></textarea>
 
                     <div class="status-icons-container" style="position: absolute; right: 42px; top: 50%; transform: translateY(-50%);">
                         <!-- Status icons here -->
@@ -56,20 +56,5 @@
         <div class="function-codemirror-container">
             <textarea id="neurite-function-cm"></textarea>
         </div>
-    </div>
-    <!-- Toggle button for function call panel: a button to the keyboard and to a screen
-         reader as well (`togglepanel.js` answers Enter and Space), not only to a mouse. -->
-    <div class="toggle-panel" onclick="toggleFunctionCallPanel()" role="button" tabindex="0"
-         aria-label="Function console" aria-expanded="false">
-        <div class="bar left-bar"></div>
-        <div class="icon-wrapper">
-            <!-- Wrapper for the icon only -->
-            <div class="toggle-icon">
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <use xlink:href="#chevron-down-icon"></use>
-                </svg>
-            </div>
-        </div>
-        <div class="bar right-bar"></div>
     </div>
 </div>

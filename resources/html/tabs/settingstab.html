@@ -15,6 +15,24 @@
 
 <div class="submenu">
 
+    <!-- The Mac app's own updates (#76), here since #78: whether the app is current is a
+         setting of the app, and this is where one is looked for. `appupdate.js` shows the
+         section only where the app's bridge (`window.neuriteDesktop`) is, so a browser never
+         draws it, and while a release is ready it puts a dot on the Settings row as well as on
+         the menu button. First in the panel, because the time it matters is when that dot has
+         just led a reader here. The button's icon and label are written by `appupdate.js`. -->
+    <div class="settings-section" id="updateSettings" hidden>
+        <div class="button-label settings-heading">Updates</div>
+        <div class="settings-row">
+            <p class="settings-note" id="update-note"></p>
+            <button type="button" class="key-button update-button" id="update-button" aria-describedby="update-note"
+                    title="Look for a newer Neurite, and install it when there is one: the graph is saved, and the app closes and opens again as the new version.">
+                <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#refresh-icon"></use></svg>
+                <span class="menu-row-label">Check for updates</span>
+            </button>
+        </div>
+    </div>
+
     <div class="settings-section">
         <div class="button-label settings-heading">Input</div>
         <!-- The modal is left where it is. Its key inputs are rebuilt and rebound

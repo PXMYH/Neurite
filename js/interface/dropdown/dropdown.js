@@ -177,6 +177,19 @@ const MainMenu = {
 
 On.click(Elem.byId('menuBackButton'), MainMenu.showList);
 
+// Import's two sources, under the row that names them (#78): the row shows or hides them
+// and does nothing else, so `aria-expanded` and `hidden` are written here and only here.
+const ImportRow = {
+    row: Elem.byId('import-button'),
+    sources: Elem.byId('import-sources'),
+
+    show(open){
+        ImportRow.row.setAttribute('aria-expanded', String(open));
+        ImportRow.sources.hidden = !open;
+    }
+}
+On.click(ImportRow.row, ()=>ImportRow.show(ImportRow.sources.hidden));
+
 function openTab(tabId, element) {
     var i, tabcontent, tablinks;
 
@@ -209,9 +222,8 @@ const nodePanel = document.querySelector(".node-panel");
 // below keeps in step with `inert`. Set here rather than in the markup because
 // `inert` as an attribute would need removing on every open anyway, and this is the
 // one place that already knows which way round it is. It costs the panel nothing
-// measurable: `inert` is not a layout property, so the function console's CodeMirror
-// still measures itself the way the note on `.dropdown-content` in `styles.css`
-// requires -- which `display: none` is what would break.
+// measurable: `inert` is not a layout property, so nothing in the panel lays itself
+// out differently for it.
 dropdownContent.inert = true;
 
 On.paste(dropdownContent, (e)=>{
@@ -234,8 +246,8 @@ On.click(menuButton, (e)=>{
     // click at (200, 30) landed on `SPAN.menu-row-label` at 60ms and on
     // `DIV.dropdown-content` at 150ms, and one Tab at 30ms landed on
     // `#open-file-button`. Closing a menu to reach what was behind it and clicking
-    // straight away is an ordinary gesture, and `Record` is one of the rows under
-    // the pointer. `inert` is not a transitionable property, so it takes the whole
+    // straight away is an ordinary gesture, and `Share screen` is one of the rows
+    // under the pointer. `inert` is not a transitionable property, so it takes the whole
     // subtree out of hit-testing, the focus order and the AX tree on this tick
     // while leaving the slide itself exactly as it was.
     dropdownContent.inert = !isOpen;
@@ -256,6 +268,8 @@ On.click(menuButton, (e)=>{
         // tablinks -- one short of the tabs while Notes had no row. `openTab` hides
         // every `.tabcontent` and clears every `activeTab` itself.
         MainMenu.showList();
+        // Folded again, as a submenu is when its menu closes.
+        ImportRow.show(false);
 
         // If there's any selected text, deselect it
         if (window.getSelection) {

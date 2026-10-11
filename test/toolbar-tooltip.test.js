@@ -42,7 +42,8 @@ function controls(){
         const inner = pill.slice(from, pill.indexOf('</' + tag + '>', from));
         out.push({tag, attrs, inner});
     }
-    assert.equal(out.length, 7, 'expected the four creators, Connect, Search and Propose Edges: ' + out.length);
+    // Eight since Clear came over from the menu (#78).
+    assert.equal(out.length, 8, 'expected the four creators, Connect, Search, Propose Edges and Clear: ' + out.length);
     return out;
 }
 

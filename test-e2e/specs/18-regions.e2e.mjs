@@ -16,6 +16,8 @@ const BUNDLE = fileURLToPath(new URL('../fixtures/notes-bundle', import.meta.url
 
 async function importBundle(page) {
     await page.click('.menu-button');
+    // Under Import since #78, with the Neurite file beside it.
+    await page.click('#import-button');
     const chooser = page.waitForEvent('filechooser');
     await page.click('#import-notes-button');
     await (await chooser).setFiles(BUNDLE);
@@ -166,7 +168,7 @@ test('the Regions come back with the graph, and a new graph starts with the defa
         displaySavedCoordinates();
     });
     assert.ok((await views()).includes('Stored here'));
-    await page.click('.menu-button');
+    // A tool of the pill since #78, so no menu to open first.
     await page.click('#clear-button');
     await page.click('#customModal .modal-ok');
     await page.waitForTimeout(800);

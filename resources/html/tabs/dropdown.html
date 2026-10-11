@@ -119,6 +119,17 @@
                 <use xlink:href="#proposals-icon-symbol"></use>
             </svg>
         </button>
+        <!-- Clear came here from the menu (#78). It acts on the whole Graph as Search and
+             Propose do, and it is what a reader reaches for between one graph and the
+             next. It is the same control as it was: `savenet.js` binds it by id, asks
+             before it acts, and saves this graph before it empties the canvas. Last in
+             the group, so it is never the button between two others. -->
+        <button id="clear-button" class="tool-bar-action" aria-label="Clear"
+                data-tooltip="Clear: put this graph away and start an empty one. It asks first, and this graph is saved before the canvas is cleared.">
+            <svg aria-hidden="true">
+                <use xlink:href="#eraser-icon"></use>
+            </svg>
+        </button>
 
         <div class="tool-bar-divider" aria-hidden="true"></div>
 
@@ -143,7 +154,7 @@
          this island unnamed the moment the attribute changed.
 
          The tooltip names the commands first, in the order the rows are in. It named
-         only the panels, which was the whole menu when it was a strip of tabs; four
+         only the panels, which was the whole menu when it was a strip of tabs; three
          commands sit above them now. It names every panel, notes and help included:
          it left notes out while that tab had no row, and it is first again (#65).
 
@@ -162,7 +173,7 @@
          open, and the two `classList.toggle`s in `dropdown.js` are the only writes to
          that state in the tree. -->
     <button type="button" class="menu-button" aria-label="Menu" aria-expanded="false"
-            data-tooltip="Menu: open, save to disk and clear a graph, screenshot, record, and the notes, AI, fractal, views, settings and help panels">
+            data-tooltip="Menu: import a graph, save it to disk, share the screen, and the notes, AI, fractal, views, settings and help panels">
         <!-- A span, not the div it was: a `<button>` takes phrasing content, and the
              three bars are `position: absolute`, so the box is identical either way. -->
         <span class="menu-icon" id="menu-icon"></span>
@@ -185,52 +196,60 @@
                      no chevron, because there is no level to descend to. The menu does
                      not close around them either -- the only writes to the `open` class
                      in the tree are the two toggles in the hamburger's own handler, so
-                     Screenshot photographs the screen with this menu over it and Record
-                     starts the same way. That was equally true when both lived inside the
-                     Saves panel, so it is not new here; it is left as it was rather than
-                     described as something it is not.
-                     They were two rows deep -- Open, Save to… and Clear inside the
-                     Saves panel, Screenshot and Record below them -- and reaching a save
-                     of the graph took opening the menu, choosing a panel, and only then
-                     finding it.
+                     Share screen photographs the screen with this menu over it. That was
+                     equally true when it lived inside the Saves panel, so it is not new
+                     here; it is left as it was rather than described as something it is
+                     not.
 
-                     The first three are the whole life of a graph read left to right:
-                     bring one in, send one out, put this one away and start again. And
-                     those first two are the *only* way a graph is kept or restored: there
-                     is no list of graphs anywhere in this interface. A graph lives on the
-                     canvas, and its durable form is a `.neurite` file on disk -- which is
-                     the one copy no browser can evict, and the one a reader can move,
-                     back up and read the size of.
+                     Import and Save to… are the whole life of a graph read top to
+                     bottom: bring one in, send one out. And they are the *only* way a
+                     graph is kept or restored: there is no list of graphs anywhere in
+                     this interface. A graph lives on the canvas, and its durable form is
+                     a `.neurite` file on disk -- which is the one copy no browser can
+                     evict, and the one a reader can move, back up and read the size of.
 
                      Autosave still runs underneath, and it still reopens the last graph
                      on a refresh, so a reload or a crash costs nothing. What it is not is
                      a filing cabinet: it holds the graph you are in, and Save to… is what
                      keeps a graph you want to come back to.
 
-                     Five of the six rows cross the page's edge -- two move a `.neurite`
-                     file, one reads a folder of notes, two read the screen through
-                     `getDisplayMedia` -- and Clear is the one that does not, which is why it sits beside Save to… rather
-                     than among them: it is the row you want next after saving, and the row
-                     a reader should be least able to hit by accident on the way to a
-                     panel.
+                     Fewer rows than there were (#78): Clear is in the tool pill now, with
+                     the other commands that act on the whole Graph; Record is gone; and
+                     the Mac app's Check for updates is in Settings, where the Settings
+                     row carries the dot the menu button does while one is ready.
 
-                     `savenet.js`, `record.js` and `handledrop.js` bind by id, so moving
-                     the markup changes no wiring. The label is its own span for the same
-                     reason as before: `Recorder.setRecordLabel` and `savenet.js` write the
-                     words, and writing to the button would take the icon with them. -->
-                <button type="button" class="menu-row" id="open-file-button"
-                        title="Open a .neurite file. It is added as a new save, so nothing on screen is overwritten.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-open-icon"></use></svg>
-                    <span class="menu-row-label">Open…</span>
+                     `savenet.js`, `zetimport.ts`, `neuralapi.js` and `handledrop.js` bind
+                     by id, so moving the markup changes no wiring. The label is its own
+                     span for the same reason as before: `savenet.js` writes the words,
+                     and writing to the button would take the icon with them. -->
+
+                <!-- One row for both ways a graph comes in (#78). They were two rows, Open…
+                     and Import notes…, and read as one command twice -- but they are not one:
+                     the first reads a `.neurite` file, the only way back to a graph Save to…
+                     wrote, and the second a folder of Markdown notes. No browser dialog offers
+                     both: a file input picks files or, with `webkitdirectory`, folders, never
+                     either. So the row opens the two sources under itself, as a submenu does,
+                     and each keeps the id its handler binds -- `savenet.js` and `zetimport.ts`
+                     need no change. `aria-expanded` is the state the chevron draws; the
+                     handler is in `dropdown.js`. -->
+                <button type="button" class="menu-row menu-disclosure" id="import-button"
+                        aria-expanded="false" aria-controls="import-sources"
+                        title="Bring a graph in: a Neurite file, or a folder of Markdown notes.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#import-icon"></use></svg>
+                    <span class="menu-row-label">Import</span>
+                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#chevron-down-icon"></use></svg>
                 </button>
-                <!-- A folder of Markdown notes, read into a graph (#71): `zetimport.ts`
-                     binds it and the folder input below. Beside Open…, the other way a
-                     graph comes in. -->
-                <button type="button" class="menu-row" id="import-notes-button"
-                        title="Read a folder of Markdown notes into a graph: each file whose frontmatter names its type becomes a note, each folder an Archive, and the notes' own [[links]] become edges. The folder is only read.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-text-icon"></use></svg>
-                    <span class="menu-row-label">Import notes…</span>
-                </button>
+                <div class="menu-sources" id="import-sources" role="group" aria-label="Import from" hidden>
+                    <button type="button" class="menu-row menu-source" id="open-file-button"
+                            title="Open a .neurite file, as Save to… writes. It is added as a new save, so nothing on screen is overwritten.">
+                        <span class="menu-row-label">Neurite file…</span>
+                    </button>
+                    <!-- A folder of Markdown notes, read into a graph (#71). -->
+                    <button type="button" class="menu-row menu-source" id="import-notes-button"
+                            title="Read a folder of Markdown notes into a graph: each file whose frontmatter names its type becomes a note, each folder an Archive, and the notes' own [[links]] become edges. The folder is only read.">
+                        <span class="menu-row-label">Folder of notes…</span>
+                    </button>
+                </div>
                 <!-- The title is written by `savenet.js`: what this does depends on
                      whether the browser can hold a file open. -->
                 <button type="button" class="menu-row" id="disk-file-button" aria-describedby="save-note">
@@ -243,38 +262,14 @@
                      survives, so its age is the one fact here that changes what a reader should
                      do. Written by `savenet.js`. -->
                 <p class="menu-note" id="save-note"></p>
-                <!-- Clear asks before it acts, and it asks through `window.confirm`, which
-                     is the app's own modal. In the panel it asked with a Yes/No pair that
-                     appeared beside it and a label that rewrote itself to "Are you sure?"
-                     -- three elements and two handlers to ask one question. A row of a
-                     menu cannot grow a second row underneath it without moving every row
-                     below, and `window.confirm` is what Load already uses for the same
-                     kind of question. -->
-                <button type="button" class="menu-row" id="clear-button"
-                        title="Put this graph away and start an empty one. The current graph is saved first, so nothing is lost and no save is deleted.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#folder-plus-icon"></use></svg>
-                    <span class="menu-row-label">Clear</span>
-                </button>
+                <!-- Named for what the browser asks for first (#78): its own dialog to share a
+                     screen, a window or a tab. What lands on the canvas is one still of it, as
+                     an image node -- `Recorder.captureScreenToImage`, bound in `neuralapi.js`. -->
                 <button type="button" class="menu-row" id="screenshotButton"
-                        title="Capture the screen and drop it on the canvas as an image node.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-image-icon"></use></svg>
-                    <span class="menu-row-label">Screenshot</span>
+                        title="Share a screen, a window or a tab, and drop a still of it on the canvas as an image node.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#screen-share-icon"></use></svg>
+                    <span class="menu-row-label">Share screen</span>
                 </button>
-                <button type="button" class="menu-row" id="recordButton"
-                        title="Record the screen. Stops on a second click, then makes a node holding the video and a download link.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-video-icon"></use></svg>
-                    <span class="menu-row-label">Record</span>
-                </button>
-                <!-- The Mac app's own updates (#76), and only there: `appupdate.js` shows the
-                     row when the app's bridge (`window.neuriteDesktop`) is present, so a browser
-                     never draws it. It checks, and once a newer release is found it installs
-                     it; the note under it says which, and how far along. -->
-                <button type="button" class="menu-row" id="update-button" aria-describedby="update-note" hidden
-                        title="Look for a newer Neurite, and install it when there is one: the graph is saved, and the app closes and opens again as the new version.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#refresh-icon"></use></svg>
-                    <span class="menu-row-label">Check for updates</span>
-                </button>
-                <p class="menu-note" id="update-note" hidden></p>
 
                 <div class="menu-separator" role="separator"></div>
 
@@ -322,7 +317,7 @@
                      So the marker is in the name instead, where it is not state and
                      cannot go stale: `.visually-hidden` -- the idiom the Back button
                      three lines up already uses -- makes the name "Ai panel" against
-                     "Screenshot". A *sibling* of `.menu-row-label`, never a child of it,
+                     "Share screen". A *sibling* of `.menu-row-label`, never a child of it,
                      because `MainMenu.showDetail` sets the panel heading from
                      `label.textContent` and a nested span would retitle the heading to
                      "Ai panel" too.
@@ -384,8 +379,8 @@
                 </button>
                 <!-- Second from the end, before help: settings are read less often
                      than any tab that holds content, and more often than help. -->
-                <button type="button" class="menu-row tablink" onclick="openTab('tab5', this)"
-                        title="Input, the Zettelkasten tags, node placement, and how to reset it all.">
+                <button type="button" class="menu-row tablink" id="tablink-settings" onclick="openTab('tab5', this)"
+                        title="The Mac app's updates, input, the Zettelkasten tags, node placement, and how to reset it all.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#gear-icon"></use></svg>
                     <span class="menu-row-label">Settings</span>
                     <span class="visually-hidden"> panel</span>
@@ -452,24 +447,14 @@
                 </div>
             </div>
 
-            <!-- The function-calling console, at the foot of the menu and in neither
-                 view: it is here in both, as it was under every tab before.
-
-                 It cannot move inside `.menu-detail`, which the list view hides with
-                 `display: none`. Its CodeMirror is built at load, inside a panel that is
-                 `height: 0` but still `display: block` and `width: 100%` -- zero height it
-                 recovers from on `refresh()`, zero width it does not. `.dropdown-content`
-                 is only translated off-screen for the same reason. -->
-            <div id="function-call-slot"></div>
-
-            <!-- The file input behind Open, and out here for the same reason as the
-                 console above it: `display: none` is what `.menu-list` hides with, and
-                 Safari will not open a file dialog for an input it treats as unrendered.
-                 Open is only reachable from the list, but the input is reachable from
-                 anywhere `savenet.js` decides to click it. -->
+            <!-- The file input behind Import's Neurite file…, out here and not beside
+                 the row: `display: none` is what `.menu-list` hides with, and Safari will
+                 not open a file dialog for an input it treats as unrendered. The row is
+                 only reachable from the list, but the input is reachable from anywhere
+                 `savenet.js` decides to click it. -->
             <input type="file" id="open-file-input" class="visually-hidden"
                    accept=".neurite,.txt,application/octet-stream" />
-            <!-- The folder behind Import notes…, out here for the same reason. -->
+            <!-- The folder behind Import's Folder of notes…, out here for the same reason. -->
             <input type="file" id="import-notes-input" class="visually-hidden" webkitdirectory multiple />
         </div>
     </div>

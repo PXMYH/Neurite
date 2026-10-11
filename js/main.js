@@ -110,7 +110,7 @@ class On {
     'message', 'mousedown', 'mouseenter', 'mouseleave',
     'mousemove', 'mouseout', 'mouseover', 'mouseup',
     'paste', 'pointercancel', 'pointerdown', 'pointermove', 'pointerout', 'pointerover',
-    'pointerup', 'resize', 'scroll',
+    'pointerup', 'resize', 'scroll', 'toggle',
     'touchcancel', 'touchend', 'touchmove', 'touchstart', 'transitionend',
     'visibilitychange', 'webglcontextlost', 'webglcontextrestored', 'wheel'
 ].forEach( (eName)=>{
@@ -169,7 +169,6 @@ class App {
         this.nodeSimulation.start();
         Ai.init();
         Embeddings.init();
-        Recorder.init();
         this.interface.init();
         this.tabEdit.init(settings);
         this.viewCode.init();
@@ -330,6 +329,8 @@ class PageLoad {
     async mainLoad(){
         for (const resource of PageLoad.resources) await this.loadResource(resource); // sequentially
         await this.loadTabs(PageLoad.tabs); // in parallel
+        // Inside the Ai panel's markup, so only once that has loaded (#78).
+        await this.loadTab('function-call-slot', 'functioncallingpanel.html');
         for (const src of PageLoad.scripts) await this.loadScript(src); // sequentially
         Graph = new Graph();
         App = new App();
@@ -345,7 +346,10 @@ class PageLoad {
             this.elem = Elem.byId(tabId);
             this.fileName = fileName;
         }
-        onResponse(res){ res.text().then(this.onContent) }
+        // Returned, so `loadTab` resolves once the markup is in the page and not merely once
+        // it has arrived: the function console's slot is inside the Ai panel's markup, and was
+        // not there yet for the loader that fills it (#78).
+        onResponse(res){ return res.text().then(this.onContent) }
         onContent = (content)=>{ this.elem.innerHTML = content }
         onFailure(){ return `Failed to load content from ${this.fileName}:` }
     }
@@ -355,7 +359,6 @@ class PageLoad {
         return Promise.all(proms);
     }
     static tabs = {
-        'function-call-slot': 'functioncallingpanel.html',
         'tab1': 'notestab.html',
         'tab4': 'aitab.html',
         'tab2': 'fractaltab.html',

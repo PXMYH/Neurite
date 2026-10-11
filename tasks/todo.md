@@ -443,3 +443,52 @@ passed only while the click landed on the last line.
   wider and running out of it when narrower -- on main too, but the inset well made it show. A
   resize now lets the well follow the card both ways (NodeView's resize writes `min-width: 0`
   and `max-width: none` with its `width: 100%`). Measured before and after, and in 26-text-card.
+
+# A shorter menu, themes in Settings, and the panels redone (#78, #79, #80, 2026-10-10)
+
+Asked, in chat, over two screenshots (the menu, and the Settings panel): "check for update
+should be in settings"; "open and import notes are doing the same thing, keep import notes,
+rename it to import"; "screenshort rename to share screen"; "views etc. move to settings and
+have each to be a theme, research some popular apps how they provide themes"; of the "Set
+Task..." strip, "what is this set task? if not useful remove it"; "move clear feature to the
+horizontal toolbox on middle top screen"; "remove record feature"; and "settings and in general
+any menu when clicked in needs an aesthetic upgrade, research some popular apps and design
+systems to make it better". Tier T3/T4, brownfield. Filed as #78 (the menu), #79 (themes) and
+#80 (the panels).
+
+Read from the handlers before moving anything:
+- Open… reads a `.neurite` file, which is the only way back to a graph Save to… wrote; Import
+  notes… reads a folder of Markdown. Not the same thing, and no browser dialog offers both.
+- Set Task is the function console: a task goes to the model with the Neural API's description,
+  the JavaScript that comes back is shown and run, and each run is kept. The only way to have
+  the AI act on the canvas, and the Neural API's vision loop drives it too. Useful, so kept.
+- Record made a video node; Screenshot (`captureScreenToImage`) and the still the vision loop
+  reads (`returnScreenshot`) are separate from it.
+- A Saved View is a pan and a zoom on the plane the notes are on, so one that moved the camera
+  as a theme would carry the reader away from their own notes.
+
+Decisions:
+- Import is one row that opens its two sources under itself, as a submenu does: Neurite file…
+  and Folder of notes…, each keeping the id its handler binds.
+- The console is the last fold of the Ai panel, named Tasks, with a line that says what it does.
+  It is hidden with the rest of AI when AI features are off.
+- Clear is a tool of the pill, after Propose, with an eraser: a folder with a plus beside the
+  File tree tool read as a new folder, and a bin would say it deletes, which it does not.
+- Check for updates is the first section of Settings, in the app only; the Settings row carries
+  the dot the menu button does while a release is ready.
+- A theme is the look only -- line colours, background, brightness and saturation, the universe,
+  and the page filters -- and never the camera or the equation. Saved Views become Places, in
+  Settings beside the themes, and keep moving the camera and nothing else.
+
+Phases:
+- [x] A: the menu (#78). Import and its sources, Share screen, Clear in the pill, Record gone,
+  Updates in Settings, the console in the Ai panel. Unit tests and the four specs it touched.
+- [ ] B: themes and places in Settings (#79).
+- [ ] C: the panels' design system (#80).
+- [ ] Review, release 1.9.0, close the three issues.
+
+Found on the way: a tab's markup was not in the page when `loadTab` resolved
+(`onResponse` dropped the promise from `res.text()`), which nothing noticed while no tab's
+markup held another's slot. The console's slot is inside the Ai panel's markup now, so its
+loader found no element on 5 of the 15 page loads of one run of 15-panels; `loadTab` waits for
+the markup now.

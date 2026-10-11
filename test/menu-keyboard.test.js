@@ -62,9 +62,16 @@ test('the hamburger is a real button, and says whether the menu is open', ()=>{
         + 'free to disagree with the class');
     assert.match(jsCode, /menuButton\.setAttribute\('aria-expanded', isOpen\)/,
         '`aria-expanded` is not written from the same boolean as the class');
-    assert.equal((jsCode.match(/aria-expanded/g) || []).length, 1,
-        'a second writer of `aria-expanded` exists in dropdown.js. Two writers is how '
-        + 'the attribute ends up disagreeing with the class it describes');
+    assert.equal((jsCode.match(/menuButton\.setAttribute\('aria-expanded'/g) || []).length, 1,
+        'a second writer of the menu button\'s `aria-expanded` exists in dropdown.js. Two '
+        + 'writers is how the attribute ends up disagreeing with the class it describes');
+    // The one other `aria-expanded` in the file is Import's (#78), and it has one writer
+    // too, beside the `hidden` it describes.
+    assert.equal((jsCode.match(/aria-expanded/g) || []).length, 2,
+        'an `aria-expanded` writer exists in dropdown.js that is neither the menu button\'s '
+        + 'nor Import\'s');
+    assert.match(jsCode, /ImportRow\.row\.setAttribute\('aria-expanded', String\(open\)\);\s*ImportRow\.sources\.hidden = !open;/,
+        'Import\'s `aria-expanded` is not written beside the `hidden` it describes');
 
     // A phrasing-content child, because `<button>` takes phrasing content and the three
     // bars are `position: absolute` so the box is identical either way.
@@ -146,13 +153,11 @@ test('the closing menu stops taking clicks and focus before it finishes sliding'
     assert.match(jsCode, /dropdownContent\.inert = !isOpen;/,
         'the closing menu is hit-testable and focusable for the whole 0.3s slide, so a '
         + 'click aimed at what was behind it is swallowed by a menu the reader dismissed '
-        + '-- or activates the row it lands on, and `Record` is one of them');
+        + '-- or activates the row it lands on, and `Share screen` is one of them');
 
     // Set at load, not in the markup, because an `inert` attribute would need removing on
-    // every open anyway. `inert` is not a layout property: measured with it set at load,
-    // the function console's CodeMirror still comes up 302x320 with `textHeight 18` and
-    // `charWidth 8`, and still takes focus and typed text with the menu open. `display:
-    // none` is what would break that, which is why the panel is hidden by transform.
+    // every open anyway. `inert` is not a layout property, so nothing in the panel lays
+    // itself out differently for it.
     assert.match(jsCode, /^dropdownContent\.inert = true;$/m,
         'the menu is not inert at load, so every row is in the focus order and every '
         + 'control in the panel is clickable before the menu has ever been opened');
@@ -309,17 +314,18 @@ test('both ways out of a view ask one focus predicate', ()=>{
 });
 
 test('every menu row is a button that says what it does', ()=>{
-    // Thirteen: the Mac app's update row (#76) is in the markup everywhere and drawn only
-    // in the app.
+    // Eleven since #78: Import and its two sources, Save to… and Share screen, and the six
+    // panel rows. Clear is a tool of the pill now, Record is gone, and the Mac app's update
+    // row is a button in Settings.
     const rows = htmlCode.match(/<button[^>]*class="[^"]*menu-row[^"]*"[^>]*>/g) || [];
-    assert.equal(rows.length, 13,
-        'the menu no longer holds thirteen rows as <button> open tags; every count below '
+    assert.equal(rows.length, 11,
+        'the menu no longer holds eleven rows as <button> open tags; every count below '
         + 'reads this list');
 
     for (const row of rows) {
         assert.match(row, /type="button"/,
             'a menu row has no type, so it is a submit button: harmless only while '
-            + '`closest(\'form\')` is null for all thirteen, and `aitab.html` does contain a '
+            + '`closest(\'form\')` is null for all eleven, and `aitab.html` does contain a '
             + '<form>. Row: ' + row.slice(0, 60));
     }
 
@@ -340,13 +346,13 @@ test('every menu row is a button that says what it does', ()=>{
 
     // What distinguishes the five instead: a word in the name rather than a state
     // attribute. Measured in the AX tree -- `name: "Ai panel"` against `name:
-    // "Screenshot"`, `haspopup: null`, `expanded: null`, and the panel heading still
-    // reads "Ai".
+    // "Screenshot"` (Share screen since #78), `haspopup: null`, `expanded: null`, and the
+    // panel heading still reads "Ai".
     const panelSpans = htmlCode.match(/<span class="visually-hidden"> panel<\/span>/g) || [];
     assert.equal(panelSpans.length, 6,
         'the six panel rows no longer carry the word that tells a reader they descend a '
         + 'level. The chevron that says so on screen is `aria-hidden`, so without this '
-        + 'they are indistinguishable from the five commands above the separator');
+        + 'they are indistinguishable from the commands above the separator');
 
     // A sibling of the label, never a child: `MainMenu.showDetail` reads the panel
     // heading out of `label.textContent`, so nesting the span retitles the heading to

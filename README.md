@@ -115,7 +115,7 @@ deployed from `main` on every push. On an iPad, open it in Safari and choose **S
 Screen**: installed, it opens offline once it has been opened online, and Safari keeps its storage
 instead of clearing it after seven days without a visit. What a finger does is in
 [`docs/controls.md`](docs/controls.md). Your Graphs live in that address's storage, so they move
-to another address, or another device, as a file: **Save to…** on one, **Open…** on the other.
+to another address, or another device, as a file: **Save to…** on one, **Import → Neurite file…** on the other.
 The address is shared by every GitHub Pages site under `pxmyh.github.io`, and so is its storage,
 so an API key typed in there can be read by any of them: give this site a domain of its own before
 entering one.

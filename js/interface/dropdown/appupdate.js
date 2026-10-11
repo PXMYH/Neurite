@@ -1,29 +1,31 @@
-// The Mac app's own updates (#76), as a command row in the menu. Only the app has the bridge
-// (`window.neuriteDesktop`, desktop/preload.cjs); in a browser the row and its note stay hidden.
+// The Mac app's own updates (#76), a section of Settings since #78. Only the app has the bridge
+// (`window.neuriteDesktop`, desktop/preload.cjs); in a browser the section stays hidden.
 //
-// The row is the refresh the issue asks for: it checks, and the note under it says what the
-// check found. Once a newer release is found, the row installs it -- the app saves the Graph,
-// closes, swaps itself for the new one and opens again (desktop/updater.cjs) -- and the menu
-// button carries a dot until then, because the check that finds one is the one nobody asked for.
+// The button is the refresh the issue asks for: it checks, and the note beside it says what the
+// check found. Once a newer release is found, the button installs it -- the app saves the Graph,
+// closes, swaps itself for the new one and opens again (desktop/updater.cjs) -- and until then a
+// dot on the menu button and another on the Settings row lead to it, because the check that
+// finds one is the one nobody asked for.
 const AppUpdate = {
     bridge: window.neuriteDesktop?.update ?? null,
+    section: Elem.byId('updateSettings'),
     row: Elem.byId('update-button'),
     note: Elem.byId('update-note'),
+    settingsRow: Elem.byId('tablink-settings'),
     state: {phase: 'idle'},
     busy: new Set(['checking', 'downloading', 'installing']),
 
     init(){
         if (!AppUpdate.bridge || !AppUpdate.row) return;
 
-        AppUpdate.row.hidden = false;
-        AppUpdate.note.hidden = false;
+        AppUpdate.section.hidden = false;
         AppUpdate.bridge.onState(AppUpdate.render);
         AppUpdate.bridge.state().then(AppUpdate.render);
         On.click(AppUpdate.row, AppUpdate.onClick);
     },
 
     // Why a release that was found cannot install itself here, with what to do instead. The
-    // row then opens the release's page.
+    // button then opens the release's page.
     blockedWords: {
         'translocated': "This copy runs where it was downloaded. Move Neurite to Applications, open it "
                       + "from there, then update.",
@@ -36,7 +38,7 @@ const AppUpdate = {
                         + "Save each graph to a file with Save to… before you replace it.",
     },
 
-    // The row's label, the note under it, and whether the note is a warning.
+    // The button's label, the note beside it, and whether the note is a warning.
     wordsFor(s){
         const check = "Check for updates";
         switch (s.phase) {
@@ -67,6 +69,11 @@ const AppUpdate = {
 
         menuButton.classList.toggle('update-ready', ready);
         menuButton.setAttribute('aria-label', ready ? "Menu, with an update ready" : "Menu");
+        // The row's name is built from its contents ("Settings panel"), so it is only named
+        // outright while it has something more to say.
+        AppUpdate.settingsRow.classList.toggle('update-ready', ready);
+        if (ready) AppUpdate.settingsRow.setAttribute('aria-label', "Settings panel, with an update ready");
+        else AppUpdate.settingsRow.removeAttribute('aria-label');
     },
 
     async onClick(){
@@ -84,8 +91,8 @@ const AppUpdate = {
         AppUpdate.ask(AppUpdate.bridge.install({version: s.version, confirmed}));
     },
 
-    // A call the main process could not answer is said in the note, not dropped: the row would
-    // otherwise go on offering an update that is not coming.
+    // A call the main process could not answer is said in the note, not dropped: the button
+    // would otherwise go on offering an update that is not coming.
     ask(call){
         Promise.resolve(call).catch( (err)=>{
             Logger.warn("The update call failed:", err);

@@ -1664,29 +1664,23 @@ textarea.title-input.title-input-stowed {
             }
 
 /* Drops out of the menu button, so it is anchored to the same corner and leaves
-   the same way it arrived. It is hidden by transform and never by `display`, which
-   is load-bearing: the panel holds the function-calling console, and CodeMirror
-   measures itself when it is constructed -- in a `display: none` container it comes
-   up with zero dimensions and stays that way.
+   the same way it arrived. It is hidden by transform and not by `display`. That was
+   load-bearing while the function console sat at the menu's foot, in neither view: it
+   was built at load, and the reasoning was that a CodeMirror built in a `display: none`
+   container comes up with zero dimensions and stays that way. Since #78 the console is
+   in the Ai panel, where it is built inside a `.tabcontent` that is `display: none` and
+   a closed `<details>`; measured there, it read 0x0 at load and 443x320 once its fold
+   was opened, a 200-character line wrapping at the editor's width. The editors in the
+   panels are refreshed when they are shown (`openTab`, `functioncallingpanel.js`).
 
-   The element to measure is `div.CodeMirror` inside `div.function-codemirror-container`.
-   It reads 302x320 with the menu closed and 330x320 with the Ai panel open, which is
-   the whole reason for the paragraph below. Not `#neurite-function-cm`, which is the
-   backing textarea CodeMirror always hides: that is `display: none` and 0x0 in every
-   state, so it cannot tell the working case from the broken one. The proof that the
-   broken case is real is one element away -- the editor in `#zet-pane-1` measures 0x0
-   here too whenever the Notes panel is not the one open, because an unopened
-   `.tabcontent` is `display: none`.
-
-   `visibility` is the third state between those two, and it is why the transform is
-   not hiding this on its own. A transformed box is still a rendered box, so every
+   `visibility` is the third state, and it is why the transform is not hiding this on
+   its own. A transformed box is still a rendered box, so every
    control in the closed menu stayed in the sequential focus order: from a fresh
    load, seven Tabs reached Open... at y = -354 and Space opened a file dialog for a
    button nowhere on screen, nine reached Screenshot, and ten started a screen
    recording with no visible control to stop it. `visibility: hidden` takes the
    subtree out of the focus order -- Tab and `.focus()` both -- while leaving the box
-   laid out, so CodeMirror still measures a real width and the reason above still
-   holds. `.visually-hidden` sets no `visibility` of its own, so `#open-file-input`
+   laid out. `.visually-hidden` sets no `visibility` of its own, so `#open-file-input`
    inherits this and stops being a stop too; Safari still opens its dialog, because
    that only ever happens with the menu open.
 
@@ -1752,21 +1746,13 @@ textarea.title-input.title-input-stowed {
 
     /* The list is as wide as its rows. At the panels' 480px its longest label ended 152px
        in, and the chevrons stood 300px away from the words they belong to. The floor keeps
-       "Not saved to a file yet." on one line under Save to…; the save note itself and the
-       folded function console are `contain: inline-size`, or the longest note (120
-       characters) or the console's editor would set the width instead of the rows. */
+       "Not saved to a file yet." on one line under Save to…; the save note itself is
+       `contain: inline-size`, or the longest note (120 characters) would set the width
+       instead of the rows. */
     .dropdown-content:has(> .menu-panel:not(.detail-open)) {
         width: max-content;
         min-width: min(220px, calc(100vw - 32px));
         max-width: calc(100vw - 32px);
-    }
-
-    /* The console opened under the list takes the panels' width, as it has under a panel:
-       its prompt, three buttons and editor do not fit in the list's. Keyed on `.hidden`,
-       which `togglePanel` takes off before the console unfolds and puts back only once it
-       has folded, so the menu is wide for the whole of both. */
-    body:not(.ai-disabled) .dropdown-content:has(.function-call-panel:not(.hidden)) {
-        width: min(var(--ui-panel-width), calc(100vw - 32px));
     }
 
         .submenu {
@@ -1834,8 +1820,8 @@ textarea.title-input.title-input-stowed {
                     }
 
                     /* `display: flex` above outranks the `hidden` attribute's own
-                       `display: none`, so a row that is not there (`#update-button` in a
-                       browser) said so only to scripts. */
+                       `display: none`, so a hidden row (`#update-button`, while it was one,
+                       in a browser) said so only to scripts. */
                     .menu-row[hidden] {
                         display: none;
                     }
@@ -1872,6 +1858,38 @@ textarea.title-input.title-input-stowed {
                         opacity: 0.45;
                     }
 
+                    /* Import's, which points down at its sources and turns over while they
+                       are open (#78): `aria-expanded` is the state, so it is also the
+                       selector. */
+                    .menu-disclosure > .menu-row-chevron {
+                        transition: transform var(--ui-transition);
+                    }
+
+                    .menu-disclosure[aria-expanded="true"] > .menu-row-chevron {
+                        transform: rotate(180deg);
+                    }
+
+                    /* The Settings row while an update is ready (`appupdate.js`), the same
+                       dot as the menu button's, after the word it leads to. */
+                    .menu-row.update-ready > .menu-row-label::after {
+                        content: "";
+                        display: inline-block;
+                        width: 7px;
+                        height: 7px;
+                        margin-left: 8px;
+                        border-radius: 50%;
+                        vertical-align: middle;
+                        background-color: var(--ui-accent);
+                    }
+
+                /* Import's two sources, the words of a submenu: no icon of their own, and
+                   in line with the label of the row they open from -- 12px of padding,
+                   the 16px icon and the 10px gap, as `.menu-note` is. */
+                .menu-source {
+                    padding-left: 38px;
+                    color: var(--text-secondary);
+                }
+
                 /* A line under a row, in line with its label: 12px of row padding, the
                    16px icon and the 10px gap. Quiet unless it has to be read (#59). */
                 .menu-note {
@@ -1896,7 +1914,7 @@ textarea.title-input.title-input-stowed {
                         color: var(--ui-danger);
                     }
 
-            /* The file input behind Open, and the help text each Fractal control is
+            /* The file input behind Import's Neurite file…, and the help text each Fractal control is
                described by. `display: none` would be simpler, but Safari refuses to
                open a dialog for an input it treats as unrendered, and a screen reader
                cannot read what is not rendered either -- so this hides it while
@@ -1950,6 +1968,16 @@ textarea.title-input.title-input-stowed {
                 .settings-heading {
                     cursor: default;
                     margin-bottom: 10px;
+                }
+
+                /* A line under a heading that says what the group does, where its name
+                   alone cannot: the function console was a strip that said "Set Task..."
+                   and nothing else (#78). */
+                .settings-note {
+                    margin: 0 0 10px;
+                    font-size: 13px;
+                    line-height: 1.45;
+                    color: var(--text-muted);
                 }
 
                 /* The one group that stays folded (#32): the API keys, entered once and
@@ -2743,8 +2771,8 @@ input[type="checkbox"] {
 
         /* One view at a time, and both may be `display: none`. The list holds nothing
            that measures itself; inside the detail, every `.tabcontent` is already
-           `display: none` until its tab opens, and the one editor that cannot survive
-           a zero-width container -- the function-calling console -- sits outside both. */
+           `display: none` until its tab opens, and the editors in them -- the notes
+           pane's and the function console's -- are refreshed when they are shown. */
         .menu-panel:not(.detail-open) > .menu-detail {
             display: none;
         }
@@ -4982,39 +5010,13 @@ code.language-markdown {
         display: block;
     }
 
-/* Lives at the foot of the dropdown now, so it takes the dropdown's width instead
-   of the fixed 300px it needed as the widest thing in a standalone panel. */
+/* In the Ai panel's Tasks fold (#78), so it takes the panel's width. */
 .function-call-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     width: 100%;
-    /* Takes the menu's width and gives it none: folded to 0px tall, it still made the
-       list 312px wide (340px in WebKit). */
-    contain: inline-size;
 }
-
-    /* `.toggle-panel` is `width: 100%` with 10px of side padding, so it measured
-       20px wider than whatever held it. The old panel clipped that with
-       `overflow: hidden`; the dropdown does not, so the collapsed chevron strip
-       hung past the panel edge. Scoped rather than fixed on `.toggle-panel`
-       itself, which five other collapsible sections also use. */
-    .function-call-container .toggle-panel {
-        box-sizing: border-box;
-        gap: 8px;
-        /* Room for its focus ring, 2px out and 2px wide, when it is scrolled into view
-           at the menu's foot (`toggleFunctionCallPanel`): the ring's lower half was cut. */
-        scroll-margin-bottom: 8px;
-    }
-
-        /* A rule across the panel with the chevron in it, drawn as the headings' rules
-           are (`.button-label`). Two faint 2px stubs, a fifth of the width each, sat
-           under 1px rules that run the full width (#32). */
-        .function-call-container .toggle-panel .bar {
-            max-width: none;
-            height: 1px;
-            background-color: var(--ui-panel-rule);
-        }
 
 
 
@@ -5178,22 +5180,9 @@ code.language-markdown {
 .function-call-panel {
     margin-top: 5px;
     margin-bottom: 5px;
-    transition: all 0.3s ease;
-    overflow-y: auto;
-    max-height: fit-content; /* Adjust as needed */
-    /* background: rgba(42, 42, 54, 0.2);  Example background */
     width: 100%; /* Match the width of the function call container */
-    overflow: hidden;
-    height: 0px;
-    display: block;
     padding: 0; /* Reset any padding */
 }
-
-
-    .function-call-panel.hidden {
-        margin-top: 0; /* Eliminate margin when hidden */
-        margin-bottom: 0; /* Eliminate margin when hidden */
-    }
 
 .function-call-list {
     height: 150px;
@@ -5371,7 +5360,6 @@ code.language-markdown {
 body.ai-disabled #tablink-ai,
 body.ai-disabled #tab4,
 body.ai-disabled #prompt-form,
-body.ai-disabled .function-call-container,
 body.ai-disabled .node-add-item.ai-icon {
     display: none !important;
 }
@@ -5880,8 +5868,6 @@ textarea:focus-visible,
    (`CustomDropdown.carryAccessibility`), so it needs a ring like the select it
    replaced -- it is the only control here that is not a real form element. */
 .select-replacer:focus-visible,
-/* The console's strip, a div with `role=button` for the same reason. */
-.function-call-container > .toggle-panel:focus-visible,
 textarea#rawTextArea:focus-visible,
 textarea#prompt:focus-visible,
 textarea[id^='custom-instructions-textarea-']:focus-visible,

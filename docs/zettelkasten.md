@@ -57,7 +57,7 @@ The Notes panel can hold several texts for one graph, each called an Archive. Th
 
 ## Importing a folder of notes
 
-**Import notes…** in the menu reads a folder of Markdown notes into a graph, the way an Open Knowledge Format bundle keeps them (the AI bundle of #69 is the case it was built on):
+**Import → Folder of notes…** in the menu reads a folder of Markdown notes into a graph, the way an Open Knowledge Format bundle keeps them (the AI bundle of #69 is the case it was built on):
 
 - Each `.md` file whose YAML frontmatter names a `type` becomes one note. Indexes, logs and the bundle's contract (`type: index`, `log`, `contract`), files with no frontmatter or no `type`, and folders whose names start with `.` or `_` are not notes, and are counted in the summary instead.
 - Each top-level folder becomes an Archive; notes at the top of the folder go into an Archive named after it.

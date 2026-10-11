@@ -1,6 +1,6 @@
-// Defines Sliding Panels: the function console at the foot of the menu, and the sections
-// of the Neurite account modal. The five that were in the Ai and Fractal panels are headed
-// groups now, always open (#32).
+// Defines Sliding Panels: the sections of the Neurite account modal. The five that were in
+// the Ai and Fractal panels are headed groups now, always open (#32), and the function
+// console, which folded at the foot of the menu, is a `<details>` in the Ai panel (#78).
 
 function togglePanel(panelContainer) {
     // Close any open custom dropdowns within the panel
@@ -53,30 +53,3 @@ function togglePanel(panelContainer) {
     }
     return panelContainer.classList.contains('panel-open');
 }
-
-function toggleFunctionCallPanel() {
-    const panel = App.viewCode.div;
-    const toggle = document.querySelector('.function-call-container > .toggle-panel');
-    const open = togglePanel(panel);
-    toggle?.setAttribute('aria-expanded', String(open));
-    if (!open || !toggle) return;
-
-    // The console opens above its strip and pushed the strip, which keeps the focus, 460px
-    // below the menu's foot. Brought back into view once the console has its height.
-    On.transitionend(panel, function reveal(e){
-        if (e.target !== panel) return;
-
-        Off.transitionend(panel, reveal);
-        toggle.scrollIntoView({block: 'nearest'});
-    });
-}
-
-// The strip is the console's one control, so it takes the keys a button does -- and only
-// here: a key the Graph also reads on `window` is not a command to it as well.
-On.keydown(document.querySelector('.function-call-container > .toggle-panel'), (e)=>{
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    toggleFunctionCallPanel();
-});

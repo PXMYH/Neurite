@@ -703,9 +703,10 @@ View.Graphs = class {
     // names.
 
     // The question is asked through the app's modal rather than by growing a
-    // Yes/No pair beside the row: as a row of the menu this has no room to put
-    // one, and every other question this file asks -- an empty save, a file too
-    // large to store -- is already a `window.confirm`.
+    // Yes/No pair beside the button: a button of the tool pill (#78), as a row of
+    // the menu before it, has no room to put one, and every other question this
+    // file asks -- an empty save, a file too large to store -- is already a
+    // `window.confirm`.
     #onBtnClearClicked = (e)=>{
         // It says what is true now that there is no list: the graph is banked, so a
         // refresh reopens it, but nothing in the interface reaches it after the next one.

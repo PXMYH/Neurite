@@ -33,13 +33,13 @@ What to know:
   macOS 15 the old Control-click › Open route no longer gets past this.) A copy you build
   yourself is not quarantined and opens directly.
 - **Your graphs** live in `~/Library/Application Support/Neurite`, separate from any browser's
-  copy. Move a graph across with Save to… in the browser and Open… in the app. `npm start`
+  copy. Move a graph across with Save to… in the browser and Import → Neurite file… in the app. `npm start`
   uses `Neurite Dev` instead, so a checkout never writes into the installed app's graphs.
 - **Quitting keeps your work.** The app waits for the graph to finish saving before it closes,
   which a browser tab cannot do.
 - **Updates.** The app looks for a newer release 20 seconds after it opens and every six hours
-  after, and the menu's **Check for updates** row asks again. When one is out, the menu button
-  shows a dot and the row reads **Update to x.y.z**: it downloads the release's DMG, checks it
+  after, and **Check for updates**, at the top of Settings, asks again. When one is out, the menu
+  button and the Settings row show a dot and the button reads **Update to x.y.z**: it downloads the release's DMG, checks it
   against the SHA-256 GitHub took when it was uploaded, saves your graph, closes, puts the new
   app where the old one was, and opens it again. A graph that cannot be saved first stops the
   update, and a new version that has not started -- its window up and your graph back -- within a

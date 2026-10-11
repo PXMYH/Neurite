@@ -83,7 +83,6 @@ View.Code = class CodeView {
     btnRegen = Elem.byId('function-regen-button');
     btnRun = Elem.byId('function-run-button');
     btnSend = Elem.byId('function-send-button');
-    div = document.querySelector('.function-call-panel');
     #divItemList = document.querySelector('.function-call-list');
     iconError = Elem.byId('functionErrorIcon');
     iconLoading = Elem.byId('functionLoadingIcon');
@@ -91,18 +90,32 @@ View.Code = class CodeView {
     isAiProcessing = false;
     mostRecentMsg = '';
     #stored = new Stored('functionCalls');
+    // The Ai panel's Tasks fold, which the console is in (#78).
+    #fold = Elem.byId('functionConsoleFold');
     svgSend = this.btnSend.querySelector('svg');
 
     init(){
         this.#btnClear.init();
         On.click(this.btnRun, this.runCode);
         this.cm.init();
+        On.toggle(this.#fold, this.#onFoldToggled);
         this.#initDivItemList(this.#divItemList);
         this.initForRequestfunctioncall();
 
         this.#stored.load().then( (data)=>{
             if (data) data.forEach(this.#addItemFromData, this)
         });
+    }
+
+    // The editor is built at load inside the closed fold, where it measures nothing, so it
+    // measures itself again each time the fold opens. And the fold is the last thing in the
+    // panel, so it opens below the bottom of the screen: brought into view, heading and all,
+    // as far as it fits -- `nearest` puts the heading at the top when the rest cannot fit.
+    #onFoldToggled = ()=>{
+        if (!this.#fold.open) return;
+
+        this.cm.cm.refresh();
+        this.#fold.scrollIntoView({block: 'nearest'});
     }
 
     #CM = class {

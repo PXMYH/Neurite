@@ -219,14 +219,17 @@ test('the keys the reference does not repeat are the ones the reader can rebind'
 });
 
 test('the commands are rows of the menu, once each, with their labels intact', ()=>{
-    // Screenshot and Record came from this tab; Open, Save to… and Clear came from the
-    // Saves panel, which no longer exists. All five are commands, so they are rows of the
-    // menu itself rather than contents of a panel.
+    // Share screen came from this tab; Save to… and the two ways in that Import holds came
+    // from the Saves panel, which no longer exists. All are commands, so they are rows of
+    // the menu itself rather than contents of a panel. Clear left for the tool pill and
+    // Record went (#78), so neither may come back as a row.
     //
     // "The id is somewhere in the page" was true before the move and after it, so it
     // cannot see the move. Name the file.
-    for (const id of ['open-file-button', 'disk-file-button',
-                      'clear-button', 'screenshotButton', 'recordButton']) {
+    const COMMANDS = ['import-button', 'open-file-button', 'import-notes-button',
+                      'disk-file-button', 'screenshotButton'];
+    const buttonOf = (id)=> menu.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
+    for (const id of [...COMMANDS, 'clear-button']) {
         const files = ['index.html', HELP, MENU,
                        'resources/html/tabs/notestab.html',
                        'resources/html/tabs/aitab.html',
@@ -235,37 +238,58 @@ test('the commands are rows of the menu, once each, with their labels intact', (
             .filter( (p)=> new RegExp('\\sid="' + id + '"').test(read(p)) );
         assert.deepEqual(files, [MENU], id + ' is not in the menu exactly once');
     }
+    assert.doesNotMatch(menu, /\sid="recordButton"/, 'Record is a row of the menu again');
 
-    // The label span is not cosmetic: `Recorder.setRecordLabel` and savenet's
-    // `#updateDiskFileButton` write into it, and writing to the button instead would
-    // replace the icon along with the words.
-    for (const id of ['open-file-button', 'disk-file-button',
-                      'clear-button', 'screenshotButton', 'recordButton']) {
-        const button = menu.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
+    // The label span is not cosmetic: savenet's `#updateDiskFileButton` writes into it, and
+    // writing to the button instead would replace the icon along with the words.
+    for (const id of COMMANDS) {
+        const button = buttonOf(id);
         assert.ok(button, id + ' is no longer a button');
-        assert.match(button[0], /class="menu-row"/, id + ' does not use the row pattern');
+        assert.match(button[0], /class="menu-row[" ]/, id + ' does not use the row pattern');
         assert.match(button[0], /<span class="menu-row-label">[^<]+<\/span>/,
             id + ' has no label span for the icon to sit beside');
-        assert.match(button[0], /<use xlink:href="#[\w-]+-icon">/, id + ' lost its icon');
-        // A chevron says "this opens a panel", which a command does not.
-        assert.doesNotMatch(button[0], /menu-row-chevron/, id + ' promises a panel it does not open');
+        // A caret says "this opens a panel", which a command does not. Import's chevron
+        // points down at what it shows, and its two sources have none.
+        assert.doesNotMatch(button[0], /#caret-right-icon/, id + ' promises a panel it does not open');
     }
-    // Screenshot and Record are the two whose title text is the only place the reader
-    // learns what they capture. Open's and Clear's are the same kind of promise -- and
-    // Clear's is the only place the row says it saves first and deletes nothing, which is
-    // the whole difference between it and the delete a reader fears it is. Save to…'s is
-    // written by `savenet.js`, which is why it is not asserted here.
-    for (const id of ['open-file-button', 'clear-button',
-                      'screenshotButton', 'recordButton']) {
-        const button = menu.match(new RegExp('<button[^>]*id="' + id + '"[\\s\\S]*?</button>'));
-        assert.match(button[0], /title="[^"]{20,}"/, id + ' says nothing on hover');
+    // The sources are the words of a submenu, in line with Import's label; the rest are rows
+    // with an icon each.
+    for (const id of ['import-button', 'disk-file-button', 'screenshotButton']) {
+        assert.match(buttonOf(id)[0], /<use xlink:href="#[\w-]+-icon">/, id + ' lost its icon');
     }
+    // The title is the only place a reader learns what each one reads, or captures. Save
+    // to…'s is written by `savenet.js`, which is why it is not asserted here.
+    for (const id of ['import-button', 'open-file-button', 'import-notes-button', 'screenshotButton']) {
+        assert.match(buttonOf(id)[0], /title="[^"]{20,}"/, id + ' says nothing on hover');
+    }
+
+    // Import shows and hides its two sources, and says which.
+    const importRow = buttonOf('import-button')[0];
+    assert.match(importRow, /aria-expanded="false"/, 'Import does not say its sources are folded');
+    assert.match(importRow, /aria-controls="import-sources"/, 'Import does not name what it shows');
+    const iSources = menu.indexOf('id="import-sources"');
+    assert.match(menu.slice(iSources - 80, iSources + 80), /<div[^>]*id="import-sources"[^>]*\shidden/,
+        'the sources are not folded until Import is pressed');
+    const iSourcesEnd = menu.indexOf('</div>', iSources);
+    for (const id of ['open-file-button', 'import-notes-button']) {
+        const at = menu.indexOf('id="' + id + '"');
+        assert.ok(at > iSources && at < iSourcesEnd, id + ' is not one of the sources Import shows');
+    }
+
+    // Clear is a tool of the pill, and its tooltip still makes the promise that is the whole
+    // difference between it and the delete a reader fears it is.
+    const clear = buttonOf('clear-button')[0];
+    assert.ok(menu.indexOf('id="clear-button"') < menu.indexOf('class="menu-list"')
+        && menu.indexOf('id="clear-button"') > menu.indexOf('class="tool-bar"'), 'Clear is not in the tool pill');
+    assert.match(clear, /class="tool-bar-action"/, 'Clear is not a tool of the pill');
+    assert.match(clear, /aria-label="Clear"/, 'Clear has no name for a screen reader');
+    assert.match(clear, /data-tooltip="[^"]*saved[^"]*"/, "Clear's tooltip no longer says the graph is saved first");
 
     // The commands come first and the panels after, with the hairline between them.
     // Without this the group could scatter and every check above would still pass.
     const iSeparator = menu.indexOf('class="menu-separator"');
     assert.ok(iSeparator > 0, 'the commands and the panels are no longer separated');
-    assert.ok(menu.indexOf('id="recordButton"') < iSeparator,
+    assert.ok(menu.indexOf('id="screenshotButton"') < iSeparator,
         'a command sits below the separator, among the panel rows');
     assert.ok(iSeparator < menu.indexOf("openTab('tab4'"),
         'a panel row sits above the separator, among the commands');
@@ -294,23 +318,20 @@ test('the commands are rows of the menu, once each, with their labels intact', (
         'the file input is inside a view that is display:none half the time');
     assert.ok(iInput > iList, 'the file input is gone from the menu');
 
-    const record = read('js/interface/dropdown/customui/record/record.js');
-    assert.match(record, /setRecordLabel\(text\)\{[\s\S]*?\.menu-row-label'\)\.textContent = text/,
-        'the label writer no longer targets the span');
     assert.match(read('js/interface/dropdown/savenet.js'),
         /querySelector\('\.menu-row-label'\) \?\? btn/,
         'the Save to… label writer no longer targets the span');
-    // Comments stripped: one of them quotes the write it warns against, and the
-    // question here is what the file does, not what it says about itself.
-    const code = record.replace(/^\s*\/\/.*$/gm, '');
-    assert.equal((code.match(/textContent\s*=/g) || []).length, 1,
-        'record.js writes textContent somewhere other than the label writer');
-    assert.doesNotMatch(code, /button\.textContent/,
-        'a write to the button itself would delete the icon');
-    // Four call sites used to write the label directly; all of them go through the
-    // helper now, including the two that reset it when the reader stops sharing.
-    assert.ok((record.match(/Recorder\.setRecordLabel\(/g) || []).length >= 4,
-        'a label reset was dropped, so the button stays on the pause glyph');
+
+    // Record went with its row, and nothing else started a recording. The still that Share
+    // screen drops, and the one the Neural API's vision loop reads, stay.
+    const record = read('js/interface/dropdown/customui/record/record.js');
+    assert.doesNotMatch(record, /MediaRecorder|startRecording|setRecordLabel/, 'record.js still records');
+    assert.match(record, /async captureScreenToImage\(\)/, 'Share screen lost its capture');
+    assert.match(read('js/interface/neuralapi.js'), /On\.click\(Elem\.byId\('screenshotButton'\), Recorder\.captureScreenshot\)/,
+        'Share screen is no longer bound');
+    assert.match(read('js/interface/neuralapi.js'), /Recorder\.returnScreenshot = function/,
+        'the vision loop lost the still it reads');
+    assert.doesNotMatch(read('js/main.js'), /Recorder\.init\(\)/, 'App.init still starts a recorder that is gone');
 });
 
 test('the notes editor opens empty, and the syntax it taught is in the ? tab', ()=>{

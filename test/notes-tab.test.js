@@ -141,6 +141,9 @@ test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>
     // around it is hidden too now, and the rule has to keep naming the form, because
     // `#tab4` is only hidden while the tab is closed by other means.
     //
+    // The function console is not named, because it is inside `#tab4` now (#78): it sat at
+    // the foot of the menu, outside every panel, and needed a selector of its own.
+    //
     // The declaration as well as the selectors. Matching `body.ai-disabled
     // #prompt-form,` reads the left of the brace and never the right, so swapping
     // `display: none !important` for `opacity: 0.99` left all five selectors
@@ -151,13 +154,19 @@ test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>
     const iRule = css.indexOf('body.ai-disabled #tablink-ai,');
     assert.notEqual(iRule, -1, 'the AI-off rule no longer starts at #tablink-ai');
     const rule = css.slice(iRule, css.indexOf('}', iRule));
-    for (const selector of ['#tab4', '#prompt-form', '.function-call-container',
-                            '.node-add-item.ai-icon']) {
+    for (const selector of ['#tab4', '#prompt-form', '.node-add-item.ai-icon']) {
         assert.ok(rule.includes('body.ai-disabled ' + selector),
             selector + ' is no longer hidden when AI features are off');
     }
     assert.match(rule, /display:\s*none\s*!important/,
         'the AI-off rule names every AI surface and then hides none of them');
+
+    // And the console is where that holds: its slot in the Ai panel's markup, folded, and
+    // none left in the menu's own, which no AI-off rule reaches any more.
+    assert.match(ai, /<details[^>]*id="functionConsoleFold"[^>]*>[\s\S]*?<div id="function-call-slot"><\/div>[\s\S]*?<\/details>/,
+        'the function console is not in a fold of the Ai panel');
+    assert.doesNotMatch(read('resources/html/tabs/dropdown.html'), /id="function-call-slot"/,
+        'the function console is back at the foot of the menu, outside the Ai panel');
 });
 
 test('the closed menu is out of the keyboard\'s reach, not merely off screen', ()=>{
@@ -167,14 +176,13 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
     // dialog; stop 9 was Screenshot; stop 10 was Record, which starts a screen recording
     // with no visible control to stop it. `#open-file-input` was reachable too.
     //
-    // `visibility` is the fix and `display` is not: the panel holds the function-calling
-    // console, whose CodeMirror measures itself at construction and never recovers a zero
-    // width. `visibility: hidden` drops the subtree from the focus order and keeps the
-    // box, so both hold at once -- verified after the fix: all four unfocusable while
-    // closed, all nine rows 286x34 when open, and the console's `div.CodeMirror` still
-    // 302x320 with the menu closed. That element and not `#neurite-function-cm`, which
-    // an earlier note named: that is the textarea CodeMirror hides behind itself, and it
-    // is `display: none` and 0x0 whether this works or not.
+    // `visibility` is the fix and `display` is not: `visibility: hidden` drops the subtree
+    // from the focus order and keeps the box, so the panel still slides out by its
+    // transform -- a box that is not rendered cannot move. Verified after the fix: all four
+    // unfocusable while closed, all nine rows 286x34 when open. It was also held for the
+    // function console, which sat at the menu's foot then, on the reasoning that its
+    // CodeMirror never recovers a zero width; in the Ai panel since #78, it is built at zero
+    // width and measured 443x320 once its fold opened.
     //
     // Every rule that can reach this element, not the first thing that looks like one.
     // This reads two rules out of the middle of a 4,000-line stylesheet, and the cascade
@@ -226,11 +234,10 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
     // `max-height` cannot undo any of this, and would still fail here. That is the safe
     // direction -- it fails loudly and reads its own fix -- so the message says what to do
     // rather than claiming the new rule must be a bug.
-    // The last two size the list and the console opened under it, and are held to widths
-    // below.
+    // The last one sizes the list, and is held to widths below. A fourth sized the list
+    // while the function console was open under it, until the console moved (#78).
     assert.deepEqual(selectors, ['.dropdown-content', '.dropdown-content.open',
-        '.dropdown-content:has(> .menu-panel:not(.detail-open))',
-        'body:not(.ai-disabled) .dropdown-content:has(.function-call-panel:not(.hidden))'],
+        '.dropdown-content:has(> .menu-panel:not(.detail-open))'],
         'another rule reaches the menu panel. If it cannot change the visibility or display '
         + 'read below, add its selector to this list; if it can, that is the bug');
 
@@ -251,16 +258,15 @@ test('the closed menu is out of the keyboard\'s reach, not merely off screen', (
     assert.match(closed, /visibility:\s*hidden/,
         'the closed menu is only translated away, so its commands still take Tab and Space');
     assert.doesNotMatch(closed, /display:\s*none/,
-        'display:none gives the function console a zero-width CodeMirror it never recovers from');
+        'the closed menu is display:none, so it cannot slide out: it vanishes');
 
     const open = ruleFor('.dropdown-content.open');
     assert.match(open, /visibility:\s*visible/,
         'the menu opens without restoring visibility, so it can never be reached at all');
-    // The open state as well as the closed one. `display: none` here is the same zero-width
-    // console, and it reaches it by the state a reader is least likely to check: the menu
-    // that works is the closed one.
+    // The open state as well as the closed one, which is the state a reader is least likely
+    // to check: the menu that works is the closed one.
     assert.doesNotMatch(open, /display:\s*none/,
-        'the open menu is display:none, which is where the zero-width console comes from');
+        'the open menu is display:none, so it can never be seen');
 });
 
 test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
@@ -432,15 +438,15 @@ test('switching menu view carries focus with it, rather than dropping it on the 
 test('every menu row describes what it does, and the heading is not overridden', ()=>{
     // The panel rows carried a `title` as chips and got nothing in exchange when
     // they became rows, leaving one or two words as the whole description of a panel --
-    // while the command rows directly above them kept theirs. So this reads all twelve: a
+    // while the command rows directly above them kept theirs. So this reads all of them: a
     // hover that works on half the rows is the shape the gap had.
     const iList = dropdownHtml.indexOf('class="menu-list"');
     const iDetail = dropdownHtml.indexOf('id="menuDetail"');
     assert.ok(iList > 0 && iDetail > iList, 'the list and the panel are no longer in that order');
     const rows = [...dropdownHtml.slice(iList, iDetail)
         .matchAll(/<button[^>]*class="menu-row[^"]*"[^>]*>/g)].map( (m)=> m[0] );
-    // The Mac app's update row (#76) is the thirteenth, drawn only in the app.
-    assert.equal(rows.length, 13, 'the menu no longer has thirteen rows; check what this is reading');
+    // Eleven since #78: Import and its two sources, Save to…, Share screen and the six panels.
+    assert.equal(rows.length, 11, 'the menu no longer has eleven rows; check what this is reading');
 
     for (const row of rows) {
         // Save to… is the one exception, and it is written at runtime: what that row

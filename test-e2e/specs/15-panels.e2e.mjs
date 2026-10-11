@@ -61,10 +61,10 @@ for (const [width, height] of [[1600, 1000], [1280, 800]]) {
     });
 }
 
-// The list is sized by its rows, and two other things sit in it: the line under Save to…,
-// which runs to 120 characters, and the folded function console. Either one sized the list
-// instead (699 and 312px).
-test('a long save note wraps inside the list, and the console opened under it takes the panels\' width', async () => {
+// The list is sized by its rows, and the line under Save to…, which runs to 120 characters,
+// sized it instead (699px). The folded function console did too (312px), until it moved into
+// the Ai panel (#78); Import's two sources, open, are rows like the rest.
+test('a long save note wraps inside the list, and Import opens its sources without widening it', async () => {
     await openMenu(page);
     const list = (await menuBox(page)).width;
     const width = await page.evaluate(() => {
@@ -85,13 +85,22 @@ test('a long save note wraps inside the list, and the console opened under it ta
     });
     assert.ok(cut <= 0, `a long file name runs ${cut}px past the list, where it is cut off`);
 
-    await page.click('.function-call-container > .toggle-panel');
-    await page.waitForTimeout(700);
-    const open = (await menuBox(page)).width;
-    assert.ok(open >= 440, `the console opened in a ${open}px menu`);
-    await page.click('.function-call-container > .toggle-panel');
-    await page.waitForTimeout(700);
-    assert.equal((await menuBox(page)).width, list, 'the list stayed wide once the console folded');
+    const sources = () => page.evaluate(() => ['open-file-button', 'import-notes-button']
+        .map((id) => document.getElementById(id).getClientRects().length > 0));
+    assert.deepEqual(await sources(), [false, false], 'Import\'s sources show before it is pressed');
+    await page.click('#import-button');
+    assert.deepEqual(await sources(), [true, true], 'Import did not show its two sources');
+    assert.equal(await page.getAttribute('#import-button', 'aria-expanded'), 'true');
+    assert.ok((await menuBox(page)).width <= list, 'Import\'s sources widened the list');
+    await page.click('#import-button');
+    assert.deepEqual(await sources(), [false, false], 'a second press did not fold them');
+
+    // And folded again the next time the menu opens, as a submenu is.
+    await page.click('#import-button');
+    await page.click('.menu-button');
+    await page.waitForTimeout(400);
+    await openMenu(page);
+    assert.deepEqual(await sources(), [false, false], 'the sources were still open when the menu came back');
 });
 
 // WebKit's Tab, like Safari's by default, passes over buttons and checkboxes (Option+Tab
@@ -103,16 +112,18 @@ test('a keyboard reaches every control in the Ai panel, and opens API Keys',
     const reached = new Set();
     for (let i = 0; i < 40; i++) {
         await page.keyboard.press('Tab');
+        // A fold's summary by the fold it opens: API Keys, and the function console's Tasks (#78),
+        // which is the last stop in the panel.
         const id = await page.evaluate(() => {
             const el = document.activeElement;
-            return el.id || (el.tagName === 'SUMMARY' ? 'summary' : el.getAttribute('aria-label') || el.tagName);
+            return el.id || (el.tagName === 'SUMMARY' ? el.parentElement.id : el.getAttribute('aria-label') || el.tagName);
         });
         reached.add(id);
-        if (id === 'Function console') break;
+        if (id === 'functionConsoleFold') break;
     }
     for (const id of ['Inference', 'Embeddings model', 'google-search-checkbox', 'code-checkbox', 'auto-mode-checkbox',
                       'embed-checkbox', 'enable-wolfram-alpha', 'wiki-checkbox', 'max-tokens-slider', 'model-temperature',
-                      'max-context-size-slider', 'node-count-slider', 'summary']) {
+                      'max-context-size-slider', 'node-count-slider', 'apiContainer', 'functionConsoleFold']) {
         assert.ok(reached.has(id), `Tab never reached ${id}: ${[...reached].join(', ')}`);
     }
 
@@ -126,24 +137,41 @@ test('a keyboard reaches every control in the Ai panel, and opens API Keys',
         'Enter on API Keys did not show the key inputs');
 });
 
-test('the folded function console is out of the Tab order, and its toggle is a button', async () => {
+// The console sat folded at the menu's foot under a strip that said "Set Task...", which
+// told nobody what it was (#78). It is the Ai panel's Tasks fold now, and says what it does.
+test('the function console is a fold of the Ai panel, out of the Tab order until it opens', async () => {
     await openMenu(page);
-    const state = () => page.evaluate(() => ({
-        inert: document.querySelector('.function-call-panel').inert,
-        expanded: document.querySelector('.function-call-container > .toggle-panel').getAttribute('aria-expanded'),
-    }));
-    assert.deepEqual(await state(), { inert: true, expanded: 'false' });
-    // At height 0 its prompt was a Tab stop nobody could see.
-    assert.equal(await page.evaluate(() => {
+    await openPanel(page, 'Ai');
+    const state = () => page.evaluate(() => {
         const prompt = document.getElementById('function-prompt');
         prompt.focus();
-        return document.activeElement === prompt;
-    }), false, 'the folded console takes the focus');
+        const editor = document.querySelector('.function-codemirror-container .CodeMirror').getBoundingClientRect();
+        return {
+            open: document.getElementById('functionConsoleFold').open,
+            focusable: document.activeElement === prompt,
+            editor: Math.round(editor.width) > 200 && Math.round(editor.height) > 100,
+        };
+    });
+    // Folded, its prompt was a Tab stop nobody could see. The editor's size says nothing while
+    // folded: Chromium lays out a closed fold's contents when they are measured.
+    const folded = await state();
+    assert.deepEqual([folded.open, folded.focusable], [false, false]);
+    assert.match(await page.textContent('#functionConsoleFold .settings-note'), /AI[\s\S]*canvas/,
+        'the fold no longer says what the console is for');
 
-    await page.focus('.function-call-container > .toggle-panel');
+    await page.focus('#functionConsoleFold > summary');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(500);
-    assert.deepEqual(await state(), { inert: false, expanded: 'true' });
+    await page.waitForTimeout(300);
+    // Built at load inside the closed fold, at zero width; opened, it is the panel's width.
+    assert.deepEqual(await state(), { open: true, focusable: true, editor: true });
+    const typed = await page.evaluate(() => {
+        const cm = App.viewCode.cm.cm;
+        cm.setValue('x'.repeat(200));
+        const line = document.querySelector('.function-codemirror-container .CodeMirror-line').getBoundingClientRect();
+        const editor = document.querySelector('.function-codemirror-container .CodeMirror').getBoundingClientRect();
+        return { wraps: line.height > 30, inside: line.right <= editor.right + 1 };
+    });
+    assert.deepEqual(typed, { wraps: true, inside: true }, 'a long line does not wrap at the editor\'s width');
 });
 
 test('no label of one or two words wraps in the panels', async () => {
@@ -242,23 +270,27 @@ test('a Saved View is reached and chosen with the keyboard',
         ['true', true], 'Enter did not go to the view, or did not select it');
 });
 
-// Opening grows the console above its strip, and pushed the strip, which has the focus,
-// 460px below the foot of the menu.
-test('the console opened from the keyboard keeps its strip in view', async () => {
+// The console is the last fold of the Ai panel (#78), so it opens below the bottom of the screen:
+// opened, it is brought into view, its heading with it. As the strip that folded it at the
+// menu's foot was, which opening pushed 460px below the menu with the focus on it.
+test('the console opened from the keyboard comes into view, its heading with it', async () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await openMenu(page);
     await openPanel(page, 'Ai');
-    await page.focus('.function-call-container > .toggle-panel');
+    await page.focus('#functionConsoleFold > summary');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(900);
-    const [strip, menu] = await page.evaluate(() => {
-        const s = document.querySelector('.function-call-container > .toggle-panel').getBoundingClientRect();
+    await page.waitForTimeout(600);
+    const [summary, prompt, menu] = await page.evaluate(() => {
+        const box = (el) => { const r = el.getBoundingClientRect(); return [r.top, r.bottom]; };
         const m = document.querySelector('.dropdown-content');
         const r = m.getBoundingClientRect();
-        return [[s.top, s.bottom], [r.top, r.top + m.clientTop + m.clientHeight]];
+        return [box(document.querySelector('#functionConsoleFold > summary')),
+                box(document.getElementById('function-prompt')),
+                [r.top, r.top + m.clientTop + m.clientHeight]];
     });
-    // Its focus ring is drawn 2px out and 2px wide, and was cut in half at the menu's foot.
-    assert.ok(strip[0] >= menu[0] && strip[1] + 4 <= menu[1], `the strip is at ${strip}, the menu's visible area at ${menu}`);
+    // Its focus ring is drawn 2px out and 2px wide.
+    assert.ok(summary[0] - 4 >= menu[0] && summary[1] + 4 <= menu[1], `the heading is at ${summary}, the menu's visible area at ${menu}`);
+    assert.ok(prompt[0] >= menu[0] && prompt[1] <= menu[1], `the task prompt is at ${prompt}, out of the menu's visible area ${menu}`);
 });
 
 // With the text clear of the chevron, 130px left 88px for a choice: "Burning Ship", "Middle

@@ -275,15 +275,42 @@ The complete notices and the id-to-icon mapping are in docs/icons.md.
         </symbol>
 
         <!-- A `symbol` rather than one of the hidden `svg` templates below, because
-             this one is reached both ways: the recorder builds a link around it in
-             script, and the Saves tab points a `use` at it from static markup. Only
-             a `symbol` serves both -- a `use` pointed at a `display: none` template
-             clones that property along with the artwork and renders nothing. -->
+             a `use` reaches it two ways: Save to… points at it from static markup,
+             and `appupdate.js` repoints the update button at it once a release is
+             found. A `use` pointed at a `display: none` template clones that
+             property along with the artwork and renders nothing. -->
         <symbol id="download-icon" data-lucide="download" viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 15V3" />
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <path d="m7 10 5 5 5-5" />
+        </symbol>
+
+        <!-- The menu's Import row (#78), over its two sources. -->
+        <symbol id="import-icon" data-lucide="import" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12" />
+            <path d="m8 11 4 4 4-4" />
+            <path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4" />
+        </symbol>
+
+        <!-- Share screen, which is what the browser asks for before it takes the still. -->
+        <symbol id="screen-share-icon" data-lucide="screen-share" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3" />
+            <path d="M8 21h8" />
+            <path d="M12 17v4" />
+            <path d="m17 8 5-5" />
+            <path d="M17 3h5v5" />
+        </symbol>
+
+        <!-- Clear, in the tool pill (#78). Not the folder-plus it had as a row of the menu:
+             beside the File tree tool, which is a folder, a folder with a plus reads as a
+             new folder. And not a bin, because nothing is deleted: the graph is saved first. -->
+        <symbol id="eraser-icon" data-lucide="eraser" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21" />
+            <path d="m5.082 11.09 8.828 8.828" />
         </symbol>
 
         <!-- The pin on each action in a Node's menu (suggestions.js). It pointed at
