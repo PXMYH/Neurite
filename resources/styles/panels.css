@@ -1160,13 +1160,33 @@
     color: var(--text-primary);
 }
 
-/* The tools' glyphs take the colour their tool sets (`--ui-chrome-icon`, and its hover and lit
-   states). The universal `* { color }` in styles.css reaches the `<svg>` and its `<use>` too,
-   so every glyph was #9d9d9d whatever its tool said -- on glass, 1.6:1 over the brightest sky. */
-.tool-bar svg,
-.tool-bar svg use {
-    color: inherit;
+/* The tools' glyphs in the colour their tool sets (`--ui-chrome-icon`, its hover, its lit state).
+   A `color` cannot reach them: the universal `* { color }` in styles.css matches the paths cloned
+   into each `<use>` as well, so `currentColor` there is #9d9d9d whatever the tool says -- 1.6:1 on
+   the glass over the brightest sky. 1.9.0 and 1.9.1 set `color: inherit` on the `<svg>` and the
+   `<use>`; both then computed #ddd while a screenshot of the glyph read 157 grey. A custom
+   property does cross into the clone, so each tool's symbol strokes with `--icon-stroke`, set by
+   the tool, and keeps `currentColor` wherever nothing sets it (`#note-icon-symbol` has done this
+   for the card chip since #77, in foundation.css). */
+#link-icon-symbol, #edges-icon-symbol, #ai-icon-symbol, #connect-icon-symbol,
+#searchSVG, #proposals-icon-symbol, #eraser-icon {
+    stroke: var(--icon-stroke, currentColor);
 }
+
+.tool-bar .node-add-item,
+.tool-bar .tool-bar-action {
+    --icon-stroke: var(--ui-chrome-icon);
+}
+
+    .tool-bar .node-add-item:hover,
+    .tool-bar .tool-bar-action:hover {
+        --icon-stroke: var(--ui-chrome-icon-hover);
+    }
+
+    .tool-bar .node-add-item[aria-pressed="true"],
+    .tool-bar .tool-bar-action[aria-pressed="true"] {
+        --icon-stroke: var(--ui-chrome-on-active);
+    }
 
 /* The universal `* { font-size: 16px }` in styles.css reaches every element, so a span or a label
    inside a row does not take its row's size: these were 16px in rows of 12 and 13 (measured

@@ -583,3 +583,10 @@ by `PageLoad.loadTabs`, which keeps `PageLoad.tabs` the one list the tests read.
   held the update button's label, the theme names and a dozen more words at 16px in rows of 12
   and 13. They take their row's size now, 28-panels checks for any word left at 16px (failing on
   1.9.0), and 1.9.1 carries it.
+- And one that 1.9.0 and 1.9.1 claimed and did not do: the tool glyphs at #ddd on the glass. The
+  fix set `color: inherit` on the `<svg>` and its `<use>`, and 28-panels read the `<svg>`'s
+  computed colour, #ddd -- while a screenshot of the glyph read 157, the universal rule's #9d9d9d,
+  because that rule matches the paths cloned into each `<use>` (the trap the card chip met in #77).
+  The tool symbols stroke with `--icon-stroke` now, set by each tool for its rest, hover and lit
+  states; 28-panels measures the glyph's brightest pixel, 221 now and 157 on 1.9.1. 1.9.2 carries
+  it.

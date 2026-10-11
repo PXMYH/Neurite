@@ -143,14 +143,31 @@ test('the tool pill and the islands are glass, and their glyphs are legible on i
             bar: alpha(bar.backgroundColor), blur: bar.backdropFilter || bar.webkitBackdropFilter,
             hud: alpha(getComputedStyle(document.querySelector('.hud-panel')).backgroundColor),
             panel: alpha(getComputedStyle(document.querySelector('.dropdown-content')).backgroundColor),
-            glyph: getComputedStyle(document.querySelector('#clear-button svg')).color,
         };
     });
     assert.ok(s.bar < 1 && s.hud < 1, `the islands are opaque: ${JSON.stringify(s)}`);
     assert.match(s.blur, /blur\(/, 'nothing behind the glass is blurred');
     assert.ok(s.panel < 1 && s.panel > s.bar, 'the panel is not glass, or not nearer opaque than the pill');
-    // The universal `* { color }` held every glyph at #9d9d9d whatever its tool said.
-    assert.equal(s.glyph, 'rgb(221, 221, 221)');
+
+    // The glyph as drawn, not as computed: the universal `* { color }` held every glyph at
+    // #9d9d9d (157) whatever its tool said, and an earlier version of this test read the <svg>'s
+    // computed colour, #ddd, while the glyph drew 157.
+    const box = await page.evaluate(() => {
+        const r = document.querySelector('#clear-button svg').getBoundingClientRect();
+        return { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
+    });
+    const png = (await page.screenshot({ clip: box, scale: 'device' })).toString('base64');
+    const brightest = await page.evaluate(async (data) => {
+        const bmp = await createImageBitmap(await (await fetch('data:image/png;base64,' + data)).blob());
+        const canvas = Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bmp, 0, 0);
+        const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let max = 0;
+        for (let i = 0; i < px.length; i += 4) max = Math.max(max, Math.min(px[i], px[i + 1], px[i + 2]));
+        return max;
+    }, png);
+    assert.ok(brightest >= 200, `the glyph is drawn at ${brightest} of 255, not the tool's #ddd`);
 });
 
 test('what cannot be undone is red, and still asks', async () => {
