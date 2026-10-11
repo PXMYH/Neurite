@@ -280,7 +280,7 @@ The app updates itself (#76): `updater.cjs` reads the latest GitHub release, che
 the asset's `digest`, copies the app beside the running one, quits, and a detached `/bin/sh` swaps
 the bundles and reopens it (Squirrel cannot take an ad-hoc-signed update). The parts with no
 Electron in them are `update-core.cjs`, run by the root `npm test`. The page's one bridge is
-`window.neuriteDesktop.update` from `preload.cjs`, read only by `appupdate.js`'s menu row;
+`window.neuriteDesktop.update` from `preload.cjs`, read only by `appupdate.js`'s button in Settings;
 `update.e2e.mjs` updates a packaged build for real in a scratch folder (`NEURITE_APP`).
 
 ## Conventions

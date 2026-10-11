@@ -137,9 +137,15 @@ async function launch(app, userData, feedUrl) {
 const label = (page) => page.evaluate(() => document.querySelector('#update-button .menu-row-label').textContent);
 const note = (page) => page.evaluate(() => document.getElementById('update-note').textContent);
 
-async function checkFromMenu(page) {
+// The menu, then Settings, where Check for updates is since #78 -- it was a row of the menu.
+async function openSettings(page) {
     await page.click('.menu-button');
     await page.waitForTimeout(400);
+    await page.click('#tablink-settings');
+    await page.waitForTimeout(300);
+}
+async function checkFromSettings(page) {
+    await openSettings(page);
     await page.click('#update-button');
 }
 
@@ -153,7 +159,7 @@ test('a packaged app updates itself to a newer build, and opens again with the s
     await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Survives the update\nStill here.\n'));
     await page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.getTitle() === 'Survives the update'));
 
-    await checkFromMenu(page);
+    await checkFromSettings(page);
     await page.waitForFunction((v) => document.querySelector('#update-button .menu-row-label').textContent === `Update to ${v}`,
                                built.next, { timeout: 30000 });
     assert.equal(await page.evaluate(() => document.querySelector('.menu-button').classList.contains('update-ready')), true);
@@ -192,7 +198,7 @@ test('a download that does not match its release is not installed', { skip, time
     const feedUrl = await feed(built, '0'.repeat(64));
     const { handle, page } = await launch(built.app, join(built.dir, 'profile'), feedUrl);
     try {
-        await checkFromMenu(page);
+        await checkFromSettings(page);
         await page.waitForFunction((v) => document.querySelector('#update-button .menu-row-label').textContent === `Update to ${v}`,
                                    built.next, { timeout: 30000 });
         await page.click('#update-button');
@@ -216,7 +222,7 @@ for (const [name, how] of [['hangs', { starts: false }], ['opens on a broken pag
         const feedUrl = await feed(built, sha);
         const userData = join(built.dir, 'profile');
         const { handle, page } = await launch(built.app, userData, feedUrl);
-        await checkFromMenu(page);
+        await checkFromSettings(page);
         await page.waitForFunction((v) => document.querySelector('#update-button .menu-row-label').textContent === `Update to ${v}`,
                                    built.next, { timeout: 30000 });
         const quit = new Promise((resolve) => handle.process().on('exit', resolve));
@@ -245,7 +251,7 @@ test('a feed that stalls is given up on, and the row can check again', { skip, t
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const { handle, page } = await launch(built.app, join(built.dir, 'profile'), `http://127.0.0.1:${server.address().port}/latest`);
     try {
-        await checkFromMenu(page);
+        await checkFromSettings(page);
         await page.waitForFunction(() => document.getElementById('update-note').classList.contains('is-warning'),
                                    undefined, { timeout: 60000 });
         assert.equal(await note(page), 'Could not check for updates: nothing arrived for 30 seconds.');
@@ -278,7 +284,7 @@ test('a newer build that loses a card is taken back, and the graph is as the old
     });
     await page.waitForFunction(() => Object.keys(Graph.nodes).length === 2);
     const before = await cards(page);
-    await checkFromMenu(page);
+    await checkFromSettings(page);
     await page.waitForFunction((v) => document.querySelector('#update-button .menu-row-label').textContent === `Update to ${v}`,
                                built.next, { timeout: 30000 });
     const quit = new Promise((resolve) => handle.process().on('exit', resolve));
@@ -324,8 +330,7 @@ test('an update whose graph cannot be kept changes nothing, however the save fai
         assert.equal(await page.evaluate(() => document.body.inert), false, `the page stayed held after "${why}"`);
     };
     try {
-        await page.click('.menu-button');
-        await page.waitForTimeout(400);
+        await openSettings(page);
         // A real write that fails: the first save of a new graph, which savenet logs and swallows.
         await page.evaluate(() => {
             window.__save = Stored.prototype.save;
