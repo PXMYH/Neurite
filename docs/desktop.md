@@ -48,10 +48,11 @@ What to know:
   folder says what happened. Run from the disk image, or from a copy macOS made where it was
   downloaded, it cannot replace itself, and the row opens the release page instead. Until the
   new version is confirmed it saves nothing, so a version that is taken back cannot write over
-  the graph the old one kept. Two limits: a power cut in the instant between moving the old app
+  the graph the old one kept. Three limits: a power cut in the instant between moving the old app
   aside and the new one in leaves no app at its path, and the old one is beside it as
-  `Neurite.app.replaced-<number>` (rename it back); and pictures or media a new version fails to
-  load are blank in it but kept, since it writes back only what it read. It is not
+  `Neurite.app.replaced-<number>` (rename it back); pictures or media a new version fails to
+  load are blank in it but kept, since it writes back only what it read; and the way back from a
+  new version that hangs stops every Neurite running from that app, a second profile's too. It is not
   Squirrel (Electron's `autoUpdater`): that only takes an
   update that satisfies the running app's designated requirement, and an ad hoc requirement is
   the build's own hash. `desktop/updater.cjs`; `npm test` here drives a real update of a
