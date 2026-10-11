@@ -12,6 +12,16 @@ afterEach(async () => { await context?.close(); });
 // before its title, its controls only when it is wanted, its prose in a well inset from the
 // card, its links as tags in the colours of the Nodes they name, all in the Node's own colour.
 
+// A note, once the frame loop has drawn its card where it lands. Straight after it is made, its box
+// can still be at the page's corner, where it is built: 2 runs in 6 of the hover test measured the
+// well at (10, 43) and moved the pointer onto the canvas there, and 1 in 8 of the chip's
+// photograph took the canvas instead of the chip.
+const addCard = async (title, body) => {
+    const uuid = await addNote(page, title, body);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    return uuid;
+};
+
 const card = (title) => page.evaluate((t) => {
     const node = Object.values(Graph.nodes).find((n) => n.getTitle() === t);
     const div = node.view.div;
@@ -66,7 +76,7 @@ const channels = (css) => {
 };
 
 test('a card shows its kind before its title, in its colour, and keeps one chip through a reload', async () => {
-    await addNote(page, 'Alpha', 'alpha');
+    await addCard('Alpha', 'alpha');
     const first = await card('Alpha');
     assert.deepEqual([first.chips, first.first, first.glyph], [1, 'card-kind', '#note-icon-symbol']);
     // The glyph's copy of the symbol takes its stroke from this property (foundation.css), and
@@ -86,7 +96,7 @@ test('a card shows its kind before its title, in its colour, and keeps one chip 
 });
 
 test('a card\'s controls wait until it is wanted, where there is a pointer to want it with', async () => {
-    await addNote(page, 'Alpha', 'alpha');
+    await addCard('Alpha', 'alpha');
     const rest = await card('Alpha');
     // Where nothing hovers, a control that waits for a hover would never be there.
     assert.equal(rest.controls, isIPad ? 0.8 : 0, isIPad ? 'the controls are hidden on a screen with no hover' : 'the controls show at rest');
@@ -102,7 +112,7 @@ test('a card\'s controls wait until it is wanted, where there is a pointer to wa
 });
 
 test('the prose sits in an opaque well inset from the card, under three brackets and the grip', async () => {
-    await addNote(page, 'Alpha', 'alpha');
+    await addCard('Alpha', 'alpha');
     // A resize writes `width: 100%` on the well, which ran it past the card (a review).
     await page.evaluate(() => { Object.values(Graph.nodes)[0].textNodeSyntaxWrapper.style.width = '100%' });
     const c = await card('Alpha');
@@ -114,8 +124,8 @@ test('the prose sits in an opaque well inset from the card, under three brackets
 });
 
 test('a link\'s tag is in the colour of the Node it names', async () => {
-    await addNote(page, 'Target', 'named');
-    await addNote(page, 'Source', 'It names [[Target]].');
+    await addCard('Target', 'named');
+    await addCard('Source', 'It names [[Target]].');
     await page.waitForFunction(() => document.querySelectorAll('.link-chip').length >= 2, undefined, { timeout: 5000 });
     const source = await card('Source');
     const target = await card('Target');
@@ -129,7 +139,7 @@ test('a link\'s tag is in the colour of the Node it names', async () => {
 });
 
 test('a collapsed card is its disc, with no chip and no brackets', async () => {
-    await addNote(page, 'Alpha', 'alpha');
+    await addCard('Alpha', 'alpha');
     await page.evaluate(() => Object.values(Graph.nodes)[0].view.toggleCollapse());
     await page.waitForTimeout(500);
     const state = await page.evaluate(() => {
@@ -143,7 +153,7 @@ test('a collapsed card is its disc, with no chip and no brackets', async () => {
 // of card beside it or running out of it; and the collapsed disc sat 22 px below the card's
 // centre under the new header's padding (5 px on main).
 test('the well follows a resized card both ways, and a collapsed card keeps its disc centred', { skip: isIPad && 'drags the grip with a mouse' }, async () => {
-    await addNote(page, 'Alpha', 'alpha');
+    await addCard('Alpha', 'alpha');
     const insets = () => page.evaluate(() => {
         const d = Object.values(Graph.nodes)[0].view.div;
         const c = d.getBoundingClientRect(), w = d.querySelector('.editor-wrapper').getBoundingClientRect();
