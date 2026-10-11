@@ -1574,8 +1574,9 @@
     font-size: 13px;
 }
 
-    /* The words a dialog says about itself, as Settings' are said. */
-    #customModal .modal-body :is(p, .proposals-status) {
+    /* The words a dialog says about itself, as Settings' are said. Not a question's: it says
+       its message larger, and the review found the prompt's set at 13px by this. */
+    #customModal:not(.asks) .modal-body :is(p, .proposals-status) {
         color: var(--text-secondary);
         font-size: 13px;
         line-height: 1.45;
@@ -1639,7 +1640,7 @@
             background: #4a6aa3;
         }
 
-#customModal .modal-body :is(textarea, .Searchbar, input[type="url"]) {
+#customModal:not(.asks) .modal-body :is(textarea, .Searchbar, input[type="url"]) {
     box-sizing: border-box;
     margin: 0;
     padding: 6px 8px;
@@ -1651,13 +1652,13 @@
     font: 13px/1.45 var(--font-sans);
 }
 
-    #customModal .modal-body .Searchbar {
+    #customModal:not(.asks) .modal-body .Searchbar {
         width: 100%;
         height: var(--control-h);
         padding: 0 8px;
     }
 
-    #customModal .modal-body :is(textarea, .Searchbar, input):focus-visible {
+    #customModal:not(.asks) .modal-body :is(textarea, .Searchbar, input):focus-visible {
         outline: 2px solid var(--ui-accent);
         outline-offset: 1px;
     }
@@ -1769,7 +1770,7 @@
 /* Lists in a dialog -- Search Nodes, Connect, the Ollama models, the Vector Database's
    documents, the file tree -- have a menu's rows: 32px, rounded, the hover a wash, and no rule
    between one row and the next, where they had a 1px #bbb line and a press that flashed white. */
-#customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p, .file-item) {
+#customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p) {
     min-height: var(--menu-item-h);
     margin: 0;
     padding: 6px 10px;
@@ -1783,7 +1784,7 @@
     transition: background-color var(--ui-transition);
 }
 
-    #customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p, .file-item):hover {
+    #customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p):hover {
         background: var(--menu-hover);
         color: var(--text-primary);
     }
@@ -1832,6 +1833,44 @@
 
 #customModal :is(#search-results, .vector-db-search-results, #key-list, #nodeList, #ollamaModelList) {
     margin-top: 8px;
+}
+
+/* The file tree: its rows as a menu's, the chosen one the accent's wash, and the folder's path
+   in the header a field, where it was 20px over a ledge of 2px and 4px borders. */
+#customModal .file-item {
+    min-height: var(--menu-item-h);
+    padding: 4px 8px;
+    box-sizing: border-box;
+    border-radius: var(--menu-item-radius);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+    #customModal .file-item:hover {
+        background: var(--menu-hover);
+    }
+
+    #customModal .file-item.selected,
+    #customModal .file-item.selected:hover {
+        background: var(--ui-accent-dim);
+    }
+
+    #customModal .file-item * {
+        color: inherit;
+        font-size: inherit;
+    }
+
+#modal-header .modal-filepath-input {
+    flex: 1 1 auto;
+    height: var(--control-h);
+    margin: 0 8px 0 0;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: rgb(0 0 0 / 22%);
+    color: var(--text-primary);
+    font: 13px/1 var(--font-mono);
 }
 
 /* A found snippet of the Vector Database: a card of the group's fill, where it was an inset
@@ -2272,3 +2311,25 @@
         color: inherit;
         font-size: inherit;
     }
+
+/* ---- A finger's targets (#83) ----------------------------------------------------------- */
+
+/* Under a coarse pointer -- an iPad, a phone -- every control, menu row and close button is a
+   finger's size, as the questions' buttons are (44px, foundation.css). They were 28px there. */
+@media (pointer: coarse) {
+    :root {
+        --control-h: 36px;
+        --menu-item-h: 40px;
+    }
+
+    #customModal:not(.asks) .close,
+    .settings-close {
+        width: 40px;
+        height: 40px;
+    }
+
+    #customModal .modal-footer > * {
+        height: 44px;
+        min-width: 96px;
+    }
+}

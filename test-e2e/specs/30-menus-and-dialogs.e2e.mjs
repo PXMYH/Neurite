@@ -25,7 +25,7 @@ const titleType = (page, selector) => page.evaluate((selector) => {
     return [cs.fontSize, cs.fontWeight, cs.color].join(' ');
 }, selector);
 // A bevel is an inset or outset border, or one whose sides are drawn in two greys.
-const bevelled = (page) => page.evaluate(() => [...document.querySelectorAll('#customModal .modal-body *')]
+const bevelled = (page) => page.evaluate(() => [...document.querySelectorAll('#customModal .modal-content *')]
     .filter((el) => el.getClientRects().length)
     .filter((el) => {
         const cs = getComputedStyle(el);
@@ -46,9 +46,12 @@ test('every tool window has the Settings modal\'s surface, title and close butto
     const settingsTitle = await titleType(page, '#settingsPageTitle');
     await page.keyboard.press('Escape');
 
-    for (const id of [...TOOLS, 'controls-modal', 'nodeConnectionModal']) {
+    // A finger's size under a coarse pointer, as the questions' buttons are.
+    const closeSize = await page.evaluate(() => (matchMedia('(pointer: coarse)').matches ? 40 : 28));
+    for (const id of [...TOOLS, 'controls-modal', 'nodeConnectionModal', 'fileTreeModal']) {
         await page.evaluate((id) => {
             if (id === 'controls-modal') return openControlsModal();
+            if (id === 'fileTreeModal') return FileTree.openModal();
             if (id === 'nodeConnectionModal') return new Modal.Connect(Object.values(Graph.nodes)[0] ?? createNodeFromWindow('Alpha', 'a'));
             Modal.open(id);
         }, id);
@@ -61,12 +64,26 @@ test('every tool window has the Settings modal\'s surface, title and close butto
             const r = b.getBoundingClientRect();
             return [b.tagName, b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height)];
         });
-        assert.deepEqual(close, ['BUTTON', 'Close', 28, 28], id + "'s close is not the Settings modal's button");
+        assert.deepEqual(close, ['BUTTON', 'Close', closeSize, closeSize], id + "'s close is not the Settings modal's button");
         assert.deepEqual(await bevelled(page), [], id + ' still has bevelled parts');
         await page.click('#customModal .close');
     }
     // Closing the Vector Database import cancels it, which its caller is told by a rejection.
     assert.deepEqual(errors.filter((e) => !e.includes('User cancelled the operation')), []);
+});
+
+test("the file tree's chosen row is marked, and its path is a field", async () => {
+    await page.evaluate(() => FileTree.openModal());
+    const seen = await page.evaluate(() => {
+        const row = document.createElement('div');
+        row.className = 'file-item selected';
+        row.textContent = 'notes.md';
+        document.querySelector('#customModal .fileTreeContainer').append(row);
+        const field = getComputedStyle(document.querySelector('#customModal .modal-filepath-input'));
+        return { row: getComputedStyle(row).backgroundColor, field: [field.fontSize, field.borderTopWidth, field.borderRightWidth, field.borderBottomWidth] };
+    });
+    assert.notEqual(seen.row, 'rgba(0, 0, 0, 0)', 'the chosen file is not marked');
+    assert.deepEqual(seen.field, ['13px', '1px', '1px', '1px'], 'the path is not a field like the others');
 });
 
 test('the questions are drawn on the same surface, with the same title', async () => {
@@ -81,6 +98,12 @@ test('the questions are drawn on the same surface, with the same title', async (
         const q = await look(page, '#customModal .modal-content');
         assert.deepEqual([q.fill, q.edge, q.width, q.radius], [tool.fill, tool.edge, tool.width, tool.radius], ask + ' is on another surface');
         assert.equal(await titleType(page, '#modal-title'), toolTitle, ask + "'s title is set otherwise");
+        const message = await page.evaluate(() => {
+            const text = document.querySelector('#customModal :is(.alert-message, .confirm-message, .modal-prompt-message)');
+            const box = document.querySelector('#customModal .modal-prompt-textarea');
+            return [getComputedStyle(text).fontSize, box ? getComputedStyle(box).marginTop : null];
+        });
+        assert.deepEqual(message, ['15px', ask === 'prompt' ? '12px' : null], ask + "'s message is set by the tool windows' rules");
         await page.evaluate(() => Modal.close());
     }
 });
@@ -115,7 +138,9 @@ test('the right-click menu, a node\'s actions and a select\'s list are one menu'
         const cs = getComputedStyle(li);
         return [Math.round(li.getBoundingClientRect().height), cs.borderTopLeftRadius, cs.fontSize];
     });
-    assert.deepEqual(row, [32, '6px', '14px'], 'a row of the right-click menu is not a menu row');
+    // 32px, and a finger's 40px under a coarse pointer.
+    const rowHeight = await page.evaluate(() => (matchMedia('(pointer: coarse)').matches ? 40 : 32));
+    assert.deepEqual(row, [rowHeight, '6px', '14px'], 'a row of the right-click menu is not a menu row');
     // The hover is a wash under the same words, where it was pale blue under black.
     await page.hover('#customContextMenu li').catch(() => {});
     const hovered = await page.evaluate(() => getComputedStyle(document.querySelector('#customContextMenu li')).color);
