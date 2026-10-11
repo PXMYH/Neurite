@@ -619,8 +619,10 @@ const TrackpadPinch = {
     start: null,
     onStart(e){
         e.preventDefault();
-        // Nor under a dialog that asks: a pinch on its dimmed page zoomed the Graph behind it.
-        this.start = ((FingersDown.size || Modal.current?.asks) ? null : {zoom: Graph.zoom, pan: Graph.pan, at: Graph.vecToZ()});
+        // Nor under a dialog that asks, nor under Settings (#82): a pinch on its dimmed page
+        // zoomed the Graph behind it.
+        this.start = ((FingersDown.size || Modal.current?.asks || SettingsModal.isOpen())
+            ? null : {zoom: Graph.zoom, pan: Graph.pan, at: Graph.vecToZ()});
     },
     onChange(e){
         e.preventDefault();

@@ -94,6 +94,7 @@ const SettingsModal = {
         const sections = [...Elem.byId('tab5').querySelectorAll('.settings-section[data-page]')];
         for (const section of sections) section.classList.toggle('page-hidden', section.dataset.page !== page);
         SettingsModal.body.classList.toggle('solo', sections.filter( (s)=>(s.dataset.page === page) ).length === 1);
+        SettingsModal.body.dataset.page = page;
         SettingsModal.body.scrollTop = 0;
 
         // What measures itself measures again now it is shown: the sliders' fills and values,
@@ -118,6 +119,21 @@ const SettingsModal = {
         SettingsModal.show(next.dataset.page);
     },
 
+    // A click outside closes it, and the rest of a double-click there is taken out as it comes
+    // (`Modal.onRestOfDoubleClick`): it came down on the Graph, and made a note.
+    onBackdrop(e){
+        SettingsModal.close();
+        Modal.closedBehind = {x: e.clientX, y: e.clientY, until: performance.now() + 500};
+    },
+
+    // A file let go over Settings is no drop on the Graph behind it, and the browser's own answer
+    // to a drop nobody takes is to open the file in place of the app. Not in the notes editor,
+    // which reads a file dropped on it in itself (CodeMirror).
+    onFile(e){
+        if (!e.dataTransfer?.types?.includes('Files') || e.target.closest?.('.CodeMirror')) return;
+        e.preventDefault();
+    },
+
     // Esc closes it -- unless one of the windows its controls open is on top, which takes Esc
     // first (`custommodal.js`), or something inside already answered the key, as an open
     // select list does.
@@ -132,7 +148,9 @@ const SettingsModal = {
     init(){
         On.click(Elem.byId('settings-button'), ()=>SettingsModal.open() );
         On.click(Elem.byId('settingsClose'), SettingsModal.close);
-        On.click(Elem.byId('settingsBackdrop'), SettingsModal.close);
+        On.click(Elem.byId('settingsBackdrop'), SettingsModal.onBackdrop);
+        On.dragover(SettingsModal.root, SettingsModal.onFile);
+        On.drop(SettingsModal.root, SettingsModal.onFile);
         for (const item of SettingsModal.nav.querySelectorAll('.settings-nav-item')) {
             On.click(item, ()=>SettingsModal.show(item.dataset.page) );
         }

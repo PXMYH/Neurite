@@ -1224,7 +1224,13 @@
    the moving sky would be read through it. */
 .settings-modal {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    left: 0;
+    /* Down to an on-screen keyboard (`--visible-height`, hud.js), so the dialog is centred in
+       the part of the window the keys leave, as the questions are (`.modal.asks`). At `inset: 0`
+       it was centred in the whole window, and its foot went under the keys. */
+    height: var(--visible-height, 100%);
     /* Over the rest of the chrome, which shares its layer: the overview and the canvas's hint
        are `z-index: 0` and come later in the page, and drew over the dialog at `auto`. Still
        inside `.dropdown`'s 100, so under `#customModal` and the tooltips. */
@@ -1428,7 +1434,7 @@
 
     /* The notes editor fills the pane, under the Archive controls, as the dialog sizes itself
        to the window. */
-    .settings-content-body:has(> #tab1[style*="block"]) {
+    .settings-content-body[data-page="notes"] {
         display: flex;
         flex-direction: column;
     }

@@ -115,6 +115,52 @@ test('the canvas keeps its keys and its gestures while Settings is open', async 
     assert.equal((await state(page)).open, true);
 });
 
+// Found by a review. The guards above asked where the focus was, and a Saved Graph restored
+// under Settings replaces the notes editor that held it, so the focus fell to `body` and `+`
+// zoomed behind the dialog; a pinch on a Mac's trackpad zoomed it too; a double-click outside
+// it closed it on the first click and made a note with the second; and a file let go over it
+// was opened by the browser in place of the app.
+test('nothing reaches the Graph through Settings: a lost focus, a pinch, a double-click, a file', async () => {
+    await openSettings(page, 'notes');
+    const zoom = () => page.evaluate(() => Graph.zoom.mag());
+    const z0 = await zoom();
+    await page.evaluate(() => document.activeElement.blur());
+    assert.equal(await page.evaluate(() => document.activeElement === document.body), true);
+    for (const key of ['+', '1', 't']) await page.keyboard.press(key);
+    await page.waitForTimeout(300);
+    assert.deepEqual([await zoom(), await nodeCount(page)], [z0, 0], 'a key with the focus on body reached the Graph');
+
+    const pinched = await page.evaluate(() => {
+        const gesture = (type, scale) => { const e = new Event(type, { cancelable: true }); Object.defineProperty(e, 'scale', { value: scale }); window.dispatchEvent(e); };
+        gesture('gesturestart', 1);
+        for (let k = 1; k <= 10; k++) gesture('gesturechange', 1 + k / 10);
+        gesture('gestureend', 2);
+        return Graph.zoom.mag();
+    });
+    assert.equal(pinched, z0, 'a trackpad pinch zoomed the Graph behind Settings');
+
+    const dropped = await page.evaluate(() => {
+        const files = new DataTransfer();
+        files.items.add(new File(['x'], 'a.txt', { type: 'text/plain' }));
+        const over = (target) => {
+            const e = new DragEvent('dragover', { dataTransfer: files, bubbles: true, cancelable: true });
+            target.dispatchEvent(e);
+            return e.defaultPrevented;
+        };
+        return [over(document.getElementById('settingsBackdrop')), over(document.querySelector('.settings-nav'))];
+    });
+    assert.deepEqual(dropped, [true, true], 'a file over Settings is left to the browser to open');
+
+    // The Fractal's lines can take the hit, and a note is made only on the canvas itself
+    // (`createnodes.js`), so they let it through, as in 08-editor.
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none' });
+    await page.mouse.dblclick(30, 500);
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = '' });
+    assert.deepEqual([(await state(page)).open, await nodeCount(page)], [false, 0],
+        'a double-click outside Settings closed it and made a note');
+});
+
 test('Settings opens on the page it was left on, through a reload too', async () => {
     await openSettings(page, 'fractal');
     await page.keyboard.press('Escape');

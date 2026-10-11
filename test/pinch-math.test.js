@@ -115,8 +115,9 @@ test('there is one pinch: Safari\'s gesture events stand aside while a finger is
     // Every finger counts, not only the Fractal's: a pinch over a card sends gesture events too.
     assert.match(code, /On\.pointerdown\(document, \(e\)=>\{ if \(e\.pointerType === 'touch'\) FingersDown\.add\(e\.pointerId\) \}, true\);/);
     assert.ok(trackpad.length > 0, 'TrackpadPinch is gone; this test reads nothing');
-    assert.match(trackpad, /onStart\(e\)\{[\s\S]*?\(FingersDown\.size \|\| Modal\.current\?\.asks\) \? null/,
-        'a gesture that starts with a finger down, or under a dialog that asks, is taken for a trackpad pinch');
+    // Nor under Settings (#82), whose dimmed page is over the Graph as well.
+    assert.match(trackpad, /onStart\(e\)\{[\s\S]*?\(FingersDown\.size \|\| Modal\.current\?\.asks \|\| SettingsModal\.isOpen\(\)\)\s*\? null/,
+        'a gesture that starts with a finger down, or under a dialog that asks or Settings, is taken for a trackpad pinch');
     assert.match(trackpad, /onChange\(e\)\{[\s\S]*?if \(!start \|\| FingersDown\.size/,
         'a gesture that goes on while a finger is down moves the view beside the touch pinch');
     assert.doesNotMatch(code, /On\.touch(start|move|end|cancel)\(svg/,

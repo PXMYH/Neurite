@@ -650,14 +650,16 @@ class Hud {
     }
 
     static isTyping(){
+        // Settings holds the keys while it is open (#82), wherever the focus is: a Saved Graph
+        // restored under it replaces the notes editor that had the focus, which falls to `body`.
+        if (SettingsModal.isOpen()) return true;
         const el = document.activeElement;
         if (!el || el === document.body) return false;
         if (el.isContentEditable) return true;
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
         // A CodeMirror pane focuses a hidden textarea, which the check above
-        // catches, but the menu also swallows these keys for its own navigation,
-        // and the Settings modal holds the focus while it is open (#82).
-        return !!el.closest?.('.dropdown-content, .modal-content, .settings-modal, .CodeMirror');
+        // catches, but the menu also swallows these keys for its own navigation.
+        return !!el.closest?.('.dropdown-content, .modal-content, .CodeMirror');
     }
 }
 

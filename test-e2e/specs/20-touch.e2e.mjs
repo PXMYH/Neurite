@@ -271,7 +271,7 @@ const keyboardUpTo = (page, height) => page.evaluate((h) => {
     visualViewport.dispatchEvent(new Event('resize'));
 }, height);
 
-test('the Pane, the menu and the caret stay above an on-screen keyboard', async () => {
+test('the Pane, Settings and the caret stay above an on-screen keyboard', async () => {
     ({ context, page } = await openNeurite(browser, { touch: true }));
     await page.evaluate(async () => {
         window.currentActiveZettelkastenMirror.setValue(
@@ -285,7 +285,8 @@ test('the Pane, the menu and the caret stay above an on-screen keyboard', async 
     });
     const bottoms = () => page.evaluate(() => ({
         pane: App.zetPanes.container.getBoundingClientRect().bottom,
-        menu: document.querySelector('.dropdown-content').getBoundingClientRect().bottom,
+        // The Pane's page of Settings since #82.
+        settings: document.querySelector('.settings-dialog').getBoundingClientRect().bottom,
         caret: window.currentActiveZettelkastenMirror.cursorCoords(null, 'window').bottom,
     }));
     const open = await bottoms();
