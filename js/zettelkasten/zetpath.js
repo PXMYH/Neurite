@@ -270,7 +270,9 @@ function adjustSliderVisibilityBasedOnPathType(styleName) {
     const sliderClass = (styleName === 'Branching') ? '.branching-slider'
                       : (styleName === 'Spiral') ? '.spiral-slider'
                       : (styleName === 'Radial') ? '.radial-slider' : ''
-    if (sliderClass) section.querySelectorAll(sliderClass).forEach(Elem.displayBlock);
+    // Shown by taking the `display: none` back off, so the stylesheet lays the row out: an
+    // inline `display: block` here undid the grid each slider row is (#80).
+    if (sliderClass) section.querySelectorAll(sliderClass).forEach(Elem.show);
 }
 
 ZetPath.init = function(){
@@ -291,6 +293,9 @@ ZetPath.init = function(){
     // what makes a change to any of these re-place the nodes. Unguarded, like the
     // loop above -- if the tab did not load, that threw first and said so.
     Modal.wireControls(Elem.byId('zetPlacementSettings'), Modals.noteModal);
+    // Four short choices, laid out as one row of segments (#80). After the wiring, which would
+    // take each segment's radio for a setting of its own.
+    Segmented.from(Elem.byId('zetPathTypeDropdown'), Elem.byId('placementHeading'));
 
     ZetPath.updateOptions();
 }

@@ -492,7 +492,48 @@ Phases:
 - [x] B: themes and the Saved Views in Settings (#79). The Fractal and Views panels' markup
   moved verbatim into Settings (Theme with Customize folded, Saved views, Fractal with Drawing
   folded), `themes.js` builds the cards, and 27-themes covers choosing, keys, Custom and Paper.
-- [ ] C: the panels' design system (#80).
+Research, as asked ("research some popular apps how they provide themes"; "research some popular
+apps and design systems"), read from first-party pages:
+- Themes, nine apps. Eight keep the theme in Settings, under Appearance or Preferences (VS Code,
+  Obsidian, Linear, GitHub, Slack, Raycast, macOS, Notion; Arc in its sidebar). Six make a theme
+  colours only. A click applies one with no confirm in most; VS Code alone previews on focus, and
+  shows the theme in use by where the focus starts. Obsidian and Raycast show each as a picture
+  of the app (512x288 shots; a mock Raycast window). Six let a reader make their own.
+  Sources: code.visualstudio.com/docs/configure/themes, obsidian.md/help/themes,
+  linear.app/docs/account-preferences, docs.github.com (managing your theme settings),
+  slack.com/help/articles/205166337, manual.raycast.com/themes, support.apple.com (mchlp1225),
+  notion.com/help/account-settings.
+- Panels. Apple's HIG (settings, toggles, sliders, segmented controls, buttons, layout, dark
+  mode), Material 3's switch, slider and state tokens, Radix Themes (spacing, type, radius,
+  segmented control, switch), shadcn (theming, field), Linear's redesign notes. What they agree
+  on: a short heading over a group of rows; the label left and every control on one right edge;
+  a description under the label, not in a tooltip; a switch for what is on at once; a slider with
+  its value; up to five short choices as a segmented control; one prominent button at most, and
+  never a destructive one; 2px focus rings; 24px targets at least; sentence case.
+
+Tokens chosen (`resources/styles/panels.css`): 16px panel padding, 24px between sections, 8px
+under a heading; a heading 12/600 in `--text-secondary`, left, no rules; a group white 4% with a
+white 6% edge and an 8px radius, rows at least 36px with white 6% hairlines; label 13/500,
+description 12/400 in `--text-secondary` (7.2:1 on the group; `--text-muted` was 4.0:1); controls
+28px, 6px radius, white 6% fill and white 15% edge, hover 12%, pressed 16%; switches 28x16; the
+focus ring 2px of `--ui-accent` 2px out. The chrome is glass, as asked of the tool pill: the pill
+and the islands at 60% of `--ui-chrome` with an 18px blur, the panel at 86% because it holds text,
+and solid under `prefers-reduced-transparency`.
+
+- [x] C: the panels' design system (#80). `panels.css` for every panel; Settings laid out as
+  groups of rows, its sliders one to a row with their values, the placement style a segmented
+  control (`Segmented`), the Ai panel's toggles switches; the tool pill and the islands glass,
+  their glyphs #ddd. 28-panels covers the anatomy, the values, the switches, the segments and the
+  glass.
+
+Found in C: every tool's glyph was #9d9d9d whatever its tool said, because the universal
+`* { color }` reaches the `<svg>` and its `<use>` -- harmless on an opaque pill, 1.6:1 on glass over
+the brightest sky. `ZetPath` showed a placement style's sliders with an inline `display: block`,
+which would have undone each slider's row; `Elem.show` takes the inline display off instead, and
+`Elem.displayBlock` had no other caller. Three WebKit-iPad tests fail on main as they do here
+(07-canvas's zoom anchor, 08-editor's pane handle, 12-connect's right-click list); the suite had
+not been run whole on the iPad before.
+
 - [ ] Review, release 1.9.0, close the three issues.
 
 Found on the way: a tab's markup was not in the page when `loadTab` resolved

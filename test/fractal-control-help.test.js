@@ -175,7 +175,8 @@ test('the hover text is still there, and the existing names are untouched', ()=>
 
     // `#flashlightStrength` is named by a `<label for>`. An `aria-label` there would
     // replace that name rather than add to it, so it must not have one.
-    assert.match(html, /<label for="flashlightStrength">Strength:<\/label>/);
+    // Without its colon since the label stands at the left of its row (#80).
+    assert.match(html, /<label for="flashlightStrength">Strength<\/label>/);
     assert.equal(attr(tagWithId('flashlightStrength'), 'aria-label'), null,
         'an aria-label on #flashlightStrength overrides the label that names it');
 

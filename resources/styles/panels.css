@@ -1,0 +1,1166 @@
+/* The menu's panels and the chrome islands, as one design system (#80).
+
+   Asked: "settings and in general any menu when clicked in needs an aesthetic upgrade,
+   research some popular apps and design systems", and, of the tool pill, "the toolbar
+   should be transparent as well". Read from Apple's HIG, Material 3, Radix and shadcn, and
+   from how Linear, Raycast and macOS lay out their settings (tasks/todo.md has the notes):
+
+   - a section is a short heading, left-aligned and set small, over a group: a faint fill and
+     edge holding rows, with hairlines between them -- not a centred word ruled out to both
+     edges, which is what every heading here was;
+   - a row is its label on the left and its control on the right, every control on one right
+     edge, and a line of description under the label when the label cannot say it alone;
+   - one height for every control (28px) and one radius (6px); a switch for what is on or off
+     at once; a slider with its value beside it; a quiet button by default, the accent for the
+     one that matters, red only for what cannot be undone;
+   - a focus ring 2px wide in the accent, offset 2px, on everything.
+
+   The chrome is glass: the tool pill and the islands let the universe show through, blurred,
+   as the cards on the canvas do. The menu's panel is glass too, nearer opaque, because it
+   holds text to read; a reader who asks the system for less transparency gets them solid.
+
+   Scoped to `.menu-detail` wherever a class is shared: `.settingsSlider`, `.gridLayout`,
+   `.checkboxarray` and the rest are also an AI Node's, and those stay as they are. Loaded
+   after foundation.css, so a rule here wins a tie by order. */
+
+:root {
+    /* As clear as a glyph on it can be and still keep 3:1 against the brightest thing behind:
+       over pure white, 60% of #232329 leaves #7b7b7f, and a glyph of #ddd measures 3.1:1 on it,
+       so the tools' glyphs are #ddd on glass where they were #bbb (2.2:1 there). The panel
+       holds text to read, so it is nearer opaque. */
+    --panel-glass: rgb(35 35 41 / 86%);
+    --chrome-glass: rgb(35 35 41 / 60%);
+    --glass-blur: blur(18px) saturate(150%);
+    --glass-edge: rgb(255 255 255 / 9%);
+
+    --group-fill: rgb(255 255 255 / 4%);
+    --group-edge: rgb(255 255 255 / 6%);
+    --group-radius: 8px;
+    --row-divider: rgb(255 255 255 / 6%);
+    --row-min: 36px;
+
+    --control-h: 28px;
+    --control-radius: 6px;
+    --control-fill: rgb(255 255 255 / 6%);
+    --control-fill-hover: rgb(255 255 255 / 12%);
+    --control-fill-active: rgb(255 255 255 / 16%);
+    --control-edge: rgb(255 255 255 / 15%);
+    --switch-off: rgb(255 255 255 / 20%);
+}
+
+/* ---- Glass ------------------------------------------------------------------------------ */
+
+/* A hover inside glass is a wash, not a tile: the opaque `--ui-chrome-hover` was chosen for
+   opaque islands, and on glass it would be the one solid thing in the pill. */
+.tool-bar,
+.menu-button,
+.hud-panel,
+.dropdown-content {
+    --ui-chrome-hover: rgb(255 255 255 / 10%);
+    --ui-chrome-icon: #ddd;
+    --ui-chrome-icon-hover: #fff;
+    border: 1px solid var(--glass-edge);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+}
+
+.tool-bar,
+.menu-button,
+.hud-panel {
+    background: var(--chrome-glass);
+}
+
+.dropdown-content {
+    background: var(--panel-glass);
+    border-radius: 12px;
+}
+
+/* Solid where glass cannot be drawn, and where the reader asked for less of it. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .tool-bar, .menu-button, .hud-panel, .dropdown-content { background: var(--ui-chrome); }
+}
+@media (prefers-reduced-transparency: reduce) {
+    .tool-bar, .menu-button, .hud-panel, .dropdown-content {
+        background: var(--ui-chrome);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+/* ---- The panel's frame ------------------------------------------------------------------ */
+
+/* The way back, which is also the panel's title: the back chevron and the name, 15/600. */
+.menu-back {
+    min-height: 44px;
+    padding: 0 16px;
+    gap: 8px;
+    border-bottom: 1px solid var(--row-divider);
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+    .menu-back svg {
+        width: 18px;
+        height: 18px;
+        margin-left: -4px;
+        color: var(--text-secondary);
+    }
+
+    .menu-back:hover svg {
+        color: var(--text-primary);
+    }
+
+.menu-detail .submenu {
+    padding: 16px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+/* A thin bar the panel's own colour, where the browser drew a white gutter down the side. */
+.dropdown-content {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 18%) transparent;
+}
+
+    .dropdown-content::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    .dropdown-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .dropdown-content::-webkit-scrollbar-thumb {
+        border: 3px solid transparent;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 18%) padding-box;
+    }
+
+/* ---- Sections and their headings -------------------------------------------------------- */
+
+.menu-detail .settings-section {
+    margin: 0 0 24px;
+}
+
+    .menu-detail .settings-section:last-child {
+        margin-bottom: 0;
+    }
+
+/* Left, small and set in the secondary colour, with no rules: the rules each side were drawn
+   by `.button-label`, a class built for a label that opens a panel. */
+.menu-detail .settings-heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 8px;
+    padding: 0 2px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: left;
+    white-space: normal;
+}
+
+    .menu-detail .settings-heading::before,
+    .menu-detail .settings-heading::after {
+        display: none;
+    }
+
+.menu-detail .settings-note {
+    margin: 0 2px 10px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+/* A fold's summary reads as the heading it is, with its chevron after the words, and the
+   whole line is the target. A fold inside a section -- Customize, Drawing -- is a row of the
+   group instead (below). */
+.menu-detail .settings-fold > summary {
+    width: fit-content;
+    border-radius: var(--control-radius);
+    cursor: pointer;
+}
+
+    .menu-detail .settings-fold > summary:hover {
+        color: var(--text-primary);
+    }
+
+    .menu-detail .settings-fold > summary .fold-mark {
+        width: 14px;
+        height: 14px;
+    }
+
+/* ---- Groups and rows -------------------------------------------------------------------- */
+
+/* The rows of a section, on one faint card. No `overflow: hidden`, which would cut off a
+   select's list where it opens over the rows below. */
+.menu-detail .settings-group {
+    margin: 0;
+    background: var(--group-fill);
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+}
+
+/* A row: its label left, its control on the group's right edge, a hairline above it unless it
+   opens the group. The rows are nested a level here and there -- a list, a fold, the sliders'
+   grid -- so the first row of the group's first child is a first row too. */
+.menu-detail .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: var(--row-min);
+    margin: 0;
+    padding: 6px 12px;
+    box-sizing: border-box;
+    border-top: 1px solid var(--row-divider);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+    .menu-detail .settings-group > :first-child,
+    .menu-detail .settings-group > :first-child > :first-child {
+        border-top: none;
+    }
+
+.menu-detail .settings-row-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.menu-detail .settings-label,
+.menu-detail .settings-row > label {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.menu-detail .settings-description {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+    .menu-detail .settings-description:empty {
+        display: none;
+    }
+
+    .menu-detail .settings-description.is-warning {
+        color: var(--ui-danger);
+    }
+
+/* A fold inside a group -- Customize, Drawing -- opens as a row: its name and its chevron
+   across the row, and its rows under it. Customize stands alone under the theme cards, so it
+   is a group of its own, folded to its one row. */
+.menu-detail .settings-subfold > summary {
+    display: flex;
+    width: auto;
+    min-height: var(--row-min);
+    margin: 0;
+    padding: 0 12px;
+    border-top: 1px solid var(--row-divider);
+    border-radius: 0;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+    .menu-detail .settings-subfold > summary .fold-mark {
+        margin-left: auto;
+        color: var(--text-secondary);
+    }
+
+    .menu-detail .settings-subfold > summary:hover {
+        background: var(--control-fill);
+    }
+
+#themeSettings > .settings-subfold {
+    background: var(--group-fill);
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+}
+
+    #themeSettings > .settings-subfold > summary {
+        border-top: none;
+        border-radius: var(--group-radius);
+    }
+
+    #themeSettings > .settings-subfold[open] > summary {
+        border-radius: var(--group-radius) var(--group-radius) 0 0;
+    }
+
+    #themeSettings > .settings-subfold > .settings-group {
+        border: none;
+        border-top: 1px solid var(--row-divider);
+        border-radius: 0 0 var(--group-radius) var(--group-radius);
+        background: none;
+    }
+
+/* ---- Sliders, as rows: label, track, value ---------------------------------------------- */
+
+/* Settings' sliders, one to a row (Apple's sliders, Material's): the label, the track across
+   the middle, and the value at the end -- an editable box where there is one, the number
+   alone where there is not. The box's wrapper steps out of the way so its two children land
+   in the row's first and last columns. The Ai panel's four keep their own grid: their labels
+   carry their values, written by `aitab.js`. */
+#tab5 .gridLayout {
+    display: block;
+}
+
+#tab5 .settingsSlider {
+    display: grid;
+    grid-template-columns: minmax(84px, 30%) minmax(0, 1fr) 56px;
+    align-items: center;
+    column-gap: 12px;
+    width: auto;
+    min-height: var(--row-min);
+    margin: 0;
+    padding: 4px 12px;
+    box-sizing: border-box;
+    border: none;
+    border-top: 1px solid var(--row-divider);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+
+    #tab5 .settingsSlider > .number-input-wrapper {
+        display: contents;
+    }
+
+    #tab5 .settingsSlider label {
+        grid-column: 1;
+        grid-row: 1;
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    #tab5 .settingsSlider input[type="range"] {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    #tab5 .settingsSlider .number-input,
+    #tab5 .settingsSlider .slider-value {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+.menu-detail .slider-value {
+    min-width: 32px;
+    color: var(--text-secondary);
+    font: 12px/1 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* The track 4px tall and the box it is drawn in 18px, so the row, not the hairline, is what a
+   pointer has to find. `customsliders.js` paints the fill as an inline `background`, so its
+   size and place are set here, against the inline shorthand that resets them. */
+.menu-detail input[type="range"] {
+    width: 100%;
+    height: 18px;
+    margin: 0;
+    opacity: 1;
+    border-radius: 2px;
+    background-size: 100% 4px !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+}
+
+    .menu-detail input[type="range"]::-webkit-slider-thumb {
+        width: 14px;
+        height: 14px;
+        margin-top: 0;
+        border-radius: 50%;
+        background: #f2f2f5;
+        box-shadow: 0 0 0 1px rgb(0 0 0 / 30%), 0 1px 3px rgb(0 0 0 / 45%);
+        transition: transform var(--ui-transition);
+    }
+
+    .menu-detail input[type="range"]:hover::-webkit-slider-thumb {
+        background: #fff;
+        transform: scale(1.1);
+    }
+
+    .menu-detail input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border: none;
+        border-radius: 50%;
+        background: #f2f2f5;
+        box-shadow: 0 0 0 1px rgb(0 0 0 / 30%), 0 1px 3px rgb(0 0 0 / 45%);
+    }
+
+    .menu-detail input[type="range"]::-moz-range-track,
+    .menu-detail input[type="range"]::-moz-range-progress {
+        background: transparent;
+    }
+
+    .menu-detail input[type="range"]:focus-visible {
+        outline: 2px solid var(--ui-accent);
+        outline-offset: 2px;
+    }
+
+/* ---- Controls --------------------------------------------------------------------------- */
+
+/* Buttons: one height, one radius, a quiet fill. Red for the one that cannot be undone, and
+   the accent for none -- a panel of settings has no primary action. */
+.menu-detail .key-button,
+.menu-detail .linkbuttons {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--control-h);
+    min-width: 0;
+    margin: 0;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: var(--control-fill);
+    box-shadow: none;
+    color: var(--text-primary);
+    font: 500 13px/1 var(--font-sans);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--ui-transition), border-color var(--ui-transition);
+}
+
+    .menu-detail .key-button:hover,
+    .menu-detail .linkbuttons:hover {
+        background: var(--control-fill-hover);
+        color: var(--text-primary);
+    }
+
+    .menu-detail .key-button:active,
+    .menu-detail .linkbuttons:active {
+        background: var(--control-fill-active);
+    }
+
+    .menu-detail .key-button:focus-visible,
+    .menu-detail .linkbuttons:focus-visible {
+        outline: 2px solid var(--ui-accent);
+        outline-offset: 2px;
+    }
+
+    .menu-detail .key-button.is-danger {
+        border-color: color-mix(in srgb, var(--ui-danger) 45%, transparent);
+        background: color-mix(in srgb, var(--ui-danger) 12%, transparent);
+        color: var(--ui-danger);
+    }
+
+        .menu-detail .key-button.is-danger:hover {
+            background: color-mix(in srgb, var(--ui-danger) 22%, transparent);
+        }
+
+    .menu-detail .key-button[aria-disabled="true"] {
+        opacity: 0.6;
+        cursor: default;
+    }
+
+    .menu-detail .key-button svg {
+        flex: none;
+        width: 14px;
+        height: 14px;
+    }
+
+/* Fields: a sunken fill, so a box that takes typing is told from a button at a glance. */
+.menu-detail input[type="text"],
+.menu-detail input[type="password"],
+.menu-detail input[type="number"] {
+    height: var(--control-h);
+    margin: 0;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: rgb(0 0 0 / 22%);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+    .menu-detail input[type="text"]:focus-visible,
+    .menu-detail input[type="password"]:focus-visible,
+    .menu-detail input[type="number"]:focus-visible {
+        outline: 2px solid var(--ui-accent);
+        outline-offset: 1px;
+    }
+
+.menu-detail .number-input {
+    width: 56px;
+    height: 24px;
+    padding: 0 6px;
+    font: 12px/1 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+#tab5 .tag-input {
+    width: 56px;
+    font-family: var(--font-mono);
+    text-align: center;
+}
+
+/* Selects: the custom replacer drawn as a field with its chevron, and its list as a popover in
+   the panel's own colours where it was a light sheet over a dark menu. */
+.menu-detail .select-replacer {
+    height: var(--control-h);
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: var(--control-fill);
+    color: var(--text-primary);
+}
+
+    .menu-detail .select-replacer:hover {
+        background: var(--control-fill-hover);
+    }
+
+    .menu-detail .select-replacer .selected-text {
+        height: calc(var(--control-h) - 2px);
+        padding: 0 26px 0 10px;
+        line-height: calc(var(--control-h) - 2px);
+        font-size: 13px;
+    }
+
+        .menu-detail .select-replacer .selected-text::after {
+            display: none;
+        }
+
+    .menu-detail .select-replacer::before,
+    .menu-detail .select-replacer::after {
+        width: 7px;
+        height: 1.5px;
+        background: var(--text-secondary);
+    }
+
+.menu-detail .options-replacer {
+    top: calc(100% + 4px);
+    padding: 4px;
+    border: 1px solid var(--glass-edge);
+    border-radius: 8px;
+    background: #2b2b33;
+    box-shadow: 0 10px 28px rgb(0 0 0 / 45%);
+}
+
+    .menu-detail .options-replacer div {
+        padding: 6px 8px;
+        border-radius: 5px;
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+
+    .menu-detail .options-replacer .dropdown-option:hover {
+        background: var(--control-fill-hover);
+    }
+
+        .menu-detail .options-replacer div.selected,
+        .menu-detail .options-replacer .dropdown-option.selected:hover {
+            background: var(--ui-accent-dim);
+            color: #fff;
+        }
+
+/* Switches, for what is on or off at once: a checkbox's label laid out as a row, its name on
+   the left and a 28x16 track on the right that the thumb slides along. The checkbox itself
+   stays as it is everywhere -- out of sight and the one thing that takes the focus. */
+.menu-detail .checkboxarray {
+    display: block;
+    width: auto;
+    padding: 0;
+}
+
+    .menu-detail .checkboxarray > div {
+        display: flex;
+        width: auto;
+        min-height: var(--row-min);
+        padding: 0 12px;
+        border-top: 1px solid var(--row-divider);
+    }
+
+    .menu-detail .checkboxarray > div:first-child {
+        border-top: none;
+    }
+
+    .menu-detail .checkboxarray input[type="checkbox"] + label {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        min-width: 0;
+        min-height: var(--row-min);
+        margin: 0;
+        padding: 0 44px 0 0;
+        border: none;
+        border-radius: 0;
+        background: none;
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 500;
+        text-align: left;
+    }
+
+        .menu-detail .checkboxarray input[type="checkbox"] + label:hover {
+            background: none;
+            color: var(--text-primary);
+        }
+
+        .menu-detail .checkboxarray input[type="checkbox"] + label::before,
+        .menu-detail .checkboxarray input[type="checkbox"] + label::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: auto;
+            border-radius: 999px;
+            transform: translateY(-50%);
+            transition: background-color var(--ui-transition), right var(--ui-transition);
+        }
+
+        /* The track. */
+        .menu-detail .checkboxarray input[type="checkbox"] + label::before {
+            right: 0;
+            width: 28px;
+            height: 16px;
+            background: var(--switch-off);
+        }
+
+        /* The thumb. */
+        .menu-detail .checkboxarray input[type="checkbox"] + label::after {
+            right: 14px;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            box-shadow: 0 1px 2px rgb(0 0 0 / 40%);
+            font-size: 0;
+        }
+
+    .menu-detail .checkboxarray input[type="checkbox"]:checked + label::before {
+        background: var(--ui-accent-solid);
+    }
+
+    .menu-detail .checkboxarray input[type="checkbox"]:checked + label::after {
+        content: "";
+        top: 50%;
+        right: 2px;
+        left: auto;
+        transform: translateY(-50%);
+        color: transparent;
+    }
+
+    .menu-detail .checkboxarray input[type="checkbox"]:focus-visible + label {
+        outline: none;
+    }
+
+        .menu-detail .checkboxarray input[type="checkbox"]:focus-visible + label::before {
+            outline: 2px solid var(--ui-accent);
+            outline-offset: 2px;
+        }
+
+.menu-detail .checkboxarray.settings-row {
+    display: block;
+    padding: 0;
+}
+
+/* A segmented control (`Segmented`): equal segments on a sunken track, the chosen one raised. */
+.menu-detail .segmented-source {
+    display: none;
+}
+
+.menu-detail .segmented {
+    display: flex;
+    flex: 1;
+    max-width: 320px;
+    padding: 2px;
+    gap: 2px;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: rgb(0 0 0 / 22%);
+}
+
+    .menu-detail .segmented-option {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        height: calc(var(--control-h) - 6px);
+        border-radius: 4px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color var(--ui-transition), color var(--ui-transition);
+    }
+
+        .menu-detail .segmented-option:hover {
+            color: var(--text-primary);
+        }
+
+        .menu-detail .segmented-option:has(input:checked) {
+            background: rgb(255 255 255 / 12%);
+            box-shadow: inset 0 0 0 1px rgb(255 255 255 / 12%);
+            color: var(--text-primary);
+        }
+
+        .menu-detail .segmented-option:has(input:focus-visible) {
+            outline: 2px solid var(--ui-accent);
+            outline-offset: 1px;
+        }
+
+/* Colour wells: round-cornered swatches, each with its letter, rather than the browser's box. */
+.menu-detail .color-picker-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+
+    .menu-detail .color-picker-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--text-secondary);
+        font-size: 11px;
+    }
+
+    .menu-detail .color-picker-item input[type="color"] {
+        width: 28px;
+        height: 22px;
+        margin: 0;
+        padding: 0;
+        border: 1px solid var(--control-edge);
+        border-radius: 5px;
+        background: none;
+        cursor: pointer;
+    }
+
+        .menu-detail .color-picker-item input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 2px;
+        }
+
+        .menu-detail .color-picker-item input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 3px;
+        }
+
+        .menu-detail .color-picker-item input[type="color"]::-moz-color-swatch {
+            border: none;
+            border-radius: 3px;
+        }
+
+/* ---- Settings' own sections ------------------------------------------------------------- */
+
+/* `.button-label` centres its words; a heading here starts at the left. */
+.menu-detail .settings-heading {
+    justify-content: flex-start;
+}
+
+/* The Saved Views as a list, one to a row, the chosen one marked in the accent: they were
+   chips wrapped across the panel. `appendViewsToContainer` writes a `scale()` on the chosen
+   one, a press-down that a row of a list has no use for, so it is held off here. */
+#tab5 .saved-coordinates-container {
+    display: block;
+    margin: 0;
+}
+
+    #tab5 .saved-coordinate-item {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        min-height: 32px;
+        margin: 0;
+        padding: 0 12px;
+        box-sizing: border-box;
+        border: none;
+        border-top: 1px solid var(--row-divider);
+        border-radius: 0;
+        background: none;
+        color: var(--text-primary);
+        font: 13px/1.2 var(--font-sans);
+        text-align: left;
+        white-space: normal;
+        transform: none !important;
+        transition: background-color var(--ui-transition);
+    }
+
+        #tab5 .saved-coordinate-item:first-child {
+            border-top: none;
+            border-radius: var(--group-radius) var(--group-radius) 0 0;
+        }
+
+        #tab5 .saved-coordinate-item:hover {
+            background: var(--control-fill);
+            color: var(--text-primary);
+        }
+
+        #tab5 .saved-coordinate-item.selected-coordinate {
+            background: var(--ui-accent-dim);
+            box-shadow: inset 3px 0 0 var(--ui-accent);
+            color: #fff;
+        }
+
+        #tab5 .saved-coordinate-item:focus-visible {
+            outline: 2px solid var(--ui-accent);
+            outline-offset: -2px;
+        }
+
+#tab5 .view-buttons {
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+}
+
+/* The pan and the zoom, typed, as two rows of the group. */
+#tab5 .coordinates-container {
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    overflow: visible;
+}
+
+    #tab5 .coordinate-field {
+        margin: 0;
+        padding: 6px 12px;
+        border-radius: 0;
+        background: none;
+    }
+
+        #tab5 .coordinate-field label {
+            flex: none;
+            width: 48px;
+            margin: 0;
+        }
+
+        #tab5 .coordinate-field input {
+            flex: 1;
+            min-width: 0;
+            font: 12px var(--font-mono);
+        }
+
+/* The equation as the row's label, the Julia constant after it. */
+#tab5 .fractal-equation .settings-label {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 14px;
+}
+
+    #tab5 #julia-constant {
+        color: var(--text-secondary);
+        font: 12px var(--font-mono);
+        cursor: grab;
+    }
+
+#tab5 .fractal-equation .dropdown-container {
+    flex: none;
+}
+
+/* The theme cards stand on the panel itself, so the gap under them is a section's. */
+#themeSettings .theme-grid {
+    margin-bottom: 12px;
+}
+
+    #themeSettings .theme-card {
+        font-size: 12px;
+    }
+
+/* A button keeps its own width: `.key-button` shared a row two-up (`flex: 1 1 45%`), which a
+   button at the end of a row has no use for. The API Keys' four still wrap two to a line. */
+.menu-detail .key-button {
+    flex: none;
+}
+
+#tab5 .fractal-equation #equation {
+    color: var(--text-primary);
+}
+
+/* ---- The Ai panel ----------------------------------------------------------------------- */
+
+/* The prompt: one field and its two buttons, the field sunken as every field is. */
+#tab4 #prompt-form > div {
+    gap: 6px;
+    align-items: flex-end;
+}
+
+    #tab4 #prompt {
+        min-height: 36px;
+        padding: 8px 10px;
+        box-sizing: border-box;
+        border: 1px solid var(--control-edge);
+        border-radius: 8px;
+        background: rgb(0 0 0 / 22%);
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+
+    #tab4 #prompt-form button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 1px solid var(--control-edge);
+        border-radius: 8px;
+        background: var(--control-fill);
+        color: var(--text-primary);
+        cursor: pointer;
+    }
+
+        #tab4 #prompt-form button:hover {
+            background: var(--control-fill-hover);
+        }
+
+/* Each group of the panel on its card, its rows divided as Settings' are. */
+#tab4 .model-select-panel,
+#tab4 .context-settings-panel,
+#tab4 .api-panel {
+    margin: 0;
+    padding: 0;
+    background: var(--group-fill);
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+}
+
+#tab4 #template-dropdowns > br {
+    display: none;
+}
+
+#tab4 .dropdown-wrapper {
+    min-height: var(--row-min);
+    margin: 0 !important;
+    padding: 6px 12px;
+    box-sizing: border-box;
+    border-top: 1px solid var(--row-divider);
+}
+
+    #tab4 .dropdown-wrapper > label {
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+#tab4 .inference-template-wrapper > .dropdown-wrapper:first-child,
+#tab4 .context-settings-panel > :first-child {
+    border-top: none;
+}
+
+#tab4 .context-settings-panel > .checkboxarray > div:first-child {
+    border-top: 1px solid var(--row-divider);
+}
+
+/* The four AI sliders keep their two columns, each cell a row's worth of label over track. */
+#tab4 #aiParameterGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    padding: 0 !important;
+    border-top: 1px solid var(--row-divider);
+}
+
+    #tab4 #aiParameterGrid .settingsSlider {
+        gap: 8px;
+        margin: 0;
+        padding: 10px 12px;
+        border: none;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+        color: var(--text-secondary);
+        font-size: 12px;
+    }
+
+    #tab4 #aiParameterGrid .settingsSlider:nth-child(n + 3) {
+        border-top: 1px solid var(--row-divider);
+    }
+
+    #tab4 #aiParameterGrid .settingsSlider:nth-child(odd) {
+        border-right: 1px solid var(--row-divider);
+    }
+
+#tab4 .api-inputs {
+    padding: 0;
+}
+
+    #tab4 .api-inputs > div {
+        min-height: var(--row-min);
+        margin: 0;
+        padding: 6px 12px;
+        border-top: 1px solid var(--row-divider);
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+
+    #tab4 .api-inputs > div:first-child {
+        border-top: none;
+    }
+
+#tab4 .api-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--row-divider);
+}
+
+/* A fold's body comes after its summary, not flush under it. */
+#tab4 .settings-fold[open] > summary {
+    margin-bottom: 8px;
+}
+
+/* The function console's parts in the panel's own controls. */
+#tab4 .function-call-list {
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+    background: var(--group-fill);
+}
+
+#tab4 .function-prompt-wrapper > div {
+    gap: 6px;
+    align-items: center;
+    margin: 8px 0;
+}
+
+    #tab4 .function-prompt-wrapper .input-group {
+        flex: 1;
+        width: auto !important;
+    }
+
+    #tab4 #function-prompt {
+        width: 100%;
+        min-height: 32px;
+        padding: 7px 10px;
+        box-sizing: border-box;
+        border: 1px solid var(--control-edge);
+        border-radius: var(--control-radius);
+        background: rgb(0 0 0 / 22%);
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+
+    #tab4 .function-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: 1px solid var(--control-edge);
+        border-radius: var(--control-radius);
+        background: var(--control-fill);
+        color: var(--text-primary);
+        cursor: pointer;
+    }
+
+        #tab4 .function-button:hover {
+            background: var(--control-fill-hover);
+        }
+
+#tab4 .function-codemirror-container .CodeMirror {
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+    background: rgb(0 0 0 / 22%);
+}
+
+/* ---- Help ------------------------------------------------------------------------------- */
+
+/* Each table of controls as a group: the keys in their column, what they do beside them, a
+   hairline between rows. */
+#howto .howto-controls {
+    width: 100%;
+    margin: 0 0 24px;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--group-fill);
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+}
+
+    #howto .howto-controls td {
+        padding: 8px 12px;
+        border-top: 1px solid var(--row-divider);
+        color: var(--text-secondary);
+        font-size: 13px;
+        line-height: 1.45;
+        vertical-align: top;
+    }
+
+    #howto .howto-controls tr:first-child td {
+        border-top: none;
+    }
+
+    #howto .howto-controls td:first-child {
+        width: 38%;
+        color: var(--text-primary);
+    }
+
+#howto .howto-intro {
+    margin: 0 2px 16px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* ---- Notes ------------------------------------------------------------------------------ */
+
+.menu-detail .archive-actions {
+    gap: 8px;
+}
+
+.menu-detail .archive-about {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* ---- The menu's list -------------------------------------------------------------------- */
+
+/* The rows' own spacing at the foot, which the panels' 16px under the notes pane doubled. */
+.dropdown-content:has(> .menu-panel:not(.detail-open)) {
+    padding-bottom: 0;
+}
+
+.menu-list {
+    padding: 6px;
+}
+
+    .menu-row {
+        border-radius: 6px;
+    }
+
+    .menu-separator {
+        margin: 6px 8px;
+        background: var(--row-divider);
+    }
+
+/* The two key fields with ids of their own had rules of their own (an inset bevel); one field
+   style for all six. */
+#tab4 .api-inputs .api-input {
+    height: var(--control-h);
+    padding: 0 8px;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: rgb(0 0 0 / 22%);
+    color: var(--text-primary);
+}
+
+/* The tools' glyphs take the colour their tool sets (`--ui-chrome-icon`, and its hover and lit
+   states). The universal `* { color }` in styles.css reaches the `<svg>` and its `<use>` too,
+   so every glyph was #9d9d9d whatever its tool said -- on glass, 1.6:1 over the brightest sky. */
+.tool-bar svg,
+.tool-bar svg use {
+    color: inherit;
+}

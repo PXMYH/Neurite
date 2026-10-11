@@ -183,7 +183,7 @@ const defaultSavedViews = {
 // Write them again against the real shape if a caller ever needs them.
 
 function receiveCurrentView() {
-    return window.prompt("Enter a title for the current location:", '', 'Store View')
+    return window.prompt("Enter a title for the current location:", '', 'Store view')
         .then( (title)=>(title === null ? null : {
                             title,
                             standardCoords: Graph.getCoords(),
@@ -250,7 +250,7 @@ async function saveCurrentView() {
     // Update button text temporarily
     const saveButton = Elem.byId('saveCoordinatesBtn');
     saveButton.textContent = "Saved!";
-    const cb = ()=>{ saveButton.textContent = "Store View" } ;
+    const cb = ()=>{ saveButton.textContent = "Store view" } ;
     Promise.delay(500).then(cb);
 }
 
@@ -347,7 +347,9 @@ function appendViewsToContainer(views, containerId) {
         const coordElement = Html.make.button('saved-coordinate-item');
         coordElement.type = 'button';
         coordElement.setAttribute('aria-pressed', 'false');
-        coordElement.textContent = view.title;
+        // Without the `// ` the built-in ones are named with -- a JavaScript comment's marker,
+        // beside each one's `functionCall` -- which in a list of names reads as noise (#80).
+        coordElement.textContent = view.title.replace(/^\/\/\s*/, '');
 
         On.click(coordElement, (e) => {
             returnToSavedView(view);

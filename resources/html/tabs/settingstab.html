@@ -13,11 +13,14 @@
 
      Headed sections, in the order a reader reaches for them: the look first, then the places
      to go, then the Fractal under both, then the rest. Two groups are folded, as API Keys is
-     in the Ai panel: Customize, because a theme is what most readers want and the fourteen
-     controls under it are for the few who tune one, and the Fractal's drawing, which is
-     about the computer as much as the look. Both are native `<details>`, which the keyboard
-     opens and a screen reader says the state of; the #32 note that made the Fractal panel's
-     groups headed rather than folded was about folds a keyboard could not reach. -->
+     in the Ai panel: Customize, because a theme is what most readers want and the controls
+     under it are for the few who tune one, and the Fractal's drawing, which is about the
+     computer as much as the look. Both are native `<details>`, which the keyboard opens and a
+     screen reader says the state of; the #32 note that made the Fractal panel's groups headed
+     rather than folded was about folds a keyboard could not reach.
+
+     Each section is a heading over a group of rows (#80, `panels.css`): a label on the left,
+     its control on the right edge, and a line under the label where it cannot say it alone. -->
 
 <div class="submenu">
 
@@ -26,16 +29,22 @@
          section only where the app's bridge (`window.neuriteDesktop`) is, so a browser never
          draws it, and while a release is ready it puts a dot on the Settings row as well as on
          the menu button. First in the panel, because the time it matters is when that dot has
-         just led a reader here. The button's icon and label are written by `appupdate.js`. -->
+         just led a reader here. The button's icon and label, and the note, are written by
+         `appupdate.js`. -->
     <div class="settings-section" id="updateSettings" hidden>
         <div class="button-label settings-heading">Updates</div>
-        <div class="settings-row">
-            <p class="settings-note" id="update-note"></p>
-            <button type="button" class="key-button update-button" id="update-button" aria-describedby="update-note"
-                    title="Look for a newer Neurite, and install it when there is one: the graph is saved, and the app closes and opens again as the new version.">
-                <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#refresh-icon"></use></svg>
-                <span class="menu-row-label">Check for updates</span>
-            </button>
+        <div class="settings-group">
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-label">Neurite for Mac</span>
+                    <p class="settings-description" id="update-note"></p>
+                </div>
+                <button type="button" class="key-button update-button" id="update-button" aria-describedby="update-note"
+                        title="Look for a newer Neurite, and install it when there is one: the graph is saved, and the app closes and opens again as the new version.">
+                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#refresh-icon"></use></svg>
+                    <span class="menu-row-label">Check for updates</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -47,13 +56,16 @@
         <div class="button-label settings-heading" id="themeHeading">Theme</div>
         <div class="theme-grid" id="themeGrid" role="radiogroup" aria-labelledby="themeHeading"></div>
 
-        <!-- The Fractal panel's Color group, as it was: `dropdown.js` saves these with each
-             graph by the container's id, and a theme sets them through the events they
-             already answer. -->
-        <details class="settings-fold" id="colorSettingsContainer">
+        <!-- The Fractal panel's Color group, its rows laid out again (#80) and every control as
+             it was: `dropdown.js` saves these with each graph by the container's id and by
+             `.color-picker-container`, and a theme sets them through the events they already
+             answer. The R, G and B pickers are three gains, one channel each, of the lines'
+             colour (`Color.rgbLerp`), so they are one row. -->
+        <details class="settings-fold settings-subfold" id="colorSettingsContainer">
             <summary class="button-label settings-heading">Customize <svg class="fold-mark" aria-hidden="true" viewBox="0 0 24 24"><use xlink:href="#chevron-down-icon"></use></svg></summary>
-            <div class="color-settings-panel">
-                <div id="colorselection">
+            <div class="settings-group color-settings-panel">
+                <div class="settings-row" title="The red, green and blue in the lines' colours">
+                    <span class="settings-label">Lines</span>
                     <div class="color-picker-container">
                         <div class="color-picker-item">
                             <label for="rColor">R</label>
@@ -67,68 +79,63 @@
                             <label for="bColor">B</label>
                             <input type="color" id="bColor" name="bColor" value="#0000FF">
                         </div>
+                    </div>
+                </div>
+                <div class="settings-row" title="The page's colour, under the Fractal">
+                    <label class="settings-label" for="colorPicker">Background</label>
+                    <div class="color-picker-container">
                         <div class="color-picker-item">
-                            <label for="colorPicker">BG</label>
-                            <input type="color" id="colorPicker" name="colorPicker" value="#000000" style="background:#222226;">
+                            <input type="color" id="colorPicker" name="colorPicker" value="#000000">
                         </div>
                     </div>
-                    <!-- The universe under the Fractal (universe.ts): on unless switched off here, for a
-                         slow computer or a reader who wants the page the BG colour above. -->
-                    <div class="checkboxarray universe-switch" title="Stars, a galaxy and a nebula under the Fractal">
-                        <div>
-                            <input type="checkbox" id="universe-checkbox" name="universe-checkbox" checked>
-                            <label for="universe-checkbox">Universe</label>
-                        </div>
+                </div>
+                <!-- The universe under the Fractal (universe.ts): on unless switched off here, for a
+                     slow computer or a reader who wants the page the colour above. A switch, as
+                     anything on or off at once is (`panels.css`). -->
+                <div class="settings-row checkboxarray universe-switch" title="Stars, a galaxy and a nebula under the Fractal">
+                    <div>
+                        <input type="checkbox" id="universe-checkbox" name="universe-checkbox" checked>
+                        <label for="universe-checkbox">Universe</label>
                     </div>
-                    
-
-                    <div id="colorsliders">
-                        <input type="range" min="0" max="255" id="rSlider" value="0" style="display: none;">
-                        <div class="gridLayout">
-
-                            <div class="settingsSlider" title="Adjusts fractal line brightness">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="cSlider">Brightness:</label>
-                                    <input id="c_value" class="number-input" type="number" min="0" max="255" value="128" step="1" aria-label="Brightness">
-                                </div>
-                                <input type="range" min="0" max="255" id="cSlider" value="128">
+                </div>
+                <div id="colorsliders">
+                    <input type="range" min="0" max="255" id="rSlider" value="0" style="display: none;">
+                    <div class="gridLayout">
+                        <div class="settingsSlider" title="Adjusts fractal line brightness">
+                            <div class="number-input-wrapper">
+                                <label for="cSlider">Brightness</label>
+                                <input id="c_value" class="number-input" type="number" min="0" max="255" value="128" step="1" aria-label="Brightness">
                             </div>
-
-                            <div class="settingsSlider" title="Adjusts fractal line vibrance">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="sSlider">Saturation:</label>
-                                    <input id="s_value" class="number-input" type="number" min="0" max="255" value="127" step="1" aria-label="Saturation">
-                                </div>
-                                <input type="range" min="0" max="255" id="sSlider" value="127">
+                            <input type="range" min="0" max="255" id="cSlider" value="128">
+                        </div>
+                        <div class="settingsSlider" title="Adjusts fractal line vibrance">
+                            <div class="number-input-wrapper">
+                                <label for="sSlider">Saturation</label>
+                                <input id="s_value" class="number-input" type="number" min="0" max="255" value="127" step="1" aria-label="Saturation">
                             </div>
-
-                            <div class="settingsSlider" title="Adjusts opacity of fractal lines">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="outer_opacity">Outer Opacity:</label>
-                                    <input id="outer_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Outer Opacity">
-                                </div>
-                                <input id="outer_opacity" type="range" min="0" max="100" value="100">
+                            <input type="range" min="0" max="255" id="sSlider" value="127">
+                        </div>
+                        <div class="settingsSlider" title="Adjusts opacity of fractal lines">
+                            <div class="number-input-wrapper">
+                                <label for="outer_opacity">Outer opacity</label>
+                                <input id="outer_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Outer opacity">
                             </div>
-
-                            <div class="settingsSlider" title="Adjusts opacity of fractal line's interior">
-                                <div class="number-input-wrapper" style="flex-direction: column;">
-                                    <label for="inner_opacity">Inner Opacity:</label>
-                                    <input id="inner_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Inner Opacity">
-                                </div>
-                                <input id="inner_opacity" type="range" min="0" max="100" value="100">
+                            <input id="outer_opacity" type="range" min="0" max="100" value="100">
+                        </div>
+                        <div class="settingsSlider" title="Adjusts opacity of fractal line's interior">
+                            <div class="number-input-wrapper">
+                                <label for="inner_opacity">Inner opacity</label>
+                                <input id="inner_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Inner opacity">
                             </div>
-
-                            <div class="settingsSlider" id="inversion-settings" title="Inverts color scheme of whole page">
-                                <!-- Slider for Inversion -->
-                                <label for="inversion-slider">Inversion</label>
-                                <input type="range" id="inversion-slider" min="0" max="100" value="0">
-                            </div>
-                            <div class="settingsSlider" id="hue-rotation-settings" title="Rotates color scheme of the whole page around the color wheel">
-                                <!-- Slider for Hue Rotation -->
-                                <label for="hue-rotation-slider">Hue Rotation</label>
-                                <input type="range" id="hue-rotation-slider" min="0" max="360" value="0">
-                            </div>
-
+                            <input id="inner_opacity" type="range" min="0" max="100" value="100">
+                        </div>
+                        <div class="settingsSlider" id="inversion-settings" title="Inverts color scheme of whole page">
+                            <label for="inversion-slider">Inversion</label>
+                            <input type="range" id="inversion-slider" min="0" max="100" value="0">
+                        </div>
+                        <div class="settingsSlider" id="hue-rotation-settings" title="Rotates color scheme of the whole page around the color wheel">
+                            <label for="hue-rotation-slider">Hue rotation</label>
+                            <input type="range" id="hue-rotation-slider" min="0" max="360" value="0">
                         </div>
                     </div>
                 </div>
@@ -141,34 +148,35 @@
          `Animation.goToCoords` -- so no Node moves and the Fractal's equation does not change.
          Which of them show depends on the equation, below: each has its own landmarks, and
          `savedViews.all` holds the ones that make sense under any of them. That listener is in
-         `displaysavedcoords.js`, which binds all of this by id. -->
+         `displaysavedcoords.js`, which binds all of this by id and writes the list. -->
     <div class="settings-section" id="savedViewsSettings">
         <div class="button-label settings-heading">Saved views</div>
-        <div id="savedCoordinatesContainer" class="saved-coordinates-container"></div>
+        <div class="settings-group">
+            <div id="savedCoordinatesContainer" class="saved-coordinates-container"></div>
 
-        <!-- Store reads the current pan and zoom and asks for a name; Delete removes the one
-             last clicked, which is the only thing that marks a Saved View as selected. The two
-             ids still say Coordinates: they are what `displaysavedcoords.js` binds by, and
-             renaming an id changes no word a reader ever sees. Buttons, as the Saved Views
-             are: links with no target, they were out of reach of the keyboard. -->
-        <div class="view-buttons">
-            <button type="button" class="key-button" id="saveCoordinatesBtn">Store View</button>
-            <button type="button" class="key-button" id="deleteCoordinatesBtn">Delete View</button>
-        </div>
-
-        <!-- Not a readout: both boxes are inputs, and typing in one moves the view. That is the
-             same journey a Saved View above makes, written as numbers -- which is the only way
-             to reach a point nobody has named. `interface.js` parses what is typed and sets
-             `App.interface.coordsLive = false` while it does, so the live position stops
-             overwriting the digits mid-word. -->
-        <div id="coordinates" class="coordinates-container">
-            <div class="coordinate-field">
-                <label for="pan">pan</label>
-                <input id="pan" type="text" value="0+0i" style="background:none; border:none;" size="28" />
+            <!-- Store reads the current pan and zoom and asks for a name; Delete removes the one
+                 last clicked, which is the only thing that marks a Saved View as selected. The
+                 two ids still say Coordinates: they are what `displaysavedcoords.js` binds by,
+                 and renaming an id changes no word a reader ever sees. -->
+            <div class="settings-row view-buttons">
+                <button type="button" class="key-button" id="saveCoordinatesBtn">Store view</button>
+                <button type="button" class="key-button" id="deleteCoordinatesBtn">Delete view</button>
             </div>
-            <div class="coordinate-field">
-                <label for="zoom">zoom</label>
-                <input id="zoom" type="text" value="1" style="background:none; border:none;" size="25" />
+
+            <!-- Not a readout: both boxes are inputs, and typing in one moves the view. That is the
+                 same journey a Saved View above makes, written as numbers -- which is the only
+                 way to reach a point nobody has named. `interface.js` parses what is typed and
+                 sets `App.interface.coordsLive = false` while it does, so the live position stops
+                 overwriting the digits mid-word. -->
+            <div id="coordinates" class="coordinates-container">
+                <div class="settings-row coordinate-field">
+                    <label for="pan">Pan</label>
+                    <input id="pan" type="text" value="0+0i" size="28" spellcheck="false" />
+                </div>
+                <div class="settings-row coordinate-field">
+                    <label for="zoom">Zoom</label>
+                    <input id="zoom" type="text" value="1" size="25" spellcheck="false" />
+                </div>
             </div>
         </div>
     </div>
@@ -178,94 +186,94 @@
          sliders by, with each graph. -->
     <div class="settings-section" id="fractalSettingsContainer">
         <div class="button-label settings-heading">Fractal</div>
-        <div class="fractal-settings-panel">
-                <div class="settingsSlider centered" title="Adjusts exponent of current fractal" style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <label style="white-space: nowrap;">
-                            <span id="equation"></span>
-                        </label>
-                        <div id="julia-constant" style="display: none;">
-                            (<span id="julia-x">0.256</span>, <span id="julia-y">0.01</span>)
-                        </div>
-                        <div class="dropdown-container" title="Select the current fractal equation">
-                            <select id="fractal-select" class="model-selector custom-select"
-                                    aria-label="Fractal equation" aria-describedby="fractal-select-help">
-                                <option value="mandelbrot">Mandelbrot</option>
-                                <option value="julia">Julia Set</option>
-                                <option value="burningShip">Burning Ship</option>
-                                <option value="tricorn">Tricorn</option>
-                                <option value="buffalo">Buffalo</option>
-                                <option value="henon">Henon Map</option>
-                                <option value="ikeda">Ikeda Map</option>
-                                <!--<option value="inverseMandelbrot">Inverse Brot</option>-->
-                            </select>
-                            <!-- The same words as the `title` above, in the accessibility tree:
-                                 a title is hover-only, so it reaches neither the keyboard nor a
-                                 screen reader. `CustomDropdown.setup` hides this select behind a
-                                 div replacer and carries both the name and this description over
-                                 to it. -->
-                            <p id="fractal-select-help" class="visually-hidden">Which equation draws the Fractal under the Graph and pulls Nodes toward its boundary. Julia Set adds a constant, shown beside the equation, that can be dragged to change it.</p>
-                        </div>
-                    </div>
-                    <input id="exponent" type="range" min="1" max="8" value="2"
-                           aria-label="Exponent" aria-describedby="exponent-help">
-                    <p id="exponent-help" class="visually-hidden">The power the equation raises z to, from 1 to 8. It appears in the equation beside the menu; the Henon and Ikeda maps have no exponent to raise.</p>
+        <div class="settings-group fractal-settings-panel">
+            <!-- The equation as it is drawn, with the Julia constant when there is one, which is
+                 dragged to change (`updatefractal.js`). -->
+            <div class="settings-row fractal-equation" title="Select the current fractal equation">
+                <span class="settings-label">
+                    <span id="equation"></span>
+                    <span id="julia-constant" style="display: none;">(<span id="julia-x">0.256</span>, <span id="julia-y">0.01</span>)</span>
+                </span>
+                <div class="dropdown-container">
+                    <select id="fractal-select" class="model-selector custom-select"
+                            aria-label="Fractal equation" aria-describedby="fractal-select-help">
+                        <option value="mandelbrot">Mandelbrot</option>
+                        <option value="julia">Julia Set</option>
+                        <option value="burningShip">Burning Ship</option>
+                        <option value="tricorn">Tricorn</option>
+                        <option value="buffalo">Buffalo</option>
+                        <option value="henon">Henon Map</option>
+                        <option value="ikeda">Ikeda Map</option>
+                        <!--<option value="inverseMandelbrot">Inverse Brot</option>-->
+                    </select>
+                    <!-- The same words as the `title` above, in the accessibility tree:
+                         a title is hover-only, so it reaches neither the keyboard nor a
+                         screen reader. `CustomDropdown.setup` hides this select behind a
+                         div replacer and carries both the name and this description over
+                         to it. -->
+                    <p id="fractal-select-help" class="visually-hidden">Which equation draws the Fractal under the Graph and pulls Nodes toward its boundary. Julia Set adds a constant, shown beside the equation, that can be dragged to change it.</p>
                 </div>
-            <details class="settings-fold" id="fractalDrawing">
+            </div>
+            <div class="settingsSlider" title="Adjusts exponent of current fractal">
+                <label for="exponent">Exponent</label>
+                <input id="exponent" type="range" min="1" max="8" value="2"
+                       aria-label="Exponent" aria-describedby="exponent-help">
+                <p id="exponent-help" class="visually-hidden">The power the equation raises z to, from 1 to 8. It appears in the equation beside the menu; the Henon and Ikeda maps have no exponent to raise.</p>
+            </div>
+
+            <details class="settings-fold settings-subfold" id="fractalDrawing">
                 <summary class="button-label settings-heading">Drawing <svg class="fold-mark" aria-hidden="true" viewBox="0 0 24 24"><use xlink:href="#chevron-down-icon"></use></svg></summary>
-                <div class="settingsSlider centered" title="Adjust smoothness of fractal lines. Lower to reduce lag" style="margin-bottom: 10px;">
-                    <div style="display:flex; justify-content: space-between;">
-                        <div class="number-input-wrapper" style="width: 45%">
-                            <div id="quality_value">Quality:</div>
-                            <input id="quality_value_number" class="number-input" type="number" min="0" max="100" value="16" step="0.1"
-                                   aria-label="Quality" aria-describedby="quality-help">
-                        </div>
-                        <div class="number-input-wrapper" style="width: 30%" title="Add idleness to save energy">
-                            <div id="frames_delay_value">Delay:</div>
-                            <input id="frames_delay_value_number" class="number-input" type="number" min="0" max="9" value="0" step="1" aria-label="Delay">
-                        </div>
-                        <div id="fps" style="text-align: right; width: 20%">?? fps (Is javascript enabled?)</div>
+                <div class="settingsSlider" title="Adjust smoothness of fractal lines. Lower to reduce lag">
+                    <div class="number-input-wrapper">
+                        <label for="quality" id="quality_value">Quality</label>
+                        <input id="quality_value_number" class="number-input" type="number" min="0" max="100" value="16" step="0.1"
+                               aria-label="Quality" aria-describedby="quality-help">
                     </div>
                     <input id="quality" type="range" min="0" max="100" value="16"
                            aria-label="Quality" aria-describedby="quality-help">
                     <p id="quality-help" class="visually-hidden">How finely the Fractal's lines are traced, from 0 to 100. Every step up costs frame rate, and the fps reading beside it is what it is costing now.</p>
                 </div>
+                <!-- The frame rate is what Quality costs, so it stands under it, written by the
+                     frame loop (`nodestep.js`). -->
+                <div class="settings-row" title="Add idleness to save energy">
+                    <div class="settings-row-text">
+                        <label class="settings-label" for="frames_delay_value_number" id="frames_delay_value">Frame delay</label>
+                        <span class="settings-description" id="fps">?? fps (Is javascript enabled?)</span>
+                    </div>
+                    <input id="frames_delay_value_number" class="number-input" type="number" min="0" max="9" value="0" step="1" aria-label="Frame delay">
+                </div>
                 <div class="gridLayout">
-
                     <div class="settingsSlider" title="Adjusts length of fractal lines. Lower to reduce lag">
                         <div class="number-input-wrapper">
-                            <label for="length">Length:</label>
+                            <label for="length">Length</label>
                             <input id="length_value" class="number-input" type="number" min="0" max="100" value="50" step="1" aria-label="Length">
                         </div>
                         <input id="length" type="range" min="0" max="100" value="50">
                     </div>
-
                     <div class="settingsSlider" title="Adjusts width of fractal lines">
                         <div class="number-input-wrapper">
-                            <label for="renderWidthMultSlider">Width:</label>
+                            <label for="renderWidthMultSlider">Width</label>
                             <input id="renderWidthMultValue" class="number-input" type="number" min="0" max="12" value="0.5" step="0.01" aria-label="Width">
                         </div>
                         <input type="range" id="renderWidthMultSlider" min="0" max="12" value="0.5" step="0.01">
                     </div>
-
                     <div class="settingsSlider" title="Adjusts amount of fractal lines. Lower to reduce lag">
                         <div class="number-input-wrapper">
-                            <label for="maxLinesSlider">Lines:</label>
+                            <label for="maxLinesSlider">Lines</label>
                             <input id="maxLinesValue" class="number-input" type="number" min="0" max="2048" value="128" step="32" aria-label="Lines">
                         </div>
                         <input type="range" id="maxLinesSlider" min="0" max="2048" value="128" step="1">
                     </div>
-
                     <div class="settingsSlider" title="Adjusts fractal line generation speed. Lower to reduce lag">
                         <div class="number-input-wrapper">
-                            <label for="regenDebtSlider">Speed:</label>
+                            <label for="regenDebtSlider">Speed</label>
                             <input id="regenDebtValue" class="number-input" type="number" min="0" max="4" value="1" step="0.01" aria-label="Speed">
                         </div>
                         <input type="range" id="regenDebtSlider" min="0" max="4" value="1" step="0.01">
                     </div>
                     <div class="settingsSlider" title="Adjusts cursor's control of line generation">
                         <div class="number-input-wrapper">
-                            <label for="flashlightStrength">Strength:</label>
+                            <label for="flashlightStrength">Strength</label>
                             <input id="flashlightStrength_value" class="number-input" type="number" min="0" max="100" value="0" step="1"
                                    aria-label="Strength" aria-describedby="flashlightStrength-help">
                         </div>
@@ -275,31 +283,27 @@
                                aria-describedby="flashlightStrength-help">
                         <p id="flashlightStrength-help" class="visually-hidden">The share of new Fractal lines drawn near the pointer instead of across the whole view, from 0 to 100. Radius sets how wide near is.</p>
                     </div>
-
                     <div class="settingsSlider" title="Adjusts radius of line generation around cursor">
                         <div class="number-input-wrapper">
-                            <label for="flashlightRadius">Radius:</label>
+                            <label for="flashlightRadius">Radius</label>
                             <input id="flashlightRadius_value" class="number-input" type="number" min="0" max="100" value="0" step="1" aria-label="Radius">
                         </div>
                         <input type="range" id="flashlightRadius" min="0" max="100" value="0" step="1">
                     </div>
-
                     <div class="settingsSlider" title="Delay between segment reveals">
-                        <div class="number-input-wrapper" style="flex-direction: column;">
-                            <label for="renderDelaySlider">Draw Speed:</label>
-                            <input id="draw_speed_value" class="number-input" type="number" min="0" max="300" value="0" step="1" aria-label="Draw Speed">
+                        <div class="number-input-wrapper">
+                            <label for="renderDelaySlider">Draw speed</label>
+                            <input id="draw_speed_value" class="number-input" type="number" min="0" max="300" value="0" step="1" aria-label="Draw speed">
                         </div>
                         <input type="range" id="renderDelaySlider" min="0" max="300" value="0" step="1">
                     </div>
-                    
                     <div class="settingsSlider" title="Adjust zoom sensitivity for mouse wheel and drag zooming">
-                        <div class="number-input-wrapper" style="flex-direction: column;">
-                            <label for="zoomSpeedSlider">Zoom Speed:</label>
-                            <input id="zoom_speed_value" class="number-input" type="number" min="0.1" max="5" value="1" step="0.1" aria-label="Zoom Speed">
+                        <div class="number-input-wrapper">
+                            <label for="zoomSpeedSlider">Zoom speed</label>
+                            <input id="zoom_speed_value" class="number-input" type="number" min="0.1" max="5" value="1" step="0.1" aria-label="Zoom speed">
                         </div>
                         <input type="range" id="zoomSpeedSlider" min="0.1" max="5" step="0.1" value="1.0">
                     </div>
-
                 </div>
             </details>
         </div>
@@ -307,10 +311,18 @@
 
     <div class="settings-section">
         <div class="button-label settings-heading">Input</div>
-        <!-- The modal is left where it is. Its key inputs are rebuilt and rebound
-             every time it opens (`openControlsModal`), so inlining them here would
-             mean rewriting that wiring for no gain the reader can see. -->
-        <button id="controls-button" class="key-button">Adjust input settings…</button>
+        <div class="settings-group">
+            <!-- The modal is left where it is. Its key inputs are rebuilt and rebound
+                 every time it opens (`openControlsModal`), so inlining them here would
+                 mean rewriting that wiring for no gain the reader can see. -->
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-label">Buttons and keys</span>
+                    <span class="settings-description">Which button pans, which key connects, and how the wheel zooms.</span>
+                </div>
+                <button type="button" id="controls-button" class="key-button">Adjust…</button>
+            </div>
+        </div>
     </div>
 
     <!-- `Tag.initializeInputs` wires this subtree, so the id is the handle it
@@ -322,106 +334,133 @@
          open Archive. `data-key` is what tells the handler which of the two it is. -->
     <div class="settings-section" id="zetTagSettings">
         <div class="button-label settings-heading">Zettelkasten</div>
-        <div class="settings-row" title="The characters that start a Node: the rest of the line becomes its Title.">
-            <label for="node-tag">Node Tag</label>
-            <input type="text" id="node-tag" data-key="node" value="##" style="width:80px;">
-        </div>
-        <div class="settings-row" title="The characters that open a reference to another Node, which draws an edge to it.">
-            <label for="ref-tag">Link Tag</label>
-            <input type="text" id="ref-tag" data-key="ref" value="[[" style="width:80px;">
+        <div class="settings-group">
+            <div class="settings-row" title="The characters that start a Node: the rest of the line becomes its Title.">
+                <div class="settings-row-text">
+                    <label class="settings-label" for="node-tag">Node tag</label>
+                    <span class="settings-description">Starts a note; the rest of the line is its title.</span>
+                </div>
+                <input type="text" id="node-tag" data-key="node" value="##" class="tag-input" spellcheck="false">
+            </div>
+            <div class="settings-row" title="The characters that open a reference to another Node, which draws an edge to it.">
+                <div class="settings-row-text">
+                    <label class="settings-label" for="ref-tag">Link tag</label>
+                    <span class="settings-description">Opens a link to another note, which draws an edge to it.</span>
+                </div>
+                <input type="text" id="ref-tag" data-key="ref" value="[[" class="tag-input" spellcheck="false">
+            </div>
         </div>
     </div>
 
     <!-- `ZetPath.init` wires this subtree, so the id is the handle it reaches for. -->
     <div class="settings-section" id="zetPlacementSettings">
-        <div class="button-label settings-heading">Node placement</div>
-        <div class="settings-row">
-            <label for="zetPathTypeDropdown">Placement Style</label>
-            <div class="dropdown-container" title="Determine what path the Zettelkasten decides to place nodes on.">
-                <select id="zetPathTypeDropdown" class="model-selector custom-select ignoreSetup">
-                    <option value="Radial">Radial</option>
-                    <option value="Spiral">Spiral</option>
-                    <option value="Branching">Branching</option>
-                    <option value="Random">Random</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- One group per style. `adjustSliderVisibilityBasedOnPathType` shows the
-             group the current style names and hides the other two, so all three
-             live here at once and only one is ever on screen. -->
-        <div class="gridLayout">
-
-            <!-- Node Count Slider : For Radial-->
-            <div class="settingsSlider radial-slider" title="Defines the number of steps or nodes in the path.">
-                <label for="radialPathLengthSlider"># of Nodes</label>
-                <input type="range" id="radialPathLengthSlider" name="radial-path-length-slider" min="1" max="64" step="1">
-            </div>
-            <!-- Distance Slider: : For Radial-->
-            <div class="settingsSlider radial-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
-                <label for="radialPathDistanceSlider">Node Spacing</label>
-                <input type="range" id="radialPathDistanceSlider" name="radial-path-distance-slider" min="0.1" max="8" step="0.1">
-            </div>
-            <!-- Scale Slider : For Radial-->
-            <div class="settingsSlider radial-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
-                <label for="radialScaleSlider">Node Size</label>
-                <input type="range" id="radialScaleSlider" name="radial-scale-slider" min="0.1" max="2" step="0.01">
-            </div>
-            <!-- Radial Branch Depth Slider: For Radial -->
-            <div class="settingsSlider radial-slider" title="Sets the starting radius from the center for the first node.">
-                <label for="radialDepthSlider"># of Radii</label>
-                <input type="range" id="radialDepthSlider" name="radial-depth-slider" min="1" max="32" step="1">
+        <div class="button-label settings-heading" id="placementHeading">Node placement</div>
+        <div class="settings-group">
+            <!-- The style decides which sliders show, so it comes first. Four short choices, so
+                 `ZetPath.init` lays them out as one segmented row (`Segmented`); the select
+                 stays, hidden, and stays the control. -->
+            <div class="settings-row">
+                <label class="settings-label" for="zetPathTypeDropdown">Style</label>
+                <div class="dropdown-container" title="Determine what path the Zettelkasten decides to place nodes on.">
+                    <select id="zetPathTypeDropdown" class="model-selector custom-select ignoreSetup">
+                        <option value="Radial">Radial</option>
+                        <option value="Spiral">Spiral</option>
+                        <option value="Branching">Branching</option>
+                        <option value="Random">Random</option>
+                    </select>
+                </div>
             </div>
 
-            <!-- Node Count Slider : For Spiral-->
-            <div class="settingsSlider spiral-slider" title="Defines the number of steps or nodes in the path.">
-                <label for="spiralPathLengthSlider"># of Nodes</label>
-                <input type="range" id="spiralPathLengthSlider" name="spiral-path-length-slider" min="1" max="100" step="1">
-            </div>
-            <!-- Distance Slider: : For Spiral-->
-            <div class="settingsSlider spiral-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
-                <label for="spiralPathDistanceSlider">Node Spacing</label>
-                <input type="range" id="spiralPathDistanceSlider" name="spiral-path-distance-slider" min="0.1" max="4" step="0.1">
-            </div>
-            <!-- Scale Slider : For Spiral-->
-            <div class="settingsSlider spiral-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
-                <label for="spiralScaleSlider">Node Size</label>
-                <input type="range" id="spiralScaleSlider" name="spiral-scale-slider" min="0.1" max="2" step="0.01">
-            </div>
-            <!-- Curl Slider: For Spiral -->
-            <div class="settingsSlider spiral-slider" title="Adjusts the curl of the spiral. Negative values create counterclockwise spirals, while positive values create clockwise spirals.">
-                <label for="curlSlider">Curl</label>
-                <input type="range" id="curlSlider" name="curl-slider" min="-1" max="1" step="0.01">
-            </div>
+            <!-- One group per style. `adjustSliderVisibilityBasedOnPathType` shows the
+                 group the current style names and hides the other two, so all three
+                 live here at once and only one is ever on screen. -->
+            <div class="gridLayout">
 
-            <!-- Node Count Slider : For Branching-->
-            <div class="settingsSlider branching-slider" title="Defines the number of steps or nodes in the path.">
-                <label for="branchingPathLengthSlider"># of Nodes</label>
-                <input type="range" id="branchingPathLengthSlider" name="branching-path-length-slider" min="1" max="100" value="64" step="1">
-            </div>
-            <!-- Distance Slider: : For Branching-->
-            <div class="settingsSlider branching-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
-                <label for="branchingPathDistanceSlider">Node Spacing</label>
-                <input type="range" id="branchingPathDistanceSlider" name="path-distance-slider" min="0.1" max="4" value="1" step="0.1">
-            </div>
-            <!-- Scale Slider : For Branching-->
-            <div class="settingsSlider branching-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
-                <label for="branchingScaleSlider">Node Size</label>
-                <input type="range" id="branchingScaleSlider" name="branching-scale-slider" min="0.1" max="2" value="0.98" step="0.01">
-            </div>
-            <!-- Branching Factor Slider: For Branching -->
-            <div class="settingsSlider branching-slider" title="Controls the number of branches emanating from each node.">
-                <label for="branchingFactorSlider">Branching Factor</label>
-                <input type="range" id="branchingFactorSlider" name="branching-factor-slider" min="2" max="12" value="4" step="1">
+                <!-- Node Count Slider : For Radial-->
+                <div class="settingsSlider radial-slider" title="Defines the number of steps or nodes in the path.">
+                    <label for="radialPathLengthSlider">Nodes</label>
+                    <input type="range" id="radialPathLengthSlider" name="radial-path-length-slider" min="1" max="64" step="1">
+                </div>
+                <!-- Distance Slider: : For Radial-->
+                <div class="settingsSlider radial-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
+                    <label for="radialPathDistanceSlider">Spacing</label>
+                    <input type="range" id="radialPathDistanceSlider" name="radial-path-distance-slider" min="0.1" max="8" step="0.1">
+                </div>
+                <!-- Scale Slider : For Radial-->
+                <div class="settingsSlider radial-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
+                    <label for="radialScaleSlider">Size</label>
+                    <input type="range" id="radialScaleSlider" name="radial-scale-slider" min="0.1" max="2" step="0.01">
+                </div>
+                <!-- Radial Branch Depth Slider: For Radial -->
+                <div class="settingsSlider radial-slider" title="Sets the starting radius from the center for the first node.">
+                    <label for="radialDepthSlider">Radii</label>
+                    <input type="range" id="radialDepthSlider" name="radial-depth-slider" min="1" max="32" step="1">
+                </div>
+
+                <!-- Node Count Slider : For Spiral-->
+                <div class="settingsSlider spiral-slider" title="Defines the number of steps or nodes in the path.">
+                    <label for="spiralPathLengthSlider">Nodes</label>
+                    <input type="range" id="spiralPathLengthSlider" name="spiral-path-length-slider" min="1" max="100" step="1">
+                </div>
+                <!-- Distance Slider: : For Spiral-->
+                <div class="settingsSlider spiral-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
+                    <label for="spiralPathDistanceSlider">Spacing</label>
+                    <input type="range" id="spiralPathDistanceSlider" name="spiral-path-distance-slider" min="0.1" max="4" step="0.1">
+                </div>
+                <!-- Scale Slider : For Spiral-->
+                <div class="settingsSlider spiral-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
+                    <label for="spiralScaleSlider">Size</label>
+                    <input type="range" id="spiralScaleSlider" name="spiral-scale-slider" min="0.1" max="2" step="0.01">
+                </div>
+                <!-- Curl Slider: For Spiral -->
+                <div class="settingsSlider spiral-slider" title="Adjusts the curl of the spiral. Negative values create counterclockwise spirals, while positive values create clockwise spirals.">
+                    <label for="curlSlider">Curl</label>
+                    <input type="range" id="curlSlider" name="curl-slider" min="-1" max="1" step="0.01">
+                </div>
+
+                <!-- Node Count Slider : For Branching-->
+                <div class="settingsSlider branching-slider" title="Defines the number of steps or nodes in the path.">
+                    <label for="branchingPathLengthSlider">Nodes</label>
+                    <input type="range" id="branchingPathLengthSlider" name="branching-path-length-slider" min="1" max="100" value="64" step="1">
+                </div>
+                <!-- Distance Slider: : For Branching-->
+                <div class="settingsSlider branching-slider" title="Sets the general spacing between nodes, affecting how spread out the path is.">
+                    <label for="branchingPathDistanceSlider">Spacing</label>
+                    <input type="range" id="branchingPathDistanceSlider" name="path-distance-slider" min="0.1" max="4" value="1" step="0.1">
+                </div>
+                <!-- Scale Slider : For Branching-->
+                <div class="settingsSlider branching-slider" title="Adjusts the size of each node. Affects how large or small nodes appear.">
+                    <label for="branchingScaleSlider">Size</label>
+                    <input type="range" id="branchingScaleSlider" name="branching-scale-slider" min="0.1" max="2" value="0.98" step="0.01">
+                </div>
+                <!-- Branching Factor Slider: For Branching -->
+                <div class="settingsSlider branching-slider" title="Controls the number of branches emanating from each node.">
+                    <label for="branchingFactorSlider">Branches</label>
+                    <input type="range" id="branchingFactorSlider" name="branching-factor-slider" min="2" max="12" value="4" step="1">
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- One row each, with what it clears said under its name. Reset puts the settings back;
+         Clear asks first, in red, because the API keys go with it. -->
     <div class="settings-section">
         <div class="button-label settings-heading">Data</div>
-        <div class="settings-row settings-row-buttons">
-            <button id="resetSettings" class="key-button" title="Return every setting to its default. Saved graphs are untouched.">Reset Settings</button>
-            <button id="clearLocalStorage" class="key-button" title="Clear settings, API keys and view history. Saved graphs live in IndexedDB and are untouched.">Clear Local Storage</button>
+        <div class="settings-group">
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-label">Reset settings</span>
+                    <span class="settings-description">Every setting back to its default. Saved graphs are untouched.</span>
+                </div>
+                <button type="button" id="resetSettings" class="key-button" title="Return every setting to its default. Saved graphs are untouched.">Reset</button>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-label">Clear local storage</span>
+                    <span class="settings-description">Settings, the keys the Ai panel holds, and view history. Saved graphs live in IndexedDB and are untouched.</span>
+                </div>
+                <button type="button" id="clearLocalStorage" class="key-button is-danger" title="Clear settings, API keys and view history. Saved graphs live in IndexedDB and are untouched.">Clear…</button>
+            </div>
         </div>
     </div>
 </div>

@@ -211,6 +211,7 @@ function openTab(tabId, element) {
 
     Elem.byId(tabId).style.display = 'block';
     element.classList.add("activeTab");
+    refreshSliders(Elem.byId(tabId));
 
     // A panel is a view of its own now, so opening a tab is also going to it.
     MainMenu.showDetail(element);

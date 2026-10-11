@@ -1,7 +1,6 @@
 class Elem {
     static byId = document.getElementById.bind(document);
     static deepClone(elem){ return elem.cloneNode(true) }
-    static displayBlock(elem){ if (elem) elem.style.display = 'block' }
     static findChild(elem, cb, ct){
         return Array.prototype.find.call(elem.children, cb, ct)
     }
@@ -15,6 +14,8 @@ class Elem {
         return elem.textContent === this.valueOf()
     }
     static hide(elem){ if (elem) elem.style.display = 'none' }
+    // The opposite of `hide`: the inline display taken off, so the stylesheet's is the one.
+    static show(elem){ if (elem) elem.style.display = '' }
     static hideById(id){ Elem.hide(Elem.byId(id)) }
     static remove(elem){ elem.remove() }
     static setBackgroundColor(color){

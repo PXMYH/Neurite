@@ -105,7 +105,9 @@
        almost nothing; now that the island is fully opaque it is buying exactly
        nothing. Excalidraw uses no backdrop-filter anywhere, measured across the
        whole rendered page. Kept as a token so the cost stays named and reversible
-       rather than deleted from three rules and forgotten. */
+       rather than deleted from three rules and forgotten. The islands are glass again
+       since #80 -- asked for, and translucent enough now for a blur to show -- and
+       panels.css sets that blur and their fill. */
     --ui-chrome-blur: none;
 
     /* The island's elevation, and its edge. Excalidraw's `--shadow-island`, three

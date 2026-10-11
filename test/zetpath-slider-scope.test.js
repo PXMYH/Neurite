@@ -91,7 +91,7 @@ function run(styleName){
                 return dom.section;
             },
             hide: (el)=> { el.style.display = 'none' },
-            displayBlock: (el)=> { el.style.display = 'block' },
+            show: (el)=> { el.style.display = '' },
         },
     });
     runInContext(slice() + ';globalThis.exported = ' + NAME + ';', context);
@@ -99,7 +99,9 @@ function run(styleName){
     return dom;
 }
 
-const shown = (elements)=> elements.filter( (el)=> el.style.display === 'block' )
+// Shown is the inline display taken off (`Elem.show`, #80), which is neither the `none` of hidden
+// nor the nothing of untouched.
+const shown = (elements)=> elements.filter( (el)=> el.style.display === '' )
     .map( (el)=> el.id ).sort();
 
 test('each placement style shows its own sliders and hides the other two', ()=>{

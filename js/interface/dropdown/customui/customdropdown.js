@@ -560,3 +560,45 @@ function refreshHtmlDropdownDisplay(select, createOptionContent) {
 
     Select.updateSelectedOption(select);
 }
+
+// A select of a few short choices as one row of segments that shows them all at once (#80):
+// Apple's segmented control, built as the WAI-ARIA radio group it is -- one Tab stop, the arrow
+// keys move and choose. The select stays, hidden, and stays the control: a segment sets it and
+// sends its `change`, which whatever is bound to the select answers as before, and the segments
+// follow it when something else sets it and says so. `labelledBy` is what names the group.
+const Segmented = {
+    from(select, labelledBy){
+        const group = Html.make.div('segmented');
+        group.setAttribute('role', 'radiogroup');
+        if (labelledBy) group.setAttribute('aria-labelledby', labelledBy.id);
+
+        for (const option of select.options) {
+            const label = Html.makeWithClass('label', 'segmented-option');
+            const radio = Html.new.input();
+            radio.type = 'radio';
+            radio.name = select.id + '-segments';
+            radio.value = option.value;
+            radio.className = 'visually-hidden';
+            label.append(radio, option.textContent);
+            On.change(radio, ()=>{
+                if (!radio.checked) return;
+
+                select.value = radio.value;
+                Select.updateSelectedOption(select);
+                select.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+            });
+            group.append(label);
+        }
+
+        const follow = ()=>{
+            for (const radio of group.querySelectorAll('input')) radio.checked = (radio.value === select.value);
+        };
+        On.change(select, follow);
+        follow();
+
+        const holder = select.closest('.dropdown-container') ?? select;
+        holder.classList.add('segmented-source');
+        holder.after(group);
+        return group;
+    }
+}

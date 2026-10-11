@@ -171,7 +171,8 @@ test('the whole route works: render, click a view, click Delete', ()=>{
     displaySavedCoordinates();
     assert.equal(container.children.length, 8, 'the strip is not 7 mandelbrot + 1 all');
 
-    const chip = container.children.find( (el)=> el.textContent === '// Reset View' );
+    // Named on screen without the `// ` its title starts with (#80).
+    const chip = container.children.find( (el)=> el.textContent === 'Reset View' );
     assert.ok(chip, 'Reset View is not on the strip');
     assert.ok(chip.onClick, 'a chip has no click handler, so a view cannot be selected');
 
