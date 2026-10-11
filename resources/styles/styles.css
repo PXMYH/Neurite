@@ -85,9 +85,8 @@
     /* The menu's one width for every panel (#32). Each sized the menu to itself --
        measured 312, 382, 339, 343, 971, 312 and 502px -- so it changed width under the
        pointer from one panel to the next, and at 312px a two-column grid of sliders was
-       two cramped columns. The Notes panel's side handle is the one thing that changes
-       it (`zetHandleHorizMouseMove`), for all of them. The list of rows is not a panel
-       and is as wide as its words (`.dropdown-content:has(...)`). */
+       two cramped columns. Help is the one panel left since #82; the list of rows is not
+       a panel and is as wide as its words (`.dropdown-content:has(...)`). */
     --ui-panel-width: 480px;
     /* The section rule each side of a panel heading. `#8882` rendered as faint broken
        stubs rather than a rule (#32). */
@@ -2928,56 +2927,17 @@ input[type="checkbox"] {
             height: 20px;
         }
 
-.zet-drag-handle-horiz {
-    width: 6px; /* Increase the width */
-    height: 100%;
-    cursor: ew-resize;
-    background-color: transparent; /* Make it transparent */
-    position: absolute;
-    /* The right edge, the one that moves: see notestab.js. It was `left: 0`. */
-    right: 0;
-    z-index: 1;
-}
-
-.zet-drag-handle-vert {
-    width: 100%;
-    height: 6px; /* Increase the height */
-    cursor: ns-resize;
-    background-color: transparent; /* Make it transparent */
-    position: absolute;
-    bottom: 0;
-    /* From the panel's left edge, or it starts after the padding and its 100% ends 10px
-       past the right one -- a sideways scroll in a panel that fits. */
-    left: 0;
-    z-index: 1;
-}
-
 .zet-pane-container {
     display: flex;
     flex-direction: column;
     border: none;
     resize: none;
     overflow: auto;
-    /* Never wider than the window leaves room for, so the side handle stays on screen.
-       The drag writes a width in px; a pane widened to 1370px at 1600px stayed 1370px
-       when the window shrank to 1000px, with its handle off screen and no way left to
-       narrow it. 54px: 27px from the window's left edge to the pane, 11px from the pane
-       to the menu's right edge, and the menu's 16px left margin kept on the right -- the
-       same limit the menu has (`.dropdown-content`), or a drag between the two moved
-       nothing. The narrowest is what the drag stops at, too (`zetHandleHorizMouseMove`):
-       it sets every panel's width, and at a 292px menu the Ai panel's rows were cut off
-       at its right edge -- the regenerate button, the selects' chevrons, a column of
-       checkboxes and one of sliders. They fit from a 372px menu. */
-    max-width: calc(100vw - 54px);
-    min-width: min(350px, calc(100vw - 54px));
-    /* The same for the height and the bottom handle: 124px from the window's top to the
-       Archive controls, the controls themselves (`--archive-bar-space`, measured by
-       `ZetPanes.trackBarHeight`, as they wrap with the panel's width), 37px from the pane
-       to the menu's bottom edge, and 16px to spare. A pane made 700px tall kept its height
-       in a 600px window, its handle at y=814. */
-    max-height: calc(var(--visible-height, 100dvh) - 177px - var(--archive-bar-space, 77px));
-    height: 60vh;
-    /* The panel's width (#32), which the side handle sets for every panel. */
+    /* The rest of the Notes pane under the Archive controls (#82): the Settings modal sizes
+       itself to the window, so the editor takes what it leaves. It was a panel of the menu,
+       sized by two drag handles and clamped to the window by hand. */
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
 }
 
@@ -2985,10 +2945,6 @@ input[type="checkbox"] {
    and the room they took is the Pane's. */
 html.short-of-room .submenu:has(.CodeMirror-focused) .archive-bar {
     display: none;
-}
-
-html.short-of-room .submenu:has(.CodeMirror-focused) .zet-pane-container {
-    --archive-bar-space: 0px !important;
 }
 
 /* The Archive controls above the text (#64): the select across the full width, the three

@@ -20,7 +20,11 @@
      rather than folded was about folds a keyboard could not reach.
 
      Each section is a heading over a group of rows (#80, `panels.css`): a label on the left,
-     its control on the right edge, and a line under the label where it cannot say it alone. -->
+     its control on the right edge, and a line under the label where it cannot say it alone.
+
+     Since #82 these sections are pages of the Settings modal rather than one panel of the
+     menu: `data-page` names the page each is shown on, and `settingsmodal.js` shows the
+     sections of the page chosen in the modal's sidebar. -->
 
 <div class="submenu">
 
@@ -31,7 +35,7 @@
          the menu button. First in the panel, because the time it matters is when that dot has
          just led a reader here. The button's icon and label, and the note, are written by
          `appupdate.js`. -->
-    <div class="settings-section" id="updateSettings" hidden>
+    <div class="settings-section" id="updateSettings" data-page="updates" hidden>
         <div class="button-label settings-heading">Updates</div>
         <div class="settings-group">
             <div class="settings-row">
@@ -52,7 +56,7 @@
          and marks the one the colours below are -- or Custom, when they are none of them. A
          theme is the look only: it sets the controls under Customize, and never the view or
          the equation, because the Fractal is the plane the notes are on. -->
-    <div class="settings-section" id="themeSettings">
+    <div class="settings-section" id="themeSettings" data-page="theme">
         <div class="button-label settings-heading" id="themeHeading">Theme</div>
         <div class="theme-grid" id="themeGrid" role="radiogroup" aria-labelledby="themeHeading"></div>
 
@@ -149,7 +153,7 @@
          Which of them show depends on the equation, below: each has its own landmarks, and
          `savedViews.all` holds the ones that make sense under any of them. That listener is in
          `displaysavedcoords.js`, which binds all of this by id and writes the list. -->
-    <div class="settings-section" id="savedViewsSettings">
+    <div class="settings-section" id="savedViewsSettings" data-page="saved-views">
         <div class="button-label settings-heading">Saved views</div>
         <div class="settings-group">
             <div id="savedCoordinatesContainer" class="saved-coordinates-container"></div>
@@ -184,7 +188,7 @@
     <!-- The Fractal panel's Controls group (#79): the equation and its exponent, then how the
          lines are drawn, folded. `fractalSettingsContainer` is the id `dropdown.js` saves its
          sliders by, with each graph. -->
-    <div class="settings-section" id="fractalSettingsContainer">
+    <div class="settings-section" id="fractalSettingsContainer" data-page="fractal">
         <div class="button-label settings-heading">Fractal</div>
         <div class="settings-group fractal-settings-panel">
             <!-- The equation as it is drawn, with the Julia constant when there is one, which is
@@ -309,7 +313,7 @@
         </div>
     </div>
 
-    <div class="settings-section">
+    <div class="settings-section" data-page="editing">
         <div class="button-label settings-heading">Input</div>
         <div class="settings-group">
             <!-- The modal is left where it is. Its key inputs are rebuilt and rebound
@@ -332,7 +336,7 @@
          They are the syntax of the text, not decoration: `Tag.node` opens a Node
          Section and `Tag.ref` declares an edge, and changing either reparses every
          open Archive. `data-key` is what tells the handler which of the two it is. -->
-    <div class="settings-section" id="zetTagSettings">
+    <div class="settings-section" id="zetTagSettings" data-page="editing">
         <div class="button-label settings-heading">Zettelkasten</div>
         <div class="settings-group">
             <div class="settings-row" title="The characters that start a Node: the rest of the line becomes its Title.">
@@ -353,7 +357,7 @@
     </div>
 
     <!-- `ZetPath.init` wires this subtree, so the id is the handle it reaches for. -->
-    <div class="settings-section" id="zetPlacementSettings">
+    <div class="settings-section" id="zetPlacementSettings" data-page="editing">
         <div class="button-label settings-heading" id="placementHeading">Node placement</div>
         <div class="settings-group">
             <!-- The style decides which sliders show, so it comes first. Four short choices, so
@@ -444,7 +448,7 @@
 
     <!-- One row each, with what it clears said under its name. Reset puts the settings back;
          Clear asks first, in red, because the API keys go with it. -->
-    <div class="settings-section">
+    <div class="settings-section" data-page="data">
         <div class="button-label settings-heading">Data</div>
         <div class="settings-group">
             <div class="settings-row">
@@ -457,7 +461,7 @@
             <div class="settings-row">
                 <div class="settings-row-text">
                     <span class="settings-label">Clear local storage</span>
-                    <span class="settings-description">Settings, the keys the Ai panel holds, and view history. Saved graphs live in IndexedDB and are untouched.</span>
+                    <span class="settings-description">Settings, the keys Ai holds, and view history. Saved graphs live in IndexedDB and are untouched.</span>
                 </div>
                 <button type="button" id="clearLocalStorage" class="key-button is-danger" title="Clear settings, API keys and view history. Saved graphs live in IndexedDB and are untouched.">Clear…</button>
             </div>

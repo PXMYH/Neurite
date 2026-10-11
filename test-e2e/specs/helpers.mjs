@@ -132,6 +132,18 @@ export function paneText(page) {
     return page.evaluate(() => window.currentActiveZettelkastenMirror.getValue());
 }
 
+// Settings on one of its pages (#82) -- `notes`, `ai`, `theme`, `saved-views`, `fractal`,
+// `editing`, `data` or `updates` -- the way a reader gets there: the menu, its Settings row,
+// then the page in the sidebar. A modal already open only changes page.
+export async function openSettings(page, name = 'notes') {
+    if (await page.locator('#settingsModal').isHidden()) {
+        const menuOpen = await page.evaluate(() => document.querySelector('.dropdown-content').classList.contains('open'));
+        if (!menuOpen) await page.click('.menu-button');
+        await page.click('#settings-button');
+    }
+    await page.click(`.settings-nav-item[data-page="${name}"]`);
+}
+
 // Delete through the card's own header button, with a real click: the header
 // buttons are bound through applySvgButtonUI, and a synthetic MouseEvent does not
 // drive them. window.confirm is the app's own modal (customdialog.js) resolving to

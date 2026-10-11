@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, paneText, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, paneText, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -47,10 +47,10 @@ async function press(page, uuid) {
     await page.mouse.up();
 }
 
-// The caret in the notes pane, put there by a click as a reader would.
+// The caret in the notes pane, put there by a click as a reader would: in Settings, on its
+// Notes page (#82).
 async function caretInPane(page) {
-    await page.click('.menu-button');
-    await page.click(".menu-row.tablink:has-text('Notes')");
+    await openSettings(page, 'notes');
     await page.click('#zetPaneContainer .CodeMirror-lines');
     const inPane = await page.evaluate(() => !!document.activeElement?.closest('.CodeMirror'));
     assert.ok(inPane, 'the caret did not reach the notes pane');
@@ -79,16 +79,23 @@ test('Shift lights the Connect tool, and a capital typed into the notes pane doe
     assert.match(await paneText(page), /H/, 'the capital was not typed');
 });
 
-test('Shift held with the caret in the notes pane still connects two Nodes', async () => {
-    // The guard above must not cost the gesture: the Shift went to the pane and was not
-    // taken as the mode, so the press itself has to say that Shift is down.
-    const [, b, c] = await fourNotes(page);
-    await caretInPane(page);
+test('Shift held with the caret in a text field still connects two Nodes', async () => {
+    // The guard above must not cost the gesture: the Shift went to the field and was not
+    // taken as the mode, so the press itself has to say that Shift is down. A card's title,
+    // since the notes pane is in the Settings modal (#82), which covers the cards.
+    const [a, b, c] = await fourNotes(page);
+    const title = await page.evaluate((id) => {
+        const r = Graph.nodes[id].view.titleInput.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, a);
+    await page.mouse.click(title.x, title.y);
+    assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('title-input')), true,
+        'the caret did not reach the title');
     await page.keyboard.down('Shift');
     await press(page, b);
     await press(page, c);
     await page.keyboard.up('Shift');
-    assert.ok(await joined(page, b, c), 'Shift + two clicks from the notes pane made no Edge');
+    assert.ok(await joined(page, b, c), 'Shift + two clicks from a text field made no Edge');
 });
 
 test('the Connect tool joins Nodes without a key, and Escape turns it off', async () => {

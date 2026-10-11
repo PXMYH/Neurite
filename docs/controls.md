@@ -37,7 +37,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>New note, then a tap</code></td>
-    <td>A note where you tap, with the caret in it. Typing a <code>## Title</code> line in the Notes panel makes one too.</td>
+    <td>A note where you tap, with the caret in it. Typing a <code>## Title</code> line in Settings → Notes makes one too.</td>
   </tr>
   <tr>
     <td><code>A finger on a title</code></td>
@@ -135,7 +135,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
 </table>
 
-Custom `## title` and `[[reference]]` tags can be set in the Zettelkasten Settings. To access the Zettelkasten Settings, click the note icon in the top left corner of the dropdown.
+Custom `## title` and `[[reference]]` tags can be set under Zettelkasten in Settings → Editing.
 
   *Full controls are listed in the ? tab within Neurite's main dropdown.
 

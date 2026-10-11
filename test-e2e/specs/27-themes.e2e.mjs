@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, isIPad, openSettings as openSettingsPage } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -10,25 +10,28 @@ afterEach(async () => { await context?.close(); });
 
 // Themes in Settings (#79, js/interface/dropdown/themes.js): named looks for the page, as cards,
 // where the Fractal and Views panels were two rows of the menu. A theme sets the colours, the
-// universe and the page filters, and nothing else.
+// universe and the page filters, and nothing else. Its own page of the Settings modal since #82.
 
-async function openSettings(page) {
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
-    await page.click('#tablink-settings');
-    await page.waitForTimeout(200);
-}
+const openSettings = (page) => openSettingsPage(page, 'theme');
 const chosen = (page) => page.evaluate(() => document.querySelector('#themeGrid input:checked')?.value ?? null);
 const cards = (page) => page.evaluate(() => [...document.querySelectorAll('#themeGrid input')].map((i) => i.value));
 const pick = (page, id) => page.click(`#themeGrid .theme-card:has(input[value="${id}"])`);
 
-test('the Fractal and Views panels are sections of Settings, and a fresh page wears Neurite', async () => {
+test('the Fractal and Views panels are pages of Settings, and a fresh page wears Neurite', async () => {
     await openSettings(page);
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#menuList .tablink .menu-row-label')]
-        .map((l) => l.textContent)), ['Notes', 'Ai', 'Settings', 'Help']);
-    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#tab5 .settings-section > .settings-heading')]
-        .filter((h) => h.getClientRects().length).map((h) => h.textContent.trim())),
-        ['Theme', 'Saved views', 'Fractal', 'Input', 'Zettelkasten', 'Node placement', 'Data']);
+        .map((l) => l.textContent)), ['Help']);
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.settings-nav-item')]
+        .filter((item) => !item.hidden).map((item) => item.textContent.trim())),
+        ['Notes', 'Ai', 'Theme', 'Saved views', 'Fractal', 'Editing', 'Data']);
+    // One page at a time, and a page of one section is named by its title alone.
+    const shown = () => page.evaluate(() => [document.getElementById('settingsPageTitle').textContent,
+        ...[...document.querySelectorAll('#tab5 .settings-section > .settings-heading')]
+            .filter((h) => h.getClientRects().length).map((h) => h.textContent.trim())]);
+    assert.deepEqual(await shown(), ['Theme']);
+    await openSettingsPage(page, 'editing');
+    assert.deepEqual(await shown(), ['Editing', 'Input', 'Zettelkasten', 'Node placement']);
+    await openSettings(page);
     assert.deepEqual(await cards(page), ['neurite', 'ember', 'aurora', 'nebula', 'ink', 'paper'],
         'a page with nothing of its own already offers a Custom card');
     assert.equal(await chosen(page), 'neurite', 'the look a fresh page has is not the Neurite theme');
@@ -153,6 +156,7 @@ test('a number typed beside a slider is saved, and moves the mark', async () => 
 test('Reset puts the theme back to Neurite, and a hue of 360 is no turn at all', async () => {
     await openSettings(page);
     await pick(page, 'ember');
+    await openSettingsPage(page, 'data');
     await page.click('#resetSettings');
     await page.waitForTimeout(200);
     assert.equal(await chosen(page), 'neurite', 'Reset left the theme as it was');

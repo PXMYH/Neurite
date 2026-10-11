@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -361,13 +361,13 @@ test('Escape closes a modal', async () => {
 // where it was (#67). The panel branch moved focus to the row unconditionally: measured,
 // caret at offset 3 in a note's title, and Escape from the Ai panel left focus on
 // `#tablink-ai`. No test entered panel view before pressing Escape, so the suite stayed
-// green over it.
+// green over it. Help is the one panel of the menu since #82.
 test('Escape from a menu panel keeps the caret in a note', async () => {
     const uuid = await addNote(page, 'Caret note', 'body');
     await page.waitForTimeout(500);
     await page.click('.menu-button');
     await page.waitForTimeout(300);
-    await page.click('#tablink-ai');
+    await page.click(".menu-row.tablink:has-text('Help')");
     await page.waitForTimeout(300);
 
     const title = page.locator(`[data-uuid="${uuid}"] .title-input, .window .title-input`).first();
@@ -388,15 +388,14 @@ test('Escape from a menu panel keeps the caret in a note', async () => {
     assert.equal(state.open, true, 'one Escape is one step, not a close');
 });
 
-// Escape is the way out of the two editors in the menu, as it is out of every panel.
+// Escape is the way out of the two editors in Settings, as it is out of every page of it.
 // CodeMirror's default keymap answered every Escape and Tab typed a tab, so once the caret
 // was in the notes editor or the function console, no key got it out: measured, Escape
-// and then Tab three times left focus in the editor each time.
-test('Escape in the notes editor steps out of the panel, onto its row', async () => {
-    await page.click('.menu-button');
+// and then Tab three times left focus in the editor each time. Both are in the Settings
+// modal since #82, which Escape closes, onto the menu button it was opened from.
+test('Escape in the notes editor closes Settings, onto the menu button', async () => {
+    await openSettings(page, 'notes');
     await page.waitForTimeout(300);
-    await page.click("button.menu-row.tablink:has-text('Notes')");
-    await page.waitForTimeout(400);
     await page.click('#tab1 .CodeMirror');
     await page.keyboard.type('## Alpha');
     await page.keyboard.press('Escape');
@@ -404,28 +403,29 @@ test('Escape in the notes editor steps out of the panel, onto its row', async ()
 
     const state = await page.evaluate(() => ({
         editor: window.currentActiveZettelkastenMirror.hasFocus(),
-        panel: document.querySelector('.menu-panel').classList.contains('detail-open'),
-        row: document.activeElement?.matches('.menu-row.tablink')
-            ? document.activeElement.textContent.trim().split(/\s+/)[0] : null,
+        open: !document.getElementById('settingsModal').hidden,
+        onButton: document.activeElement?.classList.contains('menu-button'),
     }));
     assert.equal(state.editor, false, 'the caret left the editor');
-    assert.equal(state.panel, false, 'the panel stepped back to the list');
-    assert.equal(state.row, 'Notes', "and focus is on the panel's row");
+    assert.equal(state.open, false, 'Settings closed');
+    assert.ok(state.onButton, 'focus is on the menu button, not lost');
 });
 
-test('Escape in the function console closes the menu onto its button', async () => {
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
-    await page.evaluate(() => document.querySelector('.neurite-function-cm-style').CodeMirror.focus());
+test('Escape in the function console closes Settings, onto the menu button', async () => {
+    await openSettings(page, 'ai');
+    await page.click('#functionConsoleFold > summary');
+    await page.click('#tab4 .neurite-function-cm-style');
     await page.keyboard.type('x');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(100);
 
     const state = await page.evaluate(() => ({
-        open: document.querySelector('.dropdown-content').classList.contains('open'),
+        typed: document.querySelector('.neurite-function-cm-style').CodeMirror.getValue(),
+        open: !document.getElementById('settingsModal').hidden,
         onButton: document.activeElement?.classList.contains('menu-button'),
     }));
-    assert.equal(state.open, false, 'the menu closed');
+    assert.equal(state.typed, 'x', 'the console took the key, or this test proves nothing');
+    assert.equal(state.open, false, 'Settings closed');
     assert.ok(state.onButton, 'focus is on the menu button, not lost');
 });
 

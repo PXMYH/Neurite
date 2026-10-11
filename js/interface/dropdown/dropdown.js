@@ -386,7 +386,11 @@ On.keydown(document, (e)=>{
     // window titled `26-08-23 ~ 21:11:04.191` behind the panel, focus never moved,
     // and nothing on screen said so. `contains` needs no open check of its own: a
     // closed menu is `inert`, so it cannot hold focus in the first place.
+    //
+    // The Settings modal is the fourth (#82): the tool bar is behind it, and inert while
+    // it is open, but `click()` from here does not ask.
     const focused = document.activeElement;
+    if (SettingsModal.isOpen()) return;
     if (focused && (focused.isContentEditable
         || ['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName)
         || dropdownContent.contains(focused))) return;

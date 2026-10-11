@@ -47,14 +47,14 @@ test("a note's × asks in the middle of a dimmed page, by its Title, and is answ
     assert.deepEqual({ ...d, centre: undefined }, {
         id: 'confirmModal',
         title: 'Delete “Chunking”?',
-        message: 'This also deletes its text in the Notes panel.',
+        message: 'This also deletes its text in Settings → Notes.',
         buttons: ['Cancel', 'Delete'],
         danger: true,
         // The answer that changes nothing has the keyboard, and Enter.
         focused: 'Cancel',
         centre: undefined,
         behind: true,
-        describedBy: 'This also deletes its text in the Notes panel.',
+        describedBy: 'This also deletes its text in Settings → Notes.',
     });
     assert.ok(Math.abs(d.centre[0]) <= 1 && Math.abs(d.centre[1]) <= 1, `off centre by ${d.centre}`);
     // No ×: Cancel and Escape answer, and the × answered nothing a reader could see.

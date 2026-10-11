@@ -68,13 +68,10 @@ const assertViewsFound = ()=> assert.ok(iShowList > 0 && iShowDetail > iShowList
 const tablinks = [...dropdownHtml.matchAll(/onclick="openTab\('(\w+)', this\)"[\s\S]*?class="menu-row-label">([^<]+)</g)]
     .map( (m)=> [m[1], m[2].trim()] );
 
-test('a menu row opens the Notes tab, and the rows are in a known order', ()=>{
-    // Notes first: it is the graph itself, and the rows under it are tools for it. This
-    // list once pinned Notes second, under Ai -- the accident this comment contradicted.
+test('Settings opens on Notes, its pages are in a known order, and Help is the one panel row', ()=>{
+    // Help is the only row left that opens a panel of the menu. Notes, Ai and Settings were
+    // rows too until #82 made them pages of the Settings modal, which the Settings row opens.
     assert.deepEqual(tablinks, [
-        ['tab1', 'Notes'],
-        ['tab4', 'Ai'],
-        ['tab5', 'Settings'],
         ['tab3', 'Help'],
     ], 'the menu column changed; check that every row still has a label to open under');
 
@@ -85,6 +82,30 @@ test('a menu row opens the Notes tab, and the rows are in a known order', ()=>{
             tabId + ' has a tablink and no content div');
         assert.match(main, new RegExp("'" + tabId + "': '\\w+\\.html'"),
             tabId + ' has a tablink and nothing loads into it');
+    }
+
+    // Notes first: it is the graph itself, and the pages under it are tools for it. Updates
+    // last, and only in the Mac app (`appupdate.js`).
+    const pages = [...dropdownHtml.matchAll(/class="settings-nav-item" data-page="([\w-]+)"/g)].map( (m)=>m[1] );
+    assert.deepEqual(pages, ['notes', 'ai', 'theme', 'saved-views', 'fractal', 'editing', 'data', 'updates'],
+        "the Settings modal's sidebar changed; check that every page still has something to show");
+
+    // Notes and Ai are their panels' markup whole; every other page shows the sections of
+    // Settings that name it, and every section names a page that exists.
+    const iModal = dropdownHtml.indexOf('id="settingsModal"');
+    assert.ok(iModal > 0, 'the Settings modal is gone from the menu markup');
+    for (const id of ['tab1', 'tab4', 'tab5']) {
+        assert.ok(dropdownHtml.indexOf('<div id="' + id + '" class="tabcontent">') > iModal,
+            id + ' is not inside the Settings modal');
+        assert.match(main, new RegExp("'" + id + "': '\\w+\\.html'"), 'nothing loads ' + id);
+    }
+    const sections = [...read('resources/html/tabs/settingstab.html')
+        .matchAll(/<div class="settings-section"[^>]*data-page="([\w-]+)"/g)].map( (m)=>m[1] );
+    for (const page of pages.slice(2)) {
+        assert.ok(sections.includes(page), 'the ' + page + ' page shows no section of Settings');
+    }
+    for (const page of sections) {
+        assert.ok(pages.includes(page), 'a section of Settings names ' + page + ', which no page shows');
     }
 });
 
@@ -417,8 +438,8 @@ test('every menu row describes what it does, and the heading is not overridden',
     assert.ok(iList > 0 && iDetail > iList, 'the list and the panel are no longer in that order');
     const rows = [...dropdownHtml.slice(iList, iDetail)
         .matchAll(/<button[^>]*class="menu-row[^"]*"[^>]*>/g)].map( (m)=> m[0] );
-    // Nine since #79: Import and its two sources, Save to…, Share screen and the four panels.
-    assert.equal(rows.length, 9, 'the menu no longer has nine rows; check what this is reading');
+    // Seven since #82: Import and its two sources, Save to…, Share screen, Settings and Help.
+    assert.equal(rows.length, 7, 'the menu no longer has seven rows; check what this is reading');
 
     for (const row of rows) {
         // Save to… is the one exception, and it is written at runtime: what that row
@@ -447,11 +468,11 @@ test('every menu row describes what it does, and the heading is not overridden',
     // - A title may not contain another panel's word, or one sentence can name two
     //   panels and pass as both -- "Adjust how the fractal is drawn: every control for
     //   it, in one list." reads like the Fractal panel and was on the Help row.
-    // Four since the Fractal and Views panels became sections of Settings (#79).
+    // Two since #82: Help opens its panel, and Settings opens the modal with every other
+    // panel's markup in it, so its word may be in any of those.
     const PANELS = {
-        tab4: ['aitab.html', 'API'],
-        tab5: ['settingstab.html', 'placement'],
-        tab3: ['helptab.html', 'mouse'],
+        settings: [['notestab.html', 'aitab.html', 'settingstab.html'], 'saved view', 'id="settings-button"'],
+        help: [['helptab.html'], 'mouse', "openTab('tab3'"],
     };
     // What a reader sees: comments, scripts and unrendered templates out, then tags, so ids
     // and attributes go with them. Two details, each of which let a panel keep a word it no
@@ -474,24 +495,24 @@ test('every menu row describes what it does, and the heading is not overridden',
         .replace(/<!--[\s\S]*?-->/g, '')
         .replace(/<(script|style|template|title)[\s\S]*?<\/\1>/g, '')
         .replace(/<[a-zA-Z\/!][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>/g, ' ');
-    const seen = Object.fromEntries(Object.values(PANELS).map( ([f])=> [f, visibleText(f)] ));
+    const seen = Object.fromEntries(Object.entries(PANELS).map( ([tab, [files]])=> [tab, files.map(visibleText).join(' ')] ));
 
-    for (const [tab, [file, word]] of Object.entries(PANELS)) {
+    for (const [tab, [files, word, marker]] of Object.entries(PANELS)) {
         const re = new RegExp(word, 'i');
-        const row = rows.find( (r)=> r.includes("openTab('" + tab + "'") );
+        const row = rows.find( (r)=> r.includes(marker) );
         assert.ok(row, 'no menu row opens ' + tab + ' any more; check this table');
         const title = row.match(/\stitle="([^"]*)"/);
         assert.ok(title, 'the row for ' + tab + ' says nothing on hover');
         assert.match(title[1], re,
-            'the row for ' + tab + ' no longer describes that panel: ' + title[1]);
-        assert.match(seen[file], re,
-            file + ' no longer shows the word "' + word + '", so the title above describes '
+            'the row for ' + tab + ' no longer describes what it opens: ' + title[1]);
+        assert.match(seen[tab], re,
+            files.join(', ') + ' no longer show the word "' + word + '", so the title above describes '
             + 'something the panel does not say');
 
-        for (const [other, [otherFile, otherWord]] of Object.entries(PANELS)) {
+        for (const [other, [otherFiles, otherWord]] of Object.entries(PANELS)) {
             if (other === tab) continue;
-            assert.doesNotMatch(seen[otherFile], re,
-                '"' + word + '" is in ' + otherFile + ' too, so the titles for ' + tab
+            assert.doesNotMatch(seen[other], re,
+                '"' + word + '" is in ' + otherFiles.join(', ') + ' too, so the titles for ' + tab
                 + ' and ' + other + ' can be swapped and both still pass');
             assert.doesNotMatch(title[1], new RegExp(otherWord, 'i'),
                 'the title on the row for ' + tab + ' also names the panel ' + other

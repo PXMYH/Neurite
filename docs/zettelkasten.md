@@ -48,10 +48,10 @@ Build your Zettelkasten through UI interactions in the Mind Map, and reciprocall
 
 ## Archives
 
-The Notes panel can hold several texts for one graph, each called an Archive. The list at the top of the panel says which Archive is shown and how many notes each holds; **New Archive**, **Rename Archive…** and **Delete Archive…** are under it.
+Settings → Notes can hold several texts for one graph, each called an Archive. The list at the top of the page says which Archive is shown and how many notes each holds; **New Archive**, **Rename Archive…** and **Delete Archive…** are under it.
 
-- Every Archive's notes are on the same canvas. A new note, from the tool bar or from an AI answer with no card to go to, is written into the Archive the panel shows. With two Archives or more, the panel at the bottom left of the canvas says which one that is.
-- A Title names one note across all the Archives, in any case. A Title line written a second time, in the same Archive or another, makes no second note: the line is dimmed, the Title is underlined in red, and the panel says which Archive has the note. Click the line number in that message to select the Title and rename it. When the first note is renamed or deleted, the second line becomes a note.
+- Every Archive's notes are on the same canvas. A new note, from the tool bar or from an AI answer with no card to go to, is written into the Archive the page shows. With two Archives or more, the panel at the bottom left of the canvas says which one that is.
+- A Title names one note across all the Archives, in any case. A Title line written a second time, in the same Archive or another, makes no second note: the line is dimmed, the Title is underlined in red, and the page says which Archive has the note. Click the line number in that message to select the Title and rename it. When the first note is renamed or deleted, the second line becomes a note.
 - A graph saved with one Title in two Archives opens with the later line renamed "Title (2)", both notes kept where they were, and a notice that lists each rename.
 - Delete Archive says how many notes go with the Archive. The last Archive cannot be deleted, because new notes need an Archive to go into.
 
@@ -64,9 +64,9 @@ The Notes panel can hold several texts for one graph, each called an Archive. Th
 - A note's Title is its file name. Two files with one name, in any case, each take as much of their path as tells them apart, as the bundle's own `[[Claude Code/Courses]]` does.
 - The notes' own `[[links]]` become Edges at once, across Archives as well. A link by another name (`[[Building Agents|Agents]]`) or to a heading (`[[Setup#Keys]]`) is written as a plain link to its note in Neurite's copy. A link that names no note stays as text, and the summary lists it.
 - A line of a note that begins with the Node Tag (`##` by default) or `AI:` would start a note of its own, so Neurite's copy of it begins with a space. The folder itself is only read, never written.
-- A card starts at the note's text: its frontmatter, and a first heading that repeats its Title, stay in the note (the Notes panel shows them), and the frontmatter's `description` is the line above the text.
-- Into an empty graph the import goes straight in; with notes on screen, or text in the Notes panel, it asks, and puts the graph on screen away first, as **Clear** does.
-- Each Archive of the import is a **Region** of the Plane: a disk inside one of the Mandelbrot set's primary bulbs, the largest Archive in the largest bulb and the notes at the folder's top in the main cardioid, with the Archive's name drawn over it. The notes sit in it as a block, pinned, at the size that fits the bulb, so a smaller Archive's notes are smaller and are read by zooming in. Picking the Archive in the Notes panel frames its notes beside the panel; a note made by double-click inside a Region, or typed into its Archive, is that Archive's and takes the Region's size. A double-click puts it where the pointer is when nothing is there, or in the free place of the block nearest the pointer, and the view moves just enough to show it whole.
+- A card starts at the note's text: its frontmatter, and a first heading that repeats its Title, stay in the note (Settings → Notes shows them), and the frontmatter's `description` is the line above the text.
+- Into an empty graph the import goes straight in; with notes on screen, or text in Settings → Notes, it asks, and puts the graph on screen away first, as **Clear** does.
+- Each Archive of the import is a **Region** of the Plane: a disk inside one of the Mandelbrot set's primary bulbs, the largest Archive in the largest bulb and the notes at the folder's top in the main cardioid, with the Archive's name drawn over it. The notes sit in it as a block, pinned, at the size that fits the bulb, so a smaller Archive's notes are smaller and are read by zooming in. Picking the Archive in Settings → Notes frames its notes, in view once Settings is closed; a note made by double-click inside a Region, or typed into its Archive, is that Archive's and takes the Region's size. A double-click puts it where the pointer is when nothing is there, or in the free place of the block nearest the pointer, and the view moves just enough to show it whole.
 
 ## Proposed Edges
 

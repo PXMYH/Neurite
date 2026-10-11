@@ -163,7 +163,7 @@
          open, and the two `classList.toggle`s in `dropdown.js` are the only writes to
          that state in the tree. -->
     <button type="button" class="menu-button" aria-label="Menu" aria-expanded="false"
-            data-tooltip="Menu: import a graph, save it to disk, share the screen, and the notes, AI, settings and help panels">
+            data-tooltip="Menu: import a graph, save it to disk, share the screen, open Settings with the notes and AI, and Help">
         <!-- A span, not the div it was: a `<button>` takes phrasing content, and the
              three bars are `position: absolute`, so the box is identical either way. -->
         <span class="menu-icon" id="menu-icon"></span>
@@ -263,99 +263,39 @@
 
                 <div class="menu-separator" role="separator"></div>
 
-                <!-- Every row below here opens a panel, so every one carries a chevron.
-                     `openTab` is unchanged: it shows the panel, and the panel view
-                     is what `MainMenu.showDetail` switches to. The `tablink` class
-                     stays because `openTab` clears `activeTab` across it.
-
-                     A `title` each, as the four command rows above have. These five
-                     carried one as chips and lost it becoming rows, so a five-word
-                     column was the only description of what any panel holds. `title`
-                     rather than the `data-tooltip` the pill and the menu button use:
-                     that exists because a name arriving a second late in an OS box
-                     over the canvas reads as an accident, and none of that applies to
-                     a row of a menu already open and already labelled -- while two
-                     hover mechanisms in one list would answer the same gesture two
-                     different ways depending on which row you were over.
-
-                     Each says what the panel holds, read out of the panel. The old
-                     chip titles described a Saves tab that Open… and Save to… have
-                     since left, and a Settings tab that has since gained the node
-                     placement controls.
-
-                     No `aria-haspopup`, though it sat here for one commit. The chevron
-                     that tells a reader these five descend a level is `aria-hidden`, as
-                     an icon carrying no information a label does not should be, so
-                     without some marker the five are indistinguishable from the four
-                     commands above the separator to anyone not looking at the screen.
-                     `aria-haspopup="true"` is the wrong marker: ARIA defines it as
-                     equivalent to `menu`, and Chrome's AX tree duly reported
-                     `hasPopup: "menu"` on these rows. That promises a menu widget with
-                     arrow-key semantics and delivers a panel with a Back button. Not
-                     `role="menu"` for the same reason, plus the focus-management
-                     contract it takes and this list does not implement.
-
-                     Not `aria-expanded` in its place either: opening a panel hides the
-                     whole list, so the row's own expanded state is never observable by
-                     the reader it would be describing. Measured, with the Ai panel open:
-                     `#menuList` computes `display: none`, `#tablink-ai` measures 0x0,
-                     `focus()` on it does not take, and the AX tree returns no role and
-                     no name for that node at all. `aria-expanded="true"` there would
-                     describe a node no reader can reach.
-
-                     So the marker is in the name instead, where it is not state and
-                     cannot go stale: `.visually-hidden` -- the idiom the Back button
-                     three lines up already uses -- makes the name "Ai panel" against
-                     "Share screen". A *sibling* of `.menu-row-label`, never a child of it,
-                     because `MainMenu.showDetail` sets the panel heading from
-                     `label.textContent` and a nested span would retitle the heading to
-                     "Ai panel" too.
-
-                     `type="button"` as the four commands above already carry. A button
-                     with no `type` is `type="submit"`, which does nothing here only
-                     because `closest('form')` is null for all nine rows today -- and
-                     `aitab.html` does contain a `<form>`, so the day this nav lands
-                     inside one, clicking a panel row reloads the page. -->
-
-                <!-- First, because it is the graph itself.
-
-                     `tab1` had no tablink at all, so the notes pane -- the CodeMirror
-                     where the whole map exists as text, and the thing every node is
-                     built from -- could not be opened from the interface. It was
-                     still loaded, because App.init needs it, so the editor was
-                     present and unreachable (issue #65). A reader could edit a note
-                     inside its card and never learn that the map has a text form,
-                     which is the idea the app is built on.
-
-                     Above Ai and Settings because a note is content and those are
-                     tools, and a file-text glyph because this is where the prose
-                     lives. It first landed second, under Ai, while this comment, its
-                     commit and its test all said first; it is first now. -->
-                <button type="button" class="menu-row tablink" onclick="openTab('tab1', this)"
-                        title="The notes pane: every note as text, and the [[links]] between them. Editing here edits the map.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#file-text-icon"></use></svg>
-                    <span class="menu-row-label">Notes</span>
-                    <span class="visually-hidden"> panel</span>
-                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
-                </button>
-                <button type="button" class="menu-row tablink" id="tablink-ai" onclick="openTab('tab4', this)"
-                        title="Prompt the AI, choose the model, and hold the API keys.">
-                    <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
-                    <span class="menu-row-label">Ai</span>
-                    <span class="visually-hidden"> panel</span>
-                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
-                </button>
-                <!-- Second from the end, before help: settings are read less often
-                     than any tab that holds content, and more often than help. The Fractal
-                     and Views rows were here too, until their panels became the Theme,
-                     Saved views and Fractal sections of this one (#79). -->
-                <button type="button" class="menu-row tablink" id="tablink-settings" onclick="openTab('tab5', this)"
-                        title="The theme, saved views and the Fractal, input, the Zettelkasten tags, node placement, and how to reset it all.">
+                <!-- Settings opens the Settings modal (#82), as Notion's settings open over the
+                     page: a dialog with its sections in a sidebar. Notes and Ai are sections of
+                     it now, beside the theme and the rest, so the menu keeps what is not a
+                     setting -- the commands above, and Help. It opens a window rather than a
+                     level of the menu, so it carries no chevron, and `aria-haspopup="dialog"`
+                     says what it opens. `settingsmodal.js` binds it. -->
+                <button type="button" class="menu-row" id="settings-button" aria-haspopup="dialog"
+                        title="Notes, Ai, the theme, saved views, the Fractal, editing and data, in one window.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#gear-icon"></use></svg>
                     <span class="menu-row-label">Settings</span>
-                    <span class="visually-hidden"> panel</span>
-                    <svg class="menu-row-chevron" aria-hidden="true"><use xlink:href="#caret-right-icon"></use></svg>
                 </button>
+
+                <!-- Help is the one row left that opens a panel of the menu, so it carries the
+                     chevron. `openTab` shows the panel, and the panel view is what
+                     `MainMenu.showDetail` switches to; the `tablink` class stays because
+                     `openTab` clears `activeTab` across it.
+
+                     A `title` rather than the `data-tooltip` the pill and the menu button use:
+                     that exists because a name arriving a second late in an OS box over the
+                     canvas reads as an accident, and none of that applies to a row of a menu
+                     already open and already labelled.
+
+                     No `aria-haspopup`: ARIA defines `true` as `menu`, and Chrome's AX tree
+                     reported `hasPopup: "menu"` on these rows when they had it -- a menu widget
+                     with arrow-key semantics, where what opens is a panel with a Back button.
+                     Not `aria-expanded` either: opening the panel hides the whole list, so the
+                     row's own state is never observable. The marker is in the name instead,
+                     where it cannot go stale: `.visually-hidden` makes it "Help panel". A
+                     *sibling* of `.menu-row-label`, never a child of it, because
+                     `MainMenu.showDetail` sets the panel heading from `label.textContent`.
+
+                     `type="button"`, as every row carries: a button with no `type` is a submit
+                     button, which would reload the page the day this nav sits in a form. -->
                 <button type="button" class="menu-row tablink" onclick="openTab('tab3', this)"
                         title="Every mouse and keyboard control, in one list.">
                     <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#question-mark"></use></svg>
@@ -387,25 +327,8 @@
                     <span class="menu-row-label" id="menuDetailTitle">Menu</span>
                 </button>
 
-                <!-- Tab content placeholders -->
-
-                <!-- The Notes row opens this: the editor's designed home (issue #65).
-                     The div and its `PageLoad.tabs` entry would be load-bearing even with
-                     no row, because the app reads what loads into it and would throw
-                     without it -- `App.init` builds `ZetPanes` from `#zetPaneContainer`,
-                     and `openTab` refreshes `currentActiveZettelkastenMirror` on every
-                     tab switch. It also keeps text-to-graph sync alive: an AI answer with
-                     no target node is streamed into that editor, and the sync pass turns
-                     it into nodes. -->
-                <div id="tab1" class="tabcontent">
-                    <!-- Tab 1 content will be loaded here -->
-                </div>
-                <div id="tab4" class="tabcontent">
-                    <!-- Tab 4 content will be loaded here -->
-                </div>
-                <div id="tab5" class="tabcontent">
-                    <!-- Tab 5 content will be loaded here -->
-                </div>
+                <!-- Help's panel. Notes, Ai and Settings were panels here too, until #82 made
+                     them sections of the Settings modal below. -->
                 <div id="tab3" class="tabcontent">
                     <!-- Tab 3 content will be loaded here -->
                 </div>
@@ -420,6 +343,102 @@
                    accept=".neurite,.txt,application/octet-stream" />
             <!-- The folder behind Import's Folder of notes…, out here for the same reason. -->
             <input type="file" id="import-notes-input" class="visually-hidden" webkitdirectory multiple />
+        </div>
+    </div>
+    <!-- Settings (#82), as a modal the way Notion's settings are: a large dialog over the page,
+         its pages listed in a sidebar on the left and the chosen one on the right, opened from
+         the menu's Settings row. A click outside it, the close button, or Esc closes it;
+         `settingsmodal.js` runs it, and `panels.css` draws it.
+
+         A child of `.dropdown` like the islands, so it gets the chrome's guard against canvas
+         gestures (a wheel over it scrolls it rather than zooming the Graph) and sits under
+         `#customModal`, which the controls in it open -- Adjust…, the Ollama and Vector-DB
+         windows, every `window.confirm`. Under `#invert-filter` too, so Paper turns it light
+         with everything else, which the theme cards' pictures count on.
+
+         Not a native `<dialog>`: `showModal()` draws in the top layer, above every z-index,
+         so the windows its own controls open would land behind it, and the page's filter
+         would not reach it. -->
+    <div class="settings-modal" id="settingsModal" hidden>
+        <div class="settings-backdrop" id="settingsBackdrop"></div>
+        <div class="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings" tabindex="-1">
+            <!-- The pages, in groups as Notion's are: the two that write the Graph, the three
+                 that change what is on screen, and the rest. Not "Workspace" or "Appearance",
+                 which CONTEXT.md keeps from naming the Graph and the Theme. `data-page` is
+                 what `settingsmodal.js` shows: Notes and Ai are the old panels whole, the
+                 others the sections of the Settings markup that name that page. Updates is
+                 the Mac app's only (`appupdate.js`). -->
+            <nav class="settings-nav" aria-label="Settings pages">
+                <div class="settings-nav-group">
+                    <div class="settings-nav-heading">Writing</div>
+                    <button type="button" class="settings-nav-item" data-page="notes">
+                        <svg aria-hidden="true"><use xlink:href="#file-text-icon"></use></svg>
+                        <span>Notes</span>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-page="ai">
+                        <svg aria-hidden="true"><use xlink:href="#ai-icon-symbol"></use></svg>
+                        <span>Ai</span>
+                    </button>
+                </div>
+                <div class="settings-nav-group">
+                    <div class="settings-nav-heading">View</div>
+                    <button type="button" class="settings-nav-item" data-page="theme">
+                        <svg aria-hidden="true"><use xlink:href="#palette-icon"></use></svg>
+                        <span>Theme</span>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-page="saved-views">
+                        <svg aria-hidden="true"><use xlink:href="#eyeball-symbol"></use></svg>
+                        <span>Saved views</span>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-page="fractal">
+                        <svg aria-hidden="true"><use xlink:href="#fractal-icon"></use></svg>
+                        <span>Fractal</span>
+                    </button>
+                </div>
+                <div class="settings-nav-group">
+                    <div class="settings-nav-heading">General</div>
+                    <button type="button" class="settings-nav-item" data-page="editing">
+                        <svg aria-hidden="true"><use xlink:href="#keyboard-icon"></use></svg>
+                        <span>Editing</span>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-page="data">
+                        <svg aria-hidden="true"><use xlink:href="#database-icon"></use></svg>
+                        <span>Data</span>
+                    </button>
+                    <button type="button" class="settings-nav-item" data-page="updates" id="settingsNavUpdates" hidden>
+                        <svg aria-hidden="true"><use xlink:href="#refresh-icon"></use></svg>
+                        <span>Updates</span>
+                    </button>
+                </div>
+            </nav>
+
+            <div class="settings-content">
+                <div class="settings-content-head">
+                    <h2 class="settings-page-title" id="settingsPageTitle">Settings</h2>
+                    <button type="button" class="settings-close" id="settingsClose" aria-label="Close settings">
+                        <svg aria-hidden="true"><use xlink:href="#close-icon"></use></svg>
+                    </button>
+                </div>
+                <!-- `menu-detail` as well: it is the class every panel's styles are scoped by
+                     (`panels.css`), and the panels' contents moved here whole. -->
+                <div class="settings-content-body menu-detail" id="settingsBody">
+                    <!-- The Notes page: the editor's designed home (issue #65). The div and its
+                         `PageLoad.tabs` entry would be load-bearing even unseen, because the
+                         app reads what loads into it and would throw without it -- `App.init`
+                         builds `ZetPanes` from `#zetPaneContainer`. It also keeps
+                         text-to-graph sync alive: an AI answer with no target node is streamed
+                         into that editor, and the sync pass turns it into nodes. -->
+                    <div id="tab1" class="tabcontent">
+                        <!-- Tab 1 content will be loaded here -->
+                    </div>
+                    <div id="tab4" class="tabcontent">
+                        <!-- Tab 4 content will be loaded here -->
+                    </div>
+                    <div id="tab5" class="tabcontent">
+                        <!-- Tab 5 content will be loaded here -->
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

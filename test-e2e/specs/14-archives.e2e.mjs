@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -8,7 +8,8 @@ after(async () => { await browser?.close(); });
 beforeEach(async () => { ({ context, page, errors } = await openNeurite(browser)); });
 afterEach(async () => { await context?.close(); });
 
-// Archives (#64): the controls in the Notes panel, and one Title namespace across them.
+// Archives (#64): the controls in the Notes panel -- Settings → Notes since #82 -- and one
+// Title namespace across them.
 // The controls were removed as bare icons, which took the capability with them; a Title
 // written in two Archives made two Nodes, and a Saved Graph holding the pair bound both
 // Archives to one Node when it opened.
@@ -29,10 +30,7 @@ const asked = (page) => page.evaluate(() => (Modal.current
        Modal.div.querySelector('.modal-ok').textContent] : null));
 const answer = (page, button) => page.click(`#customModal .modal-body ${button}`);
 
-async function openNotes(page) {
-    await page.click('.menu-button');
-    await page.click(".menu-row.tablink:has-text('Notes')");
-}
+const openNotes = (page) => openSettings(page, 'notes');
 // Real keys into the Archive shown, at its end.
 async function type(page, text) {
     await page.click('#zetPaneContainer .zet-pane.active .CodeMirror-lines');
@@ -124,7 +122,7 @@ test('a renamed Archive keeps its name and its place through a save and a reload
     assert.deepEqual((await state(page)).archives, ['Archive 1 · 1 note', 'Learning · 1 note']);
 });
 
-test('with two Archives the HUD says where new notes go, and opens the Notes panel', async () => {
+test('with two Archives the HUD says where new notes go, and opens Settings on Notes', async () => {
     assert.equal((await state(page)).hud, null, 'one Archive needs no saying');
     await openNotes(page);
     await page.click('#archiveNew');
@@ -136,10 +134,13 @@ test('with two Archives the HUD says where new notes go, and opens the Notes pan
         .map((s) => document.querySelector(s).getBoundingClientRect().left));
     assert.ok(Math.max(...lefts) - Math.min(...lefts) <= 1, `the line is not aligned with the rest of the overview: ${lefts}`);
 
-    await page.click('.menu-button');   // the menu closed
+    await page.click('#settingsClose');
+    await openSettings(page, 'ai');      // Settings remembers the page it was left on
+    await page.click('#settingsClose');
     await page.click('.hud-archive');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('tab1')).display), 'block',
-        'the HUD line did not open the Notes panel');
+    assert.deepEqual(await page.evaluate(() => [!document.getElementById('settingsModal').hidden,
+        getComputedStyle(document.getElementById('tab1')).display]), [true, 'block'],
+        'the HUD line did not open Settings on Notes');
 });
 
 test('a Saved Graph with one Title in two Archives opens with the later renamed, and says so', async () => {
@@ -181,6 +182,7 @@ test('a Saved Graph with one Title in two Archives opens with the later renamed,
 test('a note typed into the Pane, and one renamed on its card, each come back as one note where it was', async () => {
     await openNotes(page);
     await type(page, '## Alpha\nbody one\n');
+    await page.click('#settingsClose');   // over the cards since #82
     await page.evaluate(() => window.createNote('Beta', 'body two'));
     await page.waitForTimeout(600);
     const title = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta').view.titleInput);
@@ -264,9 +266,9 @@ test('typing a space after a Title another Archive holds, on a card, keeps the s
     await page.click('#archiveNew');
     await page.keyboard.type('## Rust\nr\n');
     await page.waitForTimeout(300);
-    // The menu closed: in the iPad's smaller window the card can land under the panel.
-    await page.click('.menu-button');
-    await page.waitForTimeout(400);
+    // Settings closed: it is over the cards (#82).
+    await page.click('#settingsClose');
+    await page.waitForTimeout(200);
     const title = await page.evaluateHandle(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta').view.titleInput);
     await title.asElement().click();
     await page.keyboard.press('ControlOrMeta+A');

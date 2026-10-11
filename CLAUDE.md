@@ -188,10 +188,13 @@ All four are held together in **one** array of records, `window.zetPaneList`, wh
 of the pane on screen, and it is the handle most code reaches for. There are no parallel arrays keyed by
 index — reach a pane's parser or processor through its `zetPaneList` record.
 
-The menu's first row, **Notes**, opens `#tab1`, which loads `notestab.html`: the pane is the
-editor's designed home (#65). The div is load-bearing beyond the row, because `App.init` builds
-`ZetPanes` from `#zetPaneContainer` and `openTab` refreshes `currentActiveZettelkastenMirror` on every
-tab switch — delete it and boot throws. `test/notes-tab.test.js` pins both halves.
+The editor's designed home (#65) is the **Notes** page of the Settings modal (#82): the menu's
+Settings row opens it (`js/interface/dropdown/settingsmodal.js`), and its sidebar shows `#tab1`, which
+loads `notestab.html`, beside Ai (`#tab4`) and the sections of Settings (`#tab5`, by `data-page`).
+The div is load-bearing beyond the page, because `App.init` builds `ZetPanes` from
+`#zetPaneContainer` — delete it and boot throws. While the modal is open everything behind it is
+inert, so code that needs the canvas closes it first (`SettingsModal.close()`).
+`test/notes-tab.test.js` pins both halves.
 
 - Text → graph: `processInput` (on CodeMirror `change`) walks lines, `Tag.node` (default `##`) opens a
   node section, `Tag.ref` (default `[[`) declares edges, `LLM_TAG` (`AI:`) makes an AI node.

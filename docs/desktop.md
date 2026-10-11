@@ -38,8 +38,9 @@ What to know:
 - **Quitting keeps your work.** The app waits for the graph to finish saving before it closes,
   which a browser tab cannot do.
 - **Updates.** The app looks for a newer release 20 seconds after it opens and every six hours
-  after, and **Check for updates**, at the top of Settings, asks again. When one is out, the menu
-  button and the Settings row show a dot and the button reads **Update to x.y.z**: it downloads the release's DMG, checks it
+  after, and **Check for updates**, on the Updates page of Settings, asks again. When one is out, the
+  menu button, the Settings row and Updates show a dot, Settings opens on Updates, and the button
+  reads **Update to x.y.z**: it downloads the release's DMG, checks it
   against the SHA-256 GitHub took when it was uploaded, saves your graph, closes, puts the new
   app where the old one was, and opens it again. A graph that cannot be saved first stops the
   update, and a new version that has not started -- its window up and your graph back -- within a

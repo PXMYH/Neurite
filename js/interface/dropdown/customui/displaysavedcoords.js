@@ -352,6 +352,8 @@ function appendViewsToContainer(views, containerId) {
         coordElement.textContent = view.title.replace(/^\/\/\s*/, '');
 
         On.click(coordElement, (e) => {
+            // Going there is the point, and Settings, where the list is (#82), covers the view.
+            SettingsModal.close();
             returnToSavedView(view);
 
             // Update selected state

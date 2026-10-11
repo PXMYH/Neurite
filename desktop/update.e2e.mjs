@@ -137,11 +137,15 @@ async function launch(app, userData, feedUrl) {
 const label = (page) => page.evaluate(() => document.querySelector('#update-button .menu-row-label').textContent);
 const note = (page) => page.evaluate(() => document.getElementById('update-note').textContent);
 
-// The menu, then Settings, where Check for updates is since #78 -- it was a row of the menu.
+// The menu, then Settings, where Check for updates is since #78 -- it was a row of the menu --
+// on its Updates page since #82. A Settings already open only changes page.
 async function openSettings(page) {
-    await page.click('.menu-button');
-    await page.waitForTimeout(400);
-    await page.click('#tablink-settings');
+    if (await page.locator('#settingsModal').isHidden()) {
+        await page.click('.menu-button');
+        await page.waitForTimeout(400);
+        await page.click('#settings-button');
+    }
+    await page.click('#settingsNavUpdates');
     await page.waitForTimeout(300);
 }
 async function checkFromSettings(page) {

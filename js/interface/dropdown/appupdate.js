@@ -1,17 +1,20 @@
-// The Mac app's own updates (#76), a section of Settings since #78. Only the app has the bridge
-// (`window.neuriteDesktop`, desktop/preload.cjs); in a browser the section stays hidden.
+// The Mac app's own updates (#76), a section of Settings since #78 and a page of the Settings
+// modal since #82. Only the app has the bridge (`window.neuriteDesktop`, desktop/preload.cjs); in
+// a browser the section and its place in the modal's sidebar stay hidden.
 //
 // The button is the refresh the issue asks for: it checks, and the note beside it says what the
 // check found. Once a newer release is found, the button installs it -- the app saves the Graph,
 // closes, swaps itself for the new one and opens again (desktop/updater.cjs) -- and until then a
 // dot on the menu button and another on the Settings row lead to it, because the check that
-// finds one is the one nobody asked for.
+// finds one is the one nobody asked for. A third dot, on Updates in the sidebar, and the modal
+// opens on that page while one is ready (`settingsmodal.js`).
 const AppUpdate = {
     bridge: window.neuriteDesktop?.update ?? null,
     section: Elem.byId('updateSettings'),
     row: Elem.byId('update-button'),
     note: Elem.byId('update-note'),
-    settingsRow: Elem.byId('tablink-settings'),
+    settingsRow: Elem.byId('settings-button'),
+    navItem: Elem.byId('settingsNavUpdates'),
     state: {phase: 'idle'},
     busy: new Set(['checking', 'downloading', 'installing']),
 
@@ -19,6 +22,7 @@ const AppUpdate = {
         if (!AppUpdate.bridge || !AppUpdate.row) return;
 
         AppUpdate.section.hidden = false;
+        AppUpdate.navItem.hidden = false;
         AppUpdate.bridge.onState(AppUpdate.render);
         AppUpdate.bridge.state().then(AppUpdate.render);
         On.click(AppUpdate.row, AppUpdate.onClick);
@@ -69,11 +73,13 @@ const AppUpdate = {
 
         menuButton.classList.toggle('update-ready', ready);
         menuButton.setAttribute('aria-label', ready ? "Menu, with an update ready" : "Menu");
-        // The row's name is built from its contents ("Settings panel"), so it is only named
-        // outright while it has something more to say.
-        AppUpdate.settingsRow.classList.toggle('update-ready', ready);
-        if (ready) AppUpdate.settingsRow.setAttribute('aria-label', "Settings panel, with an update ready");
-        else AppUpdate.settingsRow.removeAttribute('aria-label');
+        // A row's name is built from its contents ("Settings"), so it is only named outright
+        // while it has something more to say.
+        for (const [row, name] of [[AppUpdate.settingsRow, "Settings"], [AppUpdate.navItem, "Updates"]]) {
+            row.classList.toggle('update-ready', ready);
+            if (ready) row.setAttribute('aria-label', name + ", with an update ready");
+            else row.removeAttribute('aria-label');
+        }
     },
 
     async onClick(){

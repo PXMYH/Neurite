@@ -21,7 +21,7 @@ const src = readFileSync(new URL('../' + PATH, import.meta.url), 'utf8');
 
 // The one element the file reads a value out of, and the one it fills.
 function makeSandbox(fractalType){
-    const clicks = {};
+    const clicks = {closes: 0};
     const container = {children: [], innerHTML: '', appendChild(el){ this.children.push(el) }};
     const alerts = [];
     const elems = {
@@ -60,6 +60,8 @@ function makeSandbox(fractalType){
         alert: (msg)=>alerts.push(msg),
         Logger: {info(){}, debug(){}, warn(){}, err(){}},
         Animation: {goToCoords(){}},
+        // The list is a page of the Settings modal (#82), which a view's click closes to show it.
+        SettingsModal: {close(){ clicks.closes += 1 }},
         Graph: {getCoords: ()=>({zoom: '1', pan: '0+i0'})},
         structuredClone,
         Promise
@@ -178,6 +180,7 @@ test('the whole route works: render, click a view, click Delete', ()=>{
 
     chip.onClick({});
     chip.__clicked = true;
+    assert.equal(clicks.closes, 1, 'going to a view left Settings over it');
     clicks.delete({});
 
     assert.equal(savedViews.all.length, 0,

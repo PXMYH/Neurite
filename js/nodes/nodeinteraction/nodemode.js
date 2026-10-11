@@ -79,7 +79,7 @@ class NodeMode {
             e.stopPropagation();
             return App.menuContext.hide();
         }
-        if (Modal.current || dropdownContent.classList.contains('open')) return;
+        if (Modal.current || dropdownContent.classList.contains('open') || SettingsModal.isOpen()) return;
         // A select list that is open and has the focus, which is the one its own Escape
         // closes; a list left open in a closed modal is not, and it kept the key from here.
         if (document.activeElement?.closest?.('.select-replacer:not(.closed)')) return;

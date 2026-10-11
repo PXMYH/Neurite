@@ -45,10 +45,10 @@ class Hud {
                 <span class="hud-count">0 notes</span>
             </div>
             <!-- Where new notes go, once there is more than one place they could go (#64):
-                 the Note tool writes into the Archive the Notes panel shows. A door to
-                 that panel, so the answer and the way to change it are one click apart. -->
+                 the Note tool writes into the Archive Settings → Notes shows. A door to
+                 that page, so the answer and the way to change it are one click apart. -->
             <button type="button" class="hud-archive" hidden
-                    data-tooltip="New notes are written into this Archive. Open the Notes panel to choose another.">
+                    data-tooltip="New notes are written into this Archive. Open Notes in Settings to choose another.">
                 <span class="hud-archive-text">
                     <span class="hud-archive-caption">New notes go to</span>
                     <span class="hud-archive-name"></span>
@@ -222,14 +222,11 @@ class Hud {
 
         Hud.elemArchiveName.textContent = name;
         // The whole name, where a long one is cut short on the line.
-        Hud.elemArchive.setAttribute('aria-label', 'New notes go to ' + name + '. Open the Notes panel');
-        Hud.elemArchive.dataset.tooltip = `New notes are written into “${name}”. Open the Notes panel to choose another.`;
+        Hud.elemArchive.setAttribute('aria-label', 'New notes go to ' + name + '. Open Notes in Settings');
+        Hud.elemArchive.dataset.tooltip = `New notes are written into “${name}”. Open Notes in Settings to choose another.`;
     }
-    // The menu opened, then the Notes panel in it, as its row does.
-    static openNotes(){
-        if (!dropdownContent.classList.contains('open')) menuButton.click();
-        document.querySelector(".menu-row.tablink[onclick*=\"'tab1'\"]")?.click();
-    }
+    // Settings, on its Notes page (#82).
+    static openNotes(){ SettingsModal.open('notes') }
 
     // Thirteen decades of zoom will not fit in a fixed number of digits, so the
     // readout changes form rather than truncating: exact-ish while a reader is in
@@ -658,8 +655,9 @@ class Hud {
         if (el.isContentEditable) return true;
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
         // A CodeMirror pane focuses a hidden textarea, which the check above
-        // catches, but the menu also swallows these keys for its own navigation.
-        return !!el.closest?.('.dropdown-content, .modal-content, .CodeMirror');
+        // catches, but the menu also swallows these keys for its own navigation,
+        // and the Settings modal holds the focus while it is open (#82).
+        return !!el.closest?.('.dropdown-content, .modal-content, .settings-modal, .CodeMirror');
     }
 }
 

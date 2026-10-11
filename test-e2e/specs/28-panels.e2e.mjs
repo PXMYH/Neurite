@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -10,17 +10,11 @@ afterEach(async () => { await context?.close(); });
 
 // The menu's panels as one design system, and the chrome as glass (#80, panels.css): a section
 // is a heading over a group of rows, a row is its label on the left and its control on the
-// right, sliders carry their values, and on or off is a switch.
-
-async function openPanel(page, id) {
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
-    await page.click(id);
-    await page.waitForTimeout(250);
-}
+// right, sliders carry their values, and on or off is a switch. The panels are pages of the
+// Settings modal since #82, and the rules are the same there.
 
 test('a section is a heading at the left over a group of rows', async () => {
-    await openPanel(page, '#tablink-settings');
+    await openSettings(page, 'editing');
     const s = await page.evaluate(() => {
         const heading = document.querySelector('#zetTagSettings > .settings-heading');
         const group = document.querySelector('#zetTagSettings > .settings-group');
@@ -49,23 +43,29 @@ test('a section is a heading at the left over a group of rows', async () => {
     assert.deepEqual(errors, []);
 });
 
+// The slider rows on the page shown, each with what it says of its value.
+const sliderRows = (page) => page.evaluate(() => [...document.querySelectorAll('#tab5 .settingsSlider')]
+    .filter((row) => row.getClientRects().length)
+    .map((row) => {
+        const slider = row.querySelector('input[type="range"]');
+        const shown = row.querySelector('.number-input, .slider-value');
+        const r = row.getBoundingClientRect();
+        const sameLine = [row.querySelector('label'), slider, shown].every((el) => {
+            const b = el.getBoundingClientRect();
+            return b.top >= r.top - 1 && b.bottom <= r.bottom + 1;
+        });
+        return { id: slider.id, value: slider.value, shown: shown ? (shown.value ?? shown.textContent) : null,
+                 height: Math.round(r.height), sameLine };
+    }));
+
 test('every slider in Settings is one row, and says its value', async () => {
-    await openPanel(page, '#tablink-settings');
-    await page.evaluate(() => document.querySelectorAll('#tab5 details').forEach((d) => { d.open = true; }));
-    await page.waitForTimeout(200);
-    const rows = await page.evaluate(() => [...document.querySelectorAll('#tab5 .settingsSlider')]
-        .filter((row) => row.getClientRects().length)
-        .map((row) => {
-            const slider = row.querySelector('input[type="range"]');
-            const shown = row.querySelector('.number-input, .slider-value');
-            const r = row.getBoundingClientRect();
-            const sameLine = [row.querySelector('label'), slider, shown].every((el) => {
-                const b = el.getBoundingClientRect();
-                return b.top >= r.top - 1 && b.bottom <= r.bottom + 1;
-            });
-            return { id: slider.id, value: slider.value, shown: shown ? (shown.value ?? shown.textContent) : null,
-                     height: Math.round(r.height), sameLine };
-        }));
+    const rows = [];
+    for (const name of ['theme', 'fractal', 'editing']) {
+        await openSettings(page, name);
+        await page.evaluate(() => document.querySelectorAll('#tab5 details').forEach((d) => { d.open = true; }));
+        await page.waitForTimeout(200);
+        rows.push(...await sliderRows(page));
+    }
     assert.ok(rows.length >= 20, `only ${rows.length} slider rows were found`);
     for (const row of rows) {
         // Not blank either: `Number('')` is 0, which a slider at 0 would have matched (a review).
@@ -89,7 +89,7 @@ test('every slider in Settings is one row, and says its value', async () => {
 });
 
 test('on and off is a switch, and the row turns it', async () => {
-    await openPanel(page, '#tablink-ai');
+    await openSettings(page, 'ai');
     const state = () => page.evaluate(() => ({
         on: document.getElementById('code-checkbox').checked,
         track: getComputedStyle(document.querySelector('label[for="code-checkbox"]'), '::before').backgroundColor,
@@ -107,7 +107,7 @@ test('on and off is a switch, and the row turns it', async () => {
 });
 
 test('the placement style is one row of segments that sets the select and shows its sliders', async () => {
-    await openPanel(page, '#tablink-settings');
+    await openSettings(page, 'editing');
     const segments = await page.evaluate(() => [...document.querySelectorAll('#zetPlacementSettings .segmented-option')]
         .map((o) => o.textContent.trim()));
     assert.deepEqual(segments, ['Radial', 'Spiral', 'Branching', 'Random']);
@@ -171,7 +171,7 @@ test('the tool pill and the islands are glass, and their glyphs are legible on i
 });
 
 test('what cannot be undone is red, and still asks', async () => {
-    await openPanel(page, '#tablink-settings');
+    await openSettings(page, 'data');
     const colour = await page.evaluate(() => getComputedStyle(document.getElementById('clearLocalStorage')).color);
     const danger = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-danger').trim());
     assert.equal(colour, await page.evaluate((hex) => {
@@ -191,7 +191,8 @@ test('what cannot be undone is red, and still asks', async () => {
 // their own segment, a Tab onto them scrolled Settings to its top, with the ring off screen.
 test('a Tab onto the segments leaves the panel where the segments are',
      { skip: isIPad && 'WebKit Tab skips radios by default' }, async () => {
-    await openPanel(page, '#tablink-settings');
+    await page.setViewportSize({ width: 1600, height: 600 });   // short enough to scroll
+    await openSettings(page, 'editing');
     await page.evaluate(() => document.getElementById('placementHeading').scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(100);
     // From the field just before them, the Link tag.
@@ -199,7 +200,7 @@ test('a Tab onto the segments leaves the panel where the segments are',
     await page.keyboard.press('Tab');
     const s = await page.evaluate(() => {
         const el = document.activeElement;
-        const panel = document.querySelector('.dropdown-content').getBoundingClientRect();
+        const panel = document.getElementById('settingsBody').getBoundingClientRect();
         const option = el.closest('.segmented-option')?.getBoundingClientRect();
         return { onSegment: el.name === 'zetPathTypeDropdown-segments',
                  inView: Boolean(option) && option.top >= panel.top && option.bottom <= panel.bottom };
@@ -211,24 +212,32 @@ test('a Tab onto the segments leaves the panel where the segments are',
 // kept 16px where its row was 12 or 13: the update button's label, the theme names, the Ai panel's
 // slider labels and key names (found after 1.9.0 shipped). No words in a panel are that size now.
 test('no words in a panel are left at the universal 16px', async () => {
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
     const found = [];
-    for (const [tab, row] of [['tab5', '#tablink-settings'], ['tab4', '#tablink-ai'], ['tab3', '#menuList .tablink:has-text("Help")']]) {
-        await page.click(row);
+    // Every page of Settings, Updates too, which a browser hides (#82), and then Help.
+    await page.evaluate(() => {
+        document.getElementById('settingsNavUpdates').hidden = false;
+        document.getElementById('updateSettings').hidden = false;
+    });
+    const pages = ['theme', 'saved-views', 'fractal', 'editing', 'data', 'updates'].map((name) => ['tab5', name]);
+    for (const [tab, name] of [...pages, ['tab4', 'ai'], ['tab3', 'help']]) {
+        if (name === 'help') {
+            await page.keyboard.press('Escape');
+            await page.click('.menu-button');
+            await page.waitForTimeout(300);
+            await page.click('#menuList .tablink:has-text("Help")');
+        } else {
+            await openSettings(page, name);
+        }
         await page.waitForTimeout(250);
-        found.push(...await page.evaluate((tab) => {
+        found.push(...await page.evaluate(([tab, name]) => {
             const panel = document.getElementById(tab);
             panel.querySelectorAll('details').forEach((d) => { d.open = true; });
-            document.getElementById('updateSettings').hidden = false;
             return [...panel.querySelectorAll('*')]
                 .filter((el) => el.getClientRects().length && !el.closest('.visually-hidden, .CodeMirror')
                     && [...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()))
                 .filter((el) => getComputedStyle(el).fontSize === '16px')
-                .map((el) => `${tab}: ${el.tagName.toLowerCase()} "${el.textContent.trim().slice(0, 24)}"`);
-        }, tab));
-        await page.click('#menuBackButton');
-        await page.waitForTimeout(150);
+                .map((el) => `${name}: ${el.tagName.toLowerCase()} "${el.textContent.trim().slice(0, 24)}"`);
+        }, [tab, name]));
     }
     assert.deepEqual(found, []);
 });

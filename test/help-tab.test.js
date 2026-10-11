@@ -131,10 +131,11 @@ const CLAIMS = [
     {row: /instructions-checkbox/, says: /instructions/,
      file: 'js/ai/aimessage.js', code: /Elem\.byId\('instructions-checkbox'\)\.checked/,
      why: 'the How-To checkbox is read nowhere, so ticking it changes nothing'},
-    // It said "there is no editor to type it into" for weeks after the Notes row existed.
-    {row: /<code>## Title<\/code>/, says: /Notes panel/,
-     file: 'resources/html/tabs/dropdown.html', code: /openTab\('tab1', this\)/,
-     why: 'the Notes row is gone, so the help sends the reader to a panel they cannot open'},
+    // It said "there is no editor to type it into" for weeks after the Notes row existed. Notes
+    // has been a page of the Settings modal since #82.
+    {row: /<code>## Title<\/code>/, says: /Settings → Notes/,
+     file: 'resources/html/tabs/dropdown.html', code: /class="settings-nav-item" data-page="notes"/,
+     why: 'Settings has no Notes page, so the help sends the reader to a page they cannot open'},
     // The only way out of the editor by keyboard, so it has to be written down somewhere.
     {row: /<kbd>Esc<\/kbd> in the notes/, says: /way out/,
      file: 'js/interface/dropdown/tabs/notestab.js', code: /extraKeys: \{Esc: false\}/,
@@ -290,8 +291,8 @@ test('the commands are rows of the menu, once each, with their labels intact', (
     assert.ok(iSeparator > 0, 'the commands and the panels are no longer separated');
     assert.ok(menu.indexOf('id="screenshotButton"') < iSeparator,
         'a command sits below the separator, among the panel rows');
-    assert.ok(iSeparator < menu.indexOf("openTab('tab4'"),
-        'a panel row sits above the separator, among the commands');
+    assert.ok(iSeparator < menu.indexOf('id="settings-button"'),
+        'the Settings row sits above the separator, among the commands');
 
     // Open's file input has to stay rendered for Safari to open a dialog for it, so it
     // cannot live in either view: `.menu-list` and `.menu-detail` take turns at

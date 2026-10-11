@@ -314,23 +314,24 @@ test('both ways out of a view ask one focus predicate', ()=>{
 });
 
 test('every menu row is a button that says what it does', ()=>{
-    // Nine: Import and its two sources, Save to… and Share screen, and the four panel rows.
+    // Seven: Import and its two sources, Save to… and Share screen, Settings and Help.
     // Clear is a tool of the pill now, Record is gone, and the Mac app's update row is a
-    // button in Settings (#78); the Fractal and Views panels are sections of it (#79).
+    // button in Settings (#78); the Fractal and Views panels are sections of it (#79), and
+    // Notes and Ai pages of the Settings modal, which the Settings row opens (#82).
     const rows = htmlCode.match(/<button[^>]*class="[^"]*menu-row[^"]*"[^>]*>/g) || [];
-    assert.equal(rows.length, 9,
-        'the menu no longer holds nine rows as <button> open tags; every count below '
+    assert.equal(rows.length, 7,
+        'the menu no longer holds seven rows as <button> open tags; every count below '
         + 'reads this list');
 
     for (const row of rows) {
         assert.match(row, /type="button"/,
             'a menu row has no type, so it is a submit button: harmless only while '
-            + '`closest(\'form\')` is null for all nine, and `aitab.html` does contain a '
+            + '`closest(\'form\')` is null for all seven, and `aitab.html` does contain a '
             + '<form>. Row: ' + row.slice(0, 60));
     }
 
     const tablinks = rows.filter( (r)=> r.includes('tablink') );
-    assert.equal(tablinks.length, 4, 'the four panel rows are no longer four');
+    assert.equal(tablinks.length, 1, 'Help is no longer the one panel row');
 
     // This asserted the opposite for one commit. `aria-haspopup="true"` is defined by
     // ARIA as equivalent to `menu`, and Chrome's AX tree read back `hasPopup: "menu"` on
@@ -339,20 +340,25 @@ test('every menu row is a button that says what it does', ()=>{
     // hides the list the row is in, so the state would never be observable. The five
     // being undistinguished from the four commands is a gap; announcing a widget that
     // does not exist is a false statement.
-    assert.doesNotMatch(htmlCode, /aria-haspopup/,
-        'a menu row claims to open a popup menu. It opens a panel, and the AX tree '
+    //
+    // Settings is the one exception, and it names what it opens: `dialog`, which is what
+    // the Settings modal is (#82), not the `true` that reads as `menu`.
+    const popups = htmlCode.match(/<[^>]*aria-haspopup[^>]*>/g) || [];
+    assert.deepEqual(popups.map( (tag)=>[tag.match(/id="([^"]+)"/)?.[1], tag.match(/aria-haspopup="([^"]*)"/)?.[1]] ),
+        [['settings-button', 'dialog']],
+        'a menu row claims to open a popup menu. A panel row opens a panel, and the AX tree '
         + 'normalises the claim to `hasPopup: "menu"`, so a screen reader is told to '
-        + 'expect arrow keys that do nothing here');
+        + 'expect arrow keys that do nothing here; Settings opens a dialog and says so');
 
-    // What distinguishes the five instead: a word in the name rather than a state
+    // What distinguishes a panel row instead: a word in the name rather than a state
     // attribute. Measured in the AX tree -- `name: "Ai panel"` against `name:
     // "Screenshot"` (Share screen since #78), `haspopup: null`, `expanded: null`, and the
-    // panel heading still reads "Ai".
+    // panel heading still read "Ai". Help is the one left.
     const panelSpans = htmlCode.match(/<span class="visually-hidden"> panel<\/span>/g) || [];
-    assert.equal(panelSpans.length, 4,
-        'the four panel rows no longer carry the word that tells a reader they descend a '
+    assert.equal(panelSpans.length, 1,
+        'the Help row no longer carries the word that tells a reader it descends a '
         + 'level. The chevron that says so on screen is `aria-hidden`, so without this '
-        + 'they are indistinguishable from the commands above the separator');
+        + 'it is indistinguishable from the commands above the separator');
 
     // A sibling of the label, never a child: `MainMenu.showDetail` reads the panel
     // heading out of `label.textContent`, so nesting the span retitles the heading to
@@ -399,4 +405,10 @@ test('a digit is not a tool shortcut while the reader is inside the menu', ()=>{
     assert.ok(iGuard < jsCode.indexOf('tool.click()', iShortcuts),
         'the focus guard sits after `tool.click()`, so the tool has already fired by the '
         + 'time the guard decides it should not have');
+
+    // And none at all while the Settings modal is open (#82): the tool bar is behind it,
+    // and `tool.click()` does not ask whether what it clicks is inert.
+    const iModal = jsCode.indexOf('if (SettingsModal.isOpen()) return;', iShortcuts);
+    assert.ok(iModal !== -1 && iModal < jsCode.indexOf('tool.click()', iShortcuts),
+        'a digit pressed in the Settings modal fires a tool behind it');
 });

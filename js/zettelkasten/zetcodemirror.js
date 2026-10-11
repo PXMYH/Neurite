@@ -594,8 +594,8 @@ function confirmNodeDelete(nodes){
     const question = many ? `Delete the ${nodes.length} selected nodes?`
                    : titles[0] ? `Delete “${titles[0]}”?` : 'Delete this note?';
     const detail = !written ? ''
-                 : many ? 'This also deletes their text in the Notes panel.'
-                 : 'This also deletes its text in the Notes panel.';
+                 : many ? 'This also deletes their text in Settings → Notes.'
+                 : 'This also deletes its text in Settings → Notes.';
     return window.confirm(detail, {title: question, ok: 'Delete', danger: true});
 }
 
@@ -648,11 +648,14 @@ class ZettelkastenUI {
         style.backgroundColor = '#222226';
         style.width = 'auto';
         style.height = '100%';
+        // The border inside that height: outside it, the editor ran 6px past the foot of its
+        // page of Settings (#82), and its bottom edge was cut off there. No resize grip either,
+        // which was in that cut-off corner: the editor is the page's height.
+        style.boxSizing = 'border-box';
         style.borderStyle = 'inset';
         style.borderColor = '#8882';
         style.fontSize = '16px';
         style.wordWrap = 'break-word';
-        this.cm.getWrapperElement().style.resize = "vertical";
 
         this.ignoreTextAreaChanges = false;
         this.userScrolledUp = false;
@@ -859,6 +862,10 @@ function handleTitleClick(title) {
     //const node = scrollToTitle(title, cm);
     const node = Node.byTitle(title);
     if (!node) return;
+
+    // The flight is on the canvas, which Settings covers when the title was clicked in its Notes
+    // page (#82), so Settings closes first.
+    SettingsModal.close();
 
     if (node.hasBoundingRectangle()) {
         Autopilot.zoomToFitFrame(node).targetZoom_scaleBy(2).start()

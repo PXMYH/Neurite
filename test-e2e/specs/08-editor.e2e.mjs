@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, openSettings } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -132,14 +132,12 @@ test('search opens with the caret in it and finds a note that is off screen', as
 test('the notes pane can be opened from the menu', async () => {
     // tab1 had no tablink, so the CodeMirror every node is built from was loaded and
     // unreachable: a reader could edit a note in its card and never learn the map has
-    // a text form at all.
+    // a text form at all. It is the Notes page of Settings since #82.
     await addNote(page, 'Knowledge Graphs', 'A graph of concepts.');
     await addNote(page, 'Zettelkasten', 'Atomic notes. [[Knowledge Graphs]]');
     await page.waitForTimeout(800);
 
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
-    await page.click("button.menu-row.tablink:has-text('Notes')");
+    await openSettings(page, 'notes');
     await page.waitForTimeout(600);
 
     const state = await page.evaluate(() => {
@@ -163,101 +161,37 @@ test('the notes pane can be opened from the menu', async () => {
     assert.ok(state.text.includes('[[Knowledge Graphs]]'), 'and holds the link between the notes');
 });
 
-// The pane's side handle is on the edge that moves, and pulls the way the pointer goes. It
-// sat on the left edge -- which is anchored, the menu hangs from the left of the screen --
-// and subtracted the drag: measured, a drag of +120px left the pane at 270px wide (#65).
-test('the notes pane widens when its side handle is dragged right', async () => {
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
-    await page.click("button.menu-row.tablink:has-text('Notes')");
-    await page.waitForTimeout(500);
+// The editor fills the Notes page of Settings (#82), which sizes itself to the window. It had
+// two drag handles while it was a panel of the menu, and a pane widened or heightened in a big
+// window kept its size in a small one, its handles off screen: measured, 1370px wide at 1600px
+// stayed 1370px at 1000px, and a bottom handle sat at y=814 in a 600px window.
+test('the notes editor fills its page of Settings, whatever the size of the window', async () => {
+    await openSettings(page, 'notes');
+    await page.waitForTimeout(400);
 
-    const box = (id) => page.evaluate((id) => {
-        const r = document.getElementById(id).getBoundingClientRect();
-        return { x: r.x + r.width / 2, y: r.y + r.height / 2, right: r.right, width: r.width };
-    }, id);
-    const pane0 = await box('zetPaneContainer');
-    const handle = await box('zetHorizDragHandle');
-    assert.ok(handle.x > pane0.x, 'the handle sits on the right-hand edge');
-
-    await page.mouse.move(handle.x, handle.y);
-    await page.mouse.down();
-    for (let i = 1; i <= 8; i++) await page.mouse.move(handle.x + i * 15, handle.y);
-    await page.mouse.up();
-    await page.waitForTimeout(200);
-
-    const pane1 = await box('zetPaneContainer');
-    assert.ok(Math.abs(pane1.width - pane0.width - 120) <= 2,
-        `a 120px drag widened the pane by ${Math.round(pane1.width - pane0.width)}px`);
-});
-
-// A pane widened in a wide window kept its width when the window shrank: measured, 1370px
-// at 1600px stayed 1370px at 1000px, its handle off screen and nothing left to narrow it.
-test('the notes pane handle stays on screen when the window shrinks', async () => {
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
-    await page.click("button.menu-row.tablink:has-text('Notes')");
-    await page.waitForTimeout(500);
-
-    const handle = () => page.evaluate(() => {
-        const h = document.getElementById('zetHorizDragHandle');
-        const r = h.getBoundingClientRect();
-        const x = r.x + r.width / 2, y = r.y + r.height / 2;
-        return { x, y, onScreen: document.elementFromPoint(x, y) === h,
-                 pane: document.getElementById('zetPaneContainer').offsetWidth };
+    const fit = () => page.evaluate(() => {
+        const box = (sel) => document.querySelector(sel).getBoundingClientRect();
+        const dialog = box('.settings-dialog'), body = box('#settingsBody'), cm = box('#tab1 .CodeMirror');
+        const pad = getComputedStyle(document.getElementById('settingsBody'));
+        return {
+            onScreen: dialog.left >= 0 && dialog.top >= 0 && dialog.right <= innerWidth && dialog.bottom <= innerHeight,
+            // The editor reaches the foot of the page and spans its width, inside its padding.
+            gapBelow: Math.round(body.bottom - parseFloat(pad.paddingBottom) - cm.bottom),
+            gapRight: Math.round(body.right - parseFloat(pad.paddingRight) - cm.right),
+            height: Math.round(cm.height),
+            handles: document.querySelectorAll('#zetHorizDragHandle, #zetVertDragHandle').length,
+        };
     });
-    let h = await handle();
-    await page.mouse.move(h.x, h.y);
-    await page.mouse.down();
-    for (let x = h.x; x <= h.x + 1100; x += 50) await page.mouse.move(x, h.y);
-    await page.mouse.up();
-    assert.ok((await handle()).pane > 1000, 'the pane should be wide before the window shrinks');
-
-    await page.setViewportSize({ width: 1000, height: 1000 });
-    await page.waitForTimeout(300);
-    h = await handle();
-    assert.ok(h.onScreen, 'the handle can still be reached');
-
-    // A short drag first: the drag's own limit sat 26px under the stylesheet's, and a
-    // narrowing drag that stayed above it was refused outright.
-    for (const dx of [-20, -300]) {
-        h = await handle();
-        await page.mouse.move(h.x, h.y);
-        await page.mouse.down();
-        await page.mouse.move(h.x + dx, h.y, { steps: 6 });
-        await page.mouse.up();
-        await page.waitForTimeout(200);
-        const pane = (await handle()).pane;
-        assert.ok(Math.abs(pane - (h.pane + dx)) <= 2, `a ${dx}px drag took the pane from ${h.pane} to ${pane}`);
+    for (const size of [null, { width: 1000, height: 600 }, { width: 1600, height: 1000 }]) {
+        if (size) {
+            await page.setViewportSize(size);
+            await page.waitForTimeout(300);
+        }
+        const f = await fit();
+        assert.equal(f.handles, 0, 'the drag handles are back');
+        assert.ok(f.onScreen, 'the dialog runs off the window: ' + JSON.stringify(size));
+        assert.ok(f.gapBelow >= 0 && f.gapBelow <= 8, `the editor stops ${f.gapBelow}px short of the page's foot`);
+        assert.ok(f.gapRight >= 0 && f.gapRight <= 8, `the editor stops ${f.gapRight}px short of the page's edge`);
+        assert.ok(f.height > 150, `the editor is ${f.height}px tall`);
     }
-});
-
-// The same for the height. A drag past the limit in one move was refused outright, and a
-// pane made tall kept its height in a short window: measured, its bottom handle at y=814
-// in a 600px window.
-test('the notes pane bottom handle stays on screen when the window shrinks', async () => {
-    await page.click('.menu-button');
-    await page.waitForTimeout(300);
-    await page.click("button.menu-row.tablink:has-text('Notes')");
-    await page.waitForTimeout(500);
-
-    const handle = () => page.evaluate(() => {
-        const h = document.getElementById('zetVertDragHandle');
-        const r = h.getBoundingClientRect();
-        const x = r.x + r.width / 2, y = r.y + r.height / 2;
-        return { x, y, onScreen: y < innerHeight && document.elementFromPoint(x, y) === h,
-                 pane: document.getElementById('zetPaneContainer').offsetHeight };
-    });
-    let h = await handle();
-    await page.mouse.move(h.x, h.y);
-    await page.mouse.down();
-    await page.mouse.move(h.x, h.y + 250);                           // one move, past the limit
-    await page.mouse.up();
-    await page.waitForTimeout(200);
-    assert.ok((await handle()).pane > h.pane, 'a drag past the limit still makes the pane taller');
-
-    await page.setViewportSize({ width: 1600, height: 600 });
-    await page.waitForTimeout(300);
-    h = await handle();
-    assert.ok(h.onScreen, 'and its handle can still be reached in a short window');
 });

@@ -117,4 +117,4 @@ Connected AI Nodes talking to each other, the Providers they can run on, and the
   </tr>
 </table>
 
-All API keys can be input through the AI tab in the menu dropdown.
+All API keys can be input on the Ai page of Settings, which the menu opens.

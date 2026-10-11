@@ -1,7 +1,7 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -71,34 +71,36 @@ test('each Archive of an imported bundle has a Region of its own, its notes pinn
     assert.deepEqual(errors, []);
 });
 
-test('a Region is named on the Plane, and picking its Archive frames it', async () => {
-    // A laptop's window, where the Notes panel takes a third of it.
-    if (!isIPad) await page.setViewportSize({ width: 1100, height: 720 });
-    await importBundle(page);
-    await setMenu(page, true);
-    await page.click(".menu-row.tablink:has-text('Notes')");
+// Where an Archive picked in Settings → Notes is framed: the whole window, which is what is
+// left in view once Settings closes. The Notes panel took a third of a laptop's window, and the
+// disk was framed, from the middle of the window, half under it (rv8); a panel beside the Graph
+// is still charged its side (`Hud.chromeInsets`), and the Settings modal must not be.
+const pickArchive = async (page, name) => {
+    await openSettings(page, 'notes');
     await page.click('.archive-choice .select-replacer');
-    await page.click(".archive-choice .dropdown-option:has-text('Harnesses')");
+    await page.click(`.archive-choice .dropdown-option:has-text('${name}')`);
     await page.waitForTimeout(600);
-    const view = await page.evaluate(() => {
-        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
-        const r = ZetRegions.of(pane.paneId);
-        const panel = document.querySelector('.dropdown-content').getBoundingClientRect();
+    await page.click('#settingsClose');
+    return page.evaluate((name) => {
+        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === name);
         const cards = [];
         pane.processor.forEachNodeWrap((wrap) => cards.push(wrap.node.view.div.getBoundingClientRect()));
-        return { r, pan: [Graph.pan.x, Graph.pan.y], zoom: Graph.zoom.mag(), panelRight: panel.right,
+        return { r: ZetRegions.of(pane.paneId), pan: [Graph.pan.x, Graph.pan.y],
             cards: cards.map((c) => ({ left: c.left, top: c.top, right: c.right, bottom: c.bottom })), w: innerWidth, h: innerHeight };
-    });
-    // Its block of cards fills the view, beside the Notes panel it was picked from and not
-    // under it: the disk was framed, from the middle of the window, half under the panel (rv8).
+    }, name);
+};
+
+test('a Region is named on the Plane, and picking its Archive frames it', async () => {
+    if (!isIPad) await page.setViewportSize({ width: 1100, height: 720 });
+    await importBundle(page);
+    const view = await pickArchive(page, 'Harnesses');
     assert.ok(Math.hypot(view.pan[0] - view.r.x, view.pan[1] - view.r.y) < view.r.r, 'the view is not on the Region');
     for (const c of view.cards) {
-        assert.ok(c.left >= view.panelRight && c.right <= view.w && c.top >= 0 && c.bottom <= view.h,
-            'a card is off screen or under the Notes panel: ' + JSON.stringify({ c, panelRight: view.panelRight }));
+        assert.ok(c.left >= 0 && c.right <= view.w && c.top >= 0 && c.bottom <= view.h,
+            'a card is off screen: ' + JSON.stringify(c));
     }
-    assert.ok(Math.max(...view.cards.map((c) => c.right - c.left)) > 0.15 * (view.w - view.panelRight), 'the cards are too small to read');
+    assert.ok(Math.max(...view.cards.map((c) => c.right - c.left)) > 0.15 * view.w, 'the cards are too small to read');
 
-    await page.click('.menu-button');
     await page.waitForTimeout(400);
     const label = await page.evaluate(() => [...document.querySelectorAll('.region-label')]
         .filter((l) => !l.hidden).map((l) => l.textContent));
@@ -282,27 +284,18 @@ test('a note double-clicked beside a Region\'s card takes a free cell of the blo
     assert.deepEqual(overlaps.out, [], 'cards overlap');
 });
 
-// On a narrow window the menu is most of the width, and charged to the top as well as the
-// side it left Fit a corner of the screen (rv9): it costs its side, while there is room there.
-test('with the Notes panel open on a narrow window, an Archive is framed in the room beside it', { skip: isIPad && 'the iPad window is its own size' }, async () => {
+// On a narrow window the menu was most of the width, and charged to the top as well as the
+// side it left Fit a corner of the screen (rv9). Settings takes the whole of a narrow window,
+// and is closed by the time the Archive is seen, so the Archive gets the whole window.
+test('on a narrow window, an Archive picked in Settings is framed in the whole window', { skip: isIPad && 'the iPad window is its own size' }, async () => {
     await page.setViewportSize({ width: 700, height: 900 });
     await importBundle(page);
-    await setMenu(page, true);
-    await page.click(".menu-row.tablink:has-text('Notes')");
-    await page.click('.archive-choice .select-replacer');
-    await page.click(".archive-choice .dropdown-option:has-text('Harnesses')");
-    await page.waitForTimeout(600);
-    const seen = await page.evaluate(() => {
-        const pane = window.zetPaneList.find((p) => App.zetPanes.getPaneName(p.paneId) === 'Harnesses');
-        const panel = document.querySelector('.dropdown-content').getBoundingClientRect();
-        const cards = [];
-        pane.processor.forEachNodeWrap((w) => cards.push(w.node.view.div.getBoundingClientRect()));
-        return { panelRight: panel.right, cards: cards.map((c) => ({ left: c.left, right: c.right, top: c.top, bottom: c.bottom })), w: innerWidth, h: innerHeight };
-    });
+    const seen = await pickArchive(page, 'Harnesses');
     for (const c of seen.cards) {
-        assert.ok(c.left >= seen.panelRight && c.right <= seen.w && c.top >= 0 && c.bottom <= seen.h,
-            'a card is not in the room beside the panel: ' + JSON.stringify({ c, panelRight: seen.panelRight }));
+        assert.ok(c.left >= 0 && c.right <= seen.w && c.top >= 0 && c.bottom <= seen.h,
+            'a card is off screen: ' + JSON.stringify(c));
     }
+    assert.ok(Math.max(...seen.cards.map((c) => c.right - c.left)) > 0.15 * seen.w, 'the cards are too small to read');
 });
 
 // On a free spot of a Region a double-click puts the note where the pointer is; it went to the

@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -12,8 +12,9 @@ afterEach(async () => { await context?.close(); });
 // the next (312 to 971px); the Ai and Fractal groups were accordions no keyboard could
 // open, and every checkbox was `display: none`, so no keyboard could turn one on.
 
-// The Fractal and Views panels are sections of Settings since #79.
-const PANELS = ['Notes', 'Ai', 'Settings', 'Help'];
+// The Fractal and Views panels are sections of Settings since #79, and Notes, Ai and Settings
+// are pages of the Settings modal since #82: Help is the menu's one panel.
+const PAGES = ['notes', 'ai', 'theme', 'saved-views', 'fractal', 'editing', 'data'];
 
 async function openMenu(page) {
     await page.click('.menu-button');
@@ -26,6 +27,13 @@ async function openPanel(page, name) {
 const menuBox = (page) => page.evaluate(() => {
     const menu = document.querySelector('.dropdown-content');
     return { width: Math.round(menu.getBoundingClientRect().width), spill: menu.scrollWidth - menu.clientWidth };
+});
+// The page of the Settings modal, as `menuBox` reads the menu: the width inside its padding.
+const pageBox = (page) => page.evaluate(() => {
+    const body = document.getElementById('settingsBody');
+    const pad = getComputedStyle(body);
+    return { width: Math.round(body.clientWidth - parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight)),
+             spill: body.scrollWidth - body.clientWidth };
 });
 
 // How far the menu's right edge stands past the end of its longest label.
@@ -41,24 +49,29 @@ const listSlack = (page) => page.evaluate(() => {
 });
 
 for (const [width, height] of [[1600, 1000], [1280, 800]]) {
-    test(`at ${width}x${height} every panel is one width, the list is as wide as its rows, and nothing spills sideways`, async () => {
+    test(`at ${width}x${height} the list is as wide as its rows, Help as wide as a panel, and nothing spills sideways`, async () => {
         await page.setViewportSize({ width, height });
         await openMenu(page);
         const list = await menuBox(page);
         assert.ok(list.spill <= 0, `the list spills ${list.spill}px sideways`);
-        const widths = {};
-        for (const name of PANELS) {
-            await openPanel(page, name);
-            const box = await menuBox(page);
-            widths[name] = box.width;
-            assert.ok(box.spill <= 0, `${name} spills ${box.spill}px sideways`);
-            await page.click('#menuBackButton');
-        }
-        assert.deepEqual(new Set(Object.values(widths)).size, 1, 'the panels differ in width: ' + JSON.stringify(widths));
-        assert.ok(widths.Notes >= 440, `the panels are ${widths.Notes}px, too narrow for two columns`);
+        await openPanel(page, 'Help');
+        const help = await menuBox(page);
+        assert.ok(help.spill <= 0, `Help spills ${help.spill}px sideways`);
+        assert.ok(help.width >= 440, `the panel is ${help.width}px, too narrow for two columns`);
+        await page.click('#menuBackButton');
         // At the panels' width the chevrons stood 328px past the longest label.
         assert.ok(await listSlack(page) <= 80, `the list is ${list.width}px, ${await listSlack(page)}px past its longest label`);
         assert.equal((await menuBox(page)).width, list.width, 'the list did not come back to its own width');
+
+        // And every page of Settings, which is one width, the dialog's.
+        const widths = new Set();
+        for (const name of PAGES) {
+            await openSettings(page, name);
+            const box = await pageBox(page);
+            widths.add(box.width);
+            assert.ok(box.spill <= 0, `${name} spills ${box.spill}px sideways`);
+        }
+        assert.equal(widths.size, 1, 'the pages differ in width: ' + [...widths].join(', '));
     });
 }
 
@@ -108,8 +121,8 @@ test('a long save note wraps inside the list, and Import opens its sources witho
 // reaches them), so the walk is a desktop one.
 test('a keyboard reaches every control in the Ai panel, and opens API Keys',
      { skip: isIPad && 'WebKit Tab skips buttons and checkboxes by default' }, async () => {
-    await openMenu(page);
-    await openPanel(page, 'Ai');
+    // From the sidebar, whose one Tab stop is the page it shows (#82).
+    await openSettings(page, 'ai');
     const reached = new Set();
     for (let i = 0; i < 40; i++) {
         await page.keyboard.press('Tab');
@@ -141,8 +154,7 @@ test('a keyboard reaches every control in the Ai panel, and opens API Keys',
 // The console sat folded at the menu's foot under a strip that said "Set Task...", which
 // told nobody what it was (#78). It is the Ai panel's Tasks fold now, and says what it does.
 test('the function console is a fold of the Ai panel, out of the Tab order until it opens', async () => {
-    await openMenu(page);
-    await openPanel(page, 'Ai');
+    await openSettings(page, 'ai');
     const state = () => page.evaluate(() => {
         const prompt = document.getElementById('function-prompt');
         prompt.focus();
@@ -176,10 +188,9 @@ test('the function console is a fold of the Ai panel, out of the Tab order until
 });
 
 test('no label of one or two words wraps in the panels', async () => {
-    await openMenu(page);
     const wrapped = [];
-    for (const name of ['Ai', 'Settings']) {
-        await openPanel(page, name);
+    for (const name of PAGES.slice(1)) {
+        await openSettings(page, name);
         // Settings' folds open, or the Fractal's labels under Drawing and the colours under
         // Customize are measured as nothing.
         await page.evaluate(() => document.querySelectorAll('#tab5 details').forEach((d) => { d.open = true; }));
@@ -202,7 +213,6 @@ test('no label of one or two words wraps in the panels', async () => {
                 return tops.size > 1;
             })
             .map((label) => `${panel}: ${label.textContent.trim()}`), name));
-        await page.click('#menuBackButton');
     }
     assert.deepEqual(wrapped, []);
 });
@@ -215,7 +225,7 @@ test('no label of one or two words wraps in the panels', async () => {
 test('the empty canvas\'s hint is under an open panel, and out of sight while the panel reaches it', async () => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await openMenu(page);
-    await openPanel(page, 'Ai');
+    await openPanel(page, 'Help');
     await page.waitForTimeout(700);   // the overview's tick, then the hint's fade
     const opacity = () => page.evaluate(() => getComputedStyle(document.querySelector('.canvas-hint')).opacity);
     assert.equal(await opacity(), '0', 'the hint shows beside the panel that cuts it');
@@ -238,39 +248,31 @@ test('the empty canvas\'s hint is under an open panel, and out of sight while th
     assert.equal(await opacity(), '1', 'the hint did not come back when the menu closed');
 });
 
-// The side handle sets every panel's width, and a bare `1fr` column grew to the widest
-// thing that would not wrap: one long model name made the Ai panel wider than the menu.
-test('at the side handle\'s narrowest the Ai panel keeps its right-hand column, with a long model name', async () => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openMenu(page);
-    await openPanel(page, 'Ai');
-    await page.click('#tab4 .dropdown-container:has(#inference-select) .select-replacer');
-    await page.click("#tab4 .dropdown-container:has(#inference-select) .dropdown-option:has-text('Groq')");
-    await page.click('#tab4 .dropdown-container:has(#groq-select) .select-replacer');
-    await page.click("#tab4 .dropdown-container:has(#groq-select) .dropdown-option:has-text('Deepseek R1 distill Llama 70b')");
-    await page.click('#menuBackButton');
-    await openPanel(page, 'Notes');
-    const handle = await page.evaluate(() => {
-        const r = document.getElementById('zetHorizDragHandle').getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    });
-    await page.mouse.move(handle.x, handle.y);
-    await page.mouse.down();
-    for (let i = 1; i <= 10; i++) await page.mouse.move(handle.x - 80 * i, handle.y);
-    await page.mouse.up();
-    await page.click('#menuBackButton');
-    await openPanel(page, 'Ai');
-    const box = await menuBox(page);
-    assert.ok(box.width < 400, `the drag left the menu ${box.width}px wide`);
-    assert.equal(box.spill, 0, `the Ai panel spills ${box.spill}px past a ${box.width}px menu`);
+// A bare `1fr` column grew to the widest thing that would not wrap: one long model name made the
+// Ai panel wider than the menu, at the narrowest width the side handle left it (#32). The side
+// handle went with the panel (#82); the narrowest Ai page is the dialog's in a window just wide
+// enough for its sidebar. Under that the sidebar is a strip, and the page the window's width.
+test('in the narrowest Settings the Ai page keeps its right-hand column, with a long model name',
+     { skip: isIPad && 'the iPad window is its own size' }, async () => {
+    for (const width of [901]) {
+        await page.setViewportSize({ width, height: 800 });
+        await openSettings(page, 'ai');
+        await page.click('#tab4 .dropdown-container:has(#inference-select) .select-replacer');
+        await page.click("#tab4 .dropdown-container:has(#inference-select) .dropdown-option:has-text('Groq')");
+        await page.click('#tab4 .dropdown-container:has(#groq-select) .select-replacer');
+        await page.click("#tab4 .dropdown-container:has(#groq-select) .dropdown-option:has-text('Deepseek R1 distill Llama 70b')");
+        const box = await pageBox(page);
+        assert.ok(box.width < 560, `the page is ${box.width}px wide at ${width}px, which is not narrow`);
+        assert.equal(box.spill, 0, `the Ai page spills ${box.spill}px past a ${box.width}px page at ${width}px`);
+        await page.keyboard.press('Escape');
+    }
 });
 
 test('a Saved View is reached and chosen with the keyboard',
      { skip: isIPad && 'WebKit Tab skips buttons by default' }, async () => {
-    await openMenu(page);
-    await openPanel(page, 'Settings');
+    await openSettings(page, 'saved-views');
     let on = null;
-    // Past the theme cards, which are one stop, and Customize.
+    // Past the close button.
     for (let i = 0; i < 6 && on !== 'saved-coordinate-item'; i++) {
         await page.keyboard.press('Tab');
         on = await page.evaluate(() => document.activeElement.className);
@@ -279,8 +281,11 @@ test('a Saved View is reached and chosen with the keyboard',
     const zoom = await page.evaluate(() => Graph.zoom.mag());
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
-    assert.deepEqual(await page.evaluate((before) => [document.activeElement.getAttribute('aria-pressed'), Graph.zoom.mag() !== before], zoom),
-        ['true', true], 'Enter did not go to the view, or did not select it');
+    // Settings closes to show it (#82), and keeps the view marked as the one chosen.
+    assert.deepEqual(await page.evaluate((before) => [document.getElementById('settingsModal').hidden,
+        document.querySelector('.saved-coordinate-item[aria-pressed="true"]')?.textContent ?? null,
+        Graph.zoom.mag() !== before], zoom),
+        [true, 'Seahorse Valley West', true], 'Enter did not go to the view, or did not select it');
 });
 
 // The console is the last fold of the Ai panel (#78), so it opens below the bottom of the screen:
@@ -288,14 +293,13 @@ test('a Saved View is reached and chosen with the keyboard',
 // menu's foot was, which opening pushed 460px below the menu with the focus on it.
 test('the console opened from the keyboard comes into view, its heading with it', async () => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await openMenu(page);
-    await openPanel(page, 'Ai');
+    await openSettings(page, 'ai');
     await page.focus('#functionConsoleFold > summary');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(600);
     const [summary, prompt, menu] = await page.evaluate(() => {
         const box = (el) => { const r = el.getBoundingClientRect(); return [r.top, r.bottom]; };
-        const m = document.querySelector('.dropdown-content');
+        const m = document.getElementById('settingsBody');
         const r = m.getBoundingClientRect();
         return [box(document.querySelector('#functionConsoleFold > summary')),
                 box(document.getElementById('function-prompt')),
@@ -335,9 +339,12 @@ test('every choice in the panels\' and the Adjust Controls selects fits, at the 
         }
         return out;
     });
-    // The equation's select is in Settings since #79.
-    await openPanel(page, 'Settings');
-    cut.push(...await measure());
+    // The equation's select is in Settings since #79, on its own page since #82.
+    for (const name of PAGES.slice(2)) {
+        await openSettings(page, name);
+        cut.push(...await measure());
+    }
+    await openSettings(page, 'editing');
     await page.click('#controls-button');
     await page.waitForTimeout(300);
     cut.push(...await measure());
@@ -347,8 +354,7 @@ test('every choice in the panels\' and the Adjust Controls selects fits, at the 
 // One dialog opened from inside another -- an alert from Custom Endpoint -- replaced the body
 // that held the focused button before the focus was read, so it went back to `body`.
 test('a dialog opened from inside another gives the focus back to what opened the first', async () => {
-    await openMenu(page);
-    await openPanel(page, 'Ai');
+    await openSettings(page, 'ai');
     await page.click('#tab4 .dropdown-container:has(#inference-select) .select-replacer');
     await page.click("#tab4 .dropdown-container:has(#inference-select) .dropdown-option:has-text('Custom')");
     await page.focus('#addApiConfigBtn');
@@ -362,11 +368,13 @@ test('a dialog opened from inside another gives the focus back to what opened th
 // The same rule took the keyboard from a reader working beside an open modal: with Search
 // Nodes open and the caret in a note, an alert's OK sent the next keystroke to the tool bar.
 test('an alert that comes up while the reader writes beside an open modal gives the caret back', async () => {
-    await openMenu(page);
-    await openPanel(page, 'Notes');
+    // Search first: the tool bar is behind Settings while it is open (#82), and Search's
+    // window stays over it.
     await page.click('#nodeSearchButton');
     assert.equal(await page.evaluate(() => Modal.current?.id), 'zetSearchModal');
-    await page.click('#zetPaneContainer .zet-pane.active .CodeMirror-lines');
+    await openSettings(page, 'notes');
+    // At the left of the editor, clear of Search's window.
+    await page.click('#zetPaneContainer .zet-pane.active .CodeMirror-lines', { position: { x: 30, y: 10 } });
     await page.keyboard.type('## Alpha');
     await page.evaluate(() => { window.alert('Something happened.'); });
     await page.click('#customModal .modal-ok');
@@ -403,7 +411,7 @@ test('the overview is out of sight under a panel that reaches it, and back when 
      { skip: isIPad && 'the iPad window is its own size' }, async () => {
     await page.setViewportSize({ width: 1600, height: 1000 });
     await openMenu(page);
-    await openPanel(page, 'Settings');
+    await openPanel(page, 'Help');
     await page.waitForTimeout(300);
     const seen = () => page.evaluate(() => getComputedStyle(document.querySelector('.hud-panel')).visibility);
     assert.equal(await seen(), 'hidden');

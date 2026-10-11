@@ -1,6 +1,6 @@
 import { test, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page;
 before(async () => { browser = await launchBrowser(); });
@@ -135,7 +135,7 @@ test("Delete in a selected Node's menu asks first, and says how many", async () 
         return page.evaluate(() => ['.modal-title', '.confirm-message', '.modal-ok']
             .map((s) => document.querySelector(`.modal-content ${s}`).textContent));
     };
-    assert.deepEqual(await askDelete(), ['Delete the 2 selected nodes?', 'This also deletes their text in the Notes panel.', 'Delete']);
+    assert.deepEqual(await askDelete(), ['Delete the 2 selected nodes?', 'This also deletes their text in Settings → Notes.', 'Delete']);
     // The keyboard starts on the answer that changes nothing; it started on the page behind.
     assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('modal-cancel')), true,
         'the question opened without focus on Cancel');
@@ -226,8 +226,7 @@ test('f, d and the arrows leave the selection alone while typing, or with Cmd or
     ({ context, page } = await openNeurite(browser));
     const [a] = await threeNotes(page);
     await clickCard(page, a, await modKey(page));
-    await page.click('.menu-button');
-    await page.click(".menu-row.tablink:has-text('Notes')");
+    await openSettings(page, 'notes');
     await page.click('#zetPaneContainer .CodeMirror-lines');
     const t0 = await place(page, a);
     await hold(page, 'f', 150);

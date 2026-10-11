@@ -66,9 +66,15 @@ test('every tab the menu opens is loaded and has somewhere to load into', ()=>{
     // Three lists have to agree and nothing checks them: the tab row's
     // `openTab('tabN')` calls, the empty `#tabN` containers under it, and the
     // `PageLoad.tabs` map naming the file for each. Miss the container and the
-    // fetch has no target; miss the map entry and the tab opens blank.
+    // fetch has no target; miss the map entry and the tab opens blank. The Settings
+    // modal's pages are the fourth list since #82: `settingsmodal.js` shows a container
+    // by id rather than through `openTab`.
     const dropdown = html['resources/html/tabs/dropdown.html'];
-    const opened = [...dropdown.matchAll(/openTab\('([\w-]+)'/g)].map( (m)=> m[1] );
+    const modal = read('js/interface/dropdown/settingsmodal.js');
+    const shown = modal.match(/for \(const id of \[([^\]]+)\]\)/);
+    assert.ok(shown, "the modal's list of containers was not found; this test reads nothing");
+    const opened = [...dropdown.matchAll(/openTab\('([\w-]+)'/g), ...shown[1].matchAll(/'([\w-]+)'/g)]
+        .map( (m)=> m[1] );
     const containers = [...dropdown.matchAll(/id="([\w-]+)" class="tabcontent"/g)].map( (m)=> m[1] );
 
     const src = read('js/main.js');
@@ -76,8 +82,8 @@ test('every tab the menu opens is loaded and has somewhere to load into', ()=>{
                                src.indexOf('}', src.indexOf('static tabs = {')));
     const loaded = [...tabBlock.matchAll(/'([\w-]+)'\s*:/g)].map( (m)=> m[1] );
 
-    // Four since the Fractal and Views panels became sections of Settings (#79).
-    assert.ok(opened.length >= 4, 'no tab links found in dropdown.html: ' + opened.length);
+    // Help from the menu, and Notes, Ai and Settings from the modal (#82).
+    assert.deepEqual(opened, ['tab3', 'tab1', 'tab4', 'tab5'], 'the tabs opened are not the four they were');
     assert.deepEqual(opened.filter( (id)=> !containers.includes(id) ), [],
         'a tab link opens an id with no .tabcontent container');
     assert.deepEqual(opened.filter( (id)=> !loaded.includes(id) ), [],
@@ -85,7 +91,7 @@ test('every tab the menu opens is loaded and has somewhere to load into', ()=>{
     assert.deepEqual(containers.filter( (id)=> !loaded.includes(id) ), [],
         'a .tabcontent container is never filled');
 
-    assert.ok(opened.includes('tab5'), 'the Settings tab is not in the tab row');
+    assert.match(modal, /tabs: \{notes: 'tab1', ai: 'tab4'\}/, 'the modal no longer shows Notes and Ai by their tabs');
 });
 
 test('every placement slider ZetPath reads is in the page exactly once', ()=>{

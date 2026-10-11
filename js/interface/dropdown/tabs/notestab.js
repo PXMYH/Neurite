@@ -39,109 +39,6 @@ function autoGrow(event) {
     }
 }
 
-let maxWidth, maxHeight;
-
-function updateMaxDimensions() {
-    maxWidth = window.innerWidth * 0.9;
-    maxHeight = window.innerHeight * 0.7;
-}
-
-updateMaxDimensions();
-On.resize(window, updateMaxDimensions);
-
-// Horizontal drag handle -- on the pane's right edge, which is the one that moves: the
-// menu is anchored at the left of the screen, so the pane grows rightwards. It sat on the
-// left edge and subtracted the drag, so it pulled the wrong way on an edge that cannot
-// move; measured, a drag of +120px left the pane at 270px wide (#65).
-//
-// It sets the menu's width, not the pane's (#32): the pane fills its panel, and every
-// panel has the one width, so a pane widened here does not leave the next panel opened
-// narrower than the menu it sits in.
-let zetHorizDragHandle = Elem.byId('zetHorizDragHandle');
-let zetIsHorizResizing = false;
-let initialX;
-let initialWidth;
-let panelAroundPane;
-let minWidth;
-
-On.mousedown(zetHorizDragHandle, (e)=>{
-    updateMaxDimensions(); // Update dimensions at the start of each drag
-    zetIsHorizResizing = true;
-    initialX = e.clientX;
-    initialWidth = App.zetPanes.container.offsetWidth;
-    // What the menu holds beside the pane: its border and the panel's padding.
-    panelAroundPane = document.querySelector('.dropdown-content').offsetWidth - initialWidth;
-    // The stylesheet's limit (`.zet-pane-container`), so the drag and the CSS agree on
-    // how wide the pane may go. At 1000px they did not -- 926px against 900px -- and a
-    // pane the CSS had clamped to 926px refused every narrowing drag short of 26px.
-    maxWidth = parseFloat(getComputedStyle(App.zetPanes.container).maxWidth) || maxWidth;
-    // And its narrowest: the drag sets every panel's width now, and 50px made a menu no
-    // panel could be read in.
-    minWidth = parseFloat(getComputedStyle(App.zetPanes.container).minWidth) || 50;
-
-    // Prevent text selection while resizing
-    document.body.style.userSelect = 'none';
-    On.mousemove(document, zetHandleHorizMouseMove);
-    // Once: a listener added per drag and never removed piled up one more per drag.
-    On.mouseup(document, zetEndResize.bind(null, zetHandleHorizMouseMove), {once: true});
-});
-
-// The end of either drag. CodeMirror measures its width when it lays text out and not
-// when its box changes, so it is told to look again, or lines stay wrapped to the old one.
-function zetEndResize(onMove){
-    zetIsHorizResizing = false;
-    zetIsVertResizing = false;
-    // Enable text selection again after resizing
-    document.body.style.userSelect = '';
-    Off.mousemove(document, onMove);
-    window.currentActiveZettelkastenMirror?.refresh();
-}
-
-function zetHandleHorizMouseMove(event) {
-    if (!zetIsHorizResizing) return;
-
-    requestAnimationFrame(() => {
-        // Calculate the difference in the x position
-        const dx = event.clientX - initialX;
-        // Clamped, not refused: a move past either limit used to leave the pane where the
-        // last move inside them had put it, however far the pointer went.
-        const newWidth = Math.min(Math.max(initialWidth + dx, minWidth), maxWidth);
-        document.querySelector('.dropdown-content').style.setProperty('--ui-panel-width', (newWidth + panelAroundPane) + 'px');
-    });
-}
-
-// Vertical drag handle
-let zetVertDragHandle = Elem.byId('zetVertDragHandle');
-let zetIsVertResizing = false;
-let initialY;
-let initialHeight;
-
-On.mousedown(zetVertDragHandle, (e)=>{
-    updateMaxDimensions(); // Update dimensions at the start of each drag
-    zetIsVertResizing = true;
-    initialY = e.clientY;
-    initialHeight = App.zetPanes.container.offsetHeight;
-    // The stylesheet's limit again, as for the width.
-    maxHeight = parseFloat(getComputedStyle(App.zetPanes.container).maxHeight) || maxHeight;
-
-    // Prevent text selection while resizing
-    document.body.style.userSelect = 'none';
-    On.mousemove(document, zetHandleVertMouseMove);
-    On.mouseup(document, zetEndResize.bind(null, zetHandleVertMouseMove), {once: true});
-});
-
-function zetHandleVertMouseMove(event) {
-    if (!zetIsVertResizing) return;
-
-    requestAnimationFrame(() => {
-        // Calculate the difference in the y position
-        const dy = event.clientY - initialY;
-        // Clamped, not refused, as the width is: +250px in one move left it where it was.
-        const newHeight = Math.min(Math.max(initialHeight + dy, 50), maxHeight);
-        App.zetPanes.container.style.height = newHeight + 'px';
-    });
-}
-
 // One entry per Pane: its id, its editor, and the three objects built around that
 // editor. This was four arrays correlated by position, and removal filtered only
 // the first of them, so a deleted Pane's parser, UI and processor stayed
@@ -180,25 +77,7 @@ class ZetPanes {
         On.click(Elem.byId('archiveRename'), this.onRename);
         On.click(Elem.byId('archiveDelete'), this.onDelete);
         On.click(this.status, this.onStatusClick);
-        this.trackBarHeight();
         this.addPane();
-    }
-
-    // The pane's `max-height` leaves room for the Archive controls above it
-    // (`--archive-bar-space`), and they are not one height: the line that says what an
-    // Archive is takes one line, two or three with the panel's width. Taller by that line
-    // than the constant it replaced, the bar put the pane's bottom handle under the foot of
-    // the menu in a 600px window.
-    trackBarHeight(){
-        const bar = this.select?.closest('.archive-bar');
-        if (!bar || !window.ResizeObserver) return;
-
-        new ResizeObserver( ()=>{
-            if (!bar.offsetHeight) return;   // the Notes panel is closed
-
-            const space = bar.offsetHeight + parseFloat(getComputedStyle(bar).marginBottom);
-            this.container.style.setProperty('--archive-bar-space', space + 'px');
-        }).observe(bar);
     }
 
     addPane() {

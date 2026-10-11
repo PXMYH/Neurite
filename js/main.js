@@ -230,6 +230,8 @@ class PageLoad {
         'js/interface/dropdown/tabs/datatab.js',
         'js/interface/dropdown/tabs/edittab.js',
         'js/interface/dropdown/dropdown.js',
+        // After dropdown.js, whose menu it closes as it opens (#82).
+        'js/interface/dropdown/settingsmodal.js',
         // After dropdown.js, whose `menuButton` it marks when an update is ready.
         'js/interface/dropdown/appupdate.js',
         'js/interface/dropdown/neuritepanel.js',

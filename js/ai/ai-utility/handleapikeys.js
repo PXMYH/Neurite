@@ -344,7 +344,7 @@ function getAPIParams(messages, stream, customTemperature, inferenceOverride) {
     // rejected with "Cannot read properties of null"); the proxy route posted anyway.
     const modelData = route.fromModelData ? fetchCustomModelData(model) : null;
     if (route.fromModelData && !modelData) {
-        alert("Add a Custom model first: + Custom, in the Ai panel.");
+        alert("Add a Custom model first: + Custom, in Settings → Ai.");
         return null;
     }
 

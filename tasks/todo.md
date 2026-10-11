@@ -590,3 +590,70 @@ by `PageLoad.loadTabs`, which keeps `PageLoad.tabs` the one list the tests read.
   The tool symbols stroke with `--icon-stroke` now, set by each tool for its rest, hover and lit
   states; 28-panels measures the glyph's brightest pixel, 221 now and 157 on 1.9.1. 1.9.2 carries
   it.
+
+# AI always on, and Settings as a modal (#81, #82, 2026-10-11)
+
+Asked, in chat: "no need for ai toggle anymore, should be on always"; then "move notes and ai to
+settings as well, and when click settings bring up a modal, research how notion does settings, i
+want the same experience, then release 1.9.3". Tier T3, brownfield. Filed as #81 and #82.
+
+## Phase D: AI always on (#81, 4ff23c1)
+
+- The switch in the tool pill, `AiFeatures`, the `ai-disabled` class on `body` and the rule that
+  hid every AI surface behind it are gone, and so is every check of the flag: Alt+double-click
+  and the right-click menu always offer an AI node, and Connect Notes and Propose Edges always
+  ask the embeddings model. A stale `aiFeaturesEnabled=false` in a reader's storage is ignored.
+- Propose Edges said "Similar wording is off with the AI features" when the model gave no
+  vectors; it says the model gave nothing back now.
+
+## Phase E: Settings as a modal (#82)
+
+What Notion's settings are, read from the screenshots in Notion's help pages and its 2026
+release notes (dark mode is not shown anywhere; the sizes are taken, the colours are Neurite's):
+- one dialog over a page dimmed to about 60%, 1150 x 715 at most and about 40px clear of the
+  window's edges in a smaller one, its corners about 12px;
+- a 240px sidebar in its own shade, grey 12px group headings, items 28px tall every 30px with an
+  18-20px outline icon and a 14px label, the chosen one a grey fill with no accent;
+- the page beside it 60px in and 36px down, its title over a 1px rule, rows of a label with a
+  grey line under it and the control at the right;
+- a close button at the dialog's top right. Esc and a click outside are not documented;
+- a search field at the top of the sidebar (left out here: seven pages need none yet);
+- on a phone, no dialog: Settings is a screen of its own;
+- Notion calls each entry a tab. Here they are pages, because CONTEXT.md keeps "tab" and
+  "pane" for the Zettelkasten's Panes.
+
+Decisions:
+- The menu keeps its commands and Help. Its Settings row opens the modal
+  (`aria-haspopup="dialog"`, no chevron) and closes the menu as it does.
+- The pages: Writing (Notes, Ai), View (Theme, Saved views, Fractal), General (Editing, Data,
+  and Updates in the Mac app only). Not "Workspace" or "Appearance", which CONTEXT.md keeps from
+  naming the Graph and the Theme. Notes and Ai are the old panels' markup whole; the others show
+  the sections of Settings that name them with `data-page`. A page of one section hides that
+  section's heading, as the title above says it.
+- Not a native `<dialog>`: `showModal()` draws in the top layer, so `#customModal`, which the
+  controls inside open (Adjust…, every confirm), would land behind it, and the page filters that
+  Paper and the theme pictures count on would not reach it. A child of `.dropdown` instead, at
+  `z-index: 50` in its layer, and everything outside it inert while it is open, except
+  `#customModal`. Elements that were inert already, the closed menu among them, are left as
+  they were and stay inert when it closes.
+- Esc closes it unless a dialog of its own is on top or something inside already took the key;
+  focus goes back to what opened it, or to the menu button when that was the menu's row.
+- The sidebar is one Tab stop (roving `tabIndex`), and the arrows move through it and choose.
+- It opens on the page it was left on (`localStorage`), and on Updates while an update is ready,
+  which also puts a dot on Updates in the sidebar.
+- The notes editor fills its page, so its two drag handles, the code that sized the menu by
+  them, and the bar-height tracker that kept the handle on screen are gone.
+- A Cmd- or Ctrl-click on a Title in the notes and a click on a Saved View go somewhere on the
+  canvas, which the dialog covers, so they close it first.
+- Narrower than 900px the dialog takes the window and the sidebar is a strip across its top:
+  under that, a page beside a 240px sidebar was narrower than the menu's panels had been.
+
+Found while doing it:
+- The overview and the canvas's hint are `z-index: 0` and come later in `.dropdown`, so they
+  drew over the dialog at `auto` (screenshot).
+- The notes editor's inline `height: 100%` with a 3px inset border ran it 6px past its box,
+  where its bottom edge and its resize grip were cut off; it keeps the border inside its height
+  now, and the grip, which nobody could reach, is gone.
+- Words that sent a reader to "the Notes panel" or "the Ai panel" -- Help, the delete question,
+  two Wolfram alerts, the Custom model alert, the AI's own system prompt and the docs -- name
+  the page instead ("Settings → Notes").

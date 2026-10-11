@@ -6,7 +6,7 @@ const wolframMessage = `Based off the user message, arrive at a valid query to W
 
 let wolframCallCounter = 0;
 
-const wolframUnreachable = "Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai panel. Localhosts can be found at the Github link in the Help panel.";
+const wolframUnreachable = "Wolfram Alpha could not be reached. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in Settings → Ai. Localhosts can be found at the Github link in the Help panel.";
 
 async function fetchWolfram(message, isAINode = false, node = null, wolframContext = "", isStopped = null) {
     // Only the localhost gateway answers Wolfram. Without it, the reformulation below is
@@ -116,7 +116,7 @@ async function fetchWolfram(message, isAINode = false, node = null, wolframConte
         const errorData = await response.json().catch( ()=>({}) );
         Logger.err("With Wolfram Alpha API call:", errorData.error);
         Logger.err("Full error object:", errorData);
-        alert("An error occurred when making a request the Wolfram Alpha. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in the Ai panel. Localhosts can be found at the Github link in the Help panel.");
+        alert("An error occurred when making a request the Wolfram Alpha. Ensure the Wolfram server is running on your localhost with a valid Wolfram API key. The API input is in Settings → Ai. Localhosts can be found at the Github link in the Help panel.");
         return;
     }
 

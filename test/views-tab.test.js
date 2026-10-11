@@ -71,7 +71,8 @@ test('the Saved views are reachable, and the loader fills them', ()=>{
         'nothing loads settingstab.html, so Settings opens empty and every id in it is null '
         + 'when displaysavedcoords.js binds');
     assert.match(menu, /<div id="tab5" class="tabcontent">/, 'Settings has no container to load into');
-    assert.match(menu, /onclick="openTab\('tab5', this\)"/, 'no menu row opens Settings');
+    assert.match(menu, /<button type="button" class="menu-row" id="settings-button"/, 'no menu row opens Settings');
+    assert.match(menu, /class="settings-nav-item" data-page="saved-views"/, 'Settings has no Saved views page');
     assert.doesNotMatch(main + menu, /viewstab\.html|openTab\('tab7'/, 'the Views panel is back beside the section');
 
     // Order, not merely presence. `displaysavedcoords.js` calls `Elem.byId` at the top

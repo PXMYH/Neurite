@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, isIPad } from './helpers.mjs';
+import { launchBrowser, openNeurite, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -13,10 +13,8 @@ afterEach(async () => { await context?.close(); });
 // any of 2,434 marked words flew the view away, and a note naming itself threw at every
 // keystroke after.
 
-async function openNotes(page) {
-    await page.click('.menu-button');
-    await page.click(".menu-row.tablink:has-text('Notes')");
-}
+// Settings, on its Notes page (#82).
+const openNotes = (page) => openSettings(page, 'notes');
 const write = (page, text) => page.evaluate((text) => {
     const pane = window.zetPaneList[0];
     pane.processor.writeAs(ZettelkastenProcessor.Pass.edit, () => pane.cm.setValue(text));

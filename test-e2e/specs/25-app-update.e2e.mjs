@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { launchBrowser, openNeurite } from './helpers.mjs';
 
 // The Mac app's updates (#76, js/interface/dropdown/appupdate.js), a section of Settings since
-// #78, against a stand-in for the bridge the app's preload gives the page (desktop/preload.cjs).
+// #78 and its own page of the Settings modal since #82, against a stand-in for the bridge the
+// app's preload gives the page (desktop/preload.cjs).
 // The app's side -- the download, the swap and the reopening -- is driven for real by
 // desktop/update.e2e.mjs.
 
@@ -32,20 +33,25 @@ const read = (page) => page.evaluate(() => {
     const row = document.getElementById('update-button');
     const note = document.getElementById('update-note');
     const button = document.querySelector('.menu-button');
-    const settings = document.getElementById('tablink-settings');
+    const settings = document.getElementById('settings-button');
+    const nav = document.getElementById('settingsNavUpdates');
     return { shown: row.getClientRects().length > 0, label: row.querySelector('.menu-row-label').textContent,
              note: note.textContent, warning: note.classList.contains('is-warning'),
              ready: button.classList.contains('update-ready'), name: button.getAttribute('aria-label'),
              settingsDot: settings.classList.contains('update-ready'), settingsName: settings.getAttribute('aria-label'),
+             navDot: nav.classList.contains('update-ready'), navName: nav.getAttribute('aria-label'),
              calls: [...(window.__update?.calls ?? [])] };
 });
-// The menu, then its Settings row, where the button is.
+// The menu, then its Settings row, which opens the Settings modal; then Updates in its sidebar,
+// where the app has one.
 async function openSettings(page) {
     await page.click('.menu-button');
     await page.waitForTimeout(300);
-    await page.click('#tablink-settings');
+    await page.click('#settings-button');
+    if (await page.locator('#settingsNavUpdates').isVisible()) await page.click('#settingsNavUpdates');
     await page.waitForTimeout(200);
 }
+const currentPage = (page) => page.evaluate(() => document.querySelector('.settings-nav-item[aria-current="page"]')?.dataset.page);
 const push = (page, state) => page.evaluate((s) => window.__update.push(s), state);
 const available = { phase: 'available', current: '1.6.0', version: '1.7.0', page: 'https://example.com', blocked: null };
 
@@ -56,6 +62,8 @@ test('a browser has no Updates in Settings', async () => {
     assert.deepEqual(await page.evaluate(() => [document.getElementById('updateSettings').getClientRects().length,
                                                document.getElementById('update-button').getClientRects().length,
                                                document.getElementById('update-note').getClientRects().length]), [0, 0, 0]);
+    // Nor a page for them in the sidebar.
+    assert.equal(await page.locator('#settingsNavUpdates').isVisible(), false, 'a browser has an Updates page');
     // And the list it came from has no row for them.
     assert.equal(await page.evaluate(() => document.querySelector('#menuList #update-button')), null);
 });
@@ -67,20 +75,27 @@ test('the row checks, says what it found, and asks before it installs', async ()
     const current = await read(page);
     assert.deepEqual([current.shown, current.label, current.note, current.ready, current.settingsDot],
                      [true, 'Check for updates', 'Neurite 1.6.0 is the newest.', false, false]);
-    // First in the panel, where the dot that led here is answered.
+    // A page of its own, and still first in Settings' markup.
+    assert.equal(await currentPage(page), 'updates');
     assert.equal(await page.evaluate(() => document.querySelector('#tab5 .settings-section').id), 'updateSettings');
     await page.click('#update-button');
     assert.deepEqual((await read(page)).calls, ['check']);
 
-    // Found by the six-hourly check, with the menu closed: the menu button says so, and so does
-    // the Settings row it leads to.
-    await page.click('.menu-button');
+    // Found by the six-hourly check, with Settings closed on another page: the menu button says
+    // so, and so do the Settings row it leads to and Updates in the sidebar, and Settings opens
+    // on Updates.
+    await page.click('.settings-nav-item[data-page="theme"]');
+    await page.keyboard.press('Escape');
     await push(page, available);
     const found = await read(page);
-    assert.deepEqual([found.label, found.ready, found.name, found.settingsDot, found.settingsName],
-                     ['Update to 1.7.0', true, 'Menu, with an update ready', true, 'Settings panel, with an update ready']);
+    assert.deepEqual([found.label, found.ready, found.name, found.settingsDot, found.settingsName, found.navDot, found.navName],
+                     ['Update to 1.7.0', true, 'Menu, with an update ready', true, 'Settings, with an update ready',
+                      true, 'Updates, with an update ready']);
 
-    await openSettings(page);
+    await page.click('.menu-button');
+    await page.waitForTimeout(300);
+    await page.click('#settings-button');
+    assert.equal(await currentPage(page), 'updates', 'Settings did not open on the update that is ready');
     await page.click('#update-button');
     await page.waitForTimeout(300);
     assert.equal(await page.evaluate(() => Modal.div.querySelector('.modal-title').textContent), 'Update to Neurite 1.7.0?');
@@ -95,8 +110,8 @@ test('a busy row does nothing, a failure is a warning, and a release it cannot i
     await openSettings(page);
     await push(page, { phase: 'downloading', current: '1.6.0', version: '1.7.0', progress: 42 });
     const busy = await read(page);
-    assert.deepEqual([busy.label, busy.note, busy.ready, busy.settingsDot, busy.settingsName],
-                     ['Updating to 1.7.0…', 'Downloading, 42%.', false, false, null]);
+    assert.deepEqual([busy.label, busy.note, busy.ready, busy.settingsDot, busy.settingsName, busy.navDot, busy.navName],
+                     ['Updating to 1.7.0…', 'Downloading, 42%.', false, false, null, false, null]);
     await page.evaluate(() => document.getElementById('update-button').click());
     assert.deepEqual((await read(page)).calls, [], 'a click while it downloads did something');
 

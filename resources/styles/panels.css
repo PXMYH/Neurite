@@ -1212,3 +1212,286 @@
 #tab4 #aiParameterGrid span {
     color: inherit;
 }
+
+/* ---- The Settings modal (#82) ----------------------------------------------------------- */
+
+/* Settings the way Notion draws its own, measured from the screenshots in Notion's help pages:
+   one dialog over the page, dimmed behind it, 1150 x 715 at most and 40px clear of the window's
+   edges in a smaller one; a 240px sidebar of pages under small grey group headings, the chosen
+   one a grey fill with no accent; the page beside it, 60px in, under its title and a rule; the
+   close button at the dialog's top right. The rows inside are this design system's (#80), as
+   every panel's were. Opaque, where the menu's panel is glass, because a dialog this size over
+   the moving sky would be read through it. */
+.settings-modal {
+    position: absolute;
+    inset: 0;
+    /* Over the rest of the chrome, which shares its layer: the overview and the canvas's hint
+       are `z-index: 0` and come later in the page, and drew over the dialog at `auto`. Still
+       inside `.dropdown`'s 100, so under `#customModal` and the tooltips. */
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .settings-modal[hidden] {
+        display: none;
+    }
+
+.settings-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 15 15 / 60%);
+}
+
+.settings-dialog {
+    position: relative;
+    display: flex;
+    box-sizing: border-box;
+    width: min(1150px, calc(100vw - 80px));
+    height: min(715px, calc(var(--visible-height, 100dvh) - 80px));
+    overflow: hidden;
+    border: 1px solid var(--glass-edge);
+    border-radius: 12px;
+    background: var(--ui-chrome);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 25%), 0 6px 16px rgb(0 0 0 / 30%), 0 24px 64px rgb(0 0 0 / 45%);
+    outline: none;
+}
+
+/* The sidebar: a heading over each group, and a row each with its glyph, the chosen one lit.
+   Told from the page by its shade alone, as Notion's is. */
+.settings-nav {
+    flex: 0 0 240px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    padding: 14px 8px;
+    background: rgb(255 255 255 / 3%);
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 18%) transparent;
+}
+
+    .settings-nav-group + .settings-nav-group {
+        margin-top: 16px;
+    }
+
+    .settings-nav-heading {
+        padding: 0 10px 4px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .settings-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 28px;
+        margin: 2px 0;
+        padding: 0 10px;
+        border: none;
+        border-radius: var(--control-radius);
+        background: none;
+        color: var(--text-secondary);
+        font: inherit;
+        font-size: 14px;
+        text-align: left;
+        cursor: pointer;
+        --icon-stroke: var(--text-secondary);
+    }
+
+        .settings-nav-item[hidden] {
+            display: none;
+        }
+
+        .settings-nav-item span {
+            font: inherit;
+            color: inherit;
+        }
+
+        .settings-nav-item svg {
+            flex: none;
+            width: 18px;
+            height: 18px;
+        }
+
+        .settings-nav-item:hover {
+            background: var(--control-fill);
+            color: var(--text-primary);
+            --icon-stroke: var(--text-primary);
+        }
+
+        .settings-nav-item[aria-current="page"] {
+            background: var(--control-fill-hover);
+            color: var(--text-primary);
+            --icon-stroke: var(--text-primary);
+        }
+
+        /* The update that is ready, as the menu button and the Settings row mark it. */
+        .settings-nav-item.update-ready::after {
+            content: "";
+            width: 7px;
+            height: 7px;
+            margin-left: auto;
+            border-radius: 50%;
+            background: var(--ui-accent);
+        }
+
+/* The sidebar's glyphs, and the close button's, in the colour their row sets, for the reason the
+   tools' are (above). The notes glyph keeps its own blue wherever nothing sets one: it is the
+   file tree's text file too. */
+#gear-icon, #eyeball-symbol, #fractal-icon, #refresh-icon,
+#palette-icon, #keyboard-icon, #database-icon, #close-icon {
+    stroke: var(--icon-stroke, currentColor);
+}
+
+#file-text-icon {
+    stroke: var(--icon-stroke, skyblue);
+}
+
+/* The chosen page: its name over a rule, then its contents, which scroll under the name. */
+.settings-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.settings-content-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    margin: 0 60px;
+    padding: 36px 0 12px;
+    border-bottom: 1px solid var(--row-divider);
+}
+
+    .settings-page-title {
+        flex: 1 1 auto;
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 16px;
+        font-weight: 500;
+    }
+
+    /* At the dialog's corner rather than in the title's line, as Notion's is. */
+    .settings-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: none;
+        border-radius: var(--control-radius);
+        background: none;
+        cursor: pointer;
+        --icon-stroke: var(--text-secondary);
+    }
+
+        .settings-close svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .settings-close:hover {
+            background: var(--control-fill);
+            --icon-stroke: var(--text-primary);
+        }
+
+.settings-content-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 60px 36px;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 18%) transparent;
+}
+
+    /* The panels' own padding was the menu's edge; the dialog's is here. */
+    .settings-content-body .submenu {
+        padding: 0;
+    }
+
+    .settings-content-body .settings-section.page-hidden {
+        display: none;
+    }
+
+    /* A pane of one section is named by the title above it. */
+    .settings-content-body.solo .settings-section:not(.page-hidden) > .settings-heading {
+        display: none;
+    }
+
+    /* The notes editor fills the pane, under the Archive controls, as the dialog sizes itself
+       to the window. */
+    .settings-content-body:has(> #tab1[style*="block"]) {
+        display: flex;
+        flex-direction: column;
+    }
+
+        .settings-content-body > #tab1 {
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+
+            .settings-content-body > #tab1 > .submenu {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+            }
+
+/* A window too narrow for a sidebar beside the page -- a phone, an iPad upright or in split
+   view -- gets the dialog the whole window, and the sidebar as a strip of its rows across the
+   top. 900px: under it the page beside a 240px sidebar was narrower than the menu's panels
+   were, and the Ai page's rows need what those had. */
+@media (max-width: 900px) {
+    .settings-dialog {
+        flex-direction: column;
+        width: 100vw;
+        height: var(--visible-height, 100dvh);
+        border: none;
+        border-radius: 0;
+    }
+
+    .settings-nav {
+        display: flex;
+        flex: none;
+        gap: 4px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 8px;
+        border-bottom: 1px solid var(--row-divider);
+    }
+
+        .settings-nav-group {
+            display: contents;
+        }
+
+        .settings-nav-heading {
+            display: none;
+        }
+
+        .settings-nav-item {
+            flex: none;
+            width: auto;
+        }
+
+    .settings-content-head {
+        margin: 0 16px;
+        padding-top: 14px;
+    }
+
+        /* Beside the title, under the strip: at the corner it lay over the strip's last page. */
+        .settings-close {
+            position: static;
+            margin-right: -8px;
+        }
+
+    .settings-content-body {
+        padding: 16px;
+    }
+}
