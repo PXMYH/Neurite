@@ -100,7 +100,11 @@ test('the panel at the bottom left counts the selection', async () => {
     await page.waitForFunction(() => document.querySelector('.hud-count').textContent === '3 notes');
     await clickCard(page, a, key);
     await clickCard(page, b, key);
-    await page.waitForFunction(() => document.querySelector('.hud-count').textContent !== '3 notes');
+    // The count follows the selection on the overview's next tick, so read right after the
+    // second click it still said the first ("1 of 3", with two selected: measured as an iPad),
+    // and `!== '3 notes'` let that through.
+    await page.waitForFunction(() => document.querySelector('.hud-count').textContent === '2 of 3 selected',
+                               undefined, { timeout: 5000 }).catch(() => {});
     assert.equal(await count(), '2 of 3 selected');
     // Fit's tooltip sits beside the panel, not over the count it describes.
     await page.hover('.hud-panel [data-act="fit"]');
