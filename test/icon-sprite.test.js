@@ -117,18 +117,22 @@ test('retired artwork is absent from the sprite', ()=>{
     assert.equal(sprite.includes('bi-sliders2'), false, 'the unnamed Bootstrap sliders should be removed');
 });
 
-// Two folds are left in the panels since #32 made the rest headed groups: the function
-// console's toggle and the API Keys `<details>`.
+// Four folds are left in the panels, every one a native `<details>`: API Keys and the function
+// console's Tasks in the Ai panel (#78), and in Settings a theme's Customize group and the
+// Fractal's Drawing (#79). #32 made the rest headed groups.
 test('every panel toggle uses the same Lucide chevron', ()=>{
     const files = [
-        'resources/html/tabs/fractaltab.html',
+        'resources/html/tabs/settingstab.html',
         'resources/html/tabs/aitab.html',
         'resources/html/tabs/functioncallingpanel.html',
     ];
     const markup = files.map(read).join('\n');
     const chevrons = markup.match(/<use\b[^>]*(?:href|xlink:href)="#chevron-down-icon"/g) || [];
+    // Comments out: they name `<details>` too.
+    const folds = markup.replace(/<!--[\s\S]*?-->/g, '').match(/<details\b/g) || [];
 
-    assert.equal(chevrons.length, 2, 'both folds should use chevron-down-icon');
+    assert.equal(folds.length, 4, 'the panels no longer hold four folds: ' + folds.length);
+    assert.equal(chevrons.length, folds.length, 'every fold should use chevron-down-icon');
     assert.doesNotMatch(markup, /<\/svg>\s*<path\b/,
         'a path after </svg> cannot render inside that SVG');
 });

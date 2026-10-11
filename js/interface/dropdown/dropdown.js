@@ -43,7 +43,13 @@ const debouncedSaveInputValue = debounce(function (input) {
     Logger.debug("saved");
 }, 300);
 
-document.querySelectorAll('#tab2 input[type="range"], .color-picker-container input[type="color"]').forEach(function (input) {
+// The Fractal's sliders and colours, which are saved with each graph (`#saved-input-values`). They
+// were every slider in the Fractal panel, `#tab2`; that panel's two groups are sections of
+// Settings now (#79), and Settings holds sliders that are not the Fractal's.
+const FRACTAL_INPUTS = '#fractalSettingsContainer input[type="range"], #colorSettingsContainer input[type="range"], '
+                     + '.color-picker-container input[type="color"]';
+
+document.querySelectorAll(FRACTAL_INPUTS).forEach(function (input) {
     On.input(input, (e)=>debouncedSaveInputValue(input) )
 });
 
@@ -51,7 +57,7 @@ function restoreInputValues() {
     const savedValues = localStorage.getItem('inputValues');
     if (savedValues) {
         const inputValues = JSON.parse(savedValues);
-        document.querySelectorAll('#tab2 input[type="range"], .color-picker-container input[type="color"]').forEach(input => {
+        document.querySelectorAll(FRACTAL_INPUTS).forEach(input => {
             if (input.id in inputValues) {
                 input.value = inputValues[input.id];
                 // Trigger the input event for both sliders and color pickers

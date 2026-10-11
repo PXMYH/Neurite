@@ -2,7 +2,7 @@
 //
 // Twelve number boxes in the Fractal panel had none -- each sits beside a slider whose
 // `<label for>` names the slider, not the box -- and Views' pan and zoom were labelled
-// by a bare `<span>`. That mattered less while a keyboard could not reach half the
+// by a bare `<span>`. Both panels are sections of Settings since #79. That mattered less while a keyboard could not reach half the
 // panels; #32 made them reachable, so each is announced as "spin button, 50" and
 // nothing more. Read as text, like the other tab tests: the question is what the markup
 // says, and the name a browser computes comes from exactly these attributes.
@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 const root = new URL('../', import.meta.url);
 const read = (p)=> readFileSync(new URL(p, root), 'utf8');
 
-const TABS = ['aitab', 'fractaltab', 'viewstab', 'settingstab', 'notestab']
+const TABS = ['aitab', 'settingstab', 'notestab', 'functioncallingpanel']
     .map( (name)=>'resources/html/tabs/' + name + '.html' );
 
 const attr = (tag, name)=>(tag.match(new RegExp('\\s' + name + '="([^"]*)"'))?.[1] ?? null);
@@ -52,7 +52,7 @@ test('every field in the panels has a name', ()=>{
 });
 
 test('a number box is named after the slider it stands beside', ()=>{
-    const html = read('resources/html/tabs/fractaltab.html');
+    const html = read('resources/html/tabs/settingstab.html');
     for (const [box, slider] of [['length_value', 'length'], ['maxLinesValue', 'maxLinesSlider'],
                                  ['draw_speed_value', 'renderDelaySlider'], ['c_value', 'cSlider']]) {
         const label = html.match(new RegExp('<label for="' + slider + '">([^<:]+):?</label>'))?.[1];

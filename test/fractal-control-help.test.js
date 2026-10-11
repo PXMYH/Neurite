@@ -1,4 +1,4 @@
-// The Fractal tab's controls each carry a `title`, which is hover-only: a keyboard
+// The Fractal's controls each carry a `title`, which is hover-only: a keyboard
 // user never sees it, a screen reader ignores it when the element has a name, and a
 // touch device has no hover at all. So the four controls the reader is most likely
 // to be puzzled by -- the exponent, the equation menu, the quality/frame-rate
@@ -7,7 +7,8 @@
 //
 // Two halves to check, because the association is made in two places:
 //
-//   - the markup, read as text (`resources/html/tabs/fractaltab.html`), the way
+//   - the markup, read as text (`resources/html/tabs/settingstab.html`, where the
+//     Fractal panel's controls are a section since #79), the way
 //     settings-tab.test.js reads the tabs;
 //   - the equation menu, which is a `select` that `CustomDropdown.setup` hides
 //     behind a div, so its name and description have to be carried onto the div or
@@ -22,7 +23,7 @@ import { createContext, runInContext } from 'node:vm';
 const root = new URL('../', import.meta.url);
 const read = (p)=> readFileSync(new URL(p, root), 'utf8');
 
-const TAB = 'resources/html/tabs/fractaltab.html';
+const TAB = 'resources/html/tabs/settingstab.html';
 const html = read(TAB);
 
 // The four controls, the id of the help block each points at, and what the text has

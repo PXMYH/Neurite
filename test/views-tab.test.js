@@ -1,6 +1,7 @@
-// The places -- `// Seahorse Valley West` and the rest -- are a panel of their own now.
-// They were the lower two thirds of the Saves panel, which put two unrelated jobs behind
-// one row: what the browser is holding on to, and where the reader is looking.
+// The Saved Views -- `// Seahorse Valley West` and the rest -- are a section of Settings
+// (#79), beside the themes. They were a panel of their own before that, and before that the
+// lower two thirds of the Saves panel, which put two unrelated jobs behind one row: what the
+// browser is holding on to, and where the reader is looking.
 //
 // Three ways to get this half-right, and one of them is silent:
 //
@@ -22,10 +23,13 @@ const root = new URL('../', import.meta.url);
 const read = (p)=> readFileSync(new URL(p, root), 'utf8');
 
 const TABS = 'resources/html/tabs/';
-const VIEWS = TABS + 'viewstab.html';
+const SETTINGS = TABS + 'settingstab.html';
 const MENU = TABS + 'dropdown.html';
 
-const views = read(VIEWS);
+// The section, out of the Settings markup: from its own id to the next section's.
+const settings = read(SETTINGS);
+const iViews = settings.indexOf('id="savedViewsSettings"');
+const views = settings.slice(iViews, settings.indexOf('id="fractalSettingsContainer"', iViews));
 const menu = read(MENU);
 const main = read('js/main.js');
 // Comments stripped: the explanation of what was removed names it, so an unstripped
@@ -40,15 +44,17 @@ const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
 // Every panel file, so "moved" can mean "is here and nowhere else" rather than "is here".
 const tabFiles = readdirSync(new URL(TABS, root)).filter( (f)=> f.endsWith('.html') );
 
-test('every control of a saved view is in the Views panel and nowhere else', ()=>{
-    assert.ok(tabFiles.includes('viewstab.html'), 'the Views panel file is gone');
-    assert.ok(tabFiles.length >= 8, 'only ' + tabFiles.length + ' tab files; this scan is stale');
+test('every control of a saved view is in the Saved views section and nowhere else', ()=>{
+    assert.ok(iViews > 0 && views.length > 200, 'the Saved views section is gone from Settings');
+    assert.ok(!tabFiles.includes('viewstab.html'), 'the Views panel file is back beside the section');
+    assert.ok(tabFiles.length >= 6, 'only ' + tabFiles.length + ' tab files; this scan is stale');
 
     for (const id of ['savedCoordinatesContainer', 'saveCoordinatesBtn',
                       'deleteCoordinatesBtn', 'pan', 'zoom']) {
         const holders = tabFiles.filter( (f)=> new RegExp('\\sid="' + id + '"').test(read(TABS + f)) );
-        assert.deepEqual(holders, ['viewstab.html'],
-            id + ' is not in the Views panel exactly once');
+        assert.deepEqual(holders, ['settingstab.html'],
+            id + ' is not in Settings exactly once');
+        assert.match(views, new RegExp('\\sid="' + id + '"'), id + ' is in Settings but not in the Saved views section');
     }
 
     // The pair of boxes is the numeric form of a place, and both are inputs: `interface.js`
@@ -60,12 +66,13 @@ test('every control of a saved view is in the Views panel and nowhere else', ()=
     }
 });
 
-test('the Views panel is reachable, and the loader fills it', ()=>{
-    assert.match(main, /'tab7': 'viewstab\.html'/,
-        'nothing loads viewstab.html, so the panel opens empty and every id in it is null '
+test('the Saved views are reachable, and the loader fills them', ()=>{
+    assert.match(main, /'tab5': 'settingstab\.html'/,
+        'nothing loads settingstab.html, so Settings opens empty and every id in it is null '
         + 'when displaysavedcoords.js binds');
-    assert.match(menu, /<div id="tab7" class="tabcontent">/, 'the panel has no container to load into');
-    assert.match(menu, /onclick="openTab\('tab7', this\)"/, 'no menu row opens the Views panel');
+    assert.match(menu, /<div id="tab5" class="tabcontent">/, 'Settings has no container to load into');
+    assert.match(menu, /onclick="openTab\('tab5', this\)"/, 'no menu row opens Settings');
+    assert.doesNotMatch(main + menu, /viewstab\.html|openTab\('tab7'/, 'the Views panel is back beside the section');
 
     // Order, not merely presence. `displaysavedcoords.js` calls `Elem.byId` at the top
     // level of the file, so the tab markup has to exist before any script runs; scripts
@@ -130,7 +137,7 @@ test('one name for the thing, and the code agrees with the button', ()=>{
         .replace(/<!--[\s\S]*?-->/g, '')
         .replace(/<[a-zA-Z\/!][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>/g, ' ');
     for (const word of [/Coordinates/, /Places/]) {
-        assert.doesNotMatch(shown, word, 'the Views panel shows ' + word + ' again');
+        assert.doesNotMatch(shown, word, 'the Saved views section shows ' + word + ' again');
     }
 
     // The label the button carries and the label the code writes back after "Saved!" have

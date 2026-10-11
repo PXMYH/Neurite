@@ -74,8 +74,6 @@ test('a menu row opens the Notes tab, and the rows are in a known order', ()=>{
     assert.deepEqual(tablinks, [
         ['tab1', 'Notes'],
         ['tab4', 'Ai'],
-        ['tab2', 'Fractal'],
-        ['tab7', 'Views'],
         ['tab5', 'Settings'],
         ['tab3', 'Help'],
     ], 'the menu column changed; check that every row still has a label to open under');
@@ -445,8 +443,8 @@ test('every menu row describes what it does, and the heading is not overridden',
     assert.ok(iList > 0 && iDetail > iList, 'the list and the panel are no longer in that order');
     const rows = [...dropdownHtml.slice(iList, iDetail)
         .matchAll(/<button[^>]*class="menu-row[^"]*"[^>]*>/g)].map( (m)=> m[0] );
-    // Eleven since #78: Import and its two sources, Save to…, Share screen and the six panels.
-    assert.equal(rows.length, 11, 'the menu no longer has eleven rows; check what this is reading');
+    // Nine since #79: Import and its two sources, Save to…, Share screen and the four panels.
+    assert.equal(rows.length, 9, 'the menu no longer has nine rows; check what this is reading');
 
     for (const row of rows) {
         // Save to… is the one exception, and it is written at runtime: what that row
@@ -475,10 +473,9 @@ test('every menu row describes what it does, and the heading is not overridden',
     // - A title may not contain another panel's word, or one sentence can name two
     //   panels and pass as both -- "Adjust how the fractal is drawn: every control for
     //   it, in one list." reads like the Fractal panel and was on the Help row.
+    // Four since the Fractal and Views panels became sections of Settings (#79).
     const PANELS = {
         tab4: ['aitab.html', 'API'],
-        tab2: ['fractaltab.html', 'drawn'],
-        tab7: ['viewstab.html', 'views'],
         tab5: ['settingstab.html', 'placement'],
         tab3: ['helptab.html', 'mouse'],
     };

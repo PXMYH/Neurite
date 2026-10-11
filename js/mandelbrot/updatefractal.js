@@ -109,10 +109,12 @@ Fractal.initializeSelect = function(){
 
     On.mousedown(Elem.byId("julia-constant"), startDragging);
 
-    const tab2Element = Elem.byId("tab2");
-    On.mousemove(tab2Element, Fractal.updateJuliaConstant);
-    On.mouseup(tab2Element, stopDragging);
-    On.mouseleave(tab2Element, stopDragging);
+    // The panel the constant is dragged across: the Fractal panel's, before it was a section
+    // of Settings (#79).
+    const panel = Elem.byId("tab5");
+    On.mousemove(panel, Fractal.updateJuliaConstant);
+    On.mouseup(panel, stopDragging);
+    On.mouseleave(panel, stopDragging);
 
     On.change(fractalSelect, (e)=>{
         Fractal.updateStep();

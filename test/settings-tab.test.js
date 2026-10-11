@@ -76,7 +76,8 @@ test('every tab the menu opens is loaded and has somewhere to load into', ()=>{
                                src.indexOf('}', src.indexOf('static tabs = {')));
     const loaded = [...tabBlock.matchAll(/'([\w-]+)'\s*:/g)].map( (m)=> m[1] );
 
-    assert.ok(opened.length >= 5, 'no tab links found in dropdown.html: ' + opened.length);
+    // Four since the Fractal and Views panels became sections of Settings (#79).
+    assert.ok(opened.length >= 4, 'no tab links found in dropdown.html: ' + opened.length);
     assert.deepEqual(opened.filter( (id)=> !containers.includes(id) ), [],
         'a tab link opens an id with no .tabcontent container');
     assert.deepEqual(opened.filter( (id)=> !loaded.includes(id) ), [],

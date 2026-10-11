@@ -62,7 +62,7 @@ test('a pan moves its stars, and under reduced motion nothing moves', async () =
     assert.equal(await panBy(page, 0.3), at, 'a pan moves the sky under reduced motion');
 });
 
-test('the Fractal panel switches it off, and the page keeps the choice', async () => {
+test('its switch, under a theme\'s Customize, turns it off, and the page keeps the choice', async () => {
     const toggle = (on) => page.evaluate((on) => {
         const t = document.getElementById('universe-checkbox');
         t.checked = on;

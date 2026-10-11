@@ -477,13 +477,21 @@ Decisions:
 - Check for updates is the first section of Settings, in the app only; the Settings row carries
   the dot the menu button does while a release is ready.
 - A theme is the look only -- line colours, background, brightness and saturation, the universe,
-  and the page filters -- and never the camera or the equation. Saved Views become Places, in
-  Settings beside the themes, and keep moving the camera and nothing else.
+  and the page filters -- and never the camera or the equation. The Saved Views are a section of
+  Settings beside the themes, under the glossary's own name (`CONTEXT.md` lists "place" as a word
+  to avoid, so not "Places" as #79 first said), and keep moving the camera and nothing else.
+- Six themes, a light one among them: Neurite (the defaults), Ember, Aurora, Nebula, Ink, and
+  Paper, which is the page filters' inversion turned half the hue wheel, so each Node keeps its
+  own colour while the page goes light. A look that is none of them is Custom, kept when a theme
+  replaces it. Which card is chosen is read off the controls, never stored, so a graph that opens
+  with colours of its own marks its own card.
 
 Phases:
 - [x] A: the menu (#78). Import and its sources, Share screen, Clear in the pill, Record gone,
   Updates in Settings, the console in the Ai panel. Unit tests and the four specs it touched.
-- [ ] B: themes and places in Settings (#79).
+- [x] B: themes and the Saved Views in Settings (#79). The Fractal and Views panels' markup
+  moved verbatim into Settings (Theme with Customize folded, Saved views, Fractal with Drawing
+  folded), `themes.js` builds the cards, and 27-themes covers choosing, keys, Custom and Paper.
 - [ ] C: the panels' design system (#80).
 - [ ] Review, release 1.9.0, close the three issues.
 
@@ -492,3 +500,10 @@ Found on the way: a tab's markup was not in the page when `loadTab` resolved
 markup held another's slot. The console's slot is inside the Ai panel's markup now, so its
 loader found no element on 5 of the 15 page loads of one run of 15-panels; `loadTab` waits for
 the markup now.
+
+Found in B: the panel's own save of a slider is debounced, so a burst of eight writes kept only
+the last -- a theme saves each control itself. A Fractal line takes its colour once, when it is
+drawn, and most of them still wore the old palette 3.5 s after a theme was chosen;
+`Fractal.recolour` repaints the lines on screen. The page filters lie over the menu too, so each
+card's picture undoes them. And the slot inside another tab's markup is loaded in a second round
+by `PageLoad.loadTabs`, which keeps `PageLoad.tabs` the one list the tests read.

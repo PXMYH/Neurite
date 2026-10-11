@@ -28,6 +28,14 @@ reader picks another equation. It is the terrain, not a backdrop: its shape
 pulls every Node that is not pinned toward the set's boundary as it moves.
 _Avoid_: background, backdrop, wallpaper, texture
 
+**Theme**:
+The look of the page, chosen by name in Settings: the Fractal's line colours,
+the colour behind them, whether the universe shows, and the page's filters.
+It changes how everything looks and nothing else -- no Node moves, the view
+stays where it is, and the Fractal's equation does not change. A look that is
+no named Theme is the Custom one.
+_Avoid_: skin, style, palette, mode, appearance
+
 **Saved View**:
 A place on the Plane kept under a name — one pan and one zoom — so the reader
 can go back to it. It says where to look and nothing about what is there, so

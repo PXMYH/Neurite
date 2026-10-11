@@ -12,7 +12,8 @@ afterEach(async () => { await context?.close(); });
 // the next (312 to 971px); the Ai and Fractal groups were accordions no keyboard could
 // open, and every checkbox was `display: none`, so no keyboard could turn one on.
 
-const PANELS = ['Notes', 'Ai', 'Fractal', 'Views', 'Settings', 'Help'];
+// The Fractal and Views panels are sections of Settings since #79.
+const PANELS = ['Notes', 'Ai', 'Settings', 'Help'];
 
 async function openMenu(page) {
     await page.click('.menu-button');
@@ -177,17 +178,28 @@ test('the function console is a fold of the Ai panel, out of the Tab order until
 test('no label of one or two words wraps in the panels', async () => {
     await openMenu(page);
     const wrapped = [];
-    for (const name of ['Ai', 'Fractal', 'Settings']) {
+    for (const name of ['Ai', 'Settings']) {
         await openPanel(page, name);
+        // Settings' folds open, or the Fractal's labels under Drawing and the colours under
+        // Customize are measured as nothing.
+        await page.evaluate(() => document.querySelectorAll('#tab5 details').forEach((d) => { d.open = true; }));
         wrapped.push(...await page.evaluate((panel) => [...document.querySelectorAll('.tabcontent')]
             .filter((tab) => tab.style.display === 'block')
             .flatMap((tab) => [...tab.querySelectorAll('label')])
             .filter((label) => label.getClientRects().length > 0 && !label.querySelector('br')
                 && label.textContent.trim().split(/\s+/).length <= 2)
+            // The lines of its words, not of everything in it: a theme card's label holds the
+            // card's picture over its name (#79), which is two rows and no wrap.
             .filter((label) => {
-                const range = document.createRange();
-                range.selectNodeContents(label);
-                return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1;
+                const tops = new Set();
+                const walk = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+                for (let text = walk.nextNode(); text; text = walk.nextNode()) {
+                    if (!text.textContent.trim()) continue;
+                    const range = document.createRange();
+                    range.selectNodeContents(text);
+                    for (const r of range.getClientRects()) tops.add(Math.round(r.top));
+                }
+                return tops.size > 1;
             })
             .map((label) => `${panel}: ${label.textContent.trim()}`), name));
         await page.click('#menuBackButton');
@@ -256,8 +268,9 @@ test('at the side handle\'s narrowest the Ai panel keeps its right-hand column, 
 test('a Saved View is reached and chosen with the keyboard',
      { skip: isIPad && 'WebKit Tab skips buttons by default' }, async () => {
     await openMenu(page);
-    await openPanel(page, 'Views');
+    await openPanel(page, 'Settings');
     let on = null;
+    // Past the theme cards, which are one stop, and Customize.
     for (let i = 0; i < 6 && on !== 'saved-coordinate-item'; i++) {
         await page.keyboard.press('Tab');
         on = await page.evaluate(() => document.activeElement.className);
@@ -322,9 +335,7 @@ test('every choice in the panels\' and the Adjust Controls selects fits, at the 
         }
         return out;
     });
-    await openPanel(page, 'Fractal');
-    cut.push(...await measure());
-    await page.click('#menuBackButton');
+    // The equation's select is in Settings since #79.
     await openPanel(page, 'Settings');
     cut.push(...await measure());
     await page.click('#controls-button');
@@ -392,7 +403,7 @@ test('the overview is out of sight under a panel that reaches it, and back when 
      { skip: isIPad && 'the iPad window is its own size' }, async () => {
     await page.setViewportSize({ width: 1600, height: 1000 });
     await openMenu(page);
-    await openPanel(page, 'Fractal');
+    await openPanel(page, 'Settings');
     await page.waitForTimeout(300);
     const seen = () => page.evaluate(() => getComputedStyle(document.querySelector('.hud-panel')).visibility);
     assert.equal(await seen(), 'hidden');

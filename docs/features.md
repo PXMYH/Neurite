@@ -14,7 +14,7 @@ Every capability, by category.
   </thead>
   <tbody>
     <tr>
-      <td rowspan="3"><strong>Fractal Navigation</strong></td>
+      <td rowspan="4"><strong>Fractal Navigation</strong></td>
       <td>Real-time Fractal Zoom</td>
       <td>Navigate and explore iterative equations in real time. Evolve and organize an <code>infinite digital garden</code> with the help of <code>fractal mathematics</code>.</td>
     </tr>
@@ -25,6 +25,10 @@ Every capability, by category.
     <tr>
       <td>The Universe</td>
       <td>A sky of stars, a galaxy seen almost edge on and a nebula, under the Fractal, moving with every <code>pan</code>, <code>zoom</code> and <code>turn</code> and still under reduced motion. Each note is drawn in a <code>colour of its own</code>, and every link as a thread in the colours of the two notes it joins. A note's card has its kind as a chip before its title, its prose in an inset well under corner brackets, and its links as tags in the colours of the notes they name; its controls show when the card is pointed at, focused or selected. Switch the universe off with <code>Universe</code> in the Fractal panel's Color section; choosing a BG colour there does too.</td>
+    </tr>
+    <tr>
+      <td>Themes</td>
+      <td>Six looks for the page in Settings -- <code>Neurite</code>, <code>Ember</code>, <code>Aurora</code>, <code>Nebula</code>, <code>Ink</code> and <code>Paper</code>, which is light -- each a card with a picture of it. A click applies one and the arrow keys go from card to card; a look of your own is kept as <code>Custom</code>. A theme changes colours only: the view, the equation and every note stay where they are.</td>
     </tr>
     <tr>
       <td rowspan="1"><strong>Multi-Agent UI</strong></td>

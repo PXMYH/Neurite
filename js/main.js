@@ -237,6 +237,7 @@ class PageLoad {
         'js/mandelbrot/updatefractal.js',
         // The sky under the Fractal. Drawn by `nodeStep`; reads `Graph` and `settings` only then.
         'js/mandelbrot/universe.js',
+        'js/interface/dropdown/themes.js',
         'js/interface/interface.js',
         // After interface.js, which defines Autopilot -- the Hud stops it before
         // moving the camera, so a click on the overview is not fought by a chase
@@ -329,8 +330,6 @@ class PageLoad {
     async mainLoad(){
         for (const resource of PageLoad.resources) await this.loadResource(resource); // sequentially
         await this.loadTabs(PageLoad.tabs); // in parallel
-        // Inside the Ai panel's markup, so only once that has loaded (#78).
-        await this.loadTab('function-call-slot', 'functioncallingpanel.html');
         for (const src of PageLoad.scripts) await this.loadScript(src); // sequentially
         Graph = new Graph();
         App = new App();
@@ -353,16 +352,19 @@ class PageLoad {
         onContent = (content)=>{ this.elem.innerHTML = content }
         onFailure(){ return `Failed to load content from ${this.fileName}:` }
     }
-    loadTabs(tabs){
-        const proms = [];
-        for (const tabId in tabs) proms.push(this.loadTab(tabId, tabs[tabId]));
-        return Promise.all(proms);
+    // In parallel, in two rounds: a slot can be inside another tab's markup -- the function
+    // console's is in the Ai panel's (#78) -- so what has no element yet is loaded once the
+    // first round's markup is in the page.
+    async loadTabs(tabs){
+        const ids = Object.keys(tabs);
+        const now = ids.filter( (id)=>Elem.byId(id) );
+        await Promise.all(now.map( (id)=>this.loadTab(id, tabs[id]) ));
+        await Promise.all(ids.filter( (id)=>!now.includes(id) ).map( (id)=>this.loadTab(id, tabs[id]) ));
     }
     static tabs = {
+        'function-call-slot': 'functioncallingpanel.html',
         'tab1': 'notestab.html',
         'tab4': 'aitab.html',
-        'tab2': 'fractaltab.html',
-        'tab7': 'viewstab.html',
         'tab5': 'settingstab.html',
         'tab3': 'helptab.html'
     }

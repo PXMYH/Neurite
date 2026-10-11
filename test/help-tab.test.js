@@ -233,7 +233,6 @@ test('the commands are rows of the menu, once each, with their labels intact', (
         const files = ['index.html', HELP, MENU,
                        'resources/html/tabs/notestab.html',
                        'resources/html/tabs/aitab.html',
-                       'resources/html/tabs/fractaltab.html',
                        'resources/html/tabs/settingstab.html']
             .filter( (p)=> new RegExp('\\sid="' + id + '"').test(read(p)) );
         assert.deepEqual(files, [MENU], id + ' is not in the menu exactly once');

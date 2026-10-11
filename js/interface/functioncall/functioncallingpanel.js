@@ -126,6 +126,9 @@ View.Code = class CodeView {
         theme = 'default';
         // Escape leaves the console, as it leaves the notes editor: see notestab.js.
         extraKeys = {Esc: false};
+        // The name of the editor CodeMirror types into, as the notes pane's has: the textarea it
+        // is built from is hidden, and its name goes with it.
+        screenReaderLabel = "JavaScript for the task";
         #userScrolledUp = false;
 
         constructor(textArea){

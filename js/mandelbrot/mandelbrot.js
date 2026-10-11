@@ -462,6 +462,19 @@ Fractal.color = function(iters, z){
     return Color.strRgb(i.i * 123 + 2, (1 - nodeMode_v), 128, 32 + (1 - nodeMode_v) * 48);
 }
 
+// Every line on screen in the colours as they are now (#79). A line takes its colour once, when it
+// is drawn, from the point it starts at -- the first of `data-original-points` -- so a new theme
+// reached the screen one new line at a time: measured, most lines still wore the old palette
+// 3.5 s after one was chosen. Read with a pattern rather than `JSON.parse`, which would read
+// every point of every line for the first. The Edges in `svg_bg` carry no such attribute.
+Fractal.recolour = function(){
+    const iters = settings.iterations;
+    for (const path of svg_bg.querySelectorAll('path[data-original-points]')) {
+        const start = path.dataset.originalPoints.match(/^\[\{"x":([^,]+),"y":([^}]+)\}/);
+        if (start) path.setAttribute('stroke', Fractal.color(iters, new vec2(Number(start[1]), Number(start[2]))));
+    }
+}
+
 let rSlider = Elem.byId('rSlider');
 let cSlider = Elem.byId('cSlider');
 let sSlider = Elem.byId('sSlider');

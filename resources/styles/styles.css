@@ -2016,6 +2016,74 @@ textarea.title-input.title-input-stowed {
                         outline-offset: 2px;
                     }
 
+            /* The theme cards (#79): three to a row at the panels' width, each a picture of its
+               look over its name, and the one in use ringed in the accent with a check over
+               its corner -- the ring a selected card has on the canvas. The radio inside each
+               is the control; the card is its label, so a click anywhere on it chooses. */
+            .theme-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 12px 10px;
+                margin-bottom: 14px;
+            }
+
+                .theme-card {
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    min-width: 0;
+                    cursor: pointer;
+                    color: var(--text-secondary);
+                    font-size: 12.5px;
+                    line-height: 1.2;
+                }
+
+                    .theme-frame {
+                        display: block;
+                        overflow: hidden;
+                        border-radius: 8px;
+                        box-shadow: 0 0 0 1px rgb(255 255 255 / 10%);
+                        transition: box-shadow var(--ui-transition);
+                    }
+
+                        .theme-preview {
+                            display: block;
+                            width: 100%;
+                            height: auto;
+                            aspect-ratio: 16 / 9;
+                        }
+
+                    .theme-card:hover .theme-frame {
+                        box-shadow: 0 0 0 1px rgb(255 255 255 / 30%);
+                    }
+
+                    .theme-card:has(input:checked) {
+                        color: var(--text-primary);
+                    }
+
+                    .theme-card:has(input:checked) .theme-frame {
+                        box-shadow: 0 0 0 2px var(--ui-accent);
+                    }
+
+                    /* The radio is visually hidden, so its ring is drawn round the picture. */
+                    .theme-card:has(input:focus-visible) .theme-frame {
+                        outline: 2px solid var(--ui-accent);
+                        outline-offset: 3px;
+                    }
+
+                    .theme-card:has(input:checked)::after {
+                        content: "";
+                        position: absolute;
+                        top: 6px;
+                        right: 6px;
+                        width: 16px;
+                        height: 16px;
+                        border-radius: 50%;
+                        background: var(--ui-accent-solid) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 10px no-repeat;
+                        box-shadow: 0 0 0 2px rgb(0 0 0 / 35%);
+                    }
+
             /* Inside the menu's panels the panel's width is the one to fill (#32). These
                are fixed for the AI Node, which shares the classes and stays as it is. */
             .menu-detail .checkboxarray {

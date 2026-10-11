@@ -1,17 +1,23 @@
-<!-- Settings that belong to no one feature.
+<!-- Settings: how the page looks, the places on it, and what belongs to no one feature.
 
-     What is here was scattered: the input controls and the two reset buttons sat
-     under the `?` tab, which is help, and the node placement controls sat behind
-     the gear in the Notes pane header, which is the Zettelkasten's own settings.
-     Placement is not about notes -- it decides where on the canvas a Node lands
-     -- so it reads as a graph setting and now sits with the others.
+     Since #79 this holds what the Fractal and Views panels did, which were two rows of the
+     menu for what a reader sets once and comes back to rarely: a Theme, which is the look of
+     the page, and its Customize group, the colours it is made of; the Saved Views; and the
+     Fractal's equation and how it is drawn. The rest came from three places before that: the
+     input controls and the two resets sat under the `?` tab, which is help, and the node
+     placement controls behind the gear in the Notes pane header. Placement is not about
+     notes -- it decides where on the canvas a Node lands -- so it reads as a graph setting.
 
-     The Zettelkasten gear keeps Node Tag and Link Tag. Those are the syntax of
-     the text you are typing, so they belong beside the editor that reads them.
+     The Zettelkasten gear keeps Node Tag and Link Tag. Those are the syntax of the text you
+     are typing, so they belong beside the editor that reads them.
 
-     Sections are flat rather than collapsible. The panel scrolls, this tab is a
-     third the height of the Fractal one, and a setting you visit twice a month
-     is not worth a click to reveal. -->
+     Headed sections, in the order a reader reaches for them: the look first, then the places
+     to go, then the Fractal under both, then the rest. Two groups are folded, as API Keys is
+     in the Ai panel: Customize, because a theme is what most readers want and the fourteen
+     controls under it are for the few who tune one, and the Fractal's drawing, which is
+     about the computer as much as the look. Both are native `<details>`, which the keyboard
+     opens and a screen reader says the state of; the #32 note that made the Fractal panel's
+     groups headed rather than folded was about folds a keyboard could not reach. -->
 
 <div class="submenu">
 
@@ -30,6 +36,272 @@
                 <svg class="menu-row-icon" aria-hidden="true"><use xlink:href="#refresh-icon"></use></svg>
                 <span class="menu-row-label">Check for updates</span>
             </button>
+        </div>
+    </div>
+
+    <!-- Themes (#79), cards with a preview each. `themes.js` builds the cards from its own list
+         and marks the one the colours below are -- or Custom, when they are none of them. A
+         theme is the look only: it sets the controls under Customize, and never the view or
+         the equation, because the Fractal is the plane the notes are on. -->
+    <div class="settings-section" id="themeSettings">
+        <div class="button-label settings-heading" id="themeHeading">Theme</div>
+        <div class="theme-grid" id="themeGrid" role="radiogroup" aria-labelledby="themeHeading"></div>
+
+        <!-- The Fractal panel's Color group, as it was: `dropdown.js` saves these with each
+             graph by the container's id, and a theme sets them through the events they
+             already answer. -->
+        <details class="settings-fold" id="colorSettingsContainer">
+            <summary class="button-label settings-heading">Customize <svg class="fold-mark" aria-hidden="true" viewBox="0 0 24 24"><use xlink:href="#chevron-down-icon"></use></svg></summary>
+            <div class="color-settings-panel">
+                <div id="colorselection">
+                    <div class="color-picker-container">
+                        <div class="color-picker-item">
+                            <label for="rColor">R</label>
+                            <input type="color" id="rColor" name="rColor" value="#FF0000">
+                        </div>
+                        <div class="color-picker-item">
+                            <label for="gColor">G</label>
+                            <input type="color" id="gColor" name="gColor" value="#00FF00">
+                        </div>
+                        <div class="color-picker-item">
+                            <label for="bColor">B</label>
+                            <input type="color" id="bColor" name="bColor" value="#0000FF">
+                        </div>
+                        <div class="color-picker-item">
+                            <label for="colorPicker">BG</label>
+                            <input type="color" id="colorPicker" name="colorPicker" value="#000000" style="background:#222226;">
+                        </div>
+                    </div>
+                    <!-- The universe under the Fractal (universe.ts): on unless switched off here, for a
+                         slow computer or a reader who wants the page the BG colour above. -->
+                    <div class="checkboxarray universe-switch" title="Stars, a galaxy and a nebula under the Fractal">
+                        <div>
+                            <input type="checkbox" id="universe-checkbox" name="universe-checkbox" checked>
+                            <label for="universe-checkbox">Universe</label>
+                        </div>
+                    </div>
+                    
+
+                    <div id="colorsliders">
+                        <input type="range" min="0" max="255" id="rSlider" value="0" style="display: none;">
+                        <div class="gridLayout">
+
+                            <div class="settingsSlider" title="Adjusts fractal line brightness">
+                                <div class="number-input-wrapper" style="flex-direction: column;">
+                                    <label for="cSlider">Brightness:</label>
+                                    <input id="c_value" class="number-input" type="number" min="0" max="255" value="128" step="1" aria-label="Brightness">
+                                </div>
+                                <input type="range" min="0" max="255" id="cSlider" value="128">
+                            </div>
+
+                            <div class="settingsSlider" title="Adjusts fractal line vibrance">
+                                <div class="number-input-wrapper" style="flex-direction: column;">
+                                    <label for="sSlider">Saturation:</label>
+                                    <input id="s_value" class="number-input" type="number" min="0" max="255" value="127" step="1" aria-label="Saturation">
+                                </div>
+                                <input type="range" min="0" max="255" id="sSlider" value="127">
+                            </div>
+
+                            <div class="settingsSlider" title="Adjusts opacity of fractal lines">
+                                <div class="number-input-wrapper" style="flex-direction: column;">
+                                    <label for="outer_opacity">Outer Opacity:</label>
+                                    <input id="outer_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Outer Opacity">
+                                </div>
+                                <input id="outer_opacity" type="range" min="0" max="100" value="100">
+                            </div>
+
+                            <div class="settingsSlider" title="Adjusts opacity of fractal line's interior">
+                                <div class="number-input-wrapper" style="flex-direction: column;">
+                                    <label for="inner_opacity">Inner Opacity:</label>
+                                    <input id="inner_opacity_value" class="number-input" type="number" min="0" max="100" value="100" step="1" aria-label="Inner Opacity">
+                                </div>
+                                <input id="inner_opacity" type="range" min="0" max="100" value="100">
+                            </div>
+
+                            <div class="settingsSlider" id="inversion-settings" title="Inverts color scheme of whole page">
+                                <!-- Slider for Inversion -->
+                                <label for="inversion-slider">Inversion</label>
+                                <input type="range" id="inversion-slider" min="0" max="100" value="0">
+                            </div>
+                            <div class="settingsSlider" id="hue-rotation-settings" title="Rotates color scheme of the whole page around the color wheel">
+                                <!-- Slider for Hue Rotation -->
+                                <label for="hue-rotation-slider">Hue Rotation</label>
+                                <input type="range" id="hue-rotation-slider" min="0" max="360" value="0">
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <!-- Saved Views, from the Views panel (#79). Every one moves the view and nothing else --
+         `returnToSavedView` reads a stored pan and zoom and hands them to
+         `Animation.goToCoords` -- so no Node moves and the Fractal's equation does not change.
+         Which of them show depends on the equation, below: each has its own landmarks, and
+         `savedViews.all` holds the ones that make sense under any of them. That listener is in
+         `displaysavedcoords.js`, which binds all of this by id. -->
+    <div class="settings-section" id="savedViewsSettings">
+        <div class="button-label settings-heading">Saved views</div>
+        <div id="savedCoordinatesContainer" class="saved-coordinates-container"></div>
+
+        <!-- Store reads the current pan and zoom and asks for a name; Delete removes the one
+             last clicked, which is the only thing that marks a Saved View as selected. The two
+             ids still say Coordinates: they are what `displaysavedcoords.js` binds by, and
+             renaming an id changes no word a reader ever sees. Buttons, as the Saved Views
+             are: links with no target, they were out of reach of the keyboard. -->
+        <div class="view-buttons">
+            <button type="button" class="key-button" id="saveCoordinatesBtn">Store View</button>
+            <button type="button" class="key-button" id="deleteCoordinatesBtn">Delete View</button>
+        </div>
+
+        <!-- Not a readout: both boxes are inputs, and typing in one moves the view. That is the
+             same journey a Saved View above makes, written as numbers -- which is the only way
+             to reach a point nobody has named. `interface.js` parses what is typed and sets
+             `App.interface.coordsLive = false` while it does, so the live position stops
+             overwriting the digits mid-word. -->
+        <div id="coordinates" class="coordinates-container">
+            <div class="coordinate-field">
+                <label for="pan">pan</label>
+                <input id="pan" type="text" value="0+0i" style="background:none; border:none;" size="28" />
+            </div>
+            <div class="coordinate-field">
+                <label for="zoom">zoom</label>
+                <input id="zoom" type="text" value="1" style="background:none; border:none;" size="25" />
+            </div>
+        </div>
+    </div>
+
+    <!-- The Fractal panel's Controls group (#79): the equation and its exponent, then how the
+         lines are drawn, folded. `fractalSettingsContainer` is the id `dropdown.js` saves its
+         sliders by, with each graph. -->
+    <div class="settings-section" id="fractalSettingsContainer">
+        <div class="button-label settings-heading">Fractal</div>
+        <div class="fractal-settings-panel">
+                <div class="settingsSlider centered" title="Adjusts exponent of current fractal" style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <label style="white-space: nowrap;">
+                            <span id="equation"></span>
+                        </label>
+                        <div id="julia-constant" style="display: none;">
+                            (<span id="julia-x">0.256</span>, <span id="julia-y">0.01</span>)
+                        </div>
+                        <div class="dropdown-container" title="Select the current fractal equation">
+                            <select id="fractal-select" class="model-selector custom-select"
+                                    aria-label="Fractal equation" aria-describedby="fractal-select-help">
+                                <option value="mandelbrot">Mandelbrot</option>
+                                <option value="julia">Julia Set</option>
+                                <option value="burningShip">Burning Ship</option>
+                                <option value="tricorn">Tricorn</option>
+                                <option value="buffalo">Buffalo</option>
+                                <option value="henon">Henon Map</option>
+                                <option value="ikeda">Ikeda Map</option>
+                                <!--<option value="inverseMandelbrot">Inverse Brot</option>-->
+                            </select>
+                            <!-- The same words as the `title` above, in the accessibility tree:
+                                 a title is hover-only, so it reaches neither the keyboard nor a
+                                 screen reader. `CustomDropdown.setup` hides this select behind a
+                                 div replacer and carries both the name and this description over
+                                 to it. -->
+                            <p id="fractal-select-help" class="visually-hidden">Which equation draws the Fractal under the Graph and pulls Nodes toward its boundary. Julia Set adds a constant, shown beside the equation, that can be dragged to change it.</p>
+                        </div>
+                    </div>
+                    <input id="exponent" type="range" min="1" max="8" value="2"
+                           aria-label="Exponent" aria-describedby="exponent-help">
+                    <p id="exponent-help" class="visually-hidden">The power the equation raises z to, from 1 to 8. It appears in the equation beside the menu; the Henon and Ikeda maps have no exponent to raise.</p>
+                </div>
+            <details class="settings-fold" id="fractalDrawing">
+                <summary class="button-label settings-heading">Drawing <svg class="fold-mark" aria-hidden="true" viewBox="0 0 24 24"><use xlink:href="#chevron-down-icon"></use></svg></summary>
+                <div class="settingsSlider centered" title="Adjust smoothness of fractal lines. Lower to reduce lag" style="margin-bottom: 10px;">
+                    <div style="display:flex; justify-content: space-between;">
+                        <div class="number-input-wrapper" style="width: 45%">
+                            <div id="quality_value">Quality:</div>
+                            <input id="quality_value_number" class="number-input" type="number" min="0" max="100" value="16" step="0.1"
+                                   aria-label="Quality" aria-describedby="quality-help">
+                        </div>
+                        <div class="number-input-wrapper" style="width: 30%" title="Add idleness to save energy">
+                            <div id="frames_delay_value">Delay:</div>
+                            <input id="frames_delay_value_number" class="number-input" type="number" min="0" max="9" value="0" step="1" aria-label="Delay">
+                        </div>
+                        <div id="fps" style="text-align: right; width: 20%">?? fps (Is javascript enabled?)</div>
+                    </div>
+                    <input id="quality" type="range" min="0" max="100" value="16"
+                           aria-label="Quality" aria-describedby="quality-help">
+                    <p id="quality-help" class="visually-hidden">How finely the Fractal's lines are traced, from 0 to 100. Every step up costs frame rate, and the fps reading beside it is what it is costing now.</p>
+                </div>
+                <div class="gridLayout">
+
+                    <div class="settingsSlider" title="Adjusts length of fractal lines. Lower to reduce lag">
+                        <div class="number-input-wrapper">
+                            <label for="length">Length:</label>
+                            <input id="length_value" class="number-input" type="number" min="0" max="100" value="50" step="1" aria-label="Length">
+                        </div>
+                        <input id="length" type="range" min="0" max="100" value="50">
+                    </div>
+
+                    <div class="settingsSlider" title="Adjusts width of fractal lines">
+                        <div class="number-input-wrapper">
+                            <label for="renderWidthMultSlider">Width:</label>
+                            <input id="renderWidthMultValue" class="number-input" type="number" min="0" max="12" value="0.5" step="0.01" aria-label="Width">
+                        </div>
+                        <input type="range" id="renderWidthMultSlider" min="0" max="12" value="0.5" step="0.01">
+                    </div>
+
+                    <div class="settingsSlider" title="Adjusts amount of fractal lines. Lower to reduce lag">
+                        <div class="number-input-wrapper">
+                            <label for="maxLinesSlider">Lines:</label>
+                            <input id="maxLinesValue" class="number-input" type="number" min="0" max="2048" value="128" step="32" aria-label="Lines">
+                        </div>
+                        <input type="range" id="maxLinesSlider" min="0" max="2048" value="128" step="1">
+                    </div>
+
+                    <div class="settingsSlider" title="Adjusts fractal line generation speed. Lower to reduce lag">
+                        <div class="number-input-wrapper">
+                            <label for="regenDebtSlider">Speed:</label>
+                            <input id="regenDebtValue" class="number-input" type="number" min="0" max="4" value="1" step="0.01" aria-label="Speed">
+                        </div>
+                        <input type="range" id="regenDebtSlider" min="0" max="4" value="1" step="0.01">
+                    </div>
+                    <div class="settingsSlider" title="Adjusts cursor's control of line generation">
+                        <div class="number-input-wrapper">
+                            <label for="flashlightStrength">Strength:</label>
+                            <input id="flashlightStrength_value" class="number-input" type="number" min="0" max="100" value="0" step="1"
+                                   aria-label="Strength" aria-describedby="flashlightStrength-help">
+                        </div>
+                        <!-- No aria-label on the slider: the label above already names it, and
+                             an aria-label would replace that name rather than add to it. -->
+                        <input id="flashlightStrength" type="range" min="0" max="100" value="0" step="1"
+                               aria-describedby="flashlightStrength-help">
+                        <p id="flashlightStrength-help" class="visually-hidden">The share of new Fractal lines drawn near the pointer instead of across the whole view, from 0 to 100. Radius sets how wide near is.</p>
+                    </div>
+
+                    <div class="settingsSlider" title="Adjusts radius of line generation around cursor">
+                        <div class="number-input-wrapper">
+                            <label for="flashlightRadius">Radius:</label>
+                            <input id="flashlightRadius_value" class="number-input" type="number" min="0" max="100" value="0" step="1" aria-label="Radius">
+                        </div>
+                        <input type="range" id="flashlightRadius" min="0" max="100" value="0" step="1">
+                    </div>
+
+                    <div class="settingsSlider" title="Delay between segment reveals">
+                        <div class="number-input-wrapper" style="flex-direction: column;">
+                            <label for="renderDelaySlider">Draw Speed:</label>
+                            <input id="draw_speed_value" class="number-input" type="number" min="0" max="300" value="0" step="1" aria-label="Draw Speed">
+                        </div>
+                        <input type="range" id="renderDelaySlider" min="0" max="300" value="0" step="1">
+                    </div>
+                    
+                    <div class="settingsSlider" title="Adjust zoom sensitivity for mouse wheel and drag zooming">
+                        <div class="number-input-wrapper" style="flex-direction: column;">
+                            <label for="zoomSpeedSlider">Zoom Speed:</label>
+                            <input id="zoom_speed_value" class="number-input" type="number" min="0.1" max="5" value="1" step="0.1" aria-label="Zoom Speed">
+                        </div>
+                        <input type="range" id="zoomSpeedSlider" min="0.1" max="5" step="0.1" value="1.0">
+                    </div>
+
+                </div>
+            </details>
         </div>
     </div>
 
