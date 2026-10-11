@@ -2889,98 +2889,6 @@ input[type="checkbox"] {
                 color: inherit;
             }
 
-        /* In the tool pill, past the divider: it rides next to the AI note tool it
-           governs, and outside the menu because the Ai tab is one of the things it
-           hides. It spent a while at the end of the tab row, where every tab was
-           also a chip with a dark fill and a 14px label, so it read as a sixth tab. */
-        .feature-toggle {
-            display: flex;
-            align-items: center;
-            padding: 0 6px 0 2px;
-        }
-
-            /* Every checkbox in the app is `display: none`, which also takes it out of
-               the tab order, so the switch could not be reached by keyboard at all.
-               Clipped instead of hidden: off-screen, but still focusable. */
-            .feature-toggle input[type="checkbox"] {
-                position: absolute;
-                width: 1px;
-                height: 1px;
-                display: block;
-                opacity: 0;
-                pointer-events: none;
-            }
-
-            /* Drawn as a track and a knob. The app's global checkbox style dresses a
-               label to look exactly like a `.tablink` -- same dark fill, same border,
-               same 14px text -- so in a row of tabs this switch read as a sixth tab
-               and went unfound. A sliding knob is a shape nothing else in the row has. */
-            .feature-toggle input[type="checkbox"] + label {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                min-width: 0;
-                margin: 0;
-                padding: 3px 0;
-                background: none;
-                border: none;
-                border-radius: 0;
-                font-size: 11px;
-                letter-spacing: 0.06em;
-                color: #888;
-            }
-
-                /* The track. The global rule positions this absolutely to place a
-                   checkbox square; here it is a box in the label's own flex flow. */
-                .feature-toggle input[type="checkbox"] + label:before {
-                    position: static;
-                    transform: none;
-                    width: 26px;
-                    height: 14px;
-                    border-radius: 7px;
-                    background-color: #3a3a42;
-                    transition: background-color var(--ui-transition);
-                }
-
-                /* The knob. Absolute, so it can slide along the track. `content` is
-                   set here because the global rule puts a checkmark glyph in this
-                   pseudo-element when the box is checked. */
-                .feature-toggle input[type="checkbox"] + label:after {
-                    content: '';
-                    position: absolute;
-                    top: 50%;
-                    left: 2px;
-                    transform: translateY(-50%);
-                    width: 10px;
-                    height: 10px;
-                    border-radius: 50%;
-                    background-color: #888;
-                    transition: left var(--ui-transition), background-color var(--ui-transition);
-                }
-
-            .feature-toggle input[type="checkbox"]:checked + label {
-                background: none;
-                border: none;
-                color: #bbb;
-            }
-
-                .feature-toggle input[type="checkbox"]:checked + label:before {
-                    background-color: var(--ui-accent-dim);
-                }
-
-                .feature-toggle input[type="checkbox"]:checked + label:after {
-                    content: '';
-                    left: 14px;
-                    background-color: var(--ui-accent);
-                }
-
-            /* Keyboard users get no outline otherwise: the input itself is
-               `display: none`, so the ring has to be drawn on the label. */
-            .feature-toggle input[type="checkbox"]:focus-visible + label:before {
-                outline: 2px solid var(--ui-accent);
-                outline-offset: 2px;
-            }
-
         .tabcontent {
             display: none;
             /* The menu's width is the panel's (`.dropdown-content`), so nothing inside
@@ -5417,22 +5325,6 @@ code.language-markdown {
     .panel-icon.edges-icon:hover {
         cursor: pointer; /* button click event cursor */
     }
-
-/* AI features off. A class on `body` rather than a walk over the AI panels
-   because they are built at different points during boot -- tab HTML lands
-   asynchronously and node chrome later still -- so a one-shot pass would miss
-   whichever had not been created yet, while a class reaches anything added later
-   for free.
-
-   `!important` earns its place here: `openTab` writes an inline
-   `display: block` on the tab it opens, and an inline style beats any selector
-   without it. */
-body.ai-disabled #tablink-ai,
-body.ai-disabled #tab4,
-body.ai-disabled #prompt-form,
-body.ai-disabled .node-add-item.ai-icon {
-    display: none !important;
-}
 
 .overlay {
     position: absolute;

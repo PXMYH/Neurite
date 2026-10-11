@@ -23,24 +23,28 @@ const NOTES = [
     '## Linked B', 'Its body.', '',
 ].join('\n');
 
+// A stand-in for the embeddings. With `similar`, letter counts, so similar words give similar
+// vectors, one request at a time as the Worker takes them; without, no vector at all, as when the
+// model gives nothing back -- the proposals rest on mentions and Tags alone. That was AI features
+// switched off until #81 made AI always on.
+const stubEmbeddings = (page, { similar = false, delay = 0 } = {}) => page.evaluate(([similar, delay]) => {
+    window.embedCalls = 0;
+    let queue = Promise.resolve();
+    Embeddings.fetch = async (t) => {
+        window.embedCalls += 1;
+        const turn = queue.then(() => new Promise((r) => setTimeout(r, delay)));
+        queue = turn;
+        await turn;
+        if (!similar) return null;
+        const v = new Array(26).fill(0);
+        for (const ch of t.toLowerCase()) { const k = ch.charCodeAt(0) - 97; if (k >= 0 && k < 26) v[k] += 1; }
+        return v;
+    };
+}, [similar, delay]);
+
 async function setup(page, { ai = false, delay = 0 } = {}) {
-    await page.evaluate(async ([text, ai, delay]) => {
-        AiFeatures.enabled = ai;
-        // A stand-in for the embeddings: letter counts, so similar words give similar vectors,
-        // one request at a time as the Worker takes them.
-        window.embedCalls = 0;
-        let queue = Promise.resolve();
-        Embeddings.fetch = async (t) => {
-            window.embedCalls += 1;
-            const turn = queue.then(() => new Promise((r) => setTimeout(r, delay)));
-            queue = turn;
-            await turn;
-            const v = new Array(26).fill(0);
-            for (const ch of t.toLowerCase()) { const k = ch.charCodeAt(0) - 97; if (k >= 0 && k < 26) v[k] += 1; }
-            return v;
-        };
-        window.currentActiveZettelkastenMirror.setValue(text);
-    }, [NOTES, ai, delay]);
+    await stubEmbeddings(page, { similar: ai, delay });
+    await page.evaluate((text) => { window.currentActiveZettelkastenMirror.setValue(text); }, NOTES);
     await page.waitForFunction(() => Object.keys(Graph.nodes).length === 5 && Object.values(Graph.nodes).some((n) => n.edges.length), undefined, { timeout: 10000 });
     await page.waitForTimeout(800);
 }
@@ -64,7 +68,8 @@ test('the panel lists pairs with the words or Tags they rest on, and none alread
     const list = await rows(page);
     const status = await page.evaluate(() => document.querySelector('#customModal .proposals-status').textContent);
     assert.match(status, /3 notes have no Edge/);
-    assert.match(status, /Similar wording is off with the AI features/);
+    // No vector from the model (the stub's), so the wording is not compared, and the line says why.
+    assert.match(status, /Similar wording is unavailable/);
 
     const mention = list.find((r) => r.pair === 'Retrieval→Vector Store' || r.pair === 'Vector Store→Retrieval');
     assert.ok(mention, 'Retrieval names Vector Store: ' + JSON.stringify(list));
@@ -73,7 +78,7 @@ test('the panel lists pairs with the words or Tags they rest on, and none alread
     const tags = list.find((r) => /Retrieval/.test(r.pair) && /Evaluation/.test(r.pair));
     assert.deepEqual(tags?.why, ['Both tagged #rag']);
     assert.ok(!list.some((r) => /Linked A/.test(r.pair) && /Linked B/.test(r.pair)), 'a linked pair is not proposed');
-    // Reasons only, with the AI features off: nothing rests on wording alone.
+    // Reasons only, with no vectors to compare: nothing rests on wording alone.
     assert.ok(list.every((r) => !r.similarOnly && r.why.length), JSON.stringify(list));
     assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('proposal-pair')), true,
         'the keyboard is in the list');
@@ -144,7 +149,7 @@ test('a dismissed pair stays dismissed through a save and a reload, and Undo bri
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.appReady === true && Object.keys(Graph.nodes).length === 5, undefined, { timeout: 30000 });
     await page.waitForTimeout(800);
-    await page.evaluate(() => { AiFeatures.enabled = false; });
+    await stubEmbeddings(page);
     await openPanel(page);
     assert.ok(!(await rows(page)).some((r) => r.pair === pair), 'still dismissed after a reload');
 });
@@ -225,8 +230,8 @@ test('a dismissal is the two notes\' Titles, not whichever notes hold their uuid
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.appReady === true && Object.keys(Graph.nodes).length === 4, undefined, { timeout: 30000 });
     await page.waitForTimeout(800);
+    await stubEmbeddings(page);
     await page.evaluate(async () => {
-        AiFeatures.enabled = false;
         await window.createNote('Vector Index', 'An index of vectors.');
     });
     await page.waitForTimeout(800);

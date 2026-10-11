@@ -135,32 +135,19 @@ test('the main prompt is in the Ai tab, once, and not in the Notes markup', ()=>
         assert.match(ai, new RegExp('id="' + id + '"'), id + ' did not come along');
     }
 
-    // Hiding the prompt with AI features off was a rule on the form itself; the tab
-    // around it is hidden too now, and the rule has to keep naming the form, because
-    // `#tab4` is only hidden while the tab is closed by other means.
-    //
-    // The function console is not named, because it is inside `#tab4` now (#78): it sat at
-    // the foot of the menu, outside every panel, and needed a selector of its own.
-    //
-    // The declaration as well as the selectors. Matching `body.ai-disabled
-    // #prompt-form,` reads the left of the brace and never the right, so swapping
-    // `display: none !important` for `opacity: 0.99` left all five selectors
-    // byte-identical, showed every AI surface with AI features off, and passed 113 of
-    // 113 -- including this assertion, whose message says the prompt is no longer
-    // hidden. `!important` is load-bearing too: `openTab` writes `display: block`
-    // inline on the panel it opens, and without the flag that inline value wins.
-    const iRule = css.indexOf('body.ai-disabled #tablink-ai,');
-    assert.notEqual(iRule, -1, 'the AI-off rule no longer starts at #tablink-ai');
-    const rule = css.slice(iRule, css.indexOf('}', iRule));
-    for (const selector of ['#tab4', '#prompt-form', '.node-add-item.ai-icon']) {
-        assert.ok(rule.includes('body.ai-disabled ' + selector),
-            selector + ' is no longer hidden when AI features are off');
+    // AI is always on since #81: the switch that hid every AI surface is gone, and with it the
+    // class it wrote on `body`, the rule that read the class, and every check of the flag. A
+    // reader who had it off gets the AI panel, the prompt and the AI note tool back.
+    assert.doesNotMatch(css, /ai-disabled/, 'a rule still hides the AI surfaces behind a class nothing sets');
+    assert.doesNotMatch(read('resources/html/tabs/dropdown.html').replace(/<!--[\s\S]*?-->/g, ''),
+        /id="ai-features-enabled"/, 'the AI switch is back in the tool pill');
+    for (const file of ['js/globals.js', 'js/interface/dropdown/dropdown.js', 'js/nodes/createnodes/createnodes.js',
+                        'js/interface/dropdown/customui/rightclick/customcontextmenu.js',
+                        'js/nodes/nodeinteraction/modalconnect.js', 'js/zettelkasten/zetproposals.ts']) {
+        assert.doesNotMatch(read(file), /AiFeatures/, file + ' still asks whether AI features are on');
     }
-    assert.match(rule, /display:\s*none\s*!important/,
-        'the AI-off rule names every AI surface and then hides none of them');
 
-    // And the console is where that holds: its slot in the Ai panel's markup, folded, and
-    // none left in the menu's own, which no AI-off rule reaches any more.
+    // And the console is in the Ai panel's markup, folded, and none is left in the menu's own.
     assert.match(ai, /<details[^>]*id="functionConsoleFold"[^>]*>[\s\S]*?<div id="function-call-slot"><\/div>[\s\S]*?<\/details>/,
         'the function console is not in a fold of the Ai panel');
     assert.doesNotMatch(read('resources/html/tabs/dropdown.html'), /id="function-call-slot"/,
@@ -271,19 +258,11 @@ test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
     assert.doesNotMatch(dropdownJs, /openTab\('tab1'/,
         'something still opens a tab with no menu row');
 
-    // Opening into a panel is what the empty-menu bug was: `body.ai-disabled` hides
-    // `#tab4` and `#tablink-ai` with `!important`, and Notes -- the row that used to be
-    // visible either way -- is gone, so the menu opened as a 214x48 empty box.
-    // Measured in the browser before the list existed. No `openTab` call may run on
-    // open, conditional or not.
-    //
-    // Reachable after the reader switches AI features off, not on a first load: an
-    // unset flag means on. Three comments and a commit message on this branch said
-    // the opposite, all of them derived from each other rather than from the getter,
-    // which is why the default is pinned here.
-    assert.match(read('js/globals.js'),
-        /get enabled\(\)\{ return localStorage\.getItem\(AiFeatures\.#key\) !== 'false' \}/,
-        'AI features no longer default to on, so the note above is stale');
+    // Opening into a panel is what the empty-menu bug was: while AI features could be
+    // switched off (until #81) they hid `#tab4` and `#tablink-ai` with `!important`, and
+    // Notes -- the row that used to be visible either way -- was gone, so the menu opened
+    // as a 214x48 empty box. Measured in the browser before the list existed. No `openTab`
+    // call may run on open, conditional or not.
 
     // Anchored on the handler itself, not on a line inside it. This read `indexOf` of
     // `dropdownContent.classList.contains("open")` and ended at `On.mousedown`, and both
@@ -315,11 +294,6 @@ test('the menu opens on the list, and nothing opens tab1 by hand', ()=>{
     assert.match(onOpen, /MainMenu\.showList\(\)/,
         'opening the menu does not go to the list');
 
-    // Leaving the Ai panel when AI features are switched off. Back to the list: every
-    // other panel would be a guess, and `#tab1` has no row to mark active.
-    assert.match(dropdownJs,
-        /if \(!AiFeatures\.enabled && aiTabContent\.style\.display === 'block'\) MainMenu\.showList\(\)/,
-        'switching AI features off leaves the Ai panel showing');
 
     // Two views, one class. `openTab` has to switch to the panel it just showed, or
     // every row would look dead; and the heading has to come from the row itself.

@@ -41,8 +41,9 @@
                  it leads with that name, then what a click does, then the drag,
                  then the canvas shortcut.
 
-                 AI is last so that turning AI features off shortens the pill rather
-                 than leaving a hole in the middle of it. -->
+                 AI is last of the four. It was put there so that switching AI features
+                 off shortened the pill rather than leaving a hole; the switch is gone
+                 (#81), and AI is always on. -->
             <div class="panel-icon note-icon node-add-item" role="button" tabindex="0"
                  aria-label="New note"
                  data-tooltip="New note (1): click, or drag out to place it. Shift + Double Click on the canvas does the same.">
@@ -130,17 +131,6 @@
                 <use xlink:href="#eraser-icon"></use>
             </svg>
         </button>
-
-        <div class="tool-bar-divider" aria-hidden="true"></div>
-
-        <!-- The switch sits beside the AI note tool it governs, and outside the
-             menu because the Ai tab is one of the things it hides. It keeps its two
-             letters while the tools lost theirs: a switch is read by its label, and
-             no icon standing for "AI" would be legible in less space. -->
-        <div class="feature-toggle" data-tooltip="AI features: off hides every AI prompt and panel">
-            <input type="checkbox" id="ai-features-enabled" name="ai-features-enabled">
-            <label for="ai-features-enabled">AI</label>
-        </div>
     </div>
 
     <!-- Top-left, where a hamburger is looked for. The reasoning for bottom-left was
@@ -276,8 +266,7 @@
                 <!-- Every row below here opens a panel, so every one carries a chevron.
                      `openTab` is unchanged: it shows the panel, and the panel view
                      is what `MainMenu.showDetail` switches to. The `tablink` class
-                     stays because `openTab` clears `activeTab` across it, and
-                     `#tablink-ai` is the id `body.ai-disabled` hides.
+                     stays because `openTab` clears `activeTab` across it.
 
                      A `title` each, as the four command rows above have. These five
                      carried one as chips and lost it becoming rows, so a five-word

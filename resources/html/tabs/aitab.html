@@ -2,9 +2,7 @@
     <!-- The main prompt, from the Notes tab. First in the tab because it is the action
          and everything under it is configuration. Nothing was rewired: `sendMessage`,
          `autoGrow`, `#aiLoadingIcon`, `#aiErrorIcon` and `#regen-button` all bind by id.
-         `body.ai-disabled #prompt-form` in styles.css hides it, and is not redundant with
-         the rule that hides `#tab4` around it: every AI Node's regenerate button carries
-         the same id (ainode.js), so that rule is also what hides those. Issue #65. -->
+         Issue #65. -->
     <form id="prompt-form" onsubmit="sendMessage(event);">
         <div style="display: flex; width: 100%; padding-bottom: 12px;">
 
@@ -272,8 +270,7 @@
          goes to the model with the Neural API's description (`Prompt.neuralApi`), the
          JavaScript that comes back is shown here and run, and each run stays in the list.
          The Neural API's vision loop drives it too (`Animation.movementAi`).
-         Here, because it is an AI feature and does nothing without a model: under the Ai
-         row it is hidden with the rest of AI while AI features are off. Folded, as API Keys
+         Here, because it is an AI feature and does nothing without a model. Folded, as API Keys
          is, by the same native `<details>`; `functioncallingpanel.js` refreshes its editor
          when it opens. The console's markup is loaded into the slot after this panel's,
          because the slot is in it (`PageLoad.loadTabs`). -->

@@ -373,10 +373,8 @@ class ZetProposals {
         return ZetProposals.allocate(scored, notes.map( (note)=>!note.linked.size ));
     }
 
-    // Whether similar wording could be read: off with the AI features, and unavailable when the
-    // model gave no vector at all.
-    static similarNote(vectors: (number[] | null)[] | null): string {
-        if (!vectors) return 'Similar wording is off with the AI features.';
+    // Whether similar wording could be read: unavailable when the model gave no vector at all.
+    static similarNote(vectors: (number[] | null)[]): string {
         if (!vectors.some(Boolean)) return 'Similar wording is unavailable: the embeddings model gave nothing back.';
         return '';
     }
@@ -412,13 +410,10 @@ class ZetProposals {
             return;
         }
 
-        let vectors: (number[] | null)[] | null = null;
-        if ((AiFeatures as any).enabled) {
-            status.textContent = `Reading ${notes.length} notes for similar wording…`;
-            vectors = await ZetProposals.vectors(notes, (done)=>{
-                if (generation === ZetProposals.#generation) status.textContent = `Reading notes for similar wording: ${done} of ${notes.length}`;
-            });
-        }
+        status.textContent = `Reading ${notes.length} notes for similar wording…`;
+        const vectors = await ZetProposals.vectors(notes, (done)=>{
+            if (generation === ZetProposals.#generation) status.textContent = `Reading notes for similar wording: ${done} of ${notes.length}`;
+        });
         if (generation !== ZetProposals.#generation || modal.current?.id !== 'proposalsModal') return;
 
         ZetProposals.render(body, notes, ZetProposals.propose(notes, vectors), ZetProposals.similarNote(vectors));

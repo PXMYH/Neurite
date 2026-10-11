@@ -107,14 +107,11 @@ Menu.Context = class {
         );
     }
     populateForBackground(x, y){
-        // Built as a list so the Ai entry can be left out entirely with AI
-        // features off. The menu is repopulated on every open, so the switch takes
-        // effect without a reload.
         const options = [
             // Option to create a Text Node (without calling draw)
-            this.option("+ Note", createNodeFromWindow)
+            this.option("+ Note", createNodeFromWindow),
+            this.option("+ Ai", createAndDrawLlmNode)
         ];
-        if (AiFeatures.enabled) options.push(this.option("+ Ai", createAndDrawLlmNode));
         options.push(
             // Option to create a Link Node or Search Google
             this.option("+ Link", returnLinkNodes),

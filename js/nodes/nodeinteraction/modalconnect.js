@@ -29,7 +29,7 @@ Modal.Connect = class {
         const at = notes.findIndex( (note)=>(note.node === origin) );
         if (at < 0) return;
 
-        const vectors = AiFeatures.enabled ? ZetProposals.vectors(notes, undefined, true) : Promise.resolve(null);
+        const vectors = ZetProposals.vectors(notes, undefined, true);
         vectors.then( (vectors)=>{
             if (Modal.current?.id !== 'nodeConnectionModal' || !this.nodeList.isConnected) return;
 

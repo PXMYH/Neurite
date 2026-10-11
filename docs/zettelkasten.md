@@ -74,7 +74,7 @@ The light bulb in the tool bar, **Propose Edges**, lists pairs of notes that cou
 
 - **A mention**: one note's text names the other's Title, whole words and outside a link, quoted with the Title marked. A Title of one word counts only in its own case, since "Setup" or "Models" is also a plain word.
 - **Tags**: the frontmatter `tags` both notes carry, rarest first. A Tag every note has is no reason.
-- **Similar wording**: the two notes' Titles and descriptions (or their first 300 characters) read by the embeddings model chosen in the AI tab, more alike than the note's usual. Pairs with only this to go on are the weakest, and are in a group that starts closed. It is off while the AI features are off.
+- **Similar wording**: the two notes' Titles and descriptions (or their first 300 characters) read by the embeddings model chosen in the AI tab, more alike than the note's usual. Pairs with only this to go on are the weakest, and are in a group that starts closed. It is left out when the model gives no vectors back.
 
 Each note gets at most three, and no note is named more than four times, so the few notes everything mentions do not fill the list. Nothing is proposed until the button is pressed, and a note's vector is kept in the browser, so a second look is instant.
 

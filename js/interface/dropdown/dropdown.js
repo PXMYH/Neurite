@@ -153,9 +153,10 @@ const MainMenu = {
     showList(e){
         // Above the guard, never below it: this line is the only one every caller
         // needs. Below it, opening the menu leaves `detail-open` set and the menu
-        // comes back showing whichever panel was last open -- and with AI features
-        // off that panel is hidden, which is the empty-menu bug this whole list
-        // exists to end. Swapping these two lines passed 116 of 116 tests.
+        // comes back showing whichever panel was last open -- and while AI features
+        // could be switched off that panel could be hidden, which was the empty-menu
+        // bug this whole list exists to end. Swapping these two lines passed 116 of
+        // 116 tests.
         MainMenu.div.classList.remove('detail-open');
         if (!e) return;
         // The row `openTab` marked -- what the `activeTab` note in `styles.css` is
@@ -268,11 +269,10 @@ On.click(menuButton, (e)=>{
 
     if (isOpen) {
         // The list, every time. Opening straight into a panel meant choosing one that
-        // is visible, and `body.ai-disabled` hides Ai and `#tab4` with `!important`
-        // for as long as AI features are off -- which is until someone switches them
-        // on. That opened the menu as an empty 214x48 box, back when Notes had no row
-        // to fall back on. The list is the answer rather than a better guess: it holds
-        // no panel to hide.
+        // is visible, and while AI features could be switched off (until #81) they hid
+        // Ai and `#tab4` with `!important`. That opened the menu as an empty 214x48 box,
+        // back when Notes had no row to fall back on. The list is the answer rather than
+        // a better guess: it holds no panel to hide.
         //
         // The loop that stood here removed a class nobody adds (`active`, where `openTab`
         // writes `activeTab`) and hid `tabcontent[i]` for as many i as there are
@@ -392,26 +392,10 @@ On.keydown(document, (e)=>{
         || dropdownContent.contains(focused))) return;
 
     const tool = toolBar.querySelector('.' + iconClass);
-    // `offsetParent` is null while AI features are off, which hides the AI tool.
+    // `offsetParent` is null for a tool that is not drawn.
     if (!tool || !tool.offsetParent) return;
 
     tool.click();
 });
 
 
-// AI switch. Off hides every AI prompt surface through `body.ai-disabled`; the
-// two paths CSS cannot reach are guarded where they are called, in
-// `createnodes.js` and `customcontextmenu.js`.
-const aiFeaturesCheckbox = Elem.byId('ai-features-enabled');
-aiFeaturesCheckbox.checked = AiFeatures.enabled;
-
-On.change(aiFeaturesCheckbox, (e)=>{
-    AiFeatures.enabled = aiFeaturesCheckbox.checked;
-
-    // `openTab` writes an inline `display: block` on the tab it opens, so the Ai
-    // panel has to be left rather than merely restyled if it is the one showing.
-    // Back to the list, not sideways into another panel: the list is where the menu
-    // starts, and going there needs no argument about which panel is safe to show.
-    const aiTabContent = Elem.byId('tab4');
-    if (!AiFeatures.enabled && aiTabContent.style.display === 'block') MainMenu.showList();
-});
