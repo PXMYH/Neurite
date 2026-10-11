@@ -42,9 +42,11 @@ const SettingsModal = {
         SettingsModal.root.hidden = true;
         SettingsModal.setPageInert(false);
         // The menu was closed as the dialog opened, so a row of it cannot take the focus back;
-        // the menu button stands for it.
+        // the menu button stands for it, and for an opener that is gone or no longer drawn -- the
+        // overview's Archive line, once Notes has deleted the Archive it named.
         const back = SettingsModal.opener;
-        const target = (back?.isConnected && back !== document.body && !dropdownContent.contains(back)) ? back : menuButton;
+        const shown = back?.isConnected && back !== document.body && back.getClientRects().length > 0;
+        const target = (shown && !dropdownContent.contains(back)) ? back : menuButton;
         target.focus?.();
         SettingsModal.opener = null;
     },
@@ -119,9 +121,10 @@ const SettingsModal = {
         SettingsModal.show(next.dataset.page);
     },
 
-    // A click outside closes it, and the rest of a double-click there is taken out as it comes
-    // (`Modal.onRestOfDoubleClick`): it came down on the Graph, and made a note.
-    onBackdrop(e){
+    // A click outside or on the close button closes it, and the rest of a double-click there is
+    // taken out as it comes (`Modal.onRestOfDoubleClick`): it came down on the Graph, where the
+    // dialog had been, and made a note.
+    closeByClick(e){
         SettingsModal.close();
         Modal.closedBehind = {x: e.clientX, y: e.clientY, until: performance.now() + 500};
     },
@@ -147,8 +150,8 @@ const SettingsModal = {
 
     init(){
         On.click(Elem.byId('settings-button'), ()=>SettingsModal.open() );
-        On.click(Elem.byId('settingsClose'), SettingsModal.close);
-        On.click(Elem.byId('settingsBackdrop'), SettingsModal.onBackdrop);
+        On.click(Elem.byId('settingsClose'), SettingsModal.closeByClick);
+        On.click(Elem.byId('settingsBackdrop'), SettingsModal.closeByClick);
         On.dragover(SettingsModal.root, SettingsModal.onFile);
         On.drop(SettingsModal.root, SettingsModal.onFile);
         for (const item of SettingsModal.nav.querySelectorAll('.settings-nav-item')) {

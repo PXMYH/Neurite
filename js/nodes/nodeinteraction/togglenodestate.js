@@ -263,6 +263,8 @@ NodeView.runShortcut = function(method){
 On.keydown(window, (e)=>{
     if (!e.getModifierState(controls.controlKey.value)) return;
     if (!e.getModifierState(controls.shiftKey.value)) return;
+    // Not through Settings, which is over the Nodes it would fold (#82).
+    if (SettingsModal.isOpen()) return;
 
     // `e.key` carries the shifted spelling, and on some layouts a Control chord reports
     // the unshifted one, so both cases are accepted rather than guessing which arrives.

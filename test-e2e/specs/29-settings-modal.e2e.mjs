@@ -142,23 +142,96 @@ test('nothing reaches the Graph through Settings: a lost focus, a pinch, a doubl
     const dropped = await page.evaluate(() => {
         const files = new DataTransfer();
         files.items.add(new File(['x'], 'a.txt', { type: 'text/plain' }));
-        const over = (target) => {
-            const e = new DragEvent('dragover', { dataTransfer: files, bubbles: true, cancelable: true });
+        const taken = (type, target) => {
+            const e = new DragEvent(type, { dataTransfer: files, bubbles: true, cancelable: true });
             target.dispatchEvent(e);
             return e.defaultPrevented;
         };
-        return [over(document.getElementById('settingsBackdrop')), over(document.querySelector('.settings-nav'))];
+        return ['dragover', 'drop'].flatMap((type) => [taken(type, document.getElementById('settingsBackdrop')),
+                                                        taken(type, document.querySelector('.settings-nav'))]);
     });
-    assert.deepEqual(dropped, [true, true], 'a file over Settings is left to the browser to open');
+    assert.deepEqual(dropped, [true, true, true, true], 'a file over Settings is left to the browser to open');
 
     // The Fractal's lines can take the hit, and a note is made only on the canvas itself
     // (`createnodes.js`), so they let it through, as in 08-editor.
     await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none' });
     await page.mouse.dblclick(30, 500);
     await page.waitForTimeout(400);
-    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = '' });
     assert.deepEqual([(await state(page)).open, await nodeCount(page)], [false, 0],
         'a double-click outside Settings closed it and made a note');
+    // And on its close button, which the Graph is under once the dialog has gone.
+    await openSettings(page, 'notes');
+    const close = await page.evaluate(() => {
+        const r = document.getElementById('settingsClose').getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    await page.mouse.dblclick(close.x, close.y);
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = '' });
+    assert.deepEqual([(await state(page)).open, await nodeCount(page)], [false, 0],
+        'a double-click on the close button closed Settings and made a note');
+});
+
+// Found by the second review: a question asked from Settings left Settings in reach of a screen
+// reader and of Tab behind it; Esc dropped a note that was following the pointer as it closed
+// Settings; Ctrl+Shift+M folded the selection behind it; and the focus went to `body` when what
+// opened it was no longer drawn.
+test('a question over Settings has the page to itself, and Settings leaves the Graph as it was', async () => {
+    await openSettings(page, 'data');
+    await page.click('#clearLocalStorage');
+    await page.waitForFunction(() => Modal.current?.id === 'confirmModal', undefined, { timeout: 5000 });
+    assert.equal(await page.evaluate(() => document.getElementById('settingsModal').inert), true,
+        'Settings is in reach behind the question');
+    await page.click('#customModal .modal-cancel');
+    // Back into Settings, wherever it was before the question: on Clear in Chromium, and in
+    // WebKit, where a tap does not focus a button, on the page in the sidebar.
+    assert.deepEqual(await page.evaluate(() => [document.getElementById('settingsModal').inert,
+        document.getElementById('settingsModal').contains(document.activeElement)]),
+        [false, true], 'Settings stayed inert, or the focus did not come back into it');
+    await page.keyboard.press('Escape');
+
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\na\n'));
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 1, undefined, { timeout: 5000 });
+    await page.evaluate(() => App.selectedNodes.toggleNode(Object.values(Graph.nodes)[0]));
+    await openSettings(page, 'editing');
+    // Following the pointer from here: the click that opened Settings would have put it down.
+    await page.evaluate(() => { Object.values(Graph.nodes)[0].followingMouse = 1 });
+    // Control, not Cmd: the chord is `controls.controlKey`, Control on a Mac too.
+    await page.keyboard.press('Control+Shift+M');
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await page.evaluate(() => {
+        const node = Object.values(Graph.nodes)[0];
+        return [document.getElementById('settingsModal').hidden, node.followingMouse, node.view.div.classList.contains('collapsed')];
+    }), [true, 1, false], 'Escape or the fold chord reached the Graph through Settings');
+});
+
+test('the focus goes back to the menu button when what opened Settings is gone', async () => {
+    await openSettings(page, 'notes');
+    await page.click('#archiveNew');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('.hud-archive').hidden, undefined, { timeout: 3000 });
+    await page.click('.hud-archive');
+    assert.equal((await state(page)).page, 'notes');
+    // Deleting the second Archive leaves one, and the overview's line that opened Settings goes.
+    await page.click('#archiveDelete');
+    await page.waitForFunction(() => Modal.current?.id === 'confirmModal', undefined, { timeout: 5000 });
+    await page.click('#customModal .modal-ok');
+    await page.waitForFunction(() => document.querySelector('.hud-archive').hidden, undefined, { timeout: 3000 });
+    await page.keyboard.press('Escape');
+    assert.equal((await state(page)).focus, 'menu-button', 'the focus went to the page instead');
+});
+
+test('showing Notes measures its editor again', async () => {
+    await page.evaluate(() => {
+        const cm = window.currentActiveZettelkastenMirror;
+        window.refreshes = 0;
+        const refresh = cm.refresh.bind(cm);
+        cm.refresh = () => { window.refreshes += 1; return refresh() };
+    });
+    await openSettings(page, 'theme');
+    const before = await page.evaluate(() => window.refreshes);
+    await page.click('.settings-nav-item[data-page="notes"]');
+    assert.ok(await page.evaluate(() => window.refreshes) > before, 'the editor was shown as it was laid out while hidden');
 });
 
 test('Settings opens on the page it was left on, through a reload too', async () => {

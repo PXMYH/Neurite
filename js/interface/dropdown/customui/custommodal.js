@@ -98,6 +98,9 @@ Modal.open = function (contentId) {
     // drag still under way stops: the dimmed page went with it, and left a strip of the Graph
     // undimmed and in reach -- an alert raised mid-drag followed the mouse.
     Modal.div.classList.toggle('asks', Boolean(modal?.asks));
+    // A question over Settings (#82) has the keyboard and the screen reader to itself, as it
+    // has over the page: Settings is inert behind it until it is answered.
+    Elem.byId('settingsModal').inert = Boolean(modal?.asks);
     if (modal?.asks) {
         Modal.div.style.left = Modal.div.style.top = '';
         Modal.isDragging = false;
@@ -189,6 +192,7 @@ Modal.close = function () {
     Modal.closeOverlay();
     Modal.current = null;
     Modal.settleUnanswered();
+    Elem.byId('settingsModal').inert = false;
 
     // Only when the dialog had the keyboard: a click on the Graph behind moved it on.
     const back = Modal.returnFocus;

@@ -71,6 +71,9 @@ class NodeMode {
     // turns the connect mode off, and clears the selection.
     onEscape = (e)=>{
         if (e.key !== 'Escape') return;
+        // Settings takes it whole, and the Graph behind it is left as it was (#82). The
+        // right-click menu cannot be over it: `.dropdown` keeps the browser's own.
+        if (SettingsModal.isOpen()) return;
 
         Graph.forEachNode(Node.stopFollowingMouse);
         // The right-click menu is on top of everything when it is open, the menu panel and a
@@ -79,7 +82,7 @@ class NodeMode {
             e.stopPropagation();
             return App.menuContext.hide();
         }
-        if (Modal.current || dropdownContent.classList.contains('open') || SettingsModal.isOpen()) return;
+        if (Modal.current || dropdownContent.classList.contains('open')) return;
         // A select list that is open and has the focus, which is the one its own Escape
         // closes; a list left open in a closed modal is not, and it kept the key from here.
         if (document.activeElement?.closest?.('.select-replacer:not(.closed)')) return;

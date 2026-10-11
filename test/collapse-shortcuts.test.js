@@ -40,13 +40,14 @@ function sliceShortcutBlock(){
 function load(){
     let onKeyDown = null;
     const selected = [];
-    const box = {pointerView: null};
+    const box = {pointerView: null, settingsOpen: false};
 
     const NodeView = function(){};
     const sandbox = {
         NodeView,
         On: {mousemove(){}, keydown(_target, cb){ onKeyDown = cb }},
         controls: {controlKey: {value: 'Control'}, shiftKey: {value: 'Shift'}},
+        SettingsModal: {isOpen: ()=>box.settingsOpen},
         App: {selectedNodes: {
             forEachView(cb, ct){ selected.forEach((v)=>cb.call(ct, v)) }
         }},
@@ -78,6 +79,7 @@ function load(){
         makeView,
         select: (...views)=>selected.push(...views),
         hover: (view)=>{ box.pointerView = view },
+        openSettings: ()=>{ box.settingsOpen = true },
         fireKey: (e)=>{ onKeyDown(e); return e }
     };
 }
@@ -135,6 +137,18 @@ test('Ctrl+Shift+M collapses and Ctrl+Shift+F expands the card under the pointer
 
     fireKey(chord('F'));
     assert.deepEqual(hovered.calls, ['collapse', 'expand']);
+});
+
+// Settings is over the Nodes while it is open (#82), and folded a selection behind it.
+test('nothing folds while Settings is open', ()=>{
+    const {makeView, select, openSettings, fireKey} = load();
+    const selected = makeView(false);
+    select(selected);
+    openSettings();
+
+    const m = fireKey(chord('M'));
+    assert.deepEqual(selected.calls, [], 'a card behind Settings folded');
+    assert.equal(m.prevented, false, 'the chord was claimed for nothing');
 });
 
 test('the shifted and unshifted spellings of the key both work', ()=>{

@@ -123,6 +123,12 @@ test('the Notes markup still loads, and the reason it has to is still in the sou
         'App.init no longer needs #zetPaneContainer, so #tab1 can be deleted outright');
     assert.match(dropdownJs, /window\.currentActiveZettelkastenMirror\.refresh\(\)/,
         'openTab no longer refreshes the editor, so #tab1 can be deleted outright');
+    // And the Notes page of Settings (#82) refreshes it as it shows it, which is the way to the
+    // editor now: CodeMirror lays its text out to the width it last had, and while hidden it had
+    // none.
+    assert.match(read('js/interface/dropdown/settingsmodal.js'),
+        /if \(page === 'notes'\) window\.currentActiveZettelkastenMirror\?\.refresh\(\);/,
+        'showing Notes no longer refreshes the editor');
     assert.match(read(NOTES), /<div id="zetPaneContainer"/, 'the editor host is gone');
 
     // The div's own comment has to keep saying why it cannot be deleted, because that
