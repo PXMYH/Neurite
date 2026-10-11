@@ -320,7 +320,10 @@ Decisions:
 - [x] Phase 3 -- the menu row, its states and the dot; an e2e spec with a stand-in bridge.
 - [x] Phase 4a -- a packaged build updates itself to the next patch from a local feed, in a scratch
   folder (desktop/update.e2e.mjs), and refuses a DMG whose hash does not match.
-- [ ] Phase 4b -- the real one, from GitHub, after the next release.
+- [x] Phase 4b -- the real one, from GitHub: the published 1.7.0 DMG, installed in a scratch folder
+  with a profile of its own, found the published 1.8.0 by itself 18 s after opening, and after one
+  Update downloaded it from GitHub, swapped, and opened again as 1.8.0 with its note, in the new
+  cards; update.log "updated", the seal verified, nothing left in the profile.
 
 ## Review
 
