@@ -17,25 +17,24 @@ function createLlmNode(name = '', sx, sy, x, y) {
     const promptTextArea = Html.make.textarea('custom-scrollbar custom-textarea');
     promptTextArea.id = 'nodeprompt-' + llmNodeCount;
 
-    // Create the send button (keeping inline styles)
+    // The three buttons beside the prompt are drawn by `.ai-node-button` (panels.css, #83),
+    // where each wore an inline bevel and had its colours written by its own mouse handlers.
     const sendButton = Html.new.button();
     sendButton.type = "submit";
     sendButton.id = 'prompt-form-' + llmNodeCount;
-    sendButton.style.cssText = "display: flex; justify-content: center; align-items: center; padding: 3px; z-index: 1; font-size: 14px; cursor: pointer; background-color: #222226; transition: background-color 0.3s; border: inset; border-color: #8882; width: 30px; height: 30px;";
+    sendButton.className = 'ai-node-button';
     sendButton.innerHTML = Svg.play;
 
-    // Create the regenerate button (keeping inline styles)
     const regenerateButton = Html.new.button();
     regenerateButton.type = "button";
     regenerateButton.id = "prompt-form";
-    regenerateButton.style.cssText = "display: flex; justify-content: center; align-items: center; padding: 3px; z-index: 1; font-size: 14px; cursor: pointer; background-color: #222226; transition: background-color 0.3s; border: inset; border-color: #8882; width: 30px; height: 30px;";
+    regenerateButton.className = 'ai-node-button';
     regenerateButton.innerHTML = Svg.refresh;
 
-    // Create settings button (keeping inline styles)
     const aiNodeSettingsButton = Html.new.button();
     aiNodeSettingsButton.type = "button";
     aiNodeSettingsButton.id = 'aiNodeSettingsButton';
-    aiNodeSettingsButton.style.cssText = "display: flex; justify-content: center; align-items: center; padding: 3px; z-index: 1; font-size: 14px; cursor: pointer; background-color: #222226; transition: background-color 0.3s; border: inset; border-color: #8882; width: 30px; height: 30px;";
+    aiNodeSettingsButton.className = 'ai-node-button';
     const settingsIcon = Elem.deepClone(Elem.byId('aiNodeSettingsIcon'));
     settingsIcon.style.display = 'inline-block';
     aiNodeSettingsButton.appendChild(settingsIcon);
@@ -368,13 +367,16 @@ AiNode.setupPromptTextAreaListeners = function(node){
     });
 }
 
+// A Saved Graph is the markup itself, so a card saved before #83 brings its buttons' inline
+// bevel back with it: the class is given, and the style taken away, on every init.
+AiNode.styleButton = function(button){
+    button.removeAttribute('style');
+    button.classList.add('ai-node-button');
+}
+
 AiNode.setupSendButtonListeners = function(node){
     const button = node.sendButton;
-
-    On.mouseover(button, Elem.setBothColors.bind(button, '#222226', '#293e34'));
-    On.mouseout(button, Elem.setBothColors.bind(button, '#ddd', '#222226'));
-    On.mousedown(button, Elem.setBackgroundColor.bind(button, '#45a049'));
-    On.mouseup(button, Elem.setBackgroundColor.bind(button, '#ddd'));
+    AiNode.styleButton(button);
 
     On.click(button, (e)=>{
         e.preventDefault();
@@ -384,11 +386,7 @@ AiNode.setupSendButtonListeners = function(node){
 
 AiNode.setupRegenerateButtonListeners = function(node){
     const button = node.regenerateButton;
-    const setBackColor = Elem.setBackgroundColor;
-    On.mouseover(button, setBackColor.bind(button, '#333'));
-    On.mouseout(button, setBackColor.bind(button, '#222226'));
-    On.mousedown(button, setBackColor.bind(button, '#45a049'));
-    On.mouseup(button, setBackColor.bind(button, '#222226'));
+    AiNode.styleButton(button);
 
     node.regenerateResponse = function () {
         this.removeLastResponse();
@@ -408,16 +406,16 @@ AiNode.setupRegenerateButtonListeners = function(node){
 AiNode.setupSettingsButtonListeners = function(node){
     const button = node.content.querySelector('#aiNodeSettingsButton');
     const container = node.content.querySelector('.ainode-settings-container');
+    AiNode.styleButton(button);
 
-    const setBackColorPerIsActive = Elem.setBackgroundColorPerIsActive;
-    On.mouseover(button, setBackColorPerIsActive.bind(button, '#1e3751', '#333'));
-    On.mouseout(button, setBackColorPerIsActive.bind(button, '#1e3751', '#222226'));
-    On.mousedown(button, Elem.setBackgroundColor.bind(button, '#1e3751'));
-    On.mouseup(button, setBackColorPerIsActive.bind(button, '#1e3751', '#333'));
+    // Pressed while its panel is open, as a toggle says it is on; from the panel as it was
+    // saved, for a restored card.
+    button.isActive = (container.style.display === 'grid');
+    button.setAttribute('aria-pressed', String(button.isActive));
     On.click(button, (e)=>{
         button.isActive = !button.isActive;
         toggleSettings(e, container);
-        setBackColorPerIsActive.call(button, '#1e3751', '#333');
+        button.setAttribute('aria-pressed', String(button.isActive));
     });
 
     On.mousedown(container, conditionalStopPropagation);

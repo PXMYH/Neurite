@@ -2441,18 +2441,7 @@ input[type="text"i]:hover {
 
 
 
-#delete-vectordb-docs:hover {
-    background-color: #9a4a4a;
-    color: #222226;
-}
-
-#chunkAndStoreButton:hover {
-    background-color: #293e34;
-}
-
-#cancelChunkAndStoreButton:hover {
-    background-color: #5c2929;
-}
+/* The Vector Database's buttons hover as every dialog button does (#83, panels.css). */
 
 .vdb-loading-item {
     display: flex;
@@ -4215,15 +4204,6 @@ input[type=range] {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-}
-
-.single-column-layout {
-    padding-top: 5px;
-    padding-bottom: 10px;
-    display: grid;
-    grid-template-columns: 1fr; /* Single column layout */
-    gap: 15px; /* Adjusts the spacing between the items */
-    align-items: center;
 }
 
 .ainodewrapperDiv {

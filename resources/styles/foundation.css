@@ -1198,11 +1198,12 @@ body.connect-mode .window textarea {
     overflow-y: auto;
     gap: var(--space-2);
     padding: var(--space-5);
-    background-color: var(--ui-chrome);
+    /* The one dialog surface (`--dialog-*`, panels.css, #83). */
+    background-color: var(--dialog-fill);
     backdrop-filter: none;
-    border: 1px solid rgb(255 255 255 / 9%);
-    border-radius: 12px;
-    box-shadow: 0 16px 40px rgb(0 0 0 / 45%), inset 0 1px 0 rgb(255 255 255 / 4%);
+    border: 1px solid var(--dialog-edge);
+    border-radius: var(--dialog-radius);
+    box-shadow: var(--dialog-shadow);
     cursor: auto;
     animation: asks-rise-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -1215,8 +1216,9 @@ body.connect-mode .window textarea {
         box-shadow: none;
     }
 
+    /* Every dialog's title is 16px semibold (#83): this one, the tool windows', Settings'. */
     .modal.asks .modal-title {
-        font-size: var(--text-lg);
+        font-size: 16px;
         font-weight: var(--weight-semibold);
         line-height: var(--leading-tight);
         color: var(--text-primary);

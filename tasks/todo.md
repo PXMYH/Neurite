@@ -691,3 +691,51 @@ Found while doing it:
   311 of 312 (1 skipped), iPad 266 passed, 44 skipped, and the two that fail on main.
 - The Mac app, 1.9.3 from its DMG, in a scratch folder: smoke 4/4, updates 8/8, the reload test
   among them (it fails on the code before the fix: `onProbation()` is true again after a reload).
+
+# Every menu and dialog in one style (#83, 2026-10-11)
+
+Asked, in chat, over a screenshot of the "Experimental Ai Settings" window: "those menus are
+disgusting, research the menu of popular apps and follow the style, also we should make sure ALL
+menu and modal styles are consistent". Tier T3, brownfield. Filed as #83.
+
+What popular apps do, read from shadcn/ui's source (new-york-v4), Radix Themes' base-menu.css and
+Apple's HIG (measured), and from memory of Linear, Notion, Raycast and Figma (inferred):
+- a menu is a raised panel 4-8px in, with an 8px radius, a hairline edge and a shadow; its rows
+  are flat, about 32px, 14px text, with a rounded wash for the hover inside the panel and the text
+  unchanged; a check sits in a left column; small grey group labels; 1px separators; shortcuts
+  grey at the right; a destructive item red with a red wash;
+- a dialog is about 512px wide, 24px in, 10-12px corners, a 16-18px semibold title, the close X at
+  the top right, and its buttons at the foot on the right with the primary one last;
+- no app draws options as bevelled buttons. For a list of on/off options in a dialog, Notion and
+  Linear use switches, Apple, Figma and Raycast checkboxes. Here: switches, as Settings has them.
+
+What there was, from an inventory of every menu and modal (17 windows in `#customModal`, the
+right-click menu and its action list, the select lists, the AI node's panel, the tooltips): two
+styles. Settings, its pages and Help had #80's design system, scoped to `.menu-detail`; the
+windows, the right-click menu, the action list, a select's list outside Settings and the AI node
+had the older rules -- see-through frames with a 2px #333 edge and square bottom corners, title
+bars with a 30px shadow, a 32px × that turned black, checkboxes drawn as bevelled chips with a tick,
+`border: inset` buttons and fields, a light select list, a right-click menu with corners of 0 and
+10px in turn and a pale blue hover under black text.
+
+Decisions:
+- One set of tokens: `--dialog-fill`, `--dialog-edge`, `--dialog-radius` (12px, the Settings
+  modal's), `--dialog-shadow`; `--menu-fill`, `--menu-edge`, `--menu-radius` (10px), `--menu-pad`
+  (6px), `--menu-item-h` (32px, the main menu's rows), `--menu-item-radius` (6px), `--menu-hover`,
+  `--menu-shadow`.
+- The tool windows keep their place and stay draggable and undimmed (they work beside the Graph),
+  on the Settings modal's surface, with a title over a hairline and the Settings close button --
+  a real `<button>` now, where it was a `<span>` of `&times;`. Every title is 16px semibold, the
+  questions' and Settings' too.
+- Every dialog's body is `.menu-detail`, so its buttons, fields, selects and switches are
+  Settings'. The AI's options are two groups of switches; Import Text's options are rows of a
+  group; the action a dialog is for is the accent at its foot, Cancel before it.
+- Lists in dialogs (Search Nodes, Connect, Ollama, the Vector Database, the file tree) have menu
+  rows: 32px, rounded, a wash for the hover, no rule between rows; linked is a green wash and the
+  tick, a row chosen for a delete the danger's wash.
+- The right-click menu, a node's actions and every select's list are one menu; the tooltip is a
+  small panel of the same fill and edge, above the dialogs (950) and still under Paper's filter.
+- The AI node's panel is on the dialog surface, its six options toggle chips, its selects,
+  sliders, button and text box the Settings controls. Its three buttons lose their inline bevel and
+  the mouse handlers that wrote their colours; the init takes the old inline style off a card saved
+  before, since a Saved Graph is the markup itself.

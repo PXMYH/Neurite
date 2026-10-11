@@ -20,7 +20,10 @@
    holds text to read; a reader who asks the system for less transparency gets them solid.
 
    Scoped to `.menu-detail` wherever a class is shared: `.settingsSlider`, `.gridLayout`,
-   `.checkboxarray` and the rest are also an AI Node's, and those stay as they are. Loaded
+   `.checkboxarray` and the rest are also an AI Node's, which has rules of its own (below).
+   Every dialog's body carries `.menu-detail` since #83, and every dialog and menu draws from
+   the same tokens (`--dialog-*`, `--menu-*`): the Settings modal, the windows `#customModal`
+   shows, the questions, the right-click menu, a node's actions and every select's list. Loaded
    after foundation.css, so a rule here wins a tie by order. */
 
 :root {
@@ -46,6 +49,22 @@
     --control-fill-active: rgb(255 255 255 / 16%);
     --control-edge: rgb(255 255 255 / 15%);
     --switch-off: rgb(255 255 255 / 20%);
+
+    /* One surface for every dialog (#83) -- the Settings modal, the tool windows, the questions
+       -- and one for every menu that pops up: the right-click menu, its actions, a select's list.
+       They were each drawn on their own, at different times, and looked it. */
+    --dialog-fill: var(--ui-chrome);
+    --dialog-edge: var(--glass-edge);
+    --dialog-radius: 12px;
+    --dialog-shadow: 0 0 0 1px rgb(0 0 0 / 25%), 0 6px 16px rgb(0 0 0 / 30%), 0 24px 64px rgb(0 0 0 / 45%);
+    --menu-fill: rgb(43 43 51 / 94%);
+    --menu-edge: rgb(255 255 255 / 10%);
+    --menu-radius: 10px;
+    --menu-pad: 6px;
+    --menu-item-h: 32px;
+    --menu-item-radius: 6px;
+    --menu-hover: rgb(255 255 255 / 10%);
+    --menu-shadow: 0 0 0 1px rgb(0 0 0 / 25%), 0 8px 24px rgb(0 0 0 / 50%);
 }
 
 /* ---- Glass ------------------------------------------------------------------------------ */
@@ -368,7 +387,7 @@
 /* The track 4px tall and the box it is drawn in 18px, so the row, not the hairline, is what a
    pointer has to find. `customsliders.js` paints the fill as an inline `background`, so its
    size and place are set here, against the inline shorthand that resets them. */
-.menu-detail input[type="range"] {
+:is(.menu-detail, .ainode-settings-container) input[type="range"] {
     width: 100%;
     height: 18px;
     margin: 0;
@@ -379,7 +398,7 @@
     background-repeat: no-repeat !important;
 }
 
-    .menu-detail input[type="range"]::-webkit-slider-thumb {
+    :is(.menu-detail, .ainode-settings-container) input[type="range"]::-webkit-slider-thumb {
         width: 14px;
         height: 14px;
         margin-top: 0;
@@ -389,12 +408,12 @@
         transition: transform var(--ui-transition);
     }
 
-    .menu-detail input[type="range"]:hover::-webkit-slider-thumb {
+    :is(.menu-detail, .ainode-settings-container) input[type="range"]:hover::-webkit-slider-thumb {
         background: #fff;
         transform: scale(1.1);
     }
 
-    .menu-detail input[type="range"]::-moz-range-thumb {
+    :is(.menu-detail, .ainode-settings-container) input[type="range"]::-moz-range-thumb {
         width: 14px;
         height: 14px;
         border: none;
@@ -403,12 +422,12 @@
         box-shadow: 0 0 0 1px rgb(0 0 0 / 30%), 0 1px 3px rgb(0 0 0 / 45%);
     }
 
-    .menu-detail input[type="range"]::-moz-range-track,
-    .menu-detail input[type="range"]::-moz-range-progress {
+    :is(.menu-detail, .ainode-settings-container) input[type="range"]::-moz-range-track,
+    :is(.menu-detail, .ainode-settings-container) input[type="range"]::-moz-range-progress {
         background: transparent;
     }
 
-    .menu-detail input[type="range"]:focus-visible {
+    :is(.menu-detail, .ainode-settings-container) input[type="range"]:focus-visible {
         outline: 2px solid var(--ui-accent);
         outline-offset: 2px;
     }
@@ -456,13 +475,15 @@
         outline-offset: 2px;
     }
 
-    .menu-detail .key-button.is-danger {
+    .menu-detail .key-button.is-danger,
+    .menu-detail .linkbuttons.is-danger {
         border-color: color-mix(in srgb, var(--ui-danger) 45%, transparent);
         background: color-mix(in srgb, var(--ui-danger) 12%, transparent);
         color: var(--ui-danger);
     }
 
-        .menu-detail .key-button.is-danger:hover {
+        .menu-detail .key-button.is-danger:hover,
+        .menu-detail .linkbuttons.is-danger:hover {
             background: color-mix(in srgb, var(--ui-danger) 22%, transparent);
         }
 
@@ -546,31 +567,7 @@
         background: var(--text-secondary);
     }
 
-.menu-detail .options-replacer {
-    top: calc(100% + 4px);
-    padding: 4px;
-    border: 1px solid var(--glass-edge);
-    border-radius: 8px;
-    background: #2b2b33;
-    box-shadow: 0 10px 28px rgb(0 0 0 / 45%);
-}
-
-    .menu-detail .options-replacer div {
-        padding: 6px 8px;
-        border-radius: 5px;
-        color: var(--text-primary);
-        font-size: 13px;
-    }
-
-    .menu-detail .options-replacer .dropdown-option:hover {
-        background: var(--control-fill-hover);
-    }
-
-        .menu-detail .options-replacer div.selected,
-        .menu-detail .options-replacer .dropdown-option.selected:hover {
-            background: var(--ui-accent-dim);
-            color: #fff;
-        }
+/* Its list is a menu's, wherever the select is (`.options-replacer`, below, #83). */
 
 /* Switches, for what is on or off at once: a checkbox's label laid out as a row, its name on
    the left and a 28x16 track on the right that the thumb slides along. The checkbox itself
@@ -1257,10 +1254,10 @@
     width: min(1150px, calc(100vw - 80px));
     height: min(715px, calc(var(--visible-height, 100dvh) - 80px));
     overflow: hidden;
-    border: 1px solid var(--glass-edge);
-    border-radius: 12px;
-    background: var(--ui-chrome);
-    box-shadow: 0 0 0 1px rgb(0 0 0 / 25%), 0 6px 16px rgb(0 0 0 / 30%), 0 24px 64px rgb(0 0 0 / 45%);
+    border: 1px solid var(--dialog-edge);
+    border-radius: var(--dialog-radius);
+    background: var(--dialog-fill);
+    box-shadow: var(--dialog-shadow);
     outline: none;
 }
 
@@ -1374,12 +1371,13 @@
     border-bottom: 1px solid var(--row-divider);
 }
 
+    /* 16px semibold, as every dialog's title is (#83). */
     .settings-page-title {
         flex: 1 1 auto;
         margin: 0;
         color: var(--text-primary);
         font-size: 16px;
-        font-weight: 500;
+        font-weight: 600;
     }
 
     /* At the dialog's corner rather than in the title's line, as Notion's is. */
@@ -1501,3 +1499,776 @@
         padding: 16px;
     }
 }
+
+/* ---- Dialogs, one frame (#83) ----------------------------------------------------------- */
+
+/* Asked, over a screenshot of the AI's options: "those menus are disgusting, research the menu of
+   popular apps and follow the style, also we should make sure ALL menu and modal styles are
+   consistent". Every window `#customModal` shows had the frame it was given in 2023: see-through
+   with a 2px #333 edge, square bottom corners, a title bar with a 30px shadow, and a 32px × that
+   turned black when pointed at. The tool windows take the Settings modal's surface now
+   (`--dialog-*`), a title over a hairline, and its close button; the questions (`.asks`) keep
+   their own layout on the same surface (foundation.css). They stay undimmed behind: a tool window
+   works beside the Graph, and can be dragged. */
+#customModal:not(.asks) .modal-content {
+    min-width: min(320px, calc(100vw - 32px));
+    border: 1px solid var(--dialog-edge);
+    border-radius: var(--dialog-radius);
+    background: var(--dialog-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--dialog-shadow);
+}
+
+#customModal:not(.asks) .modal-header {
+    gap: 12px;
+    margin: 0 20px;
+    padding: 16px 0 12px;
+    border-bottom: 1px solid var(--row-divider);
+    background: none;
+    box-shadow: none;
+}
+
+    #customModal:not(.asks) .modal-title {
+        flex: 1 1 auto;
+        color: var(--text-primary);
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+
+    /* At the corner, as the Settings modal's is. */
+    #customModal:not(.asks) .close {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        margin-right: -8px;
+        padding: 0;
+        border: none;
+        border-radius: var(--control-radius);
+        background: none;
+        cursor: pointer;
+        --icon-stroke: var(--text-secondary);
+    }
+
+        #customModal .close svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        #customModal:not(.asks) .close:hover {
+            background: var(--control-fill);
+            --icon-stroke: var(--text-primary);
+        }
+
+        #customModal .close:focus-visible {
+            outline: 2px solid var(--ui-accent);
+            outline-offset: 2px;
+        }
+
+#customModal:not(.asks) .modal-body {
+    padding: 16px 20px 20px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+    /* The words a dialog says about itself, as Settings' are said. */
+    #customModal .modal-body :is(p, .proposals-status) {
+        color: var(--text-secondary);
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    /* A heading inside a dialog is a section's, small and grey, as in Settings. */
+    #customModal .modal-body :is(h3, .button-label) {
+        margin: 0 0 8px;
+        padding: 0 2px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-align: left;
+    }
+
+        #customModal .modal-body .button-label::before,
+        #customModal .modal-body .button-label::after {
+            display: none;
+        }
+
+/* The buttons, fields and lists the dialogs had before Settings had a design: drawn as its
+   controls (`.menu-detail .key-button`, the fields, above). The action a dialog is for is the
+   accent, as the questions' OK is; everything else is quiet. */
+#customModal .modal-body :is(.api-modal-button, .set-instructions-button, .add-prompt-button,
+                             .delete-prompt-button, .purchase-btn, .deletebuttons) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--control-h);
+    min-width: 0;
+    margin: 0;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: var(--control-fill);
+    box-shadow: none;
+    color: var(--text-primary);
+    font: 500 13px/1 var(--font-sans);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--ui-transition), border-color var(--ui-transition);
+}
+
+    #customModal .modal-body :is(.api-modal-button, .set-instructions-button, .add-prompt-button,
+                                 .delete-prompt-button, .purchase-btn, .deletebuttons):hover {
+        border-color: var(--control-edge);
+        background: var(--control-fill-hover);
+        color: var(--text-primary);
+    }
+
+    #customModal .modal-body :is(.key-button, .linkbuttons, .api-modal-button).is-primary {
+        border-color: transparent;
+        background: var(--ui-accent-solid);
+        color: #fff;
+    }
+
+        #customModal .modal-body :is(.key-button, .linkbuttons, .api-modal-button).is-primary:hover {
+            background: #4a6aa3;
+        }
+
+#customModal .modal-body :is(textarea, .Searchbar, input[type="url"]) {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: rgb(0 0 0 / 22%);
+    box-shadow: none;
+    color: var(--text-primary);
+    font: 13px/1.45 var(--font-sans);
+}
+
+    #customModal .modal-body .Searchbar {
+        width: 100%;
+        height: var(--control-h);
+        padding: 0 8px;
+    }
+
+    #customModal .modal-body :is(textarea, .Searchbar, input):focus-visible {
+        outline: 2px solid var(--ui-accent);
+        outline-offset: 1px;
+    }
+
+    #customModal .modal-body input[type="text"] {
+        width: 100%;
+    }
+
+/* The foot of a dialog that does one thing: its buttons at the right, the one it is for last
+   and in the accent, as the questions' are and as macOS and shadcn order them. */
+#customModal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* Fields with a name over them: Custom Endpoint's three. */
+#customModal .api-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: min(360px, calc(100vw - 72px));
+}
+
+    #customModal .api-modal-content > label {
+        margin-top: 8px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+        #customModal .api-modal-content > label:first-child {
+            margin-top: 0;
+        }
+
+/* Import Text: the text, then its two options as rows of a group. */
+#customModal .import-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+    #customModal .importLinkTextarea {
+        width: min(520px, calc(100vw - 72px));
+        height: 220px;
+        resize: none;
+    }
+
+/* A slider in a dialog's group is a row: its name at the left and the track taking the rest. */
+#customModal .settings-group .settings-row > input[type="range"] {
+    flex: 0 1 220px;
+}
+
+/* Adjust Controls: its table is a group of rows, a hairline between them, the name at the left
+   and the control at the right, where it was a grid of 1px #5d5d5d cells. */
+#customModal .modal-body table {
+    width: 100%;
+    border: 1px solid var(--group-edge);
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: var(--group-radius);
+    background: var(--group-fill);
+}
+
+    #customModal .modal-body :is(th, td) {
+        padding: 6px 12px;
+        border: none;
+        border-top: 1px solid var(--row-divider);
+        background: none;
+        color: var(--text-primary);
+        font-size: 13px;
+        text-align: left;
+    }
+
+    #customModal .modal-body tr:first-child > :is(th, td) {
+        border-top: none;
+    }
+
+    #customModal .modal-body td:last-child {
+        text-align: right;
+    }
+
+    #customModal .modal-body .label-container strong {
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+/* The explanation behind a control's question mark: a quiet round button, the glyph grey. */
+#customModal .question-button {
+    width: 22px;
+    height: 22px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: var(--control-fill);
+    --icon-stroke: var(--text-secondary);
+}
+
+    #customModal .question-button:hover {
+        background: var(--control-fill-hover);
+    }
+
+    #customModal .question-button svg {
+        width: 16px;
+        height: 16px;
+    }
+
+/* Lists in a dialog -- Search Nodes, Connect, the Ollama models, the Vector Database's
+   documents, the file tree -- have a menu's rows: 32px, rounded, the hover a wash, and no rule
+   between one row and the next, where they had a 1px #bbb line and a press that flashed white. */
+#customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p, .file-item) {
+    min-height: var(--menu-item-h);
+    margin: 0;
+    padding: 6px 10px;
+    box-sizing: border-box;
+    border: none;
+    border-radius: var(--menu-item-radius);
+    background: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.4;
+    transition: background-color var(--ui-transition);
+}
+
+    #customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p, .file-item):hover {
+        background: var(--menu-hover);
+        color: var(--text-primary);
+    }
+
+    #customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p):active {
+        background: var(--control-fill-active);
+    }
+
+    #customModal :is(.search-result-item, #nodeList li, #ollamaModelList .model-item, #key-list p) * {
+        color: inherit;
+        font-size: inherit;
+    }
+
+    /* Linked, or the model in use: a green wash and the tick, both, as before. */
+    #customModal :is(#nodeList li.connected, #ollamaModelList .connected) {
+        background: rgb(84 135 111 / 18%);
+    }
+
+        #customModal :is(#nodeList li.connected, #ollamaModelList .connected):hover {
+            background: rgb(84 135 111 / 30%);
+        }
+
+    /* Chosen for a delete: the danger's wash, as a destructive item's is in a menu. */
+    #customModal #key-list p.selected,
+    #customModal #key-list p.selected:hover {
+        background: color-mix(in srgb, var(--ui-danger) 20%, transparent);
+        color: var(--text-primary);
+    }
+
+    /* The row the arrow keys are on, as a focused row of the menu is drawn. */
+    #customModal #nodeList li.active {
+        outline: none;
+        background: var(--ui-accent-dim);
+        box-shadow: inset 0 0 0 1px var(--ui-accent);
+    }
+
+    #customModal #nodeList li.group-label,
+    #customModal #nodeList li.group-label:hover {
+        min-height: 0;
+        padding: 10px 10px 4px;
+        background: none;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+#customModal :is(#search-results, .vector-db-search-results, #key-list, #nodeList, #ollamaModelList) {
+    margin-top: 8px;
+}
+
+/* A found snippet of the Vector Database: a card of the group's fill, where it was an inset
+   frame with a drop shadow. */
+#customModal .vdb-search-result {
+    margin: 0 0 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+    background: var(--group-fill);
+    box-shadow: none;
+}
+
+/* The Vector Database import: its two columns' headings as a section's. */
+#customModal .gridLayout h3 {
+    margin: 0 0 6px;
+}
+
+#customModal :is(#rawTextArea, #chunkedTextDisplay) {
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: rgb(0 0 0 / 22%);
+}
+
+/* The Prompt Library's two panes, divided by a hairline. */
+#customModal .prompt-list-container {
+    border-right: 1px solid var(--row-divider);
+}
+
+#customModal .prompt-list input {
+    margin-bottom: 4px;
+}
+
+/* The Neurite account's three parts are folds, each its name on a row that opens it. */
+#customModal .label-bar-container {
+    border: 1px solid var(--group-edge);
+    border-radius: var(--group-radius);
+    background: var(--group-fill);
+}
+
+    #customModal .label-bar-container > .button-label {
+        display: flex;
+        align-items: center;
+        min-height: var(--row-min);
+        margin: 0;
+        padding: 0 12px;
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0;
+        cursor: pointer;
+    }
+
+        #customModal .label-bar-container > .button-label:hover {
+            background: var(--control-fill);
+        }
+
+    #customModal .label-bar-container > .panel-content {
+        padding: 0 12px 12px;
+    }
+
+#customModal .balance-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(320px, calc(100vw - 72px));
+}
+
+    #customModal .balance-modal-content > br {
+        display: none;
+    }
+
+    #customModal .label-bar-container > .button-label {
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+/* A footer's buttons are as wide as their words; several had `width: 100%` of their own. */
+#customModal .modal-footer > * {
+    width: auto;
+}
+
+/* The Vector Database's list: no rule over it, where a 2px grey line ran across the top. */
+#customModal .scrollable-list {
+    border-top: none;
+}
+
+/* A slider's name in a dialog is a row's label, not 16px grey. */
+#customModal .settingsSlider label,
+#customModal .settingsSlider label span {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+#customModal :is(.prompt-buttons, .prompt-list-buttons) {
+    display: flex;
+    gap: 6px;
+}
+
+/* ---- Menus, one style (#83) ------------------------------------------------------------- */
+
+/* The right-click menu, a node's list of actions, and every select's list take the menu
+   tokens: a raised panel 6px in, 10px corners and a hairline edge; 32px rows of 14px text
+   with 6px corners, the hover a white wash and the text unchanged. The numbers are shadcn's
+   and Radix's menus' (tasks/todo.md has them) and this app's own main menu's, which had them
+   already. The right-click menu was black at 69% with corners of 0 and 10px in turn, rules
+   between its rows, and a hover of pale blue under black text; the list of actions was
+   lavender glass; a select's list outside Settings was a light sheet. */
+#customContextMenu,
+.suggestions-container,
+.options-replacer {
+    box-sizing: border-box;
+    padding: var(--menu-pad);
+    border: 1px solid var(--menu-edge);
+    border-radius: var(--menu-radius);
+    background: var(--menu-fill);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--menu-shadow);
+    color: var(--text-primary);
+}
+
+    #customContextMenu li {
+        min-height: var(--menu-item-h);
+        border-bottom: none;
+        border-radius: var(--menu-item-radius);
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+
+        #customContextMenu li:not(.input-item) {
+            padding: 0 10px;
+        }
+
+        #customContextMenu li:hover {
+            background: var(--menu-hover);
+            color: var(--text-primary);
+        }
+
+        #customContextMenu li.input-item:hover {
+            background: none;
+        }
+
+    /* A node's "Search actions": a field at the top of the menu, as a menu's filter is. */
+    #customContextMenu .custom-node-method-input,
+    #customContextMenu .custom-node-method-input:hover {
+        width: 100%;
+        min-width: 200px;
+        height: var(--menu-item-h);
+        padding: 0 10px;
+        border: 1px solid var(--control-edge);
+        border-radius: var(--menu-item-radius);
+        background: rgb(0 0 0 / 22%);
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+
+        #customContextMenu .custom-node-method-input::placeholder,
+        #customContextMenu .custom-node-method-input:hover::placeholder {
+            color: var(--text-secondary);
+            font-style: normal;
+        }
+
+    .suggestions-container div,
+    .suggestion-item {
+        min-height: var(--menu-item-h);
+        padding: 0 4px 0 10px;
+        border-radius: var(--menu-item-radius);
+    }
+
+        .suggestions-container div:hover {
+            background: var(--menu-hover);
+        }
+
+        .suggestion-item span {
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+    /* The pin is a trailing glyph, as a menu's shortcut is: grey, the accent once pinned, and
+       no longer grown to 1.4 times its size under the pointer. */
+    .suggestions-container .pin-button {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border-radius: var(--menu-item-radius);
+    }
+
+        .suggestions-container .pin-button:hover {
+            transform: none;
+            background: var(--control-fill);
+        }
+
+/* A select's list, wherever the select is. Settings had this one already (`.menu-detail`). */
+.options-replacer {
+    top: calc(100% + 4px);
+    border-color: var(--menu-edge);
+}
+
+    .options-replacer div {
+        min-height: 28px;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: var(--menu-item-radius);
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+
+    .options-replacer .dropdown-option:hover {
+        background: var(--menu-hover);
+    }
+
+        .options-replacer div.selected,
+        .options-replacer .dropdown-option.selected:hover {
+            background: var(--ui-accent-dim);
+            color: #fff;
+        }
+
+/* The tooltip, as a small menu panel: the same fill, edge and corners. Over the dialogs now
+   (900), whose buttons have them -- the Proposed Edges' Link -- and still under the page's
+   filter (2000), so Paper turns it light with everything else. */
+.ui-tooltip {
+    z-index: 950;
+    border: 1px solid var(--menu-edge);
+    border-radius: 8px;
+    background: var(--menu-fill);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--menu-shadow);
+    color: var(--text-primary);
+}
+
+/* ---- The AI node's settings and buttons (#83) ------------------------------------------- */
+
+/* The three buttons beside its prompt: the Settings controls' square, the glyph grey, the
+   gear pressed while its panel is open. */
+.ai-node-button {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    width: 28px;
+    height: 28px;
+    margin: 1px 0;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--control-edge);
+    border-radius: var(--control-radius);
+    background: var(--control-fill);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background-color var(--ui-transition), color var(--ui-transition);
+    --icon-stroke: currentColor;
+}
+
+    .ai-node-button:hover {
+        background: var(--control-fill-hover);
+        color: var(--text-primary);
+    }
+
+    .ai-node-button:active {
+        background: var(--control-fill-active);
+    }
+
+    .ai-node-button[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--ui-accent) 60%, transparent);
+        background: var(--ui-accent-dim);
+        color: #fff;
+    }
+
+    .ai-node-button svg {
+        width: 16px;
+        height: 16px;
+    }
+
+/* The panel its gear opens, over the card: the dialogs' surface, where it was a 30% wash the
+   Graph showed through. Its options are toggle chips -- the accent when on, as a pressed toggle
+   is drawn -- where they were bevelled chips with a tick; the rest are the Settings controls. */
+.ainode-settings-container {
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--dialog-edge);
+    border-radius: var(--menu-radius);
+    background: var(--dialog-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--menu-shadow);
+}
+
+    /* Two to a row: the panel's middle column is some 160px, and Wolfram is the widest. */
+    .ainode-settings-container .checkboxarray {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        align-content: start;
+        width: auto;
+        padding: 0;
+    }
+
+        .ainode-settings-container .checkboxarray div {
+            width: auto;
+            min-width: 0;
+        }
+
+        .ainode-settings-container .checkboxarray input[type="checkbox"] + label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 26px;
+            margin: 0;
+            padding: 0 8px;
+            border: 1px solid var(--control-edge);
+            border-radius: var(--control-radius);
+            background: var(--control-fill);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+            .ainode-settings-container .checkboxarray input[type="checkbox"] + label:hover {
+                background: var(--control-fill-hover);
+                color: var(--text-primary);
+            }
+
+            .ainode-settings-container .checkboxarray input[type="checkbox"] + label::before,
+            .ainode-settings-container .checkboxarray input[type="checkbox"] + label::after {
+                display: none;
+            }
+
+        .ainode-settings-container .checkboxarray input[type="checkbox"]:checked + label {
+            border-color: color-mix(in srgb, var(--ui-accent) 60%, transparent);
+            background: var(--ui-accent-dim);
+            color: #fff;
+        }
+
+        .ainode-settings-container .checkboxarray input[type="checkbox"]:focus-visible + label {
+            outline: 2px solid var(--ui-accent);
+            outline-offset: 2px;
+        }
+
+    .ainode-settings-container .select-replacer {
+        height: var(--control-h);
+        border: 1px solid var(--control-edge);
+        border-radius: var(--control-radius);
+        background: var(--control-fill);
+        color: var(--text-primary);
+    }
+
+        .ainode-settings-container .select-replacer .selected-text {
+            height: calc(var(--control-h) - 2px);
+            padding: 0 26px 0 10px;
+            line-height: calc(var(--control-h) - 2px);
+            font-size: 13px;
+        }
+
+            .ainode-settings-container .select-replacer .selected-text::after {
+                display: none;
+            }
+
+        .ainode-settings-container .select-replacer::before,
+        .ainode-settings-container .select-replacer::after {
+            width: 7px;
+            height: 1.5px;
+            background: var(--text-secondary);
+        }
+
+    .ainode-settings-container .slider-container label {
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .ainode-settings-container .prompt-library-button {
+        height: var(--control-h);
+        padding: 0 12px;
+        border: 1px solid var(--control-edge);
+        border-radius: var(--control-radius);
+        background: var(--control-fill);
+        color: var(--text-primary);
+        font: 500 13px/1 var(--font-sans);
+        cursor: pointer;
+    }
+
+        .ainode-settings-container .prompt-library-button:hover {
+            background: var(--control-fill-hover);
+        }
+
+    .ainode-settings-container .custom-instructions-textarea {
+        box-sizing: border-box;
+        padding: 6px 8px;
+        border: 1px solid var(--control-edge);
+        border-radius: var(--control-radius);
+        background: rgb(0 0 0 / 22%);
+        color: var(--text-primary);
+        font: 13px/1.45 var(--font-sans);
+    }
+
+/* The explanation behind a question mark in a dialog (Adjust Controls): a panel over the
+   dialog on the same surface, its close as the dialog's, where it was see-through with a 2px
+   #333 edge and an × that turned red. */
+#customModal .modal-overlay {
+    border: 1px solid var(--dialog-edge);
+    border-radius: var(--group-radius);
+    background: var(--dialog-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--menu-shadow);
+}
+
+    #customModal .modal-overlay-content {
+        background: none;
+        color: var(--text-secondary);
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    #customModal .modal-overlay-close {
+        display: grid;
+        place-items: center;
+        top: 10px;
+        right: 10px;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border-radius: var(--control-radius);
+        color: var(--text-secondary);
+        font-size: 20px;
+        line-height: 1;
+    }
+
+        #customModal .modal-overlay-close:hover {
+            background: var(--control-fill);
+            color: var(--text-primary);
+        }
+
+    #customModal .modal-overlay-body :is(li, p, strong, b) {
+        color: inherit;
+        font-size: inherit;
+    }

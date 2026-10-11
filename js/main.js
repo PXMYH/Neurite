@@ -18,12 +18,6 @@ class Elem {
     static show(elem){ if (elem) elem.style.display = '' }
     static hideById(id){ Elem.hide(Elem.byId(id)) }
     static remove(elem){ elem.remove() }
-    static setBackgroundColor(color){
-        this.style.backgroundColor = color
-    }
-    static setBackgroundColorPerIsActive(colorActive, colorInactive){
-        this.style.backgroundColor = (this.isActive ? colorActive : colorInactive)
-    }
     static setBothColors(foreColor, backgroundColor){
         this.style.backgroundColor = backgroundColor;
         this.style.color = foreColor;
