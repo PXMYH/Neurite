@@ -371,3 +371,17 @@ Decisions:
   waits on; a swap stopped half way (a reboot) stranded the old bundle -- the copy that starts
   clears it when no script came for its started file; `hdiutil` and the other tools had no
   deadline; and the in-bundle profile's advice would have lost it.
+- A fifth round found eight, and the review loop stops here: the findings moved from the updater
+  to the save and restore under it. Answered: a copy on probation (an update not yet confirmed)
+  wrote its graph during the minute before it was taken back -- for a note that costs nothing,
+  the Pane's text makes the card again, but an image it could not rebuild was gone; it saves
+  nothing now until confirmed (measured both ways, update.e2e.mjs); the skipped-card allowance
+  was stale, since the old copy's last save already holds only what it could rebuild -- the new
+  copy may skip none; a failed blob write moved the image to an id never written and deleted the
+  one it had, in every autosave, not only an update's -- it keeps its blob now
+  (21-durability, which fails on main); an AI answer streaming into a note goes on writing after
+  the last save, so an update waits for it; the new bundle must run under the same executable
+  name the rollback looks for; and the started file is written before the marker goes, or the
+  marker stays. Accepted, and said in docs/desktop.md: a power cut between the two renames
+  leaves no app at the path (the old one is beside it as `.replaced-<pid>`); and media a new
+  version fails to load are blank in it, but kept, since it writes nothing it did not read.

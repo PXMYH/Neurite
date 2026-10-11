@@ -155,16 +155,18 @@ async function install(choice) {
         }
         await checkBundle(staged, version, target);
 
+        // An AI answer streaming into a note goes on writing after the save has taken its copy,
+        // and no hold stops it, so an update waits for it to finish.
+        if (await aiBusy()) throw new Error('an AI answer is still coming in; update once it is done');
+
         // Saved here, where a failure can still stop the update, with the page held still from
         // now: a save takes its copy of the graph before it writes it, so an edit typed during
         // the write would go with the old app.
         await hold(true);
         if (!await saveGraph()) throw new Error('the graph could not be saved first');
 
-        // How many saved cards this copy could not rebuild: the new one must not lose more.
-        const skipped = await restoreSkipped();
         await fsp.rm(startedFile(), { force: true });
-        await fsp.writeFile(markerFile(), JSON.stringify({ version, from: app.getVersion(), skipped }));
+        await fsp.writeFile(markerFile(), JSON.stringify({ version, from: app.getVersion() }));
         // The profile it ran with, so the new copy opens the same graphs: a test's, or the
         // reader's own when there is no such argument.
         const args = process.argv.slice(1).filter((arg) => arg.startsWith('--user-data-dir='));
@@ -233,6 +235,10 @@ async function checkBundle(staged, version, target) {
         throw new Error('the download is not Neurite');
     }
     if (await read(staged, 'CFBundleShortVersionString') !== version) throw new Error(`the download is not ${version}`);
+    // The swap's rollback finds a stuck copy by its executable's path, so it has to be the same.
+    if (await read(staged, 'CFBundleExecutable') !== await read(target, 'CFBundleExecutable')) {
+        throw new Error('the download runs under another name');
+    }
     const pkg = JSON.parse(fs.readFileSync(path.join(staged, 'Contents', 'Resources', 'app.asar', 'package.json'), 'utf8'));
     if (pkg.version !== version) throw new Error(`the download calls itself ${pkg.version}, not ${version}`);
 }
@@ -265,9 +271,10 @@ async function hold(on, win = BrowserWindow.getAllWindows()[0]) {
     await win.webContents.executeJavaScript(`document.body.inert = ${on === true}`).catch(() => {});
 }
 
-async function restoreSkipped(win = BrowserWindow.getAllWindows()[0]) {
-    if (!win || win.isDestroyed()) return 0;
-    return win.webContents.executeJavaScript('App.viewGraphs?.restoreSkipped ?? 0').catch(() => 0);
+async function aiBusy(win = BrowserWindow.getAllWindows()[0]) {
+    if (!win || win.isDestroyed()) return false;
+    return win.webContents.executeJavaScript("typeof activeRequests !== 'undefined' && activeRequests.size > 0")
+        .catch(() => false);
 }
 
 // Asked by the window's close (main.cjs): is this a quit for an update.
@@ -275,23 +282,34 @@ const quitting = () => Boolean(pending);
 
 // After an update, once the window's page is up (`watch`): say whether the update happened, and
 // tell the swap script this copy started by writing its version where the script waits for it.
-// Up means the page says so and its graph is back (`appReady`, then `whenRestored`) with no
-// more of its cards lost than the old copy lost (the marker's `skipped`): the main process
+// Up means the page says so and its graph is back (`appReady`, then `whenRestored`) with none
+// of its cards lost: the main process
 // getting this far was the signal once, and a release whose frontend throws on load, or that
 // cannot rebuild a kind of card, then took the old bundle with it. Only the version the update
 // went for says it started; an older copy opened on the profile meanwhile reads the marker and
 // says the update did not install, and the script, still waiting, puts the old bundle back.
 async function confirmStarted(marker) {
     const told = core.afterUpdate(marker, app.getVersion());
-    await fsp.rm(markerFile(), { force: true }).catch(() => {});
     if (told?.phase === 'updated') {
-        const said = await fsp.writeFile(startedFile(), app.getVersion()).then(() => true, () => false);
+        // Said before anything else, and nothing is said if it cannot be: the script then puts
+        // the old copy back, and the marker, still there, lets that copy say why.
+        if (!await fsp.writeFile(startedFile(), app.getVersion()).then(() => true, () => false)) return;
         // A swap script still waiting takes the file and clears its own backup within a tenth of
         // a second. One stopped half way (a reboot) leaves both, and the backup is cleared here --
         // never sooner: the backup is what a live script would put back.
-        if (said) setTimeout(clearStranded, 15000).unref?.();
+        setTimeout(clearStranded, 15000).unref?.();
     }
-    if (told) publish(told);
+    await fsp.rm(markerFile(), { force: true }).catch(() => {});
+    // `confirmed` ends the page's probation (preload.cjs); a check failing meanwhile does not.
+    if (told) publish({ ...told, confirmed: true });
+}
+
+// For the window this copy opens (main.cjs): whether it is an update on probation, in which case
+// its page saves nothing until `confirmStarted` -- a copy that would not be confirmed (it lost a
+// card) wrote its short graph over the old one's during the minute before the old one came back.
+function webPreferences() {
+    const onProbation = app.isPackaged && fs.existsSync(markerFile());
+    return onProbation ? { additionalArguments: ['--neurite-update-probation'] } : {};
 }
 
 function watch(win) {
@@ -300,8 +318,11 @@ function watch(win) {
         let marker;
         try { marker = JSON.parse(await fsp.readFile(markerFile(), 'utf8')) }
         catch { return }                               // no update under way
+        // Every card the old copy saved: its last save, which the update checked, holds only
+        // the cards it could rebuild, so the new copy may skip none (the count once allowed the
+        // old copy's own, which its save had already dropped).
         const up = `window.appReady === true && Promise.resolve(App.viewGraphs?.whenRestored)
-            .then((ok) => ok === true && (App.viewGraphs?.restoreSkipped ?? 0) <= ${Number(marker.skipped) || 0})`;
+            .then((ok) => ok === true && (App.viewGraphs?.restoreSkipped ?? 0) === 0)`;
         for (let tries = 0; tries < 120 && !win.isDestroyed(); tries++) {
             if (await win.webContents.executeJavaScript(up).catch(() => false)) return confirmStarted(marker);
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -348,4 +369,4 @@ function init() {
     setInterval(check, EVERY_MS);
 }
 
-module.exports = { init, watch, quitting, saveGraph, stayOpen };
+module.exports = { init, watch, webPreferences, quitting, saveGraph, stayOpen };

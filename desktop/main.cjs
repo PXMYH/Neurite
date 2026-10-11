@@ -167,7 +167,7 @@ function createWindow() {
         minWidth: 720,
         minHeight: 480,
         backgroundColor: '#000000',     // the canvas colour: no white flash before paint
-        webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
+        webPreferences: { preload: path.join(__dirname, 'preload.cjs'), ...updater.webPreferences() },
     });
     const contents = win.webContents;
 

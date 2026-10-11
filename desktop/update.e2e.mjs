@@ -51,7 +51,7 @@ after(async () => {
 // gets as far as opening, when `starts` is false: its main process waits forever, with no window
 // and no dialog, which is the case the swap's watchdog has to stop as well as notice; or, when
 // `pageUp` is false, one whose window opens on a page that never comes up.
-async function prepare(name, { starts = true, pageUp = true } = {}) {
+async function prepare(name, { starts = true, pageUp = true, loses = null } = {}) {
     const source = packaged.replace(/\/Contents\/MacOS\/[^/]+$/, '');
     const dir = join(work, name);
     const apps = join(dir, 'Applications');
@@ -80,6 +80,18 @@ async function prepare(name, { starts = true, pageUp = true } = {}) {
     await asar.createPackage(unpacked, archive);
     // The frontend throws as it loads, so the window opens and the page never says it is up.
     if (!pageUp) writeFileSync(join(nextApp, 'Contents', 'Resources', 'dist', 'js', 'main.js'), 'throw new Error("this build does not start");\n');
+    // A build that cannot rebuild one kind of saved card (`loses`, a flag of `node_json`). An
+    // image, because a note's card is made again from the Pane's text, and an image is not.
+    if (loses) {
+        const file = join(nextApp, 'Contents', 'Resources', 'dist', 'js', 'nodes', 'nodeclass.js');
+        const source = readFileSync(file, 'utf8');
+        const at = source.indexOf('    constructor(thing, createEdges = true){');
+        assert.notEqual(at, -1, 'the Node constructor moved; this test breaks nothing');
+        const open = source.indexOf('{', at) + 1;
+        writeFileSync(file, source.slice(0, open)
+            + `\n        if (thing && JSON.parse(thing.dataset.node_json || '{}')[${JSON.stringify(loses)}]) throw new Error('this build cannot rebuild that card');`
+            + source.slice(open));
+    }
     run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', nextApp]);
     const dmg = join(dir, `Neurite-${next}-arm64.dmg`);
     run('/usr/bin/hdiutil', ['create', '-volname', 'Neurite', '-srcfolder', stage, '-ov', '-format', 'UDZO', dmg]);
@@ -243,6 +255,48 @@ test('a feed that stalls is given up on, and the row can check again', { skip, t
         await page.waitForFunction(() => document.getElementById('update-note').textContent === 'Checking…',
                                    undefined, { timeout: 5000 });
     } finally { await handle.close() }
+});
+
+// A fifth review: a newer build that could not rebuild a card was rightly not confirmed, but its
+// autosave ran during the minute before the old app came back and wrote the short graph over the
+// one the old app had saved. An update not yet confirmed writes nothing now. An image, which the
+// Pane's text cannot make again as it makes a note's card.
+test('a newer build that loses a card is taken back, and the graph is as the old app saved it', { skip, timeout: 600000 }, async () => {
+    const built = await prepare('loses', { loses: 'isImageNode' });
+    const sha = createHash('sha256').update(readFileSync(built.dmg)).digest('hex');
+    const feedUrl = await feed(built, sha);
+    const userData = join(built.dir, 'profile');
+    const cards = (page) => page.evaluate(() => Object.fromEntries(Object.values(Graph.nodes).map((n) => [n.getTitle(), n.uuid])));
+    const { handle, page } = await launch(built.app, userData, feedUrl);
+    await page.evaluate(async () => {
+        window.currentActiveZettelkastenMirror.setValue('## Kept\nStays.\n');
+        const img = new Image();
+        img.src = URL.createObjectURL(new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="red"/></svg>'],
+                                               { type: 'image/svg+xml' }));
+        await img.decode();
+        NodeView.addForImage(img, 'Picture');
+    });
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 2);
+    const before = await cards(page);
+    await checkFromMenu(page);
+    await page.waitForFunction((v) => document.querySelector('#update-button .menu-row-label').textContent === `Update to ${v}`,
+                               built.next, { timeout: 30000 });
+    const quit = new Promise((resolve) => handle.process().on('exit', resolve));
+    await page.click('#update-button');
+    await page.click('.modal-ok');
+    await quit;
+
+    await waitFor('the old app back', 150000, () => versionOf(built.app) === built.current
+                                                    && readFileSync(join(userData, 'update.log'), 'utf8').includes('the old one is back'));
+    const [pid] = await waitFor('the old app to open again', 30000, () => pidsOf(built.app).length && pidsOf(built.app));
+    process.kill(pid);
+    await waitFor('the reopened copy to stop', 15000, () => pidsOf(built.app).length === 0);
+    const again = await launch(built.app, userData, feedUrl);
+    try {
+        await again.page.waitForFunction(() => Object.keys(Graph.nodes).length >= 1, undefined, { timeout: 20000 });
+        await again.page.waitForTimeout(1500);
+        assert.deepEqual(await cards(again.page), before, 'the build that was taken back wrote over the graph');
+    } finally { await again.handle.close() }
 });
 
 // Reviews: the window's close saved and then closed whatever the save did, so an update went

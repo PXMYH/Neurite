@@ -1059,10 +1059,20 @@ View.Graphs = class {
             this.#proms.push(this.#saveBlobForNode(node));
         }
         #saveBlobForNode(node){
+            const previous = node.blob;
             return fetch(node.view.innerContent.firstChild.src)
                 .then( (res)=>res.blob() )
                 .then(this.saveNodeItsBlob.bind(this, node))
                 .catch( (err)=>{
+                    // `saveNodeItsBlob` moves the Node to its new id before the write (the
+                    // importer reads the id at once), so a write that failed left it pointing at
+                    // nothing, and the clean-up then deleted its old blob as an orphan: the only
+                    // copy (an adversarial review, #76). It goes back to the blob it had, kept.
+                    if (node.blob !== previous) {
+                        if (this.#dictMeta) delete this.#dictMeta[node.blob];
+                        node.blob = previous;
+                    }
+                    delete this.#prevBlobs[previous];
                     this.mom.lastSaveError = err;
                     Logger.err("Failed to save blob:", err);
                 });
@@ -1213,6 +1223,9 @@ View.Graphs = class {
     // A save that declines to run is the one thing this must never be, so both the
     // blanking and the exit are gone.
     #autosave = ()=>{
+        // A Mac app that is an update not yet confirmed (desktop/updater.cjs) writes nothing: if
+        // it is taken back, the old copy has to find the graph it left.
+        if (window.neuriteDesktop?.update?.onProbation?.()) return Promise.resolve();
         const selected = this.#selectedGraph;
         const saved = (!selected) ? this.#saver.saveWithTitle(this.#titleForNewGraph())
                     : this.#saver.saveWithTitle(selected.title || this.#titleForNewGraph());

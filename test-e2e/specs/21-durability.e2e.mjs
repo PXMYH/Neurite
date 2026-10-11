@@ -387,3 +387,49 @@ test('one Node of every type comes back from a file', async () => {
     await page.waitForTimeout(1500);
     assert.deepEqual(await describe(page), made);
 });
+
+// A save whose blob write failed moved the image to a blob id never written, and the clean-up then
+// deleted the one it had as an orphan: the only copy (an adversarial review of the Mac app's
+// update, which stops on a failed save but could not undo this). Measured on main: "1.blob"
+// stored, then a failed write left the Node on "2.blob", nothing stored, and a broken image after
+// a reload.
+test('an image whose blob write fails keeps the blob it had, and the save says it failed', async () => {
+    ({ context, page } = await openNeurite(browser));
+    const state = () => page.evaluate(async () => {
+        const img = Object.values(Graph.nodes).find((n) => n.isImageNode);
+        const stored = [];
+        await localforage.createInstance({ name: 'blobs', storeName: 'blob-data' }).iterate((_, k) => { stored.push(k) });
+        return { blob: img?.blob ?? null, blobUrl: Boolean(img?.view?.innerContent?.firstChild?.src?.startsWith('blob:')), stored };
+    });
+    await page.evaluate(async () => {
+        const img = new Image();
+        img.src = URL.createObjectURL(new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="red"/></svg>'],
+                                               { type: 'image/svg+xml' }));
+        await img.decode();
+        NodeView.addForImage(img, 'Red');
+        await new Promise((r) => setTimeout(r, 300));
+        await App.viewGraphs.saveNow();
+    });
+    const reload = async () => {
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 30000 });
+        await page.waitForTimeout(1500);
+    };
+    await reload();
+    const kept = await state();
+    assert.equal(kept.stored.length, 1, 'the image was not saved to begin with');
+
+    const error = await page.evaluate(async () => {
+        const save = Stored.prototype.save;
+        Stored.prototype.save = function (key, val) {
+            return this.name === 'blob-data' ? Promise.reject(new Error('the disk is full')) : save.call(this, key, val);
+        };
+        await App.viewGraphs.saveNow().catch(() => {});
+        Stored.prototype.save = save;
+        return String(App.viewGraphs.lastSaveError?.message);
+    });
+    assert.equal(error, 'the disk is full', 'the save did not say a blob failed');
+    assert.deepEqual(await state(), kept, 'the image moved off the blob it had');
+    await reload();
+    assert.deepEqual(await state(), kept, 'the image did not come back after a reload');
+});
