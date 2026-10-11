@@ -37,11 +37,14 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
+      # Never the latest release: the Mac app reads `/releases/latest` for its own updates
+      # (desktop/update-core.cjs), and a servers release there hid every newer one of the app.
       - name: Create new dated release
         run: |
           gh release create ${{ steps.version.outputs.tag }} release/servers.zip \
             --title "Localhost Servers ${{ steps.version.outputs.timestamp }}" \
-            --notes "Current release of Neurite's localhost servers"
+            --notes "Current release of Neurite's localhost servers" \
+            --latest=false
 
       - name: Delete older servers-* releases (keep latest)
         run: |
