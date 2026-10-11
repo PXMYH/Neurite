@@ -197,6 +197,43 @@ test('a packaged app updates itself to a newer build, and opens again with the s
     } finally { await again.handle.close() }
 });
 
+// Found by a review: the window an update opens carries `--neurite-update-probation` for every
+// load of its page, so a page reloaded after the update was confirmed -- Cmd+R, or the page
+// brought back after a crash -- came back on probation, which `confirmed` ends only once, and
+// saved nothing for the rest of the session. This copy is the update to its own version, as the
+// marker an update leaves says, so it opens on probation and confirms itself.
+test('a page reloaded after its update was confirmed saves again', { skip, timeout: 300000 }, async () => {
+    const dir = join(work, 'reload');
+    const app = join(dir, 'Applications', 'Neurite.app');
+    mkdirSync(join(dir, 'Applications'), { recursive: true });
+    run('/usr/bin/ditto', [packaged.replace(/\/Contents\/MacOS\/[^/]+$/, ''), app]);
+    started.push(app);
+    const userData = join(dir, 'profile');
+    mkdirSync(userData);
+    writeFileSync(join(userData, 'update-pending.json'), JSON.stringify({ version: versionOf(app), from: '0.0.1' }));
+
+    // No feed to reach: the check twenty seconds in fails, which is no part of this.
+    const { handle, page } = await launch(app, userData, 'http://127.0.0.1:9/latest');
+    try {
+        const probation = () => page.evaluate(() => window.neuriteDesktop.update.onProbation());
+        await waitFor('the update to be confirmed', 60000, () => !existsSync(join(userData, 'update-pending.json')));
+        await page.waitForFunction(() => window.neuriteDesktop.update.onProbation() === false, undefined, { timeout: 10000 });
+
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => window.appReady === true, undefined, { timeout: 120000 });
+        assert.equal(await probation(), false, 'the page reloaded after its update was confirmed is on probation again');
+        // And it saves: a note written now is in the graph the next launch opens.
+        await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## After the reload\nKept.\n'));
+        await page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.getTitle() === 'After the reload'));
+        assert.equal(await page.evaluate(() => App.viewGraphs.saveNow().then(() => true)), true);
+    } finally { await handle.close() }
+    const again = await launch(app, userData, 'http://127.0.0.1:9/latest');
+    try {
+        await again.page.waitForFunction(() => Object.values(Graph.nodes).some((n) => n.getTitle() === 'After the reload'),
+                                         undefined, { timeout: 20000 });
+    } finally { await again.handle.close() }
+});
+
 test('a download that does not match its release is not installed', { skip, timeout: 600000 }, async () => {
     const built = await prepare('mismatch');
     const feedUrl = await feed(built, '0'.repeat(64));

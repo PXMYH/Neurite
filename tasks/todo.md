@@ -657,3 +657,37 @@ Found while doing it:
 - Words that sent a reader to "the Notes panel" or "the Ai panel" -- Help, the delete question,
   two Wolfram alerts, the Custom model alert, the AI's own system prompt and the docs -- name
   the page instead ("Settings → Notes").
+
+## Review
+
+- The first adversarial review (Codex, read-only) found five, each answered with a test that
+  fails with its guard taken out (a650e0f):
+  - the canvas's keys were guarded by where the focus was, and a Saved Graph restored under
+    Settings replaces the notes editor that held it, so the focus fell to `body` and `+` zoomed
+    behind the dialog: `Hud.isTyping` answers yes while Settings is open;
+  - a Mac trackpad's pinch (Safari's gesture events) zoomed the Graph behind it;
+  - a double-click outside it closed it and made a note with the second click;
+  - a file let go over it was opened by the browser in place of the app;
+  - it was centred in the whole window, so an iPad's keyboard covered its foot -- 20-touch's
+    two keyboard tests found that one as well.
+- The second found ten (c5bb5bb, 0faa7bb, and the probation fix):
+  - a question over Settings left it in reach of Tab and a screen reader: inert under it;
+  - Esc dropped a note following the pointer, and Ctrl+Shift+M/F folded the selection;
+  - a double-click on the close button made a note, as the backdrop's had;
+  - closed after its opener stopped being drawn, the focus went to `body`;
+  - two tests passed for the wrong reason (the drop, and a refresh on a path no longer used);
+  - and two in the Mac app's updates, from before #81: a page reloaded after an update was
+    confirmed (Cmd+R, or the page brought back after a crash) came back on probation and saved
+    nothing for the rest of the session, as the window's flag is the same for every load --
+    the preload asks the main process now; and a servers-* release would have become the latest
+    release and hidden every newer Mac release from the app -- it is made with `--latest=false`.
+  - Left as it was: a key held as Settings opens moves the selection until it is let go, as it
+    does under any click.
+- The third found one: had the marker not been removed, a reload after the confirmation would
+  have read it and gone back on probation. The main process remembers the confirmation itself.
+  A fourth round was not run: the third found one, in code the second had added.
+- Full suite on 8037951: Chromium 308 of 311 and 1 skipped, the two keyboard tests failing; as
+  an iPad 263 passed, 44 skipped, those two and the two that fail on main. On a650e0f: Chromium
+  311 of 312 (1 skipped), iPad 266 passed, 44 skipped, and the two that fail on main.
+- The Mac app, 1.9.3 from its DMG, in a scratch folder: smoke 4/4, updates 8/8, the reload test
+  among them (it fails on the code before the fix: `onProbation()` is true again after a reload).

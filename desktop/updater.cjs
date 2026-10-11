@@ -300,17 +300,28 @@ async function confirmStarted(marker) {
         setTimeout(clearStranded, 15000).unref?.();
     }
     await fsp.rm(markerFile(), { force: true }).catch(() => {});
-    // `confirmed` ends the page's probation (preload.cjs); a check failing meanwhile does not.
-    if (told) publish({ ...told, confirmed: true });
+    // `confirmed` ends the page's probation (preload.cjs) -- this load's, and every reload's after
+    // it, even where the marker could not be removed (`onProbation`); a check failing meanwhile
+    // does not.
+    if (told) {
+        confirmed = true;
+        publish({ ...told, confirmed: true });
+    }
 }
 
 // For the window this copy opens (main.cjs): whether it is an update on probation, in which case
 // its page saves nothing until `confirmStarted` -- a copy that would not be confirmed (it lost a
 // card) wrote its short graph over the old one's during the minute before the old one came back.
 function webPreferences() {
-    const onProbation = app.isPackaged && fs.existsSync(markerFile());
-    return onProbation ? { additionalArguments: ['--neurite-update-probation'] } : {};
+    return onProbation() ? { additionalArguments: ['--neurite-update-probation'] } : {};
 }
+// Whether it still is: until `confirmStarted` has its answer. Asked again by the page's preload at
+// every load of it (`update:probation`), because a window's arguments are the same for every load:
+// a page reloaded after the update was confirmed -- Cmd+R, or the page brought back after a crash
+// (main.cjs) -- came back on probation, which `confirmed` ends only once, and saved nothing for the
+// rest of the session.
+let confirmed = false;
+const onProbation = () => app.isPackaged && !confirmed && fs.existsSync(markerFile());
 
 function watch(win) {
     if (!app.isPackaged) return;
@@ -360,6 +371,7 @@ const fromApp = (event) => Boolean(event.senderFrame?.url?.startsWith('app://neu
 
 function init() {
     ipcMain.handle('update:state', () => state);
+    ipcMain.on('update:probation', (event) => { event.returnValue = onProbation() });
     ipcMain.handle('update:check', (event) => (fromApp(event) ? check() : state));
     ipcMain.handle('update:install', (event, choice) => (fromApp(event) ? install(choice) : state));
     // A checkout has no bundle to replace; it is told so if it asks, and is never asked for.

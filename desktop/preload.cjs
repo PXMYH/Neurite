@@ -4,8 +4,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // An update this copy is, not yet confirmed (updater.cjs): its page saves nothing until it is,
-// so a copy the update will take back cannot write over the graph the old copy kept.
-let probation = process.argv.includes('--neurite-update-probation');
+// so a copy the update will take back cannot write over the graph the old copy kept. Asked of the
+// main process at each load, a reload's too: the window's flag is the one it opened with.
+let probation = process.argv.includes('--neurite-update-probation')
+    && ipcRenderer.sendSync('update:probation') === true;
 ipcRenderer.on('update:state', (_, state) => {
     if (state?.confirmed) probation = false;
 });
