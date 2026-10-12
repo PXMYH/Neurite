@@ -184,18 +184,24 @@ class Edge {
 class EdgeView {
     funcPopulate = 'populateForEdge';
     mouseIsOver = false;
-    // A thread between two cards (#84), as Obsidian's Canvas, tldraw and React Flow draw one: it
+    // A thread between two cards (#84), as Obsidian's Canvas, React Flow and tldraw draw one: it
     // leaves the side of one card that faces the other, and meets the facing side of the other,
-    // square to each, on a curve; it is the same 1.5 screen px at every zoom, 2.5 under the
-    // pointer; and it runs in a gradient from the colour of one note to the other's. It was a
-    // ribbon from centre to centre, so it met each card wherever the line happened to cross its
-    // edge, often at a corner, with its arrowhead half way along it and its width following the
-    // zoom and the Edge's stress.
-    static restPx = 1.5;
-    static hoverPx = 2.5;
-    // The arrowhead, at the card it points at: its tip on the card's edge. In screen px.
-    static arrowLength = 9;
-    static arrowHalf = 4;
+    // square to each, on a curve, in a gradient from the colour of one note to the other's. It
+    // was a ribbon from centre to centre, so it met each card wherever the line happened to cross
+    // its edge, often at a corner, with its arrowhead half way along it.
+    //
+    // Its width on screen goes with the square root of the zoom, as Obsidian's does (2 px at
+    // 100% there): 1.5 px at x1, from 1 px zoomed out to 2 px zoomed in, so a hairline does not
+    // run between cards zoomed up to fill the screen nor a band between cards a few px across.
+    // 1.5 px more under the pointer.
+    static widthPx(hovered){
+        const px = Math.min(2, Math.max(1, 1.5 / Math.sqrt(Graph.zoom.mag())));
+        return px + (hovered ? 1.5 : 0);
+    }
+    // The arrowhead, at the card it points at, its tip on the card's edge: Obsidian's, which is
+    // 10.4 px long and 13 across on its 2 px line, in proportion to this one.
+    static arrowLength = 5.2;
+    static arrowHalf = 3.25;
     constructor(model, id, style){
         this.model = model;
         this.id = id;
@@ -228,9 +234,8 @@ class EdgeView {
             return;
         }
 
-        const px = (this.mouseIsOver ? EdgeView.hoverPx : EdgeView.restPx);
         this.svgLink.setAttribute('d', curve.d);
-        this.svgLink.setAttribute('stroke-width', px * EdgeView.svgPerPx());
+        this.svgLink.setAttribute('stroke-width', EdgeView.widthPx(this.mouseIsOver) * EdgeView.svgPerPx());
         this.svgLink.style.display = '';
         this.svgHalo.setAttribute('d', curve.d);
         this.svgHalo.style.display = '';
@@ -243,9 +248,10 @@ class EdgeView {
         // Its base back along the curve's last tangent, which leaves the card's side square. At
         // most a quarter of the card's smaller half on screen, and never under half its own size:
         // a card zoomed out to a few px carried an arrowhead nearly as big as itself.
+        const w = EdgeView.widthPx(false);
         const half = to.screenBox().half;
-        const fit = Math.min(1, Math.max(0.5, Math.min(half.x, half.y) / 4 / EdgeView.arrowLength));
-        const size = fit * (this.mouseIsOver ? 1.25 : 1);
+        const fit = Math.min(1, Math.max(0.5, Math.min(half.x, half.y) / 4 / (EdgeView.arrowLength * w)));
+        const size = w * fit * (this.mouseIsOver ? 1.25 : 1);
         const tip = curve.points[3];
         const base = tip.plus(curve.out1.scale(EdgeView.arrowLength * size));
         const side = new vec2(-curve.out1.y, curve.out1.x).scale(EdgeView.arrowHalf * size);

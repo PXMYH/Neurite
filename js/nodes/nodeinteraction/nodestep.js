@@ -97,9 +97,9 @@ class NodeSimulation {
             const m = Node.prev.pos.toSvg();
             const l = Graph.vecToZ().toSvg();
             svg_mousePath.setAttribute('d', "M " + m + " L " + l);
-            // As wide on screen as an Edge under the pointer (`EdgeView.hoverPx`): at 50 times
+            // As wide on screen as an Edge under the pointer (`EdgeView.widthPx`): at 50 times
             // the orbit's width it was an 11 px band in a 900 px window, beside threads of 2.
-            width = EdgeView.hoverPx * EdgeView.svgPerPx();
+            width = EdgeView.widthPx(true) * EdgeView.svgPerPx();
         } else {
             svg_mousePath.setAttribute('d', this.mousePath.join(''));
         }

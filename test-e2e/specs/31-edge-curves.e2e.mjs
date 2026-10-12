@@ -8,11 +8,15 @@ after(async () => { await browser?.close(); });
 beforeEach(async () => { ({ context, page, errors } = await openNeurite(browser)); });
 afterEach(async () => { await context?.close(); });
 
-// An Edge drawn as the threads between cards are in Obsidian's Canvas, tldraw and React Flow
+// An Edge drawn as the threads between cards are in Obsidian's Canvas, React Flow and tldraw
 // (#84): from the side of one card that faces the other to the other's facing side, on a curve
-// that leaves and meets each square; 1.5 screen px wide at any zoom and 2.5 under the pointer;
-// its arrowhead on the card it points at. It was a ribbon from centre to centre that met each
-// card wherever the line crossed its edge, with the arrowhead half way along it.
+// that leaves and meets each square, slim, with its arrowhead on the card it points at. It was a
+// ribbon from centre to centre that met each card wherever the line crossed its edge, with the
+// arrowhead half way along it.
+
+// The width it is drawn at on screen: 1.5 px at x1, going with the square root of the zoom from
+// 1 px to 2, and 1.5 px more under the pointer.
+const widthAt = (zoom, hovered = false) => Math.min(2, Math.max(1, 1.5 / Math.sqrt(zoom))) + (hovered ? 1.5 : 0);
 
 // Left, which names Right, so the Edge's arrow points at Right.
 async function link(page) {
@@ -52,7 +56,7 @@ const drawn = (page) => page.evaluate(() => {
     return {
         commands: d.match(/[A-Za-z]/g).join(''), curve: points(d), arrow: points(v.svgArrow.getAttribute('d')),
         width: Number(v.svgLink.getAttribute('stroke-width')) * Math.hypot(ctm.a, ctm.b),
-        paint: getComputedStyle(v.svgLink).stroke, gradient: v.gradient.id,
+        paint: getComputedStyle(v.svgLink).stroke, gradient: v.gradient.id, zoom: Graph.zoom.mag(),
         Left: box('Left'), Right: box('Right'),
     };
 });
@@ -96,29 +100,31 @@ test('an Edge runs from the side of one card that faces the other to the facing 
     assert.deepEqual(errors, []);
 });
 
-// Its arrowhead is 9 px long and 8 across, smaller on a card too small on screen for it: at most a
-// quarter of the card's smaller half, and never under half its own size.
-test('an Edge is 1.5 screen px wide at any zoom, its arrowhead on the card it points at', async () => {
+// Its arrowhead is Obsidian's, 5.2 widths long and 6.5 across, smaller on a card too small on
+// screen for it: at most a quarter of the card's smaller half, and never under half its own size.
+test('an Edge is as slim as the zoom says, its arrowhead on the card it points at', async () => {
     await link(page);
     await pin(page, 3, 0);
     for (const factor of [1, 2, 0.5, 8]) {
         await page.evaluate((f) => { Graph.zoom = Graph.zoom.scale(f) }, factor);
         await page.waitForTimeout(300);
         const e = await drawn(page);
-        assert.ok(Math.abs(e.width - 1.5) < 0.05, `the Edge is ${e.width.toFixed(2)} px wide after a zoom by ${factor}`);
+        const w = widthAt(e.zoom);
+        assert.ok(Math.abs(e.width - w) < 0.05, `the Edge is ${e.width.toFixed(2)} px wide after a zoom by ${factor}, not ${w.toFixed(2)}`);
 
         // Its tip on the middle of the side it points at, its base out from it along the Edge.
         const [l, tip, r] = e.arrow;
-        const long = Math.min(9, Math.max(4.5, Math.min(e.Right.r - e.Right.l, e.Right.b - e.Right.t) / 8));
+        const room = Math.min(e.Right.r - e.Right.l, e.Right.b - e.Right.t) / 2;
+        const long = 5.2 * w * Math.min(1, Math.max(0.5, room / 4 / (5.2 * w)));
         near(tip, { x: e.Right.l, y: e.Right.y }, 'the arrowhead is not on the card it points at');
         near({ x: (l.x + r.x) / 2, y: (l.y + r.y) / 2 }, { x: tip.x - long, y: tip.y },
             `the arrowhead is not ${long.toFixed(1)} px long along the Edge after a zoom by ${factor}`, 0.3);
-        assert.ok(Math.abs(Math.hypot(l.x - r.x, l.y - r.y) - long * 8 / 9) < 0.3, 'the arrowhead is not 8/9 as wide as it is long');
+        assert.ok(Math.abs(Math.hypot(l.x - r.x, l.y - r.y) - long * 6.5 / 5.2) < 0.3, 'the arrowhead is not 1.25 times as wide as it is long');
         await page.evaluate((f) => { Graph.zoom = Graph.zoom.scale(1 / f) }, factor);
     }
 });
 
-test('under the pointer an Edge is 2.5 px wide in the same colours, and a link being drawn is as wide', async () => {
+test('under the pointer an Edge is wider in the same colours, and a link being drawn is as wide', async () => {
     await link(page);
     await pin(page, 3, 0);
     const e = await drawn(page);
@@ -130,11 +136,11 @@ test('under the pointer an Edge is 2.5 px wide in the same colours, and a link b
         await page.mouse.move((p0.x + 3 * c0.x + 3 * c1.x + p1.x) / 8, (p0.y + 3 * c0.y + 3 * c1.y + p1.y) / 8);
         await page.waitForTimeout(200);
         const hovered = await drawn(page);
-        assert.ok(Math.abs(hovered.width - 2.5) < 0.05, `under the pointer the Edge is ${hovered.width.toFixed(2)} px wide`);
+        assert.ok(Math.abs(hovered.width - widthAt(e.zoom, true)) < 0.05, `under the pointer the Edge is ${hovered.width.toFixed(2)} px wide`);
         assert.equal(hovered.paint, e.paint, 'under the pointer the Edge lost its colours');
         await page.mouse.move(5, 500);
         await page.waitForTimeout(200);
-        assert.ok(Math.abs((await drawn(page)).width - 1.5) < 0.05, 'the Edge stayed wide after the pointer left');
+        assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom)) < 0.05, 'the Edge stayed wide after the pointer left');
     }
 
     // The band from an armed note to the pointer, while a link is being drawn.
@@ -147,7 +153,7 @@ test('under the pointer an Edge is 2.5 px wide in the same colours, and a link b
         Node.prev = null;
         return width;
     });
-    assert.ok(Math.abs(band - 2.5) < 0.05, `a link being drawn is ${band.toFixed(2)} px wide`);
+    assert.ok(Math.abs(band - widthAt(e.zoom, true)) < 0.05, `a link being drawn is ${band.toFixed(2)} px wide`);
     assert.deepEqual(errors, []);
 });
 
@@ -162,7 +168,7 @@ test('an Edge restored from a Saved Graph is drawn as a new one is', async () =>
     const e = await drawn(page);
     assert.equal(e.commands, 'MC', 'the restored Edge is not one curve');
     assert.equal(e.paint, `url("#${e.gradient}")`, "the restored Edge is not in its notes' colours");
-    assert.ok(Math.abs(e.width - 1.5) < 0.05, `the restored Edge is ${e.width.toFixed(2)} px wide`);
+    assert.ok(Math.abs(e.width - widthAt(e.zoom)) < 0.05, `the restored Edge is ${e.width.toFixed(2)} px wide`);
     near(e.curve[3], { x: e.Right.l, y: e.Right.y }, "the restored Edge does not meet Right's side");
     assert.deepEqual(errors, []);
 });
