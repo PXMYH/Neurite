@@ -739,3 +739,111 @@ Decisions:
   sliders, button and text box the Settings controls. Its three buttons lose their inline bevel and
   the mouse handlers that wrote their colours; the init takes the old inline style off a card saved
   before, since a Saved Graph is the markup itself.
+
+## Review
+
+- The first adversarial review (Codex, read-only) of 98619fa found four, fixed in e295cf4:
+  - the questions' text lost its size to an id selector inside `:is()`, which raised every
+    branch's specificity;
+  - the file tree's chosen row was no longer marked;
+  - the file tree's path was still the old field;
+  - a finger's targets were too small under a coarse pointer.
+- The second found five, fixed in 16fba71:
+  - Escape while Adjust Controls waited for a key bound "Escape" and closed the dialog, and a key
+    pressed after its close button was bound;
+  - a tool opened from the keyboard left its tooltip up over its dialog;
+  - the coarse sizes missed the menu rows, the nav items, the AI node's buttons and the help
+    overlay's close;
+  - Neurite's folds took no key;
+  - the Prompt Library's titles had no `type`, so the field rules missed them.
+- The third (with #84's first) found one more here: a key armed in Adjust Controls survived a
+  close and a reopen, and a Tab there bound Tab. Fixed in 464c3c3: the handler holds the field it
+  was armed for, and reopening draws a new one.
+- 30-menus-and-dialogs: eight tests, all failing on main; the last two fail on e295cf4, and the
+  reopen case fails on 15d2205.
+- Full suite on e295cf4: Chromium 320 of 321 and 1 skipped; as an iPad 275 passed, 44 skipped,
+  and the two that fail on main (07-canvas's zoom anchor, 12-connect's right-click list).
+
+# Edges as slim curves between the cards' sides (#84, 2026-10-11)
+
+Asked, in chat: "The connection between two nodes are too disgusting, need to be slimer and more
+beautifully connected. Have different colors as well". Tier T3, brownfield. Filed as #84.
+
+What canvas apps do. M means read in source, CSS or first-party docs; I means inferred:
+- Obsidian Canvas, read in its installed bundle (app.css, and the canvas code in app.js): a cubic
+  curve from the middle of a card's side to the middle of the other's, with control points on each
+  side's normal at clamp(d/2, 70, 150) px, and a 7 px straight stub to the border (M). The line is
+  2 px at 100%, and 2 px x sqrt(zoom) on screen (M). The arrowhead is a filled triangle 10.4 px long
+  and 13 across, with its tip on the border, at the far end only by default (M). Grey by default,
+  or one of six preset colours (M). Under the pointer the line is 5.5 px, and its 24 px target is
+  tinted by a tenth of its colour (M).
+- React Flow (xyflow source): 1 px; a cubic curve whose control points are half the gap out from
+  each side, or 0.25 x 25 x sqrt(overlap) where the sides have passed each other (M). It ends on
+  a 6 px handle at the side's middle (M). No arrowhead by default (M). Its hit path is 20 px (M).
+- tldraw: 2, 3.5, 5 or 10 px, 3.5 by default; a straight line or an arc; open chevron heads (M).
+- Excalidraw: 1, 2 or 4 px, 2 by default; sharp, round or elbow; 15-25 px heads (M).
+- Kinopio: 5 px round-capped curves, each connection in its own colour (M). Miro: 1 px by
+  default, curved, snapped to a side's middle (M). Heptabase and Whimsical publish no numbers.
+- tldraw, React Flow, Excalidraw and Kinopio draw in page units, so their widths scale one for
+  one with the zoom (I).
+
+What there was: a filled ribbon from one Node's centre to the other's, 1 to 2.5 px at its wider
+end, that met each card wherever the line crossed its edge. The arrowhead was half way along the
+Edge, with a faint larger copy laid over it, and the hover turned the Edge one light blue. The
+colours were already the gradient of the two notes' colours (since 2026-10-09).
+
+Decisions:
+- The side's middle, as Obsidian, React Flow and Miro do: Neurite's cards are rectangles, and a
+  line that leaves square looks joined. The sides face across where the gap between the cards is
+  wider than it is tall, and up and down where it is not.
+- React Flow's control points, not Obsidian's clamp. React Flow's depend only on the geometry, so
+  the curve keeps its shape at any zoom. Obsidian's 70-150 px is in canvas units, so here it would
+  need a zoom factor of its own.
+- Worked out in screen px from the boxes the frame has just placed (`Node.screenBox`), and
+  converted by the SVG scale read once per frame, before the cards are written.
+- Stroked, at a width written in the SVG's units every frame: 1.5 px at x1, with Obsidian's sqrt
+  of the zoom, from 1 px to 2; 1.5 px more under the pointer. Not `non-scaling-stroke`, whose
+  gradient WebKit paints in its last colour.
+- The gradient stays, from the note that names the other to the note it names. It is what tells
+  one Edge from the next; Kinopio gives each connection its own colour for the same reason. The
+  hover keeps the colours.
+- Obsidian's arrowhead in proportion to the line (5.2 widths long, 6.5 across), with its tip on the
+  card's border. It is cut down on a card too small on screen for it.
+- Left out: Obsidian's 7 px stub (the curve leaves its side square already); a glow under the
+  pointer (over the 30 px halo it read as a flat band in one colour); dimming the other Edges on
+  hover (inferred, and not asked for).
+- A Proposed Edge is dashed along the curve its Edge would take, and a link being drawn is as wide
+  as an Edge under the pointer.
+
+## Review
+
+- The first adversarial review (Codex, read-only) of de66822 found three here (464c3c3):
+  - a Saved Graph from before 5b25a7d drew its Edges at half the opacity of new ones, because the
+    view copied the saved style onto the path; nothing draws that style now, and it is still kept;
+  - under a Frames delay the hover waited for the next frame, up to half a second: the width is
+    written at once;
+  - left as it was: under a Frames delay, a card that changes size between frames keeps its Edge
+    on its old side until the next frame, as the card itself is re-centred only then.
+- The full suite on de66822 failed one test in both browsers: 18-regions double-clicked the middle
+  of a gap between two cards, where an Edge to another Region now crosses (a probe read
+  `edge-halo` there), and a double-click on an Edge is the Edge's. The test clicks a fifth of the
+  way down the gap.
+- The second found one defect, in the first's fix (69571d3). The hover's width came from the live
+  zoom against the frame's SVG: 5.1 px where 3 was meant, after a zoom out under held frames. Now
+  the frame works out both widths. It also found three tests that could pass without their case:
+  31's throttled hover, 18's typing, and 30's tooltip. Each now proves its case. Making 30's
+  tooltip check real showed an older trap, left as it was: a pointer resting where a dialog's
+  close button was gets a `pointerover` on the page's first change after the dialog goes, and
+  that hides the first tooltip a Tab shows.
+- The third found one test reading the whole Region's text for the typing (baab73d). No defect in
+  the code. Stopped there: the findings went from three to one to none.
+- Negative controls:
+  - all four of 31's tests fail on the code before de66822;
+  - 31's restored Edge (opacity 0.5) and throttled hover fail on 15d2205;
+  - 31's held-frames hover fails on 464c3c3 (5.12 px);
+  - 30's reopened key binding fails on 15d2205, and its tooltip check fails with
+    `HoverTooltip.hide()` taken out of `Modal.open`.
+- Full suite on 464c3c3: Chromium 326 of 327 and 1 skipped. Its iPad run was spoilt: a control
+  script removed and rebuilt the snapshot it ran from, which now has a name of its own.
+- Full suite on 69571d3: Chromium 326 of 327 and 1 skipped; as an iPad 281 passed, 44 skipped,
+  and the two that fail on main (07-canvas's zoom anchor, 12-connect's right-click list).
