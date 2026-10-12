@@ -1109,40 +1109,24 @@ body.connect-mode .window textarea {
 
 /* Edges, which are the graph.
 
-   An edge is a filled ribbon rather than a stroked line -- its width is geometry,
-   set from JS (connect.js:48) -- so these rules control colour only.
+   An Edge is a thread from the side of one card to the facing side of the other, on a curve
+   (#84, `EdgeView.sideCurve`). It is stroked in a gradient of its two notes' colours, at a
+   width `EdgeView.draw` sets in the SVG's units every frame so that it stays the same few
+   screen px at any zoom -- not with `non-scaling-stroke`, whose gradient WebKit paints in its
+   last colour. So these rules give it its caps and nothing else. Under the pointer it is
+   wider, and its arrowhead larger, in the same colours: a hover that changed it to one light
+   blue took away the colours that say which two notes it joins.
 
-   The arrowhead was `rgba(51, 51, 51, 0.9)`: a near-black mark on a black canvas,
-   measuring 1.28:1 against it. The one thing that tells a reader which way a claim
-   runs was invisible, and its hover rule was a no-op because `.edge-arrow-hover` and
-   `.edge-border-hover` are the same value. The arrow is the accent now, and the
-   border behind it stays the cooler blue, so direction reads at rest and brightens
-   on hover instead of changing to the colour it already was. */
+   The arrowhead is at the card it points at, in that note's colour. It was half way along
+   the Edge, with a faint larger copy of itself over it (`.edge-border`). */
+.edge-link {
+    fill: none;
+    stroke-linecap: round;
+}
+
 .edge-arrow {
     fill: var(--edge-tip, var(--ui-accent));
-}
-
-/* The halo round the arrowhead (`makeBorderPath`), in the arrow's own colour and faint. It is
-   painted over the arrow, so at styles.css's 80% blue it was the arrowhead a reader saw. */
-.edge-border {
-    fill: var(--edge-tip, rgb(127 186 223));
-    opacity: 0.3;
-}
-
-
-.edge-arrow-hover {
-    fill: #b9cdf0;
-}
-
-.edge-border-hover {
-    fill: #b9cdf0;
-}
-
-/* The ribbon under the pointer, in the arrow's hover colour. It was `lightskyblue`, a
-   sixth blue, set from JS; a class beats the colour attributes `EdgeView.draw` writes. */
-.edge-link-hover {
-    fill: #b9cdf0;
-    stroke: #b9cdf0;
+    stroke: none;
 }
 
 /* An Edge's pointer target (`EdgeView.makeHalo`): its centre line, 30 screen px wide at

@@ -159,6 +159,7 @@ class Node {
         const drawnAt = parseFloat(e.style.transform.slice('scale('.length));
         if (box && (!(drawnAt > 0) || e.style.display === 'none' || !(box.width > 0))) box = null;
         this.#measuredAt = box ? drawnAt : s;
+        this.#drawScale = s;
 
         e.style.position = 'absolute';
         e.style.transform = 'scale(' + s + ',' + s + ')';
@@ -185,8 +186,12 @@ class Node {
     // The card put with its centre where `draw` worked it out, by its box as it is drawn.
     #centre = null;
     #measuredAt = 1;
+    #drawScale = 1;
+    #half = null;
     place(bb){
         const p = this.#centre.minus(new vec2(bb.width, bb.height).scale(0.5 / this.#measuredAt));
+        // Half its size as it is drawn, at this frame's scale, for the Edges (`screenBox`).
+        this.#half = new vec2(bb.width, bb.height).scale(0.5 * this.#drawScale / this.#measuredAt);
         this.content.style.left = p.x + 'px';
         this.content.style.top = p.y + 'px';
 
@@ -194,6 +199,14 @@ class Node {
         //e.style['margin-left'] = "-"+(e.offsetWidth/2)+'px';//"-50%";
         //e.style['vertical-align']= 'middle';
         //e.style['text-align']= 'center';
+    }
+
+    // Where the card is on screen this frame, in client px: its centre, and half its size as it
+    // was last drawn -- none before it has been, so an Edge meets its centre. For the Edges, which
+    // are drawn to its sides (#84). Its centre is worked out every frame, hidden or not.
+    screenBox(){
+        if (!this.#centre) return null;
+        return {centre: this.#centre, half: this.#half ?? new vec2(0, 0)};
     }
 
     step(dt, box, svgbb, later) {

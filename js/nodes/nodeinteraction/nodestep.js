@@ -97,9 +97,9 @@ class NodeSimulation {
             const m = Node.prev.pos.toSvg();
             const l = Graph.vecToZ().toSvg();
             svg_mousePath.setAttribute('d', "M " + m + " L " + l);
-            // As slim as an Edge now is (`EdgeView.slim`): at 50 it was an 11 px band in a
-            // 900 px window, beside threads of 2.
-            width *= 16;
+            // As wide on screen as an Edge under the pointer (`EdgeView.hoverPx`): at 50 times
+            // the orbit's width it was an 11 px band in a 900 px window, beside threads of 2.
+            width = EdgeView.hoverPx * EdgeView.svgPerPx();
         } else {
             svg_mousePath.setAttribute('d', this.mousePath.join(''));
         }
@@ -139,6 +139,9 @@ class NodeSimulation {
         const nodes = [];
         Graph.forEachNode(Array.prototype.push, nodes);
         const svgbb = svg.getBoundingClientRect();
+        // The scale the Edges convert by, from this box: read again after the cards are written,
+        // it would lay the page out once more (`EdgeView.toSvg`).
+        Svg.updateScaleAndOffset(svgbb);
         const boxes = nodes.map(Node.boxOf);
         const later = [];
         nodes.forEach( (node, i)=> node.step(dt, boxes[i], svgbb, later) );

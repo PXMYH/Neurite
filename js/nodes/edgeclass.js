@@ -94,9 +94,8 @@ class Edge {
         return (processor?.sectionNames(start, end.getTitle()) ? start : null);
     }
 
-    // `directionality.start` is the Node the arrow points at: `EdgeView.makeSvgArrow`
-    // reflects the arrowhead through its centre (`rotatePoint`), so its tip is drawn at
-    // `start`, not `end`. Between two notes a direction is written as a Ref in `end`'s
+    // `directionality.start` is the Node the arrow points at: `EdgeView.draw` puts the
+    // arrowhead's tip on `start`'s card, not `end`'s. Between two notes a direction is written as a Ref in `end`'s
     // section naming `start` -- the note that names the other points at it -- and the
     // parser reads the direction back from the Refs on every pass (`handleRefTags`).
     toggleDirection() {
@@ -184,28 +183,25 @@ class Edge {
 
 class EdgeView {
     funcPopulate = 'populateForEdge';
-    maxWidth = 0.05;
     mouseIsOver = false;
-    // How much of the width the ribbon used to be drawn at. It was too thick: about 5 CSS px
-    // at x0.4, where the Graph is a map of notes and the Edges should be the threads between
-    // them, as the hairlines between the stars are in the universe under it. The arrowhead keeps
-    // its own size (`makeSvgArrow` is given the full width): a third of it was a speck.
-    static slim = 0.32;
-    // And never wider on screen than a thread, however far in the view is: the ribbon is drawn in
-    // the Plane's units, so it grows with the zoom like a card does, and at x1 a third of its old
-    // width was still 5 px. Nor narrower than a hairline, however far out: a ribbon thinner than a
-    // pixel fades out of sight. In CSS px, at its wider end. The floor is geometry, not a stroke:
-    // a `non-scaling-stroke` outline was the first way, and WebKit painted it in the gradient's
-    // last colour from end to end.
-    static threadPx = 2.5;
-    static hairPx = 1;
+    // A thread between two cards (#84), as Obsidian's Canvas, tldraw and React Flow draw one: it
+    // leaves the side of one card that faces the other, and meets the facing side of the other,
+    // square to each, on a curve; it is the same 1.5 screen px at every zoom, 2.5 under the
+    // pointer; and it runs in a gradient from the colour of one note to the other's. It was a
+    // ribbon from centre to centre, so it met each card wherever the line happened to cross its
+    // edge, often at a corner, with its arrowhead half way along it and its width following the
+    // zoom and the Edge's stress.
+    static restPx = 1.5;
+    static hoverPx = 2.5;
+    // The arrowhead, at the card it points at: its tip on the card's edge. In screen px.
+    static arrowLength = 9;
+    static arrowHalf = 4;
     constructor(model, id, style){
         this.model = model;
         this.id = id;
         this.style = style;
         this.gradient = this.makeGradient();
         this.svgArrow = this.makePath('edge-arrow');
-        this.svgBorder = this.makePath('edge-border');
         this.svgLink = this.makeLink();
         this.svgHalo = this.makeHalo();
     }
@@ -217,53 +213,91 @@ class EdgeView {
         On.dblclick(elem, this.onDblClick);
     }
     draw(){
-        const mouseIsOver = this.mouseIsOver;
-        // In the colours of the two Nodes it joins, whatever colour it was saved with: the style
-        // an Edge carries in a Saved Graph is the one blue every Edge had. The hover colour is the
-        // stylesheet's (`.edge-link-hover`), with the arrow's.
-        this.paint();
+        const [a, b] = this.model.pts;
+        if (!a || !b) return;
 
-        const stressValue = Math.max(this.model.stress(), 0.01);
-        let wscale = this.style['stroke-width'] / (0.5 + stressValue) * (mouseIsOver ? 2 : 1.6);
-        wscale = Math.min(wscale, this.maxWidth);
-
+        // From the Node the arrow leaves to the one it points at (`start`), and from the first to
+        // the second where it points at neither.
         const direction = this.model.directionality;
-        const hasDirection = (direction.start && direction.end);
-
-        const funcMakePath = (hasDirection ? 'makeStraightPath' : 'makeCurvedPath');
-        const pts = this.model.pts;
-        const pxPerUnit = Math.min(innerWidth, innerHeight) / 2 / Graph.zoom.mag();
-        const widest = Math.max(pts[0]?.scale || 1, pts[1]?.scale || 1);
-        const toUnits = 1 / (2 * widest * pxPerUnit);
-        const ribbon = Math.max(EdgeView.hairPx * toUnits, Math.min(wscale * EdgeView.slim, EdgeView.threadPx * toUnits));
-        const path = this[funcMakePath](pts, ribbon);
-        if (!path) return;
-        this.svgLink.setAttribute('d', path);
-        this.svgHalo.setAttribute('d', this.centreLine);
-
-        if (!hasDirection) {
-            this.svgArrow.style.display = 'none';
-            this.svgBorder.style.display = 'none';
+        const hasDirection = Boolean(direction.start && direction.end);
+        const from = (hasDirection ? direction.end : a);
+        const to = (hasDirection ? direction.start : b);
+        const curve = EdgeView.curveBetween(from, to);
+        if (!curve) {
+            for (const path of [this.svgLink, this.svgHalo, this.svgArrow]) path.style.display = 'none';
             return;
         }
 
-        const svgArrow = this.makeSvgArrow(
-            direction.start.pos,
-            direction.end.pos,
-            direction.start.scale,
-            direction.end.scale,
-            wscale
-        );
-        this.svgArrow.setAttribute('d', svgArrow.arrowPath);
-        this.svgArrow.style.display = '';
+        const px = (this.mouseIsOver ? EdgeView.hoverPx : EdgeView.restPx);
+        this.svgLink.setAttribute('d', curve.d);
+        this.svgLink.setAttribute('stroke-width', px * EdgeView.svgPerPx());
+        this.svgLink.style.display = '';
+        this.svgHalo.setAttribute('d', curve.d);
+        this.svgHalo.style.display = '';
+        this.paint(from, to, curve.ends);
 
-        const borderPath = this.makeBorderPath(svgArrow);
-        this.svgBorder.setAttribute('d', borderPath);
-        this.svgBorder.style.display = '';
+        if (!hasDirection) {
+            this.svgArrow.style.display = 'none';
+            return;
+        }
+        // Its base back along the curve's last tangent, which leaves the card's side square. At
+        // most a quarter of the card's smaller half on screen, and never under half its own size:
+        // a card zoomed out to a few px carried an arrowhead nearly as big as itself.
+        const half = to.screenBox().half;
+        const fit = Math.min(1, Math.max(0.5, Math.min(half.x, half.y) / 4 / EdgeView.arrowLength));
+        const size = fit * (this.mouseIsOver ? 1.25 : 1);
+        const tip = curve.points[3];
+        const base = tip.plus(curve.out1.scale(EdgeView.arrowLength * size));
+        const side = new vec2(-curve.out1.y, curve.out1.x).scale(EdgeView.arrowHalf * size);
+        const [l, t, r] = [base.plus(side), tip, base.minus(side)].map(EdgeView.toSvg);
+        this.svgArrow.setAttribute('d', 'M ' + l.x + ' ' + l.y + ' L ' + t.x + ' ' + t.y
+                                      + ' L ' + r.x + ' ' + r.y + ' Z');
+        this.svgArrow.style.display = '';
     }
-    // One gradient per Edge, from the colour of the Node at one end to the other's
-    // (`Node.colourOf`), laid along the line between them in the Plane's own units, so it
-    // moves with the Nodes. The colours are written only when they change.
+    // The curve between two cards on screen, in client px: from the middle of the side of the
+    // first that faces the second to the middle of the side of the second that faces the first --
+    // across, where the gap between them is wider than it is tall, and up or down where it is not
+    // -- with each end's control point straight out of its side. React Flow's bezier: half the
+    // distance between the two sides out from each, or, where the sides have passed each other,
+    // a bend that grows with the square root of how far (`getBezierPath`, curvature 0.25).
+    static sideCurve(A, B){
+        if (!A || !B) return null;
+
+        const d = B.centre.minus(A.centre);
+        const across = (Math.abs(d.x) - (A.half.x + B.half.x) >= Math.abs(d.y) - (A.half.y + B.half.y));
+        const sign = Math.sign(across ? d.x : d.y) || 1;
+        const out0 = (across ? new vec2(sign, 0) : new vec2(0, sign));
+        const out1 = out0.scale(-1);
+        const p0 = A.centre.plus(across ? new vec2(sign * A.half.x, 0) : new vec2(0, sign * A.half.y));
+        const p1 = B.centre.plus(across ? new vec2(-sign * B.half.x, 0) : new vec2(0, -sign * B.half.y));
+        const gap = (across ? (p1.x - p0.x) : (p1.y - p0.y)) * sign;
+        const bend = (gap >= 0 ? 0.5 * gap : 0.25 * 25 * Math.sqrt(-gap));
+        if ([p0.x, p0.y, p1.x, p1.y, bend].some( (n)=>!Number.isFinite(n) )) return null;
+
+        return {points: [p0, p0.plus(out0.scale(bend)), p1.plus(out1.scale(bend)), p1], out1};
+    }
+    // The curve from one Node's card to another's in the SVG's units, as a path, or null before
+    // both have been drawn. A Proposed Edge is drawn on it too (`ZetProposals.draw`), as the Edge
+    // it would be.
+    static curveBetween(from, to){
+        const curve = EdgeView.sideCurve(from.screenBox?.(), to.screenBox?.());
+        if (!curve) return null;
+
+        const [p0, c0, c1, p1] = curve.points.map(EdgeView.toSvg);
+        const d = 'M ' + p0.x + ' ' + p0.y + ' C ' + c0.x + ' ' + c0.y + ', '
+                + c1.x + ' ' + c1.y + ', ' + p1.x + ' ' + p1.y;
+        return {...curve, d, ends: [p0, p1]};
+    }
+    // A point on screen in the SVG's own units, and how many of them make one screen px. The
+    // scale and offset are the frame's (`NodeSimulation.updateNodes`): reading the SVG's box again
+    // here, after the cards were moved, would lay the page out a second time every frame.
+    static toSvg(p){ return Graph.xyToZ(p.x, p.y, false).toSvg() }
+    static svgPerPx(){ return 2 * Graph.zoom.mag() * Svg.zoom / Svg.scale }
+
+    // One gradient per Edge, from the colour of the Node it leaves to the colour of the one it
+    // reaches (`Node.colourOf`), laid from one end of the curve to the other in the SVG's units,
+    // so it moves with the cards. Every Edge is in the colours of its own two notes, so no two
+    // Edges between different notes look alike. Written only when they change.
     static paints = null;
     makeGradient(){
         EdgeView.paints ||= svg.insertBefore(Svg.new.defs(), svg.firstChild);
@@ -278,44 +312,32 @@ class EdgeView {
         EdgeView.paints.append(gradient);
         return gradient;
     }
-    paint(){
-        const [a, b] = this.model.pts;
-        if (!a || !b) return;
-
-        const from = a.pos.toSvg(), to = b.pos.toSvg();
+    paint(from, to, [p0, p1]){
         const g = this.gradient;
-        const ends = from.x + ' ' + from.y + ' ' + to.x + ' ' + to.y;
+        const ends = p0.x + ' ' + p0.y + ' ' + p1.x + ' ' + p1.y;
         if (ends !== this.ends) {
             this.ends = ends;
-            g.setAttribute('x1', from.x);
-            g.setAttribute('y1', from.y);
-            g.setAttribute('x2', to.x);
-            g.setAttribute('y2', to.y);
+            g.setAttribute('x1', p0.x);
+            g.setAttribute('y1', p0.y);
+            g.setAttribute('x2', p1.x);
+            g.setAttribute('y2', p1.y);
         }
-        const colours = Node.colourOf(a) + ' ' + Node.colourOf(b);
+        const colours = Node.colourOf(from) + ' ' + Node.colourOf(to);
         if (colours !== this.colours) {
             this.colours = colours;
             const [ca, cb] = colours.split(' ');
             g.firstChild.setAttribute('stop-color', ca);
             g.lastChild.setAttribute('stop-color', cb);
-            this.svgLink.setAttribute('fill', 'url(#' + g.id + ')');
-            this.svgLink.setAttribute('stroke', 'none');
-        }
-        // The arrowhead in the colour of the Node it points at, which is `start`: the arrow is
-        // turned about its middle (`rotatePoint`), so its tip lands at the start of its direction.
-        const at = this.model.directionality.start;
-        const tip = at ? Node.colourOf(at) : '';
-        if (tip !== this.tip) {
-            this.tip = tip;
-            this.svgArrow.style.setProperty('--edge-tip', tip);
-            this.svgBorder.style.setProperty('--edge-tip', tip);
+            // Stroked, at a width set in the SVG's units each frame (`draw`), never a
+            // `non-scaling-stroke`: WebKit paints that one's gradient in its last colour.
+            this.svgLink.setAttribute('stroke', 'url(#' + g.id + ')');
+            this.svgLink.setAttribute('fill', 'none');
+            // The arrowhead in the colour of the Node it points at.
+            this.svgArrow.style.setProperty('--edge-tip', cb);
         }
     }
     toggleMouseOver(status){
         this.mouseIsOver = status;
-        this.svgLink.classList.toggle('edge-link-hover', status);
-        this.svgArrow.classList.toggle('edge-arrow-hover', status);
-        this.svgBorder.classList.toggle('edge-border-hover', status);
     }
 
     makeLink(){
@@ -338,177 +360,13 @@ class EdgeView {
         this.attachEventListeners(path);
         return path;
     }
-    // What the pointer aims at (#51): the Edge's centre line, stroked 30 screen px wide
-    // and invisible, above the three paths that draw it (`.edge-halo`). The drawn ribbon
-    // was the only target, and it is as thin as it looks -- measured, 9 px either side of
-    // its middle at x1 and 2 px at x0.25, where it all but could not be hit.
+    // What the pointer aims at (#51): the Edge's line, stroked 30 screen px wide and invisible,
+    // above the paths that draw it (`.edge-halo`). The drawn line was the only target, and it is
+    // as thin as it looks.
     makeHalo(){
         const path = this.makePath('edge-halo');
         path.style.display = '';
         return path;
-    }
-    makeStraightPath(pts, wscale){
-        const path = ["M "];
-        const c = this.model.center();
-
-        // Constructing the straight edge path
-        for (const n of pts) {
-            if (n.pos.isInvalid()) return '';
-
-            const rotated = n.pos.minus(c).rot90();
-            if (rotated.x !== 0 || rotated.y !== 0) {
-                const left = rotated.normed(n.scale * wscale);
-                if (left.isInvalid()) return '';
-
-                path.push(n.pos.minus(left).toSvg(),
-                          " L ",
-                          left.plus(n.pos).toSvg(), " ");
-            }
-        }
-
-        // Closing the straight edge path
-        const argMinus = pts[0].pos.minus(c).rot90().normed(pts[0].scale * wscale);
-        const firstPoint = pts[0].pos.minus(argMinus);
-        if (firstPoint.isInvalid()) return '';
-
-        path.push(" ", firstPoint.toSvg(), "z");
-        this.centreLine = "M " + pts[0].pos.toSvg() + " L " + pts[1].pos.toSvg();
-        return path.join('');
-    }
-    makeCurvedPath(pts, wscale){
-        if (pts.length < 2) return '';
-
-        const startPoint = pts[0].pos;
-        const endPoint = pts[1].pos;
-        const startScale = pts[0].scale || 1;
-        const endScale = pts[1].scale || 1;
-
-        const horizontal = (startPoint.x - endPoint.x) / 1.1;
-        const vertical = (startPoint.y - endPoint.y);
-        const distance = Math.sqrt(horizontal * horizontal + vertical * vertical);
-
-        // Calculate the perpendicular vector with adjusted scale based on node scales
-        const startPerp = new vec2(vertical, -horizontal).normed(startScale * wscale);
-        const endPerp = new vec2(vertical, -horizontal).normed(endScale * wscale);
-
-        // Calculate the points for the curved path
-        const startLeft = startPoint.minus(startPerp);
-        if (startLeft.isInvalid()) return '';
-
-        const startRight = startPoint.plus(startPerp);
-        if (startRight.isInvalid()) return '';
-
-        const endLeft = endPoint.minus(endPerp);
-        if (endLeft.isInvalid()) return '';
-
-        const endRight = endPoint.plus(endPerp);
-        if (endRight.isInvalid()) return '';
-
-        const curve = Math.min(1, Math.abs(vertical)) / 2;
-        const vecLeft = new vec2(0, (vertical > 0 ? 1 : -1) * curve * distance);
-        const vecRight = new vec2(0, (vertical > 0 ? -1 : 1) * curve * distance);
-        const vecBase = new vec2(horizontal, 0);
-
-        // Adjust the control points based on the distance
-        const controlPointLeft1 = startLeft.minus(vecBase).minus(vecLeft);
-        if (controlPointLeft1.isInvalid()) return '';
-
-        const controlPointLeft2 = endLeft.plus(vecBase).plus(vecLeft);
-        if (controlPointLeft2.isInvalid()) return '';
-
-        const controlPointRight1 = startRight.minus(vecBase).plus(vecRight);
-        if (controlPointRight1.isInvalid()) return '';
-
-        const controlPointRight2 = endRight.plus(vecBase).minus(vecRight);
-        if (controlPointRight2.isInvalid()) return '';
-
-        // The same curve at no width, which its two sides agree on: `vecRight` is
-        // `-vecLeft`, so both sides' control points meet here.
-        this.centreLine = "M " + startPoint.toSvg()
-            + " C " + startPoint.minus(vecBase).minus(vecLeft).toSvg()
-            + ", " + endPoint.plus(vecBase).plus(vecLeft).toSvg()
-            + ", " + endPoint.toSvg();
-
-        return "M "
-            + startLeft.toSvg()
-            + " C "
-            + controlPointLeft1.toSvg() + ", "
-            + controlPointLeft2.toSvg() + ", "
-            + endLeft.toSvg()
-            + " L "
-            + endRight.toSvg()
-            + " C "
-            + controlPointRight2.toSvg() + ", "
-            + controlPointRight1.toSvg() + ", "
-            + startRight.toSvg()
-            + " Z";
-    }
-    makeSvgArrow(startPoint, endPoint, startScale, endScale, wscale){
-        const perspectiveFactor = 0.5; // Range [0, 1]
-        const adjustedStartScale = 1 + (startScale - 1) * perspectiveFactor;
-        const adjustedEndScale = 1 + (endScale - 1) * perspectiveFactor;
-        const totalAdjustedScale = adjustedStartScale + adjustedEndScale;
-        const startWeight = adjustedEndScale / totalAdjustedScale;
-        const endWeight = adjustedStartScale / totalAdjustedScale;
-        const midPoint = startPoint.scale(startWeight).plus(endPoint.scale(endWeight));
-
-        // 0.4, set by measurement rather than by reasoning about the chain above.
-        //
-        // The arrowhead was 1.5 and measured 38.3px against a 325px card -- 11.8% of the
-        // card's width. That was tolerable while nothing was drawing one and dominant once
-        // every reference did. An intermediate 0.85 barely moved the ratio, because
-        // `wscale` also carries the edge's stress and the two changes partly cancelled:
-        // reasoning about the product of five factors was the wrong approach, and reading
-        // the rendered box was the right one.
-        //
-        // 0.4 puts it near 5% of a card: unmistakably an arrowhead, and no longer the
-        // largest mark between two notes.
-        const arrowScaleFactor = 0.4;
-        const arrowLength = ((startScale + endScale) / 2 * wscale * 5) * arrowScaleFactor;
-        const arrowWidth = ((startScale + endScale) / 2 * wscale * 3) * arrowScaleFactor;
-        const direction = endPoint.minus(startPoint);
-        const directionNormed = direction.normed(arrowLength);
-        const perp = new vec2(-directionNormed.y, directionNormed.x).normed(arrowWidth);
-
-        let arrowBase1 = midPoint.minus(perp);
-        let arrowBase2 = midPoint.plus(perp);
-        let arrowTip = midPoint.plus(directionNormed);
-
-        const arrowFlipFactor = 0.85;
-        const arrowBaseCenterX = (arrowBase1.x + arrowBase2.x) / 2;
-        const arrowBaseCenterY = (arrowBase1.y + arrowBase2.y) / 2;
-        const arrowCenterX = arrowBaseCenterX * arrowFlipFactor + arrowTip.x * (1 - arrowFlipFactor);
-        const arrowCenterY = arrowBaseCenterY * arrowFlipFactor + arrowTip.y * (1 - arrowFlipFactor);
-        const arrowCenter = new vec2(arrowCenterX, arrowCenterY);
-
-        arrowBase1 = this.rotatePoint(arrowBase1, arrowCenter);
-        arrowBase2 = this.rotatePoint(arrowBase2, arrowCenter);
-        arrowTip = this.rotatePoint(arrowTip, arrowCenter);
-
-        const arrowPath = "M " + arrowBase1.toSvg()
-                        + " L " + arrowTip.toSvg()
-                        + " L " + arrowBase2.toSvg() + " Z";
-        return { arrowPath, arrowBase1, arrowBase2, arrowTip };
-    }
-    makeBorderPath(svgArrow){
-        const { arrowBase1, arrowBase2, arrowTip } = svgArrow;
-
-        const arrowMidX = (arrowBase1.x + arrowBase2.x + arrowTip.x) / 3;
-        const arrowMidY = (arrowBase1.y + arrowBase2.y + arrowTip.y) / 3;
-        const arrowMidPoint = new vec2(arrowMidX, arrowMidY);
-
-        const offsetScale = 1.4;
-        const borderBase1 = arrowMidPoint.plus(arrowBase1.minus(arrowMidPoint).scale(offsetScale));
-        const borderBase2 = arrowMidPoint.plus(arrowBase2.minus(arrowMidPoint).scale(offsetScale));
-        const borderTip = arrowMidPoint.plus(arrowTip.minus(arrowMidPoint).scale(offsetScale));
-
-        return "M " + borderBase1.toSvg()
-            + " L " + borderTip.toSvg()
-            + " L " + borderBase2.toSvg() + " Z";
-    }
-
-    rotatePoint(point, center){
-        return new vec2(2 * center.x - point.x, 2 * center.y - point.y);
     }
 
     // A plain click does nothing to an Edge. It turned the arrow, and between two notes a turn

@@ -183,25 +183,6 @@ body {
 }
 
 
-.edge-arrow {
-    fill: rgba(51, 51, 51, 0.9); /* Semi-transparent fill color */
-}
-
-.edge-arrow-hover {
-    /* fill: rgba(51, 51, 51, 0.5);  Semi-transparent fill color */
-    fill: rgb(127 186 223 / 80%); /* Slightly more opaque fill for hover */
-}
-
-.edge-border {
-    fill: rgb(127 186 223 / 80%);
-}
-
-.edge-border-hover {
-    /* Styles for hovered state of the border */
-    fill: rgb(127 186 223 / 80%);
-}
-
-
 .hidden {
     display: none;
     overflow: hidden;

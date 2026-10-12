@@ -10,6 +10,7 @@ afterEach(async () => { await context?.close(); });
 
 // Nodes in their own colours over the universe, and Edges as threads in those colours. Every card
 // was one brown with one #d49454 edge, and every Edge the same #8fb4e8 ribbon, 5 CSS px at x0.4.
+// How an Edge is drawn -- its curve, its width, its arrowhead's place -- is 31-edge-curves.
 
 const cards = (page) => page.evaluate(() => Object.values(Graph.nodes).map((n) => ({
     title: n.getTitle(), colour: Node.colourOf(n),
@@ -41,25 +42,23 @@ test("an Edge is a thread in its two Nodes' colours, its arrowhead in the colour
     await page.waitForTimeout(400);
     const e = await page.evaluate(() => {
         const edge = [...new Set(Object.values(Graph.nodes).flatMap((n) => n.edges))][0];
-        const v = edge.view, pts = edge.pts;
-        // The ribbon's width on screen at its wider end, from the geometry it was drawn with.
-        const px = Math.min(innerWidth, innerHeight) / 2 / Graph.zoom.mag();
-        const wscale = Math.min(v.style['stroke-width'] / (0.5 + Math.max(edge.stress(), 0.01)) * 1.6, v.maxWidth);
-        const widest = Math.max(...pts.map((p) => p.scale));
+        const v = edge.view, { start, end } = edge.directionality;
         return {
             stops: [...v.gradient.children].map((s) => s.getAttribute('stop-color')),
-            ends: pts.map((p) => Node.colourOf(p)),
-            painted: v.svgLink.getAttribute('fill') === `url(#${v.gradient.id})`,
-            tip: [getComputedStyle(v.svgArrow).fill, edge.directionality.start?.getTitle(), Node.colourOf(edge.directionality.start)],
-            width: 2 * widest * Math.max(EdgeView.hairPx / (2 * widest * px), Math.min(wscale * EdgeView.slim, EdgeView.threadPx / (2 * widest * px))) * px,
-            painted2: v.svgLink.getAttribute('stroke'),
+            // From the note that names the other to the one it names (#84).
+            ends: [end, start].map((n) => Node.colourOf(n)),
+            stroke: v.svgLink.getAttribute('stroke') === `url(#${v.gradient.id})`,
+            fill: getComputedStyle(v.svgLink).fill,
+            scaling: getComputedStyle(v.svgLink).vectorEffect,
+            tip: [getComputedStyle(v.svgArrow).fill, start?.getTitle(), Node.colourOf(start)],
         };
     });
-    assert.deepEqual(e.stops, e.ends, "the Edge's gradient is not its two Nodes' colours");
-    assert.equal(e.painted, true, 'the ribbon is not painted with its gradient');
+    assert.deepEqual(e.stops, e.ends, "the Edge's gradient is not its two Nodes' colours, from the one that names the other");
+    assert.equal(e.stroke, true, 'the thread is not stroked with its gradient');
+    assert.equal(e.fill, 'none', 'the curve is filled');
     assert.equal(e.tip[1], 'Right', 'the arrow does not point at the Node the Ref names');
     assert.equal(e.tip[0], rgb(e.tip[2]), 'the arrowhead is not the colour of the Node it points at');
-    assert.ok(e.width >= 1 - 1e-9 && e.width <= 2.5 + 1e-9, `the ribbon is ${e.width} px wide`);
-    // Filled only: WebKit paints a non-scaling stroke's gradient in its last colour.
-    assert.equal(e.painted2, 'none');
+    // Its width is set in the SVG's units each frame: WebKit paints a non-scaling stroke's
+    // gradient in its last colour.
+    assert.equal(e.scaling, 'none');
 });

@@ -30,7 +30,7 @@ class Graph {
     }
     addEdgeView(edgeView){
         this.edgeViews[edgeView.id] = edgeView;
-        this.htmlEdges.append(edgeView.svgArrow, edgeView.svgBorder, edgeView.svgLink, edgeView.svgHalo);
+        this.htmlEdges.append(edgeView.svgLink, edgeView.svgArrow, edgeView.svgHalo);
     }
     addNode(node){
         let id = this.nodes.length;
@@ -393,7 +393,6 @@ class Graph {
     }
     deleteEdgeView(edgeView){
         edgeView.svgArrow.remove();
-        edgeView.svgBorder.remove();
         edgeView.svgLink.remove();
         edgeView.svgHalo.remove();
         edgeView.gradient.remove();
@@ -517,8 +516,10 @@ class Graph {
         const elem = target.closest('[data-view-type]');
         if (elem) return this[elem.dataset.viewType][elem.dataset.viewId];
     }
-    xyToZ(x, y){
-        Svg.updateScaleAndOffset();
+    // `measure` false takes the SVG's scale and offset as the frame last read them, for a caller
+    // drawing after the cards were moved (`EdgeView`), where reading the box lays the page out.
+    xyToZ(x, y, measure = true){
+        if (measure) Svg.updateScaleAndOffset();
         return new vec2(
             ((x - Svg.offset.x) / Svg.scale - .5) * 2,
             ((y - Svg.offset.y) / Svg.scale - .5) * 2

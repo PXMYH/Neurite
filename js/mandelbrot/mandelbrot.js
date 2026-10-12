@@ -171,8 +171,7 @@ Svg.windowScale = function(svgbb){
     if (!svgbb) svgbb = svg.getBoundingClientRect();
     return Math.min(svgbb.width, svgbb.height); //Math.hypot(window.innerHeight,window.innerWidth)/2**.5;
 }
-Svg.updateScaleAndOffset = function(){
-    const svgbb = svg.getBoundingClientRect();
+Svg.updateScaleAndOffset = function(svgbb = svg.getBoundingClientRect()){
     Svg.scale = Svg.windowScale(svgbb);
 
     const off = (svgbb.width < svgbb.height ? svgbb.right : svgbb.bottom);

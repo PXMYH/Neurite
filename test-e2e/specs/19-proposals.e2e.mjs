@@ -96,11 +96,14 @@ test('choosing a pair frames both notes clear of the panel and draws the dashed 
         const panel = document.querySelector('#customModal .modal-content').getBoundingClientRect();
         const clear = (n) => { const r = n.view.div.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= panel.left && r.bottom <= innerHeight; };
         const path = document.getElementById('proposedEdge');
-        return { a: clear(a), b: clear(b), d: path.getAttribute('d'), dash: getComputedStyle(path).strokeDasharray,
+        return { a: clear(a), b: clear(b), d: path.getAttribute('d'), edge: EdgeView.curveBetween(a, b)?.d,
+            dash: getComputedStyle(path).strokeDasharray,
             box: path.getBoundingClientRect().width + path.getBoundingClientRect().height };
     });
     assert.ok(seen.a && seen.b, 'both cards on screen and left of the panel: ' + JSON.stringify(seen));
-    assert.match(seen.d, /^M .+ L .+/);
+    // On the curve the Edge would be drawn on, from the side of one card to the other's (#84).
+    assert.match(seen.d, /^M .+ C .+/);
+    assert.equal(seen.d, seen.edge, 'the dashed line is not where the Edge would be');
     assert.notEqual(seen.dash, 'none');
     assert.ok(seen.box > 10, 'the line has a length on screen');
 

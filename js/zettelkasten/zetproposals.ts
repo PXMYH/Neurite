@@ -571,7 +571,8 @@ class ZetProposals {
         if (dismissed && ZetProposals.shown?.a === a && ZetProposals.shown?.b === b) ZetProposals.hide();
     }
 
-    // The dashed line, redrawn with the frame (`nodeStep`) while the panel is open.
+    // The dashed line, redrawn with the frame (`nodeStep`) while the panel is open, on the curve
+    // the Edge would be drawn on (#84).
     static #path: SVGPathElement | null = null;
     static draw(): void {
         const path = ZetProposals.#path ??= document.getElementById('proposedEdge') as SVGPathElement | null;
@@ -579,7 +580,7 @@ class ZetProposals {
 
         const pair = ZetProposals.shown;
         const on = pair && !pair.a.removed && !pair.b.removed && (Modal as any).current?.id === 'proposalsModal';
-        const d = on ? `M ${pair.a.pos.toSvg()} L ${pair.b.pos.toSvg()}` : '';
+        const d = on ? (EdgeView.curveBetween(pair.a, pair.b)?.d ?? '') : '';
         if (path.getAttribute('d') !== d) path.setAttribute('d', d);
     }
 
