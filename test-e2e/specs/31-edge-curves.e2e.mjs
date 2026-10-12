@@ -140,6 +140,19 @@ test('under the pointer an Edge is wider in the same colours, and a link being d
         assert.equal(hovered.paint, e.paint, 'under the pointer the Edge lost its colours');
         await page.mouse.move(5, 500);
         await page.waitForTimeout(200);
+        // With the frames throttled, the width still answers at once: once a frame has counted
+        // the delay, the next is 30 off.
+        await page.evaluate(() => { settings.framesDelay = 9 });
+        await page.waitForTimeout(100);
+        await page.mouse.move((p0.x + 3 * c0.x + 3 * c1.x + p1.x) / 8, (p0.y + 3 * c0.y + 3 * c1.y + p1.y) / 8);
+        await page.waitForTimeout(60);
+        assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom, true)) < 0.05, 'with a Frames delay the hover waited for the frame');
+        await page.mouse.move(5, 500);
+        await page.waitForTimeout(60);
+        assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom)) < 0.05, 'with a Frames delay the Edge stayed wide');
+        // The frame already counted 30 off goes on counting them.
+        await page.evaluate(() => { settings.framesDelay = 0 });
+        await page.waitForTimeout(800);
         assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom)) < 0.05, 'the Edge stayed wide after the pointer left');
     }
 
@@ -157,11 +170,14 @@ test('under the pointer an Edge is wider in the same colours, and a link being d
     assert.deepEqual(errors, []);
 });
 
-// The style an Edge carries in a Saved Graph is the old ribbon's, a fill and a width in the Plane's
-// units; restored, it is drawn as any other Edge is.
+// The style an Edge carries in a Saved Graph is the old ribbon's, a fill, a width in the Plane's
+// units and an opacity -- half, in one saved before 5b25a7d. Restored, it is drawn as any other is.
 test('an Edge restored from a Saved Graph is drawn as a new one is', async () => {
     await link(page);
-    await page.evaluate(() => App.viewGraphs.saveNow());
+    await page.evaluate(() => {
+        Object.values(Graph.edges)[0].style = { stroke: 'none', 'stroke-width': '0.005', fill: 'lightcyan', opacity: '0.5' };
+        return App.viewGraphs.saveNow();
+    });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.appReady === true && Object.keys(Graph.edges).length === 1, undefined, { timeout: 30000 });
     await pin(page, 3, 0);
@@ -170,5 +186,9 @@ test('an Edge restored from a Saved Graph is drawn as a new one is', async () =>
     assert.equal(e.paint, `url("#${e.gradient}")`, "the restored Edge is not in its notes' colours");
     assert.ok(Math.abs(e.width - widthAt(e.zoom)) < 0.05, `the restored Edge is ${e.width.toFixed(2)} px wide`);
     near(e.curve[3], { x: e.Right.l, y: e.Right.y }, "the restored Edge does not meet Right's side");
+    assert.deepEqual(await page.evaluate(() => {
+        const edge = Object.values(Graph.edges)[0], link = getComputedStyle(edge.view.svgLink);
+        return [edge.style.opacity, link.opacity, link.fill];
+    }), ['0.5', '1', 'none'], "the restored Edge is drawn in its old style's opacity or fill");
     assert.deepEqual(errors, []);
 });

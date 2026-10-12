@@ -341,12 +341,14 @@ test('a note double-clicked between a Region\'s cards is shown whole, clear of t
         return pane.paneId;
     });
     await page.waitForTimeout(500);
-    // Halfway between the block's two cards.
+    // Halfway between the block's two cards, and a fifth of the way down them: the Edge between
+    // them crosses the gap from the middle of one's side to the middle of the other's (#84), and a
+    // double-click on an Edge is the Edge's.
     const gap = await page.evaluate((paneId) => {
         const boxes = [];
         window.zetPaneList.find((p) => p.paneId === paneId).processor.forEachNodeWrap((w) => boxes.push(w.node.view.div.getBoundingClientRect()));
         const [a, b] = boxes.sort((p, q) => p.left - q.left);
-        return { x: (a.right + b.left) / 2, y: (a.top + a.bottom) / 2 };
+        return { x: (a.right + b.left) / 2, y: a.top + (a.bottom - a.top) / 5 };
     }, paneId);
     await page.evaluate(() => { document.getElementById('bg').style.pointerEvents = 'none'; });
     await page.mouse.dblclick(gap.x, gap.y);

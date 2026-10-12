@@ -216,6 +216,15 @@ test('the dialogs answer the keyboard: a key being bound, a tool\'s tooltip, a f
     await page.keyboard.press('k');
     assert.equal(await page.evaluate(() => controls.shiftKey.value || controls.shiftKey.default), was,
         'a key pressed after the dialog closed was bound');
+    // Closed and opened again before any key: the field it was armed for is gone.
+    await page.evaluate(() => openControlsModal());
+    await page.click('#customModal #shiftKeyInput');
+    await page.click('#customModal .close');
+    await page.evaluate(() => openControlsModal());
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => controls.shiftKey.value || controls.shiftKey.default), was,
+        'a key pressed after the dialog was closed and opened again was bound');
+    await page.click('#customModal .close');
 
     await page.focus('.tool-bar .ai-icon');
     await page.waitForTimeout(200);

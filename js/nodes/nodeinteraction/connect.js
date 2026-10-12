@@ -49,8 +49,9 @@ function connectNodes(node1, node2) {
     }
 }
 
-// An edge is a filled ribbon, not a stroked line: `stroke: none` and the width is
-// geometry (`stroke-width` here is only what the width calculation scales from).
+// The style is kept with the Edge in the Saved Graph (`g`), and drawn by nothing since #84:
+// an Edge is a curve in its two notes' colours, as wide as the zoom says (`EdgeView`). It was
+// the ribbon's, when an edge was a filled ribbon and `stroke-width` what its width scaled from.
 //
 // The fill was `lightcyan` at 0.5 opacity, which composites over the black canvas to
 // roughly #707f7f -- measured 4.3:1 against the canvas but only 1.5:1 against a card,

@@ -21,7 +21,7 @@ class Edge {
         const edgeKey = this.edgeKey = pts.map(String.uuidOf).sort().join('-');
         this.directionality = Graph.edgeDirectionalities[edgeKey]
                            || {start: null, end: null};
-        this.view = new EdgeView(this, edgeKey, style);
+        this.view = new EdgeView(this, edgeKey);
 
         Logger.debug("Creating edge with pts:", pts);
         Logger.debug("Directionality after assignment:", this.directionality);
@@ -202,13 +202,15 @@ class EdgeView {
     // 10.4 px long and 13 across on its 2 px line, in proportion to this one.
     static arrowLength = 5.2;
     static arrowHalf = 3.25;
-    constructor(model, id, style){
+    // The style an Edge was made with (`Edge.style`, saved as `g`) is the old ribbon's, and is
+    // not drawn: written onto the curve, a Saved Graph from before 5b25a7d drew its Edges at half
+    // the opacity of new ones, in a fill a curve must not have.
+    constructor(model, id){
         this.model = model;
         this.id = id;
-        this.style = style;
         this.gradient = this.makeGradient();
         this.svgArrow = this.makePath('edge-arrow');
-        this.svgLink = this.makeLink();
+        this.svgLink = this.makePath('edge-link');
         this.svgHalo = this.makeHalo();
     }
 
@@ -342,21 +344,14 @@ class EdgeView {
             this.svgArrow.style.setProperty('--edge-tip', cb);
         }
     }
+    // The width answers the pointer at once, where the next frame may be half a second off (a
+    // Frames delay, `NodeSimulation.nodeStep`). The curve and the arrowhead wait for it: they are
+    // drawn from where the frame put the cards, and the view may have moved since.
     toggleMouseOver(status){
         this.mouseIsOver = status;
+        this.svgLink.setAttribute('stroke-width', EdgeView.widthPx(status) * EdgeView.svgPerPx());
     }
 
-    makeLink(){
-        const path = Svg.new.path();
-        for (const [key, value] of Object.entries(this.style)) {
-            path.setAttribute(key, value)
-        }
-        path.classList.add('edge-link');
-        path.dataset.viewType = 'edgeViews';
-        path.dataset.viewId = this.id;
-        this.attachEventListeners(path);
-        return path;
-    }
     makePath(className){
         const path = Svg.new.path();
         path.classList.add(className);

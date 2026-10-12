@@ -112,15 +112,17 @@ function prepareForKeyChange(key) {
 }
 // The next key pressed is the one bound -- unless it is Escape, which gives the change up as it
 // leaves a question, and goes no further: on to the dialog's own Escape, it closed the dialog and
-// kept "Escape" as the key. And unless the dialog is gone by then (its close button), when the key
-// is nobody's binding. Captured, so it comes before the dialog's Escape.
+// kept "Escape" as the key. And unless the field it was asked for is gone by then, when the key is
+// nobody's binding: the dialog closed (its close button), or closed and opened again, which draws
+// its body anew (`Modal.open`) -- a Tab there bound Tab. Captured, so it comes before the dialog's
+// Escape.
 function setNewKey(key) {
     const was = controls[key].value || controls[key].default;
+    const input = Elem.byId(key + 'Input');
     function handler(e){
         Off.keydown(document, handler, true);
-        if (Modal.current?.id !== 'controls-modal') return;
+        if (!input.isConnected || Modal.current?.id !== 'controls-modal') return;
 
-        const input = Elem.byId(key + 'Input');
         if (e.key === 'Escape') {
             e.stopPropagation();
             input.innerText = was;
