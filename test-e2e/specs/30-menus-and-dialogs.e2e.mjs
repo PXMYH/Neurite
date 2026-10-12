@@ -226,8 +226,20 @@ test('the dialogs answer the keyboard: a key being bound, a tool\'s tooltip, a f
         'a key pressed after the dialog was closed and opened again was bound');
     await page.click('#customModal .close');
 
-    await page.focus('.tool-bar .ai-icon');
+    // Tab onto it from the tool before it: a tooltip shows for a focus a key put there. The pointer
+    // first leaves the spot the dialog's close button was on: the first change of the page after
+    // the dialog went sends the pointer over what is under it now, and that hides a tooltip.
+    await page.mouse.move(5, 500);
+    await page.waitForTimeout(100);
+    await page.evaluate(() => {
+        const tools = [...document.querySelectorAll('.tool-bar [data-tooltip]')];
+        tools[tools.indexOf(document.querySelector('.tool-bar .ai-icon')) - 1].focus();
+    });
+    await page.keyboard.press('Tab');
     await page.waitForTimeout(200);
+    assert.deepEqual(await page.evaluate(() => [document.activeElement === document.querySelector('.tool-bar .ai-icon'),
+        HoverTooltip.target === document.activeElement, document.querySelector('.ui-tooltip')?.classList.contains('ui-tooltip-visible')]),
+        [true, true, true], "the AI tool's tooltip was not up before it was opened");
     await page.keyboard.press('Enter');
     await page.waitForTimeout(200);
     assert.deepEqual(await page.evaluate(() => [Modal.current?.id,

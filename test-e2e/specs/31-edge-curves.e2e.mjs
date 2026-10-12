@@ -140,20 +140,20 @@ test('under the pointer an Edge is wider in the same colours, and a link being d
         assert.equal(hovered.paint, e.paint, 'under the pointer the Edge lost its colours');
         await page.mouse.move(5, 500);
         await page.waitForTimeout(200);
-        // With the frames throttled, the width still answers at once: once a frame has counted
-        // the delay, the next is 30 off.
-        await page.evaluate(() => { settings.framesDelay = 9 });
-        await page.waitForTimeout(100);
+        // With the frames held, as a Frames delay holds them for up to half a second, the width
+        // still answers at once, and in the held frame's terms: the view has zoomed out since it,
+        // and the Edge on screen is still the frame's.
+        await page.evaluate(() => { App.nodeSimulation.framesLeftToSkip = 1e6; Graph.zoom = Graph.zoom.scale(2); });
         await page.mouse.move((p0.x + 3 * c0.x + 3 * c1.x + p1.x) / 8, (p0.y + 3 * c0.y + 3 * c1.y + p1.y) / 8);
         await page.waitForTimeout(60);
-        assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom, true)) < 0.05, 'with a Frames delay the hover waited for the frame');
+        const held = await drawn(page);
+        assert.ok(Math.abs(held.width - widthAt(e.zoom, true)) < 0.05, `with the frames held the Edge under the pointer is ${held.width.toFixed(2)} px wide`);
         await page.mouse.move(5, 500);
         await page.waitForTimeout(60);
-        assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom)) < 0.05, 'with a Frames delay the Edge stayed wide');
-        // The frame already counted 30 off goes on counting them.
-        await page.evaluate(() => { settings.framesDelay = 0 });
-        await page.waitForTimeout(800);
-        assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom)) < 0.05, 'the Edge stayed wide after the pointer left');
+        assert.ok(Math.abs((await drawn(page)).width - widthAt(e.zoom)) < 0.05, 'with the frames held the Edge stayed wide');
+        assert.ok(await page.evaluate(() => App.nodeSimulation.framesLeftToSkip > 1e5), 'a frame ran while they were held');
+        await page.evaluate(() => { Graph.zoom = Graph.zoom.scale(0.5); App.nodeSimulation.framesLeftToSkip = 1; });
+        await page.waitForTimeout(200);
     }
 
     // The band from an armed note to the pointer, while a link is being drawn.

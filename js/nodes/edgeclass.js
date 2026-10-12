@@ -236,8 +236,12 @@ class EdgeView {
             return;
         }
 
+        // Its width in the SVG's units this frame, at rest and under the pointer: the hover writes
+        // one of the two between frames (`toggleMouseOver`).
+        const perPx = EdgeView.svgPerPx();
+        this.width = {rest: EdgeView.widthPx(false) * perPx, hover: EdgeView.widthPx(true) * perPx};
         this.svgLink.setAttribute('d', curve.d);
-        this.svgLink.setAttribute('stroke-width', EdgeView.widthPx(this.mouseIsOver) * EdgeView.svgPerPx());
+        this.svgLink.setAttribute('stroke-width', this.mouseIsOver ? this.width.hover : this.width.rest);
         this.svgLink.style.display = '';
         this.svgHalo.setAttribute('d', curve.d);
         this.svgHalo.style.display = '';
@@ -345,11 +349,12 @@ class EdgeView {
         }
     }
     // The width answers the pointer at once, where the next frame may be half a second off (a
-    // Frames delay, `NodeSimulation.nodeStep`). The curve and the arrowhead wait for it: they are
-    // drawn from where the frame put the cards, and the view may have moved since.
+    // Frames delay, `NodeSimulation.nodeStep`), and in that frame's terms: the Edge on screen is
+    // the frame's, and the view may have zoomed since -- a width worked out from the zoom now was
+    // twice what it should be after a zoom out. The curve and the arrowhead wait for the frame.
     toggleMouseOver(status){
         this.mouseIsOver = status;
-        this.svgLink.setAttribute('stroke-width', EdgeView.widthPx(status) * EdgeView.svgPerPx());
+        if (this.width) this.svgLink.setAttribute('stroke-width', status ? this.width.hover : this.width.rest);
     }
 
     makePath(className){

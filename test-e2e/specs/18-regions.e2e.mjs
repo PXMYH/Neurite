@@ -362,10 +362,13 @@ test('a note double-clicked between a Region\'s cards is shown whole, clear of t
         const cards = [];
         window.zetPaneList.find((p) => p.paneId === paneId).processor.forEachNodeWrap((w) => cards.push({ t: w.node.getTitle(), b: w.node.view.div.getBoundingClientRect() }));
         const made = cards.find((c) => !['Claude Code/Courses', 'Setup'].includes(c.t));
+        if (!made) return { made: false };
         const overlaps = cards.filter((c) => c !== made && !(c.b.right <= made.b.left || c.b.left >= made.b.right || c.b.bottom <= made.b.top || c.b.top >= made.b.bottom)).map((c) => c.t);
-        return { on: made.b.left >= 0 && made.b.top >= 0 && made.b.right <= innerWidth && made.b.bottom <= innerHeight, overlaps, scrollX, scrollY,
+        return { made: true, text: window.zetPaneList.find((p) => p.paneId === paneId).cm.getValue(), on: made.b.left >= 0 && made.b.top >= 0 && made.b.right <= innerWidth && made.b.bottom <= innerHeight, overlaps, scrollX, scrollY,
             toolbar: document.querySelector('.tool-bar').getBoundingClientRect().top };
     }, paneId);
+    assert.ok(seen.made, 'the double-click made no note');
+    assert.ok(seen.text.includes('Typed here') && seen.text.includes('And a second line'), 'the typing did not reach the new note');
     assert.ok(seen.on, 'the new card is not on screen');
     assert.deepEqual(seen.overlaps, [], 'it overlaps a card of the Region');
     assert.equal(seen.scrollY, 0, 'the page scrolled');
