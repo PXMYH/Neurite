@@ -120,7 +120,8 @@ NodeView.prototype.initCollapsed = function(){
 
     if (!this.btnExpand) {
         this.btnExpand = this.getBtnExpand();
-        On.click(this.btnExpand, this.toggleCollapse.bind(this));
+        On.mousedown(this.btnExpand, this.onExpandPress.bind(this));
+        On.click(this.btnExpand, this.onExpandClick.bind(this));
         On.keydown(this.btnExpand, NodeView.keyActivates(this.toggleCollapse.bind(this)));
 
         const circle = this.circleCollapsed = this.getCircleCollapsed();
@@ -129,6 +130,19 @@ NodeView.prototype.initCollapsed = function(){
     }
     this.btnExpand.style.display = '';
     this.circleCollapsed.style.display = '';
+}
+// A click on the expand button opens the note only when it is a plain click. A press that
+// links -- the connect mode, or a link armed and waiting for this note -- or selects (Mod) is the
+// note's, as it is anywhere else on the circle, and so is a drag: the button took the click that
+// finished a link and opened the note as well, and a circle dragged by it opened where it was
+// let go. Read at the press, when an armed link is still armed: its release finishes the link
+// (`Node.stopFollowingMouse`), before the click.
+NodeView.prototype.onExpandPress = function(e){
+    this.expandPressIsGesture = App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e) || Boolean(Node.prev);
+}
+NodeView.prototype.onExpandClick = function(e){
+    if (this.expandPressIsGesture || App.interface.nodeMode.isOnFor(e) || this.model._hasAddedGrabbing) return;
+    this.toggleCollapse(e);
 }
 NodeView.prototype.makeBtnExpand = function(){
     const btn = Svg.new.svg();

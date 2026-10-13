@@ -229,11 +229,17 @@ body {
 }
 
 
+/* Tucked under the circle's lower rim, clear of the title. It sat inside the circle, from just
+   below its middle (24 px from 50% down): under a one-line title it began 2 px below the text,
+   and it covered the last 8 px of a two-line one, so a click on a circle's title opened the note
+   -- and a Shift + click there finished a link and opened the note as well. It overlaps the
+   circle by 4 px rather than leaving a gap: crossing a gap ends the circle's hover, and the
+   button shows only under it. */
 .expand-button {
     position: absolute;
-    top: 50%;
+    top: calc(100% - 4px);
     left: 50%;
-    transform: translate(-50%, 50%); /* moves the button so it's a bit lower than center */
+    transform: translateX(-50%);
     width: 24px;
     height: 24px;
     cursor: pointer;
@@ -252,6 +258,13 @@ body {
 .expand-button:focus-visible {
     opacity: 1;
     pointer-events: auto;
+}
+
+/* Gone while the connect mode is on (Shift, or the Connect tool): every click on a note then
+   links it, the circle's included. */
+body.connect-mode .collapsed .expand-button {
+    opacity: 0;
+    pointer-events: none;
 }
 
 

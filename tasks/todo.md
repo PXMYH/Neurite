@@ -884,3 +884,31 @@ Plan:
       (plain, Control), over a collapsed circle, with its title's size; Alt over the Plane
       still turns it; Shift + horizontal wheel lengthens an Edge. The unit test for the zoom
       signs reads the new expression.
+
+## Linking collapsed notes without opening them
+
+Asked, in chat, while the above was under way: "when i link two nodes together and use shift key,
+when i click the second circle text it always expand the text node becaues the expand action
+happens to be in center of circle, figure out if there's better itneraction nto to accientally
+trigger this".
+
+Measured in Chromium, on a collapsed note with a two-line title: the expand button ran from 12 to
+36 px under the circle's middle, over the last 8 px of the title. It showed under any hover,
+Shift's included. A Shift + click there finished the link on the release
+(`Node.stopFollowingMouse`), then the click reached the button and opened the note. A drag that
+began on the button opened the note where it was let go.
+
+What canvas and outline apps do with a node's collapse toggle (from memory): XMind, MindNode and
+Miro's mind maps put it on the node's edge, where its branches leave. Outliners put it beside the
+title as a disclosure triangle. None puts it on the label.
+
+Decisions:
+- [x] The button sits under the circle's lower rim, clear of the title. It overlaps the circle by
+      4 px, because crossing a gap would end the circle's hover, and the button shows only under it.
+- [x] While the connect mode is on (Shift, or the Connect tool), it is gone. Every click on the
+      circle links it.
+- [x] A click on it opens the note only when it is a plain click. A press that links (the connect
+      mode, or an armed link) or selects (Mod) belongs to the note, and so does a drag. The keyboard
+      still opens it (Enter or Space on the focused button).
+- [x] Found on the way: a note collapsed in the frame it was made got its link strip drawn after,
+      shown, and its circle pushed 45 px out of its card. The strip is hidden there now.

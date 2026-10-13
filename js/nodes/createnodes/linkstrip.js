@@ -68,6 +68,10 @@ class LinkStrip {
         // title, not to a corner of its prose. A null reference node appends,
         // which is the right answer for a card whose header is somehow last.
         view.div.insertBefore(strip, view.headerContainer?.nextSibling ?? null);
+        // Hidden on a card collapsed before its first frame, as collapsing hides the rest
+        // (`hideButHeaderAndTitle`): drawn, it pushed the circle 45 px out of its card and off its
+        // title and expand button. Expanding shows it with the rest.
+        if (view.div.classList.contains('collapsed')) strip.style.display = 'none';
         return strip;
     }
 

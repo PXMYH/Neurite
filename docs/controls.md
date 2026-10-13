@@ -83,7 +83,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Ctrl + Shift + F</code></td>
-    <td>Expand a collapsed node. Same target rule as above.</td>
+    <td>Expand a collapsed node. Same target rule as above. The expand button under a circle's rim, which shows under the pointer, does it too. While Connect is on, a click on a circle links it and never expands it.</td>
   </tr>
     <tr>
     <td><code>Right Click</code></td>

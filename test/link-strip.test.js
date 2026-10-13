@@ -25,14 +25,15 @@ const LINKSTRIP = 'js/nodes/createnodes/linkstrip.js';
 
 // The smallest element the code under test can be driven through: children in
 // order, a settable `textContent` that clears them the way the DOM's does, a
-// `nextSibling` so the insertion point can be asserted, and the one selector form
-// the code actually asks for.
+// `nextSibling` so the insertion point can be asserted, the one selector form
+// the code actually asks for, and a `classList` that reads `className`.
 function makeElem(tag, className){
     const el = {
         tag,
         className: className ?? '',
         children: [],
         style: { setProperty(k, v){ el.style[k] = v } },
+        classList: { contains(c){ return el.className.split(/\s+/).includes(c) } },
         attrs: {},
         title: '',
         parent: null,
@@ -190,6 +191,18 @@ test('the strip sits between the header and the note body', ()=>{
     // bottom of a note long enough to scroll.
     assert.deepEqual(classesOf(card.div), ['header-container', 'link-strip', 'editor-wrapper']);
     assert.equal(card.header.nextSibling, strip);
+});
+
+// A card collapsed before its first frame: the strip made after it was shown, and pushed the
+// circle 45 px out of its card. Collapsing hides the card's children, and a strip made on a
+// collapsed card starts hidden with them; expanding shows them all.
+test('a strip first drawn on a collapsed card starts hidden', ()=>{
+    const card = makeCard({links: ['Fractal geometry']});
+    card.div.className = 'window collapsed';
+
+    const {strip} = paint(card);
+
+    assert.equal(strip.style.display, 'none');
 });
 
 test('a frame that changed nothing repaints nothing', ()=>{

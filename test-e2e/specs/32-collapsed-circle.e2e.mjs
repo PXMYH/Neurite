@@ -14,17 +14,19 @@ afterEach(async () => { await context?.close(); });
 // Alt (Option) + scroll resizes it too now. The circle's title is under the same transform, so it
 // grows and shrinks with it.
 
-// Notes made, pinned side by side across the middle of the view, and collapsed.
-async function notes(page, titles, collapse = true) {
+// Notes made, pinned side by side across the middle of the view, and collapsed once they have
+// been drawn, as a reader collapses one.
+async function notes(page, titles) {
     for (const t of titles) await addNote(page, t, t.toLowerCase());
-    await page.evaluate(({ titles, collapse }) => {
+    await page.waitForTimeout(500);
+    await page.evaluate((titles) => {
         titles.forEach((t, i) => {
             const n = Object.values(Graph.nodes).find((n) => n.getTitle() === t);
             n.pos = Graph.pan.plus(new vec2((i - (titles.length - 1) / 2) * 0.6, 0));
             n.anchor = n.pos; n.anchorForce = 1;
-            if (collapse) n.view.toggleCollapse();
+            n.view.toggleCollapse();
         });
-    }, { titles, collapse });
+    }, titles);
     await page.waitForTimeout(600);
 }
 // The first note's circle and title on screen, and its scale.
@@ -109,5 +111,112 @@ test('Shift + a scroll across, as a Mac mouse wheel sends it, lengthens an Edge'
     await wheel(page, mid, 'Shift', -200, 0);
     const now = await page.evaluate(() => Object.values(Graph.edges)[0].length);
     near(now / was, await factor(page, -200), 1e-9, 'Shift + a scroll across did not lengthen the Edge by one turn');
+    assert.deepEqual(errors, []);
+});
+
+// Linking collapsed notes (asked in chat: "when i click the second circle text it always expand
+// the text node"). The expand button sat inside the circle, from just under its middle, where it
+// covered the last 8 px of a two-line title; a Shift + click there linked the notes and opened the
+// second one as well. It is under the circle's rim now, gone while the connect mode is on, and a
+// press that links, selects or drags never opens the note.
+const spot = (page, title) => page.evaluate((title) => {
+    const v = Object.values(Graph.nodes).find((n) => n.getTitle() === title).view;
+    const c = v.div.querySelector('.collapsed-circle').getBoundingClientRect(), t = v.div.querySelector('.collapsed-title').getBoundingClientRect();
+    const b = v.div.querySelector('.expand-button').getBoundingClientRect();
+    // Where the button and a two-line title met: the button ran from 12 px under the circle's
+    // middle to 36 px under it, and the title's second line ends about 17 px under it.
+    return { centre: { x: c.x + c.width / 2, y: c.y + c.height / 2 }, was: { x: c.x + c.width / 2, y: c.y + c.height / 2 + 15 },
+             button: { x: b.x + b.width / 2, y: b.y + b.height / 2, top: b.top }, title: { bottom: t.bottom }, circle: { bottom: c.bottom } };
+}, title);
+const linked = (page) => page.evaluate(() => ({
+    edges: Object.values(Graph.edges).map((e) => e.pts.map((n) => n.getTitle()).sort().join(' - ')).sort(),
+    open: Object.values(Graph.nodes).filter((n) => !n.view.div.classList.contains('collapsed')).map((n) => n.getTitle()),
+}));
+const press = (page, at) => (isIPad ? page.touchscreen.tap(at.x, at.y) : page.mouse.click(at.x, at.y));
+
+test("Shift + click on a collapsed note's circle links it, under its title too, and never opens it", { skip: isIPad && 'a finger has no Shift' }, async () => {
+    await notes(page, ['Alpha', 'Agent = Model + Harness + Evals']);
+    const a = await spot(page, 'Alpha'), b = await spot(page, 'Agent = Model + Harness + Evals');
+    assert.ok(b.was.y < b.title.bottom, 'the spot under test is not on the title any more; this test proves nothing');
+    await page.keyboard.down('Shift');
+    await page.mouse.click(a.centre.x, a.centre.y);
+    await page.mouse.move(b.was.x, b.was.y);
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => getComputedStyle(Object.values(Graph.nodes)[1].view.div.querySelector('.expand-button')).opacity), '0',
+        'the expand button shows while the connect mode is on');
+    await page.mouse.click(b.was.x, b.was.y);
+    await page.keyboard.up('Shift');
+    await page.waitForTimeout(400);
+    assert.deepEqual(await linked(page), { edges: ['Agent = Model + Harness + Evals - Alpha'], open: [] });
+    assert.deepEqual(errors, []);
+});
+
+test('with the Connect tool on, a click or a tap on each circle links them and opens neither', async () => {
+    await notes(page, ['Alpha', 'Agent = Model + Harness + Evals']);
+    const a = await spot(page, 'Alpha'), b = await spot(page, 'Agent = Model + Harness + Evals');
+    await press(page, await page.evaluate(() => { const r = document.getElementById('connectTool').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }));
+    await page.waitForTimeout(200);
+    await press(page, a.centre);
+    await page.waitForTimeout(200);
+    await press(page, b.was);
+    await page.waitForTimeout(400);
+    assert.deepEqual(await linked(page), { edges: ['Agent = Model + Harness + Evals - Alpha'], open: [] });
+    assert.deepEqual(errors, []);
+});
+
+test("the expand button is under the circle's rim, clear of its title; a click on it opens the note, a drag from it does not", { skip: isIPad && 'shows under a mouse' }, async () => {
+    await notes(page, ['Alpha', 'Agent = Model + Harness + Evals']);
+    for (const title of ['Alpha', 'Agent = Model + Harness + Evals']) {
+        const s = await spot(page, title);
+        await page.mouse.move(s.centre.x, s.centre.y);
+        await page.waitForTimeout(200);
+        const now = await spot(page, title);
+        assert.ok(now.button.top >= now.title.bottom, `${title}: the expand button is on the title (${now.button.top} < ${now.title.bottom})`);
+        assert.ok(now.button.top < now.circle.bottom, `${title}: the expand button has come off the circle, and its hover with it`);
+    }
+    // A drag that starts on it moves the circle and leaves it collapsed.
+    let s = await spot(page, 'Alpha');
+    await page.mouse.move(s.centre.x, s.centre.y);
+    await page.mouse.move(s.button.x, s.button.y, { steps: 4 });
+    await page.mouse.down();
+    await page.mouse.move(s.button.x + 80, s.button.y + 40, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    assert.deepEqual((await linked(page)).open, [], 'a drag from the expand button opened the note');
+    // Reached from the circle, a plain click on it opens the note.
+    s = await spot(page, 'Alpha');
+    await page.mouse.move(s.centre.x, s.centre.y);
+    await page.mouse.move(s.button.x, s.button.y, { steps: 4 });
+    await page.waitForTimeout(150);
+    await page.mouse.click(s.button.x, s.button.y);
+    await page.waitForTimeout(400);
+    assert.deepEqual((await linked(page)).open, ['Alpha'], 'a click on the expand button did not open the note');
+    assert.deepEqual(errors, []);
+});
+
+// A note collapsed in the frame it was made, before its link strip was first drawn: the strip
+// was made after, shown, and pushed the circle 45 px out of its card -- off its title and its
+// expand button.
+test('a note collapsed as it is made shows no link strip, and its circle stays in its card', async () => {
+    // Made and collapsed in one task, so no frame runs between: the strip is drawn after.
+    const before = await page.evaluate(() => {
+        window.currentActiveZettelkastenMirror.setValue('## Alpha\nalpha\n\n## Agent = Model + Harness + Evals\nagent\n');
+        return Object.values(Graph.nodes).map((n) => {
+            n.anchor = n.pos; n.anchorForce = 1;
+            n.view.toggleCollapse();
+            return Boolean(n.view.div.querySelector(':scope > .link-strip'));
+        });
+    });
+    assert.deepEqual(before, [false, false], 'the strip was drawn before the collapse; this test proves nothing');
+    await page.waitForTimeout(600);
+    const seen = await page.evaluate(() => Object.values(Graph.nodes).map((n) => {
+        const strip = n.view.div.querySelector(':scope > .link-strip');
+        const card = n.view.div.getBoundingClientRect(), disc = n.view.div.querySelector('.collapsed-circle').getBoundingClientRect();
+        return [strip ? getComputedStyle(strip).display : 'none', Math.round(disc.top - card.top)];
+    }));
+    for (const [display, offset] of seen) {
+        assert.equal(display, 'none', 'a collapsed card shows its link strip');
+        assert.ok(Math.abs(offset) <= 8, `the circle is ${offset} px down its card`);
+    }
     assert.deepEqual(errors, []);
 });
