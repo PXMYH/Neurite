@@ -912,3 +912,29 @@ Decisions:
       still opens it (Enter or Space on the focused button).
 - [x] Found on the way: a note collapsed in the frame it was made got its link strip drawn after,
       shown, and its circle pushed 45 px out of its card. The strip is hidden there now.
+
+## Review
+
+- The first adversarial review (Codex, read-only) of 4b4259c and c008986 found five, fixed in
+  e1f24d5:
+  - with Alt's key moved to Control, a pinch resized the card under it;
+  - Alt + scroll during a flight to coordinates threw (`referenceFrame` is null there);
+  - a link strip saved shown in a collapsed card stayed shown after a restore;
+  - the expand button's verdict on a press outlived the press;
+  - a title of three or more lines still reached the button. It now grows up from three
+    quarters of the way down the circle.
+- Found while pinning those, and older than the branch: a reload put every collapsed card's
+  window buttons back on show (`refreshControlIcons` swapped in an unhidden copy). Their 30 px
+  pushed the circle out of its card, so that its middle was where the expand button sat, which
+  is the spot the request named.
+- The second found three, fixed in f5d7cd6. Two of them were measured on 3888110 as well:
+  - a rename in the Notes text left a collapsed circle's old title;
+  - a restored collapsed card asked to fit its title on every frame (94 times a second for two);
+  - a press whose release was lost to another window kept its verdict and added a listener.
+- Negative controls, each on the commit before its fix:
+  - 32's resize tests fail on 3888110 ("1 is not 1.2214");
+  - its linking tests fail on 4b4259c;
+  - its first-review tests fail on c008986;
+  - its rename and fitter tests fail on e1f24d5.
+- Full suite on c008986: Chromium 333 of 334 and 1 skipped; as an iPad 283 passed, 49 skipped, and
+  the two that fail on main. On e1f24d5: Chromium 335 of 336 and 1 skipped.
