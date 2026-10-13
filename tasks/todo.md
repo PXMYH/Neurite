@@ -992,4 +992,6 @@ Decisions:
   iPad after two taps with Connect on.
 - Full suite on 07b1a93: Chromium 343 of 344 and 1 skipped; as an iPad 288 passed, 54 skipped, and
   the two that fail on main. On b4984bc: Chromium 348 of 349 and 1 skipped; as an iPad 288 passed,
-  59 skipped, and the same two.
+  59 skipped, and the same two. On ed1a5a2, the code released as 1.9.6: Chromium 349 of 350 and 1
+  skipped; as an iPad 288 passed, 60 skipped, and the same two. The Mac app from its DMG: smoke 4/4,
+  updates 8/8.
