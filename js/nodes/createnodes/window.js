@@ -265,6 +265,10 @@ class NodeView {
         if (savedButtons && buttonTemplate) {
             const currentButtons = Elem.deepClone(buttonTemplate);
             currentButtons.setAttribute('class', 'button-container');
+            // Hidden still, if collapsing hid them (`hideButHeaderAndTitle`). The fresh copy came
+            // back shown on every collapsed card a Saved Graph restored, and the 30 px of buttons
+            // pushed its circle out of its card, under its title and over its expand button.
+            currentButtons.style.display = savedButtons.style.display;
             savedButtons.replaceWith(currentButtons);
             this.buttons = currentButtons;
         }

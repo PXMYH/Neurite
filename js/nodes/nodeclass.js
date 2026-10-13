@@ -572,7 +572,8 @@ class Node {
         // `Node.wheelTurn`, which takes the turn across where there is none down.
         const amount = Math.exp(-Node.wheelTurn(e) * settings.zoomSpeed * settings.zoomSpeedMultiplier);
 
-        if (Autopilot.isMoving() && this.uuid === Autopilot.referenceFrame.uuid) {
+        // A flight to coordinates has no Node to follow (`Animation.goToCoords`).
+        if (Autopilot.isMoving() && this.uuid === Autopilot.referenceFrame?.uuid) {
             Autopilot.targetZoom_scaleBy(1 / amount);
         } else {
             // Scale selected nodes or individual node
@@ -714,9 +715,10 @@ class Node {
     // where Shift turns a mouse wheel sideways. Alt is how a gesture reaches a Node through its
     // text already, and over the Plane it still turns the view (`Interface.onWheel`). Not
     // Control: a trackpad's pinch arrives as Control and the wheel, and over a card that is
-    // the canvas's zoom.
+    // the canvas's zoom -- so not Alt's key either while Control is down, should Adjust Controls
+    // have given Alt's place to Control.
     static wheelResizes(e){
-        return App.interface.nodeMode.isOnFor(e) || e.getModifierState(controls.altKey.value);
+        return App.interface.nodeMode.isOnFor(e) || (e.getModifierState(controls.altKey.value) && !e.ctrlKey);
     }
     // How far a wheel that resizes turned, positive for down: `deltaY`, or `deltaX` where it is
     // 0. macOS sends Shift and a mouse wheel as a scroll across, so read from `deltaY` alone

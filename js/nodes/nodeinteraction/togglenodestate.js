@@ -12,12 +12,15 @@ NodeView.prototype.toggleCollapse = function(e){
 }
 Node.toggleCollapse = function(node){ node.view.toggleCollapse() }
 
+// The title's last line ends three quarters of the way down the circle, and a longer title grows
+// up from there. Held about the middle (`translate(-50%, -65%)`), a third line reached the expand
+// button under the circle's rim, and a fourth went over it.
 NodeView.prototype.centerTitleInput = function(){
     const style = this.titleInputWrapper.style;
     style.position = 'absolute';
-    style.top = '50%';
+    style.top = '75%';
     style.left = '50%';
-    style.transform = 'translate(-50%, -65%)';
+    style.transform = 'translate(-50%, -100%)';
     style.pointerEvents = 'none'; // Disable interactions during collapse
     style.zIndex = '5'; // Just in case
 
@@ -94,8 +97,6 @@ NodeView.prototype.collapse = function () {
     style.backdropFilter = 'none';
     div.classList.add('collapsed');
 
-    this.centerTitleInput();
-
     this.initCollapsed();
 
     if (div.classList.contains('window-anchored')) {
@@ -118,6 +119,10 @@ NodeView.prototype.onCircleDoubleClicked = function(e){
 NodeView.prototype.initCollapsed = function(){
     if (!this.div.classList.contains('collapsed')) return;
 
+    // Here, the one path a collapse and a restore both take: a Saved Graph is the markup, and a
+    // card collapsed before would keep the title where the old placement put it.
+    this.centerTitleInput();
+
     if (!this.btnExpand) {
         this.btnExpand = this.getBtnExpand();
         On.mousedown(this.btnExpand, this.onExpandPress.bind(this));
@@ -136,12 +141,17 @@ NodeView.prototype.initCollapsed = function(){
 // note's, as it is anywhere else on the circle, and so is a drag: the button took the click that
 // finished a link and opened the note as well, and a circle dragged by it opened where it was
 // let go. Read at the press, when an armed link is still armed: its release finishes the link
-// (`Node.stopFollowingMouse`), before the click.
+// (`Node.stopFollowingMouse`), before the click. And kept for that click only, which the browser
+// sends straight after the release: a click with no press before it -- assistive technology sends
+// one -- is a plain click, even after a drag that ended off the button and so made no click.
 NodeView.prototype.onExpandPress = function(e){
-    this.expandPressIsGesture = App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e) || Boolean(Node.prev);
+    this.expandPress = {gesture: App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e) || Boolean(Node.prev)};
+    On.mouseup(window, ()=>{ setTimeout( ()=>{ this.expandPress = null }, 0 ) }, {once: true, capture: true});
 }
 NodeView.prototype.onExpandClick = function(e){
-    if (this.expandPressIsGesture || App.interface.nodeMode.isOnFor(e) || this.model._hasAddedGrabbing) return;
+    const press = this.expandPress;
+    this.expandPress = null;
+    if (press?.gesture || (press && this.model._hasAddedGrabbing) || App.interface.nodeMode.isOnFor(e)) return;
     this.toggleCollapse(e);
 }
 NodeView.prototype.makeBtnExpand = function(){

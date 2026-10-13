@@ -46,6 +46,11 @@ class LinkStrip {
 
     static #render(view, links){
         const strip = LinkStrip.#ensure(view);
+        // Hidden on a collapsed card, as collapsing hides the rest (`hideButHeaderAndTitle`). One
+        // first drawn after a card was collapsed -- in the frame it was made -- was shown, and
+        // pushed the circle 45 px out of its card and off its title and expand button; and a Saved
+        // Graph keeps it so. Expanding shows it with the rest.
+        if (view.div.classList.contains('collapsed')) strip.style.display = 'none';
         // Clearing drops the old chips' listeners with them, so nothing here has
         // to be unbound by hand.
         strip.textContent = '';
@@ -68,10 +73,6 @@ class LinkStrip {
         // title, not to a corner of its prose. A null reference node appends,
         // which is the right answer for a card whose header is somehow last.
         view.div.insertBefore(strip, view.headerContainer?.nextSibling ?? null);
-        // Hidden on a card collapsed before its first frame, as collapsing hides the rest
-        // (`hideButHeaderAndTitle`): drawn, it pushed the circle 45 px out of its card and off its
-        // title and expand button. Expanding shows it with the rest.
-        if (view.div.classList.contains('collapsed')) strip.style.display = 'none';
         return strip;
     }
 
