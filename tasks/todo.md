@@ -937,4 +937,6 @@ Decisions:
   - its first-review tests fail on c008986;
   - its rename and fitter tests fail on e1f24d5.
 - Full suite on c008986: Chromium 333 of 334 and 1 skipped; as an iPad 283 passed, 49 skipped, and
-  the two that fail on main. On e1f24d5: Chromium 335 of 336 and 1 skipped.
+  the two that fail on main. On e1f24d5: Chromium 335 of 336 and 1 skipped. On 931ce9e, the code
+  released as 1.9.5: Chromium 337 of 338 and 1 skipped; as an iPad 287 passed, 49 skipped, and the
+  two that fail on main. The Mac app from its DMG: smoke 4/4, updates 8/8.
