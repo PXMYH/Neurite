@@ -8,6 +8,11 @@
 // Pinned as an identity rather than as three separate sign checks: the three expressions
 // have to stay the same expression, because the way this broke was one of them being
 // written differently from the others and no one noticing which way it pointed.
+//
+// Two of them read the wheel through `Node.wheelTurn` now, the two a modifier gates: a card's
+// resize and an Edge's length. macOS turns Shift and a mouse wheel into a scroll across, with
+// `deltaY` 0, so they take `deltaX` where `deltaY` is 0. The canvas keeps `deltaY` alone, or a
+// trackpad's swipe across would zoom it. The same sign either way: `deltaY` comes first.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,12 +48,21 @@ test('nothing reads the legacy wheelDelta any more', ()=>{
 });
 
 test('all three zooms are the same expression', ()=>{
+    // The canvas's, which a card zooms too when the wheel is not resizing it.
     const wanted = 'Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier)';
-    for (const [path, src] of Object.entries(code)) {
-        assert.ok(src.includes(wanted),
-            path + ' no longer computes its zoom the same way as the other two. All three '
-            + 'must read: ' + wanted);
+    for (const path of ['js/interface/interface.js', 'js/nodes/nodeclass.js']) {
+        assert.ok(code[path].includes(wanted),
+            path + ' no longer zooms the canvas the way the canvas does. It must read: ' + wanted);
     }
+    // A card's resize and an Edge's length, which a modifier gates.
+    const gated = 'Math.exp(-Node.wheelTurn(e) * settings.zoomSpeed * settings.zoomSpeedMultiplier)';
+    for (const path of ['js/nodes/nodeclass.js', 'js/nodes/edgeclass.js']) {
+        assert.ok(code[path].includes(gated),
+            path + ' no longer resizes the way the other modifier gesture does. It must read: ' + gated);
+    }
+    // And `Node.wheelTurn` is `deltaY` first, so all three read the same sign.
+    assert.match(code['js/nodes/nodeclass.js'], /static wheelTurn\(e\)\{ return e\.deltaY \|\| e\.deltaX \}/,
+        '`Node.wheelTurn` no longer reads deltaY first, or no longer falls back to deltaX');
 });
 
 test('the negation is on deltaY, which is what makes up mean in', ()=>{

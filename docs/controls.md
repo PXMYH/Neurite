@@ -141,7 +141,7 @@ Custom `## title` and `[[reference]]` tags can be set under Zettelkasten in Sett
 
 `UI Tips`
 - `Optimal Node Placement`: Zoom in `Scroll` to create space for new nodes to ensure they have room to expand.
-- `Managing Windows`: Drag windows by their title bar and resize by scrolling while holding `Shift`.
+- `Managing Windows`: Drag windows by their title bar and resize by scrolling while holding `Shift` or `Alt/Option` -- a collapsed note's circle too, and its title with it.
 - `Freezing Nodes`: Hold `Shift` to freeze nodes in place, then `Double Click` nodes to anchor them in place.
 - `Ai Tutorial`: The HOW-TO checkbox sends a context message to the AI that allows it to answer some questions about Neurite.
 

@@ -393,7 +393,8 @@ class EdgeView {
         // Same convention as the fractal's zoom and a card's, so an edge lengthens on a
         // scroll up rather than shortening. `wheelDelta` is the legacy property and its
         // sign is the opposite of `deltaY`'s, which is what had all three disagreeing.
-        const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
+        // Shift turns a Mac's mouse wheel sideways: `Node.wheelTurn` reads that turn as well.
+        const amount = Math.exp(-Node.wheelTurn(e) * settings.zoomSpeed * settings.zoomSpeedMultiplier);
 
         // Determine if this edge should be scaled based on both nodes being selected
         const selectedNodes = App.selectedNodes;

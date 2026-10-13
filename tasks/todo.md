@@ -847,3 +847,40 @@ Decisions:
   script removed and rebuilt the snapshot it ran from, which now has a name of its own.
 - Full suite on 69571d3: Chromium 326 of 327 and 1 skipped; as an iPad 281 passed, 44 skipped,
   and the two that fail on main (07-canvas's zoom anchor, 12-connect's right-click list).
+
+# A collapsed note's circle resized by the wheel again (2026-10-12)
+
+Asked, in chat: "i want to be able to adjust the collapsed text node circle size by a shortcut,
+previously i believe if i hold option or control key then scroll, the circle becomes larger or
+small, but that feature is lost, get it back, also i want the text to be shrinking or expanding
+accordingly as well based on the size of circle". Tier T2, brownfield.
+
+What there is, measured in Chromium over a collapsed note (60 px circle, "Alpha" in 25 px type):
+- Shift + a vertical wheel resizes it: `node.scale` 1 to 1.221 for one notch up, and the
+  circle (62 to 76 px) and its title (62 x 29 to 76 x 35 px) grow by the same factor, since
+  both are drawn under the card's one `scale()` transform. Shift + scroll is the documented
+  gesture (Help, controls.md), and the one the code has had since upstream.
+- Shift + a horizontal wheel does nothing. macOS sends Shift and a mouse wheel as a scroll
+  across: `deltaX`, with `deltaY` 0. The card read the legacy `wheelDelta` until ed5b1a0
+  (2026-08-30), and in Chromium a horizontal wheel carries `wheelDelta` 120, the X axis's. Since
+  then it reads `deltaY`, which is 0 there. On a Mac with a mouse, the shortcut was lost then.
+- Alt (Option), Control and Command + scroll over the circle zoom the canvas, as a plain scroll does.
+
+Plan:
+- [x] The card's resize reads `deltaY`, or `deltaX` where there is none (`Node.wheelTurn`; a
+      name with `wheelDelta` in it trips the test that keeps the legacy property out), and so
+      does Shift + scroll on an Edge.
+- [x] Alt (Option) + scroll over a card resizes it too, the circle included: Alt is how a
+      gesture reaches a Node through its text already, and on a Mac Option is not turned
+      sideways. Not Control: a Mac trackpad's pinch arrives as Control + wheel, and over a card
+      it must stay the canvas's zoom. Over the Plane, Alt + scroll still turns the view.
+- [x] The resize keeps the wheel from also scrolling a note's text under it.
+- [x] An AI note's response lets the resize through, as it does for Shift (probed: Alt and
+      Shift 1 to 1.221 over it, a plain scroll leaves it at 1).
+- [x] The text: nothing to add. The title is under the same transform as the circle, so it
+      grows and shrinks with it (measured above). Pinned by the spec.
+- [x] Help and controls.md say Shift or Alt.
+- [x] Spec (32-collapsed-circle): Shift (vertical and horizontal), Alt, and the gestures that must not resize
+      (plain, Control), over a collapsed circle, with its title's size; Alt over the Plane
+      still turns it; Shift + horizontal wheel lengthens an Edge. The unit test for the zoom
+      signs reads the new expression.

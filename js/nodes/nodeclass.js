@@ -539,7 +539,8 @@ class Node {
         }
     }
     onWheel = (e)=>{
-        // Without Shift, the wheel is the canvas's gesture, not the card's.
+        // Without Shift or Alt (`Node.wheelResizes`), the wheel is the canvas's gesture, not the
+        // card's.
         //
         // This returned and nothing else happened: the canvas's own wheel listener is
         // bound to `#svg_bg` (interface.js:124) and a card is not inside it, so the
@@ -552,7 +553,7 @@ class Node {
         // A note whose body has more text than fits still scrolls, because that is what
         // the wheel means inside a scrollable box; the canvas only takes the gesture when
         // there is nothing to scroll.
-        if (!App.interface.nodeMode.isOnFor(e)) {
+        if (!Node.wheelResizes(e)) {
             if (Node.wheelScrollsContent(e)) return;
             Autopilot.stop();
             const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
@@ -567,8 +568,9 @@ class Node {
         // for up to mean in. This read `e.wheelDelta`, which is the legacy property and
         // carries the *opposite* sign -- +120 for a scroll up where `deltaY` is -120 -- so
         // Shift plus a scroll up shrank a card while the same gesture on the canvas zoomed
-        // into the fractal. One card and one plane, two directions.
-        const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
+        // into the fractal. One card and one plane, two directions. Read through
+        // `Node.wheelTurn`, which takes the turn across where there is none down.
+        const amount = Math.exp(-Node.wheelTurn(e) * settings.zoomSpeed * settings.zoomSpeedMultiplier);
 
         if (Autopilot.isMoving() && this.uuid === Autopilot.referenceFrame.uuid) {
             Autopilot.targetZoom_scaleBy(1 / amount);
@@ -594,6 +596,8 @@ class Node {
                 }
             }
         }
+        // Nor does the text under the pointer scroll while the card grows round it.
+        e.preventDefault();
         e.stopPropagation();
     }
     disableEmbedPointerEvents(){this.setEmbedPointerEvents('none')};
@@ -705,6 +709,21 @@ class Node {
     // already at its end hands it to the canvas, so a short note does not trap the
     // gesture at all and a long one stops trapping it once it is read to the bottom.
     static wheelScrollsContent(e){ return Boolean(Node.scrollerFor(e.target, e.deltaY)) }
+    // Whether the wheel over a card resizes it, collapsed to its circle or not, rather than
+    // zooming the canvas: under the connect mode (Shift), or with Alt held -- Option on a Mac,
+    // where Shift turns a mouse wheel sideways. Alt is how a gesture reaches a Node through its
+    // text already, and over the Plane it still turns the view (`Interface.onWheel`). Not
+    // Control: a trackpad's pinch arrives as Control and the wheel, and over a card that is
+    // the canvas's zoom.
+    static wheelResizes(e){
+        return App.interface.nodeMode.isOnFor(e) || e.getModifierState(controls.altKey.value);
+    }
+    // How far a wheel that resizes turned, positive for down: `deltaY`, or `deltaX` where it is
+    // 0. macOS sends Shift and a mouse wheel as a scroll across, so read from `deltaY` alone
+    // Shift + scroll did nothing on a Mac since ed5b1a0, which moved the card off the legacy
+    // `wheelDelta` -- that one falls back to the X axis (120 for a turn across, measured in
+    // Chromium). A trackpad's turn down wins over its drift across.
+    static wheelTurn(e){ return e.deltaY || e.deltaX }
     // The box at or above `el` that can scroll the way `delta` goes -- down, or with `axis` 'x'
     // right, when positive -- or null. A finger on a card asks it too, across as well as down:
     // a code block's long line could not be reached by one (interface.js, rv16).

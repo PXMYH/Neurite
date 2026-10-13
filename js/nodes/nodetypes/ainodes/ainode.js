@@ -305,8 +305,8 @@ AiNode.setupResponseDivListeners = function(node){
         aiResponseDiv.style.userSelect = 'none'
     });
     On.wheel(aiResponseDiv, (e)=>{
-        // Unless the connect mode is on for it (Shift), the response scrolls and keeps the wheel.
-        if (!App.interface.nodeMode.isOnFor(e)) e.stopPropagation();
+        // Unless the wheel resizes the card (Shift or Alt), the response scrolls and keeps it.
+        if (!Node.wheelResizes(e)) e.stopPropagation();
     }, { passive: false });
 
     let userHasScrolled = false;
