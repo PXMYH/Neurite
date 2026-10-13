@@ -425,8 +425,10 @@ class Node {
         this.#linkOnClick = null;
         if (armed && armed === Node.prev && !this._hasAddedGrabbing) {
             if (armed !== this) {
+                // A burst says a link was made, so none when the two were linked already.
+                const linked = Boolean(findExistingEdge(this, armed));
                 connectNodes(this, armed);
-                LinkFx.burst(armed, this);
+                if (!linked) LinkFx.burst(armed, this);
             }
             Node.prev = null;
         }

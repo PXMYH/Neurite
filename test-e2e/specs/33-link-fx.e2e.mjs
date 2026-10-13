@@ -19,6 +19,8 @@ async function two(page) {
     await addNote(page, 'Alpha', 'alpha');
     await addNote(page, 'Beta', 'beta');
     await page.evaluate(() => {
+        // The view held still: a note added flies the view to it (`Autopilot`).
+        Autopilot.stop();
         const by = Object.fromEntries(Object.values(Graph.nodes).map((n) => [n.getTitle(), n]));
         const { hw } = Graph.planeHalfExtent(by.Alpha);
         const at = (n, pos) => { n.pos = pos; n.anchor = pos; n.anchorForce = 1; n.vel = new vec2(0, 0); };
@@ -178,5 +180,133 @@ test('with the Connect tool, a click or a tap on each note links them and plays 
     assert.equal((await fx(page)).bursts, 1, 'no burst was played');
     await page.waitForTimeout(400);
     assert.equal(await page.evaluate(() => Object.keys(Graph.edges).length), 1, 'no Edge was made');
+    assert.deepEqual(errors, []);
+});
+
+// Found by the first review.
+
+// A Frames delay runs the simulation every few frames (30 at 9), and the effect was drawn with it:
+// a 900 ms burst had one or two poses, or none. Held outright here, so only skipped frames run.
+test('the burst plays on frames the simulation skips', { skip: isIPad && 'Shift + click' }, async () => {
+    await two(page);
+    const a = await card(page, 'Alpha'), b = await card(page, 'Beta');
+    await page.keyboard.down('Shift');
+    await page.mouse.click(a.x, a.t + 6);
+    await page.mouse.move(b.x, b.y, { steps: 6 });
+    await page.mouse.click(b.x, b.y);
+    await page.keyboard.up('Shift');
+    await page.evaluate(() => { App.nodeSimulation.framesLeftToSkip = 1e6 });
+    await page.waitForTimeout(60);
+    const one = await fx(page);
+    await page.waitForTimeout(150);
+    const two_ = await fx(page);
+    await page.evaluate(() => { App.nodeSimulation.framesLeftToSkip = 1 });
+    assert.equal(one.bursts, 1, 'no burst was drawn while the simulation was held');
+    assert.ok(two_.ripple.r > one.ripple.r, `the ripple stood still while the simulation was held (${one.ripple.r} then ${two_.ripple.r})`);
+    assert.deepEqual(errors, []);
+});
+
+// Two cards overlapping: the one on top is the one later in the page. `Graph.nodes` runs in uuid
+// order, so a card raised by being moved to the end of the page was not the one found.
+test('over two overlapping notes, the ring is on the one drawn on top', { skip: isIPad && 'a finger does not hover' }, async () => {
+    await addNote(page, 'Alpha', 'alpha');
+    await addNote(page, 'Beta', 'beta');
+    await addNote(page, 'Gamma', 'gamma');
+    // After the arrivals have settled: a note that lands on another is pushed off it
+    // (`Graph.relaxOverlaps`), so cards overlap only once a reader puts them there.
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+        Autopilot.stop();
+        const by = Object.fromEntries(Object.values(Graph.nodes).map((n) => [n.getTitle(), n]));
+        const { hw, hh } = Graph.planeHalfExtent(by.Alpha);
+        const at = (n, pos) => { n.pos = pos; n.anchor = pos; n.anchorForce = 1; n.vel = new vec2(0, 0); };
+        at(by.Alpha, Graph.pan.plus(new vec2(-3 * hw, 0)));
+        at(by.Beta, Graph.pan.plus(new vec2(2 * hw, 0)));
+        at(by.Gamma, Graph.pan.plus(new vec2(2.5 * hw, 0.25 * hh)));
+        // Beta, made before Gamma, raised over it.
+        by.Beta.content.parentElement.appendChild(by.Beta.content);
+    });
+    await page.waitForTimeout(600);
+    const a = await card(page, 'Alpha'), b = await card(page, 'Beta'), g = await card(page, 'Gamma');
+    const both = { x: (g.l + b.r) / 2, y: (g.t + b.b) / 2 };
+    assert.equal(await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return Object.values(Graph.nodes).find((n) => el && n.content.contains(el))?.getTitle();
+    }, both), 'Beta', 'Beta is not on top at the spot under test; this test proves nothing');
+    await page.keyboard.down('Shift');
+    await page.mouse.click(a.x, a.t + 6);
+    await page.mouse.move(both.x, both.y, { steps: 6 });
+    await page.waitForTimeout(150);
+    const seen = await fx(page);
+    await page.keyboard.up('Shift');
+    near(seen.ring.c, { x: b.l, y: b.y }, 'the ring is not on the card on top');
+    assert.deepEqual(errors, []);
+});
+
+// Beta drawn large across the view, and Alpha, off its left, armed: the point the Edge would meet
+// Beta is off the screen to the left, far from the pointer.
+async function large(page, scale) {
+    await addNote(page, 'Alpha', 'alpha');
+    await addNote(page, 'Beta', 'beta');
+    await page.evaluate((scale) => {
+        Autopilot.stop();
+        const by = Object.fromEntries(Object.values(Graph.nodes).map((n) => [n.getTitle(), n]));
+        const { hw } = Graph.planeHalfExtent(by.Alpha);
+        const at = (n, pos) => { n.pos = pos; n.anchor = pos; n.anchorForce = 1; n.vel = new vec2(0, 0); };
+        at(by.Alpha, Graph.pan.plus(new vec2(-(scale + 4) * hw, 0)));
+        at(by.Beta, Graph.pan);
+        by.Beta.scale = scale;
+    }, scale);
+    await page.waitForTimeout(700);
+    await page.evaluate(() => { Node.prev = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Alpha') });
+}
+
+// The arc has at most 24 jags, however far the point it meets: on a card scaled up thousands of
+// times that point is tens of thousands of px off, and at a jag per 12 px the arc froze the page.
+test('the arc has a bounded number of jags, however far it reaches', { skip: isIPad && 'a finger does not hover' }, async () => {
+    await large(page, 8);
+    await page.mouse.move(1450, 500, { steps: 4 });
+    await page.waitForTimeout(150);
+    const seen = await fx(page);
+    await page.evaluate(() => { Node.prev = null });
+    assert.ok(seen.arc.shown, 'the pointer is not over the scaled note; this test proves nothing');
+    const reach = Math.hypot(seen.arc.points.at(-1).x - 1450, seen.arc.points.at(-1).y - 500);
+    assert.ok(reach > 600, `the arc reaches only ${reach} px; this test proves nothing`);
+    assert.ok(seen.arc.points.length <= 25, `the arc has ${seen.arc.points.length} points`);
+    assert.deepEqual(errors, []);
+});
+
+// A burst says a link was made: linking two notes linked already makes nothing, and shows nothing.
+test('linking two notes linked already plays no burst', { skip: isIPad && 'Shift + click' }, async () => {
+    await two(page);
+    const a = await card(page, 'Alpha'), b = await card(page, 'Beta');
+    for (const round of [1, 2]) {
+        await page.keyboard.down('Shift');
+        await page.mouse.click(a.x, a.t + 6);
+        await page.mouse.move(b.x, b.y, { steps: 6 });
+        await page.mouse.click(b.x, b.y);
+        await page.keyboard.up('Shift');
+        await page.waitForTimeout(60);
+        assert.equal((await fx(page)).bursts, (round === 1 ? 1 : 0), `round ${round}: the wrong number of bursts`);
+        await page.waitForTimeout(1100);
+    }
+    assert.equal(await page.evaluate(() => Object.keys(Graph.edges).length), 1);
+    assert.deepEqual(errors, []);
+});
+
+// The comet's corners are the card's, at the scale it is drawn: they were 6 px whatever the card's
+// were, and cut the corners of a card drawn eight times over short.
+test("the comet follows the card's own corners at its scale", { skip: isIPad && 'a click on a card drawn this large' }, async () => {
+    await large(page, 4);
+    await page.mouse.click(800, 500);
+    await page.waitForTimeout(60);
+    const [radius, want] = await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta');
+        const d = document.querySelector('#linkFx .link-fx-comet')?.getAttribute('d') ?? '';
+        const scale = parseFloat(n.content.style.transform.slice('scale('.length));
+        return [Number(d.match(/A ([\d.]+)/)?.[1]), parseFloat(getComputedStyle(n.view.div).borderTopLeftRadius) * scale];
+    });
+    assert.ok(want > 12, `the card's corner is only ${want} px on screen; this test proves nothing`);
+    assert.ok(Math.abs(radius - want) < 0.5, `the comet's corners are ${radius} px, the card's ${want}`);
     assert.deepEqual(errors, []);
 });

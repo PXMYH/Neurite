@@ -185,6 +185,9 @@ class NodeSimulation {
     nodeStep = (time)=>{
         this.framesLeftToSkip -= 1;
         if (this.framesLeftToSkip > 0) {
+            // On a skipped frame too: the effect is timed, and with a Frames delay of 9 it had a
+            // pose every 30 frames, so a burst could end before it was drawn (#87).
+            LinkFx.draw(time);
             return window.requestAnimationFrame(this.nodeStep)
         }
 

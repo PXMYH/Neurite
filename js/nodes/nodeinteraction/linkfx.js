@@ -51,15 +51,18 @@ class LinkFx {
     static #inside(box, p, pad = 0){
         return Math.abs(p.x - box.centre.x) <= box.half.x + pad && Math.abs(p.y - box.centre.y) <= box.half.y + pad;
     }
-    // The card under the pointer other than `armed`: the last one drawn there, which is the one on
-    // top. From the frame's boxes rather than `elementFromPoint`, which after the frame's writes
-    // would lay the page out again.
+    // The card under the pointer other than `armed`: of those whose boxes hold it, the one later in
+    // the page, which is drawn on top -- not the one later in `Graph.nodes`, whose integer uuids
+    // run in number order, so a note made after a restore sat on top and was not the one found.
+    // From the frame's boxes rather than `elementFromPoint`, which after the frame's writes would
+    // lay the page out again.
     static #targetAt(p, armed){
         let found = null;
         Graph.forEachNode( (node)=>{
             if (node === armed || node.removed) return;
             const box = LinkFx.#box(node);
-            if (box && LinkFx.#inside(box, p)) found = node;
+            if (!box || !LinkFx.#inside(box, p)) return;
+            if (!found || (found.content.compareDocumentPosition(node.content) & document.DOCUMENT_POSITION_FOLLOWING)) found = node;
         } );
         return found;
     }
@@ -73,7 +76,7 @@ class LinkFx {
         const d = b.minus(a), len = d.mag();
         if (LinkFx.reduced?.matches || len < 1) return 'M ' + a.x + ' ' + a.y + ' L ' + b.x + ' ' + b.y;
 
-        const n = Math.max(4, Math.round(len / 12));
+        const n = Math.min(24, Math.max(4, Math.round(len / 12)));
         const side = new vec2(-d.y / len, d.x / len);
         const amp = Math.min(9, 3 + len * 0.14);
         let path = 'M ' + a.x + ' ' + a.y;
@@ -142,7 +145,16 @@ class LinkFx {
     // gestures call this and the AI does not.
     static burst(source, target){
         if (!source || !target || source === target) return;
-        LinkFx.bursts.push({source, target, at: performance.now(), els: null});
+        LinkFx.bursts.push({source, target, at: performance.now(), els: null, radius: LinkFx.#radiusOf(target)});
+    }
+    // A card's corner on screen: its CSS radius at the scale it is drawn at (`Node.draw` writes
+    // `scale(s,s)`). Read once, when the burst starts: the comet's corners were 6 px whatever the
+    // card's were, and on a card drawn eight times over they cut 40 px corners short.
+    static #radiusOf(node){
+        const div = node.view?.div, content = node.content;
+        if (!div || !content) return 6;
+        const scale = parseFloat(content.style.transform.slice('scale('.length)) || 1;
+        return (parseFloat(getComputedStyle(div).borderTopLeftRadius) || 0) * scale;
     }
     static #drawBursts(parts, now){
         const live = new Set(LinkFx.bursts);
@@ -180,7 +192,7 @@ class LinkFx {
 
             // The comet round the card's edge, from where the Edge meets it.
             if (reduced) { b.els.comet.style.display = b.els.cometGlow.style.display = 'none'; continue; }
-            const {path, length, start} = LinkFx.#rim(to, at, b.target.view?.div?.classList.contains('collapsed'));
+            const {path, length, start} = LinkFx.#rim(to, at, b.target.view?.div?.classList.contains('collapsed'), b.radius);
             const progress = Math.min(1, t / LinkFx.cometMs);
             // Grown out of where the Edge meets the card, with no tail behind that point.
             const run = length * 0.45 * (1 - (1 - progress) ** 2);
@@ -209,11 +221,11 @@ class LinkFx {
         return els;
     }
     // A card's edge as a path that starts at its top-left corner and runs clockwise, its length, and
-    // how far along it `at` lies -- the middle of the side the Edge meets. A circle for a collapsed
-    // card, which is one.
-    static #rim(box, at, round){
+    // how far along it `at` lies -- the middle of the side the Edge meets. Its corners are the card's
+    // (`radius`), and a collapsed card, which is a circle, is one.
+    static #rim(box, at, round, radius = 6){
         const {centre: c, half: h} = box;
-        const r = (round ? Math.min(h.x, h.y) : Math.min(6, h.x, h.y));
+        const r = (round ? Math.min(h.x, h.y) : Math.min(radius, h.x, h.y));
         const [x0, y0, x1, y1] = [c.x - h.x, c.y - h.y, c.x + h.x, c.y + h.y];
         const w = x1 - x0 - 2 * r, v = y1 - y0 - 2 * r, q = Math.PI * r / 2;
         const path = 'M ' + (x0 + r) + ' ' + y0 + ' H ' + (x1 - r)
