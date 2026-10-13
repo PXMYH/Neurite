@@ -147,12 +147,15 @@ class LinkFx {
         if (!source || !target || source === target) return;
         LinkFx.bursts.push({source, target, at: performance.now(), els: null, radius: LinkFx.#radiusOf(target)});
     }
+    // A collapsed card is a circle, whose `50%` is no corner, so it has none to keep: read again
+    // when one opened during its burst (`#drawBursts`).
     // A card's corner on screen: its CSS radius at the scale it is drawn at (`Node.draw` writes
     // `scale(s,s)`). Read once, when the burst starts: the comet's corners were 6 px whatever the
     // card's were, and on a card drawn eight times over they cut 40 px corners short.
     static #radiusOf(node){
         const div = node.view?.div, content = node.content;
         if (!div || !content) return 6;
+        if (div.classList.contains('collapsed')) return null;
         const scale = parseFloat(content.style.transform.slice('scale('.length)) || 1;
         return (parseFloat(getComputedStyle(div).borderTopLeftRadius) || 0) * scale;
     }
@@ -192,7 +195,9 @@ class LinkFx {
 
             // The comet round the card's edge, from where the Edge meets it.
             if (reduced) { b.els.comet.style.display = b.els.cometGlow.style.display = 'none'; continue; }
-            const {path, length, start} = LinkFx.#rim(to, at, b.target.view?.div?.classList.contains('collapsed'), b.radius);
+            const round = Boolean(b.target.view?.div?.classList.contains('collapsed'));
+            if (!round && b.radius == null) b.radius = LinkFx.#radiusOf(b.target);
+            const {path, length, start} = LinkFx.#rim(to, at, round, b.radius ?? 6);
             const progress = Math.min(1, t / LinkFx.cometMs);
             // Grown out of where the Edge meets the card, with no tail behind that point.
             const run = length * 0.45 * (1 - (1 - progress) ** 2);

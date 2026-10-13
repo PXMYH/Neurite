@@ -310,3 +310,27 @@ test("the comet follows the card's own corners at its scale", { skip: isIPad && 
     assert.ok(Math.abs(radius - want) < 0.5, `the comet's corners are ${radius} px, the card's ${want}`);
     assert.deepEqual(errors, []);
 });
+
+// Found by the second review: a note opened during its burst kept the corner it had as a circle --
+// `50%`, read as 50 px -- for the rest of the comet's run.
+test("a note opened during its burst gets the comet on its card's corners", { skip: isIPad && 'Shift + click' }, async () => {
+    await two(page);
+    await page.evaluate(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta').view.toggleCollapse());
+    await page.waitForTimeout(400);
+    const a = await card(page, 'Alpha'), b = await card(page, 'Beta');
+    await page.keyboard.down('Shift');
+    await page.mouse.click(a.x, a.t + 6);
+    await page.mouse.move(b.x, b.y, { steps: 6 });
+    await page.mouse.click(b.x, b.y);
+    await page.keyboard.up('Shift');
+    await page.evaluate(() => Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta').view.toggleCollapse());
+    await page.waitForTimeout(120);
+    const [radius, want] = await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta');
+        const d = document.querySelector('#linkFx .link-fx-comet')?.getAttribute('d') ?? '';
+        const scale = parseFloat(n.content.style.transform.slice('scale('.length));
+        return [Number(d.match(/A ([\d.]+)/)?.[1]), parseFloat(getComputedStyle(n.view.div).borderTopLeftRadius) * scale];
+    });
+    assert.ok(Math.abs(radius - want) < 0.5, `the comet's corners are ${radius} px, the opened card's ${want}`);
+    assert.deepEqual(errors, []);
+});
