@@ -279,3 +279,41 @@ test('a collapsed note restored from a Saved Graph keeps its circle in its card,
     assert.ok(Math.abs(offset) <= 8, `the circle is ${offset} px down its card`);
     assert.deepEqual(errors, []);
 });
+
+// Its title follows the Notes text while it is a circle. The circle's copy was taken only at the
+// collapse, so a rename in the Pane showed the old title until the note was opened.
+test('a collapsed note renamed in the Notes text shows its new title', async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\nalpha\n'));
+    await page.waitForFunction(() => Object.keys(Graph.nodes).length === 1, undefined, { timeout: 5000 });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => Object.values(Graph.nodes)[0].view.toggleCollapse());
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { const cm = window.currentActiveZettelkastenMirror; cm.setValue(cm.getValue().replace('## Alpha', '## Beta')); });
+    await page.waitForTimeout(400);
+    assert.deepEqual(await page.evaluate(() => { const n = Object.values(Graph.nodes)[0];
+        return [n.getTitle(), n.view.div.querySelector('.collapsed-title').textContent]; }), ['Beta', 'Beta']);
+    assert.deepEqual(errors, []);
+});
+
+// A restored collapsed card's title is stowed, and measures 0 high; the fitter asked again every
+// frame for as long as the card stayed a circle -- 94 times in a second for two cards.
+test('a restored collapsed note does not ask to fit its title every frame', async () => {
+    await notes(page, ['Alpha', 'Beta']);
+    await page.evaluate(() => App.viewGraphs.saveNow());
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true && Object.keys(Graph.nodes).length === 2, undefined, { timeout: 30000 });
+    await page.waitForTimeout(800);
+    const asked = await page.evaluate(() => new Promise((done) => {
+        const fits = new Set(Object.values(Graph.nodes).map((n) => n.view.fitTitleHeight));
+        let n = 0;
+        const raf = window.requestAnimationFrame;
+        window.requestAnimationFrame = (cb) => { if (fits.has(cb)) n++; return raf.call(window, cb); };
+        setTimeout(() => { window.requestAnimationFrame = raf; done(n); }, 1000);
+    }));
+    assert.equal(asked, 0, `the title fitter was asked for ${asked} times in a second`);
+    // Opened, its title has its height.
+    await page.evaluate(() => Object.values(Graph.nodes)[0].view.toggleCollapse());
+    await page.waitForTimeout(400);
+    assert.ok(await page.evaluate(() => parseFloat(Object.values(Graph.nodes)[0].view.titleInput.style.height) > 0), 'the opened title has no height');
+    assert.deepEqual(errors, []);
+});

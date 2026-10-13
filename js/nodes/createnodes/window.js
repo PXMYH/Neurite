@@ -347,10 +347,13 @@ class NodeView {
         // laid out yet and `scrollHeight` is 0. Writing that pins the title shut -- the
         // box measures nothing and the text is clipped to it, which is the bug this whole
         // change is about, reintroduced by the fix for it. Leave the height that `rows="1"`
-        // gives and ask again once the browser has measured something.
+        // gives and ask again once the browser has measured something -- unless the title is
+        // stowed under a collapsed card, which measures nothing for as long as the card stays a
+        // circle: asked again every frame, a Saved Graph of collapsed cards ran this once per card
+        // per frame. Expanding fits it (`hideCollapsedTitle`).
         if (wanted < 1) {
             el.style.height = '';
-            requestAnimationFrame(this.fitTitleHeight);
+            if (!el.classList.contains('title-input-stowed')) requestAnimationFrame(this.fitTitleHeight);
             return;
         }
 

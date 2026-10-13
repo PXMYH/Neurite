@@ -43,11 +43,10 @@ NodeView.prototype.resetTitleInput = function(){
     this.hideCollapsedTitle();
 }
 
-// Written from the input every time it is shown rather than kept in step by a listener.
-// The input is the one source of truth for the title -- the Zettelkasten text can rename
-// a card while it is collapsed -- and a card is only collapsed or expanded a handful of
-// times, so reading the value at that moment is both cheaper and impossible to get out
-// of date.
+// Written from the input when it is shown, and kept in step with it by `syncCollapsedTitle`. The
+// input is the one source of truth for the title, and the Notes text renames a card through it
+// while the card is collapsed (zettelkasten.js writes it in four places, a link node and the
+// prompt library in more), so a copy taken only at the collapse showed the old title.
 NodeView.prototype.showCollapsedTitle = function(){
     const el = this.collapsedTitle || this.ensureCollapsedTitle();
     if (!el) return;
@@ -61,6 +60,17 @@ NodeView.prototype.hideCollapsedTitle = function(){
     if (el) el.classList.remove('collapsed-title-visible');
 
     this.titleInput.classList.remove('title-input-stowed');
+    // Shown again, so it has a height to fit now (`fitTitleHeight` leaves a stowed one alone).
+    this.fitTitleHeight?.();
+}
+// Polled with the frame, as the link strip is (`Node.step`): it returns at once unless the title
+// changed while the card was a circle.
+NodeView.prototype.syncCollapsedTitle = function(){
+    const el = this.collapsedTitle;
+    if (!el || !this.titleInput || !this.div.classList.contains('collapsed')) return;
+
+    const title = this.titleInput.value;
+    if (el.textContent !== title) el.textContent = title;
 }
 
 NodeView.prototype.hideButHeaderAndTitle = function(child){
@@ -144,9 +154,13 @@ NodeView.prototype.initCollapsed = function(){
 // (`Node.stopFollowingMouse`), before the click. And kept for that click only, which the browser
 // sends straight after the release: a click with no press before it -- assistive technology sends
 // one -- is a plain click, even after a drag that ended off the button and so made no click.
+// One handler per card, so a press whose release never came -- let go in another window -- adds
+// no second listener (the same function is added once), and the window's blur ends it as well.
 NodeView.prototype.onExpandPress = function(e){
     this.expandPress = {gesture: App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e) || Boolean(Node.prev)};
-    On.mouseup(window, ()=>{ setTimeout( ()=>{ this.expandPress = null }, 0 ) }, {once: true, capture: true});
+    this.endExpandPress ||= ()=>{ setTimeout( ()=>{ this.expandPress = null }, 0 ) };
+    On.mouseup(window, this.endExpandPress, {once: true, capture: true});
+    On.blur(window, this.endExpandPress, {once: true});
 }
 NodeView.prototype.onExpandClick = function(e){
     const press = this.expandPress;

@@ -219,6 +219,8 @@ class Node {
         // Returns immediately unless this card's links changed since the last
         // frame. See linkstrip.js for why the row is polled and not pushed to.
         LinkStrip.refresh(this.view);
+        // And a collapsed card's title, for the same reason (togglenodestate.js).
+        this.view?.syncCollapsedTitle?.();
     }
 
     clampDt(dt) {
