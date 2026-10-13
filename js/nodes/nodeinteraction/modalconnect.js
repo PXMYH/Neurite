@@ -144,6 +144,7 @@ Modal.Connect = class {
         if (!existingEdge) {
             if (li.dataset.proposed !== undefined) ZetProposals.link(originNode, node);
             else connectNodes(node, originNode);
+            LinkFx.burst(originNode, node);
             li.classList.replace('disconnected', 'connected');
             return;
         }

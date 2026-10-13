@@ -156,13 +156,13 @@ test('under the pointer an Edge is wider in the same colours, and a link being d
         await page.waitForTimeout(200);
     }
 
-    // The band from an armed note to the pointer, while a link is being drawn.
+    // The wire from an armed note to the pointer, while a link is being drawn: `LinkFx` (#87),
+    // in screen px above the cards.
     const band = await page.evaluate(async () => {
         Node.prev = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Left');
         await new Promise((done) => setTimeout(done, 200));
-        const path = document.getElementById('mousePath');
-        const ctm = path.getScreenCTM();
-        const width = Number(path.getAttribute('stroke-width')) * Math.hypot(ctm.a, ctm.b);
+        const wire = document.querySelector('#linkFx .link-fx-wire');
+        const width = (getComputedStyle(wire).display === 'none' ? 0 : Number(wire.getAttribute('stroke-width')));
         Node.prev = null;
         return width;
     });

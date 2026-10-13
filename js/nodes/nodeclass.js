@@ -424,7 +424,10 @@ class Node {
         const armed = this.#linkOnClick;
         this.#linkOnClick = null;
         if (armed && armed === Node.prev && !this._hasAddedGrabbing) {
-            if (armed !== this) connectNodes(this, armed);
+            if (armed !== this) {
+                connectNodes(this, armed);
+                LinkFx.burst(armed, this);
+            }
             Node.prev = null;
         }
 

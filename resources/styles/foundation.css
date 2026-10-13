@@ -270,11 +270,63 @@ textarea.title-input {
     border-color: var(--ui-accent);
 }
 
-/* The band from a Node with a link armed to the pointer (`#mousePath`, `nodestep.js`), and
-   the pointer over a card while the connect mode is on: the accent, and a crosshair rather
-   than the text caret that said a click would type. */
-#mousePath.link-band {
-    stroke: var(--ui-accent);
+/* The link being drawn from a Node with a link armed, and the one just made (#87, `LinkFx`):
+   a white wire to the pointer, a ring and an arc over the note it would go to, and a burst on
+   that note when it is made. In screen px, above the cards (DOM order: after #nodes), taking no
+   pointer. The colours are the note's the link starts from, written by linkfx.js. The pointer
+   over a card while the connect mode is on is a crosshair rather than the text caret that said
+   a click would type. */
+#linkFx {
+    position: fixed;
+    inset: 0;
+    /* In viewport units: the body carries a transform (dropdown.js), so a fixed box is placed
+       against it, and the body is 0 px tall -- `height: 100%` drew nothing at all. */
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    overflow: visible;
+}
+
+#linkFx path,
+#linkFx circle {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#linkFx .link-fx-wire {
+    stroke: #f3f4f8;
+}
+
+#linkFx .link-fx-arc {
+    stroke-width: 2px;
+}
+
+#linkFx .link-fx-arc2 {
+    stroke-width: 1px;
+    stroke-opacity: 0.55;
+}
+
+#linkFx .link-fx-arc-glow {
+    stroke-width: 7px;
+    stroke-opacity: 0.35;
+}
+
+#linkFx .link-fx-ring {
+    stroke-width: 1.75px;
+}
+
+#linkFx .link-fx-halo {
+    stroke-width: 8px;
+    stroke-opacity: 0.18;
+}
+
+#linkFx .link-fx-port {
+    fill: #fff;
+}
+
+#linkFx .link-fx-ripple {
+    stroke-width: 2px;
 }
 
 body.connect-mode .window,

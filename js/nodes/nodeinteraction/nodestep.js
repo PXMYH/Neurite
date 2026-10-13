@@ -88,21 +88,11 @@ class NodeSimulation {
 
     updateMousePathWidth() {
         const svg_mousePath = this.svg_mousePath;
-        let width = Graph.zoom.mag() * 0.0005 * Svg.zoom;
+        const width = Graph.zoom.mag() * 0.0005 * Svg.zoom;
 
-        // The same path is the band of a link being drawn, which is drawn in the accent
-        // (foundation.css): in the orbit's grey it measured 1.4:1 on the Plane.
-        svg_mousePath.classList.toggle('link-band', Boolean(Node.prev));
-        if (Node.prev) {
-            const m = Node.prev.pos.toSvg();
-            const l = Graph.vecToZ().toSvg();
-            svg_mousePath.setAttribute('d', "M " + m + " L " + l);
-            // As wide on screen as an Edge under the pointer (`EdgeView.widthPx`): at 50 times
-            // the orbit's width it was an 11 px band in a 900 px window, beside threads of 2.
-            width = EdgeView.widthPx(true) * EdgeView.svgPerPx();
-        } else {
-            svg_mousePath.setAttribute('d', this.mousePath.join(''));
-        }
+        // The same path drew a link being drawn, as a band from the armed Node's centre. That is
+        // `LinkFx` now (#87), a wire from the card's side, above the cards; this is the orbit's.
+        svg_mousePath.setAttribute('d', (Node.prev ? '' : this.mousePath.join('')));
 
         if (!App.nodeMode && !Node.prev) {
             Node.prev = null;
@@ -212,6 +202,7 @@ class NodeSimulation {
         this.updateNodes(dt).updateEdges(dt).updateRegen();
         ZetRegions.draw();
         ZetProposals.draw();
+        LinkFx.draw(time);
 
         window.requestAnimationFrame(this.nodeStep);
     }

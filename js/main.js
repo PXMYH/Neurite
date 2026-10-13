@@ -254,6 +254,7 @@ class PageLoad {
         'js/nodes/nodeinteraction/movenodes.js',
         'js/nodes/nodeinteraction/nodeactioninterface.js',
         'js/nodes/nodeinteraction/connect.js',
+        'js/nodes/nodeinteraction/linkfx.js',
         'js/nodes/nodeinteraction/togglenodestate.js',
         'js/nodes/nodeinteraction/filternodes.js',
         'js/nodes/nodeinteraction/bundlecode.js:MODULE',
