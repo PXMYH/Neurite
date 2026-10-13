@@ -969,3 +969,27 @@ Decisions:
 - [x] Played by the two gestures that make a link: the click on a second note, and the link
       picker. `connectNodes` is also the AI's (memory notes, child notes), and those stay quiet.
 - [x] Under reduced motion: a straight arc, no ripple, no comet; the flash only fades.
+
+## Review
+
+- The first adversarial review (Codex, read-only) of 910d5c6 and 07b1a93 found five, fixed in
+  b4984bc:
+  - under a Frames delay the effect had a pose every 30 frames, so a burst could end undrawn;
+    it is drawn on skipped frames now;
+  - over overlapping cards the ring went to the one underneath (`Graph.nodes` runs in uuid order;
+    the card on top is the one later in the page);
+  - the arc had no cap on its jags, and froze the page on a card scaled thousands of times;
+  - linking two notes linked already played the burst;
+  - the comet's corners were 6 px whatever the card's.
+- The second found one, in the first's fix (096be45): a note opened during its burst kept the
+  corner it had as a circle (`50%`, read as 50 px).
+- The third found none. Stopped: five, then one, then none.
+- Negative controls: all six of 33's first tests fail on bfd1d91, which has no layer. The five
+  first-review tests fail on 07b1a93 (the ring "(1061, 519) is not (974, 500)", "the arc has 106
+  points"), and the second's on b4984bc ("50 px, the opened card's 5").
+- Seen in a browser first: screenshots, a recorded video read at 6 and 12 frames a second beside
+  the reference, the comet's head tracked along the card's edge, and the burst in WebKit as an
+  iPad after two taps with Connect on.
+- Full suite on 07b1a93: Chromium 343 of 344 and 1 skipped; as an iPad 288 passed, 54 skipped, and
+  the two that fail on main. On b4984bc: Chromium 348 of 349 and 1 skipped; as an iPad 288 passed,
+  59 skipped, and the same two.
