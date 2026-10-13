@@ -71,7 +71,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Hold Shift + Click</code></td>
-    <td>Connect two nodes. The Connect tool in the bar at the top does the same without the key; Esc turns it off.</td>
+    <td>Connect two nodes. While a link is armed, a wire follows the pointer from the first note, and over another note a spark jumps to where the link will meet it; the click plays a burst on that note. The Connect tool in the bar at the top does the same without the key; Esc turns it off.</td>
   </tr>
   <tr>
     <td><code>Double Click</code></td>

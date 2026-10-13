@@ -940,3 +940,32 @@ Decisions:
   the two that fail on main. On e1f24d5: Chromium 335 of 336 and 1 skipped. On 931ce9e, the code
   released as 1.9.5: Chromium 337 of 338 and 1 skipped; as an iPad 287 passed, 49 skipped, and the
   two that fail on main. The Mac app from its DMG: smoke 4/4, updates 8/8.
+
+# The connect effect (#87, 2026-10-13)
+
+Asked, in chat, over a screen recording of a node editor (Limns, on Xiaohongshu): "I want this
+effect when connecting nodes". Tier T3, brownfield.
+
+What the recording shows, read frame by frame at 4 and 10 frames a second:
+- A white wire is dragged from an output port. Near a target port, the port gets a glowing ring,
+  and an electric arc in the connection's colour jumps from the wire's end to the port. The arc is
+  jagged, with a fainter second bolt, and changes shape on every frame.
+- On release, the wire turns that colour and a bright streak lights the node's edge at the port. A
+  ring ripples out from the port and fades, and a comet of light runs up the node's side and
+  across its top, in about half a second.
+- Each connection has its own colour.
+
+Decisions:
+- [x] A layer of its own, `#linkFx`, above the cards (DOM order), taking no pointer, in screen px.
+      The Edge layer is under the cards, so it could not show an arc that crosses one. Sized in
+      viewport units, because the body carries a transform, so a fixed box sits on the 0 px body.
+- [x] Drawn with the frame, from the frame's boxes (`Node.screenBox`), with no `elementFromPoint`,
+      which would lay the page out again after the frame's writes. Hidden when idle.
+- [x] The wire is white, as in the recording, and leaves the armed card from the side facing the
+      pointer, as the Edge will.
+- [x] The arc, the ring, the ripple, the comet and the flash are in the colour of the note the link
+      starts from. The Edge then settles into its gradient of the two notes' colours, so each link
+      arrives in its own colour.
+- [x] Played by the two gestures that make a link: the click on a second note, and the link
+      picker. `connectNodes` is also the AI's (memory notes, child notes), and those stay quiet.
+- [x] Under reduced motion: a straight arc, no ripple, no comet; the flash only fades.
