@@ -77,8 +77,10 @@ NodeView.prototype.syncCollapsedTitle = function(){
 // (#88): the circle shows only the title, so a note kept for its link -- a repository, a paper --
 // looked like any other. A link is what GitHub's Markdown links by itself, an address that starts
 // with `http://`, `https://` or `www.`. Not a bare `github.com/...`, which a file name before a
-// slash would pass for.
-NodeView.WEB_LINK = /\b(?:https?:\/\/|www\.)\S/i;
+// slash would pass for. It may follow anything but a Latin letter or a digit: `\b` turned away
+// Markdown's `_https://..._` and passed `(www.)`. Its host starts with a letter or a digit of any
+// script, or the `[` of an IPv6 one, and Chinese text may run up to it with no space.
+NodeView.WEB_LINK = /(?<![a-z0-9])(?:https?:\/\/|www\.)[\p{L}\p{N}\[]/iu;
 // Polled with the frame, as the title is, and for the same reason: the text has writers that send
 // no event -- an AI's reply, a Saved Graph's restore. It returns at once unless the text changed.
 // The mark is there while the text holds a link and gone otherwise, so a Saved Graph keeps nothing

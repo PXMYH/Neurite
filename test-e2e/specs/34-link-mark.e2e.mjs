@@ -48,9 +48,10 @@ const rgb = (hex) => `rgb(${hex.slice(1).match(/../g).map((h) => parseInt(h, 16)
 
 test('what counts as a web link is what GitHub links by itself: http://, https:// or www.', async () => {
     const yes = ['https://github.com/PXMYH/Neurite', 'see http://localhost:8999.', 'the [site](https://example.org)', '<https://a.io>',
-        'www.example.com', 'WWW.EXAMPLE.COM/DOCS', '(www.x.io/docs)', 'HTTPS://A.IO'];
+        'www.example.com', 'WWW.EXAMPLE.COM/DOCS', '(www.x.io/docs)', 'HTTPS://A.IO', '_https://example.com_', '**www.example.com**',
+        '请看https://github.com/PXMYH', '链接：www.example.cn', 'https://[::1]:8999/', 'https://例子.测试', 'one\nhttps://a.io'];
     const no = ['notes.md/draft', 'github.com/PXMYH', 'xhttps://a.io', 'https:// a.io', 'http:/a.io', 'awww.cute', 'me@example.com',
-        '[[Other note]]', 'ftp://files.example.com', ''];
+        '[[Other note]]', 'ftp://files.example.com', '', 'The World Wide Web (www.)', 'see https://)', '1https://a.io'];
     const read = (cases) => page.evaluate((cases) => cases.map((s) => NodeView.WEB_LINK.test(s)), cases);
     assert.deepEqual(await read(yes), yes.map(() => true), 'an address went unmarked');
     assert.deepEqual(await read(no), no.map(() => false), 'something that is not an address was marked');
@@ -146,8 +147,10 @@ test('a click or a tap on the mark with the Connect tool on links the notes and 
 });
 
 // A Saved Graph is the markup, mark and all. Restored, the mark comes from the note's text: one
-// saved before the mark existed gains it, and one the text has moved on from loses it.
-test("a restored note's mark comes from its text, not from the Saved Graph's markup", async () => {
+// saved before the mark existed gains it, and one the text has moved on from loses it -- by the
+// restore itself, with no frame run: the collapse a restore runs comes before its text is bound,
+// and a frame can be held back by the Frames delay.
+test("a restored note's mark comes from its text, not from the Saved Graph's markup, before any frame", async () => {
     await circles(page, '## Repo\nSee https://github.com/PXMYH/Neurite\n\n## Plain\nNo address here.\n', 2);
     await page.evaluate(() => {
         const find = (t) => Object.values(Graph.nodes).find((n) => n.getTitle() === t);
@@ -157,9 +160,10 @@ test("a restored note's mark comes from its text, not from the Saved Graph's mar
         find('Plain').view.circleCollapsed.append(stale);
         return App.viewGraphs.saveNow();
     });
+    await page.addInitScript(() => { window.requestAnimationFrame = () => 0 });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => window.appReady === true && Object.keys(Graph.nodes).length === 2, undefined, { timeout: 30000 });
-    await page.waitForTimeout(800);
+    // Polled on a timer: the default polls on animation frames, and there are none.
+    await page.waitForFunction(() => window.appReady === true && Object.keys(Graph.nodes).length === 2, undefined, { timeout: 30000, polling: 100 });
     assert.deepEqual(await marks(page, ['Repo', 'Plain']), [1, 0]);
     assert.deepEqual(errors, []);
 });

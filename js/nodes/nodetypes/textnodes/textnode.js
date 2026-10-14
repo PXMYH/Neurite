@@ -126,5 +126,9 @@ class TextNode {
 
         // Attach events for contentEditable and textarea
         addEventsToUserInputTextarea(divContentEditable, textarea, node, divDisplay);
+
+        // A restored collapsed note's link mark, from its text (togglenodestate.js): the collapse
+        // a restore runs came before the text was bound, and a Saved Graph's mark is only markup.
+        node.view?.syncWebLinkMark?.();
     }
 }
