@@ -1007,15 +1007,37 @@ title's last line ends 43 px down the circle, and the expand button shows under 
 lower rim on hover.
 
 Decisions:
-- [ ] A link is what GitHub's Markdown links by itself: an address that starts with `http://`,
+- [x] A link is what GitHub's Markdown links by itself: an address that starts with `http://`,
       `https://` or `www.`, anywhere in the note's text. A bare `github.com/...` is not, as a
       file name before a slash would pass for one.
-- [ ] The mark is the toolbar's Link node glyph (`#link-icon-symbol`) cut out of a disc in the
+- [x] The mark is the toolbar's Link node glyph (`#link-icon-symbol`) cut out of a disc in the
       Node's colour, on the circle's lower-right rim: clear of the title and the expand button.
       Mocked four ways on real circles; a dark glyph reads at 5.7:1 or better on all seven
       palette colours, a white one under 3:1 on every one.
-- [ ] In the circle, so it is drawn and hidden with it and scales with the card. It takes no
+- [x] In the circle, so it is drawn and hidden with it and scales with the card. It takes no
       pointer: dragging, linking and opening the circle stay as they are.
-- [ ] Kept in step from the frame (`Node.step`), as the collapsed title is: the text has writers
+- [x] Kept in step from the frame (`Node.step`), as the collapsed title is: the text has writers
       that send no event (an AI's reply, a Saved Graph's restore). There while the text holds a
       link and absent otherwise, so a Saved Graph keeps no state of it that the text does not.
+      Set at once by the collapse, and by `TextNode.init`, which binds the text on both paths.
+
+## Review
+
+- Seen in a browser first, at 1x and 2x and in WebKit as an iPad: four looks mocked on real
+  circles before any code; the built mark on short, long and resized circles, under the hover's
+  expand button and the selection ring, and after a reload. The glyph in the sprite's weight of 2
+  read as a smudge at 1x, so the mark draws it at 2.6; the toolbar's Link node glyph is the same,
+  pixel for pixel, with that rule and without it (and other pixels when given 2.6).
+- Cost: 0.03 ms a frame for 200 collapsed notes of 5 KB, and 0.16 ms if every text changed.
+- The first adversarial review (Codex, read-only) found two, fixed in 77c1463:
+  - a restore runs the collapse before the text is bound, so a Saved Graph's mark stood, as
+    markup, until the next step -- 30 frames under a Frames delay. Reproduced with no animation
+    frame at all: the marks read `[0, 1]` where the text says `[1, 0]`;
+  - `\b` turned away Markdown's `_https://..._` and passed `(www.)`.
+- The second found none. Stopped: two, then none.
+- Negative controls: all six tests of 34 fail on 63568a6. On 8d1b5ff, each wrong variant fails
+  at least one: without the sync at the collapse (4), without the frame's poll (3, 6), with the mark taking
+  the pointer (5), at the top right (2), never removed (3, 4, 6). Tests 1 and 6 fail on 581edbb,
+  and 6 on 77c1463 without the sync in `TextNode.init`.
+- Full suite on 581edbb: Chromium 355 of 356 and 1 skipped; as an iPad 294 passed, 60 skipped,
+  and the two that fail on main.
