@@ -192,16 +192,20 @@ NodeView.prototype.initCollapsed = function(){
 }
 // A click on the circle, or on the expand button, opens the note only when it is a plain click. A
 // press that links -- the connect mode, Shift, or a link armed and waiting for this note -- or
-// selects (Mod) is the note's, and so is a drag: the button took the click that finished a link
-// and opened the note as well, and a circle dragged by it opened where it was let go. Read at
-// the press, when an armed link is still armed: its release finishes the link
-// (`Node.stopFollowingMouse`), before the click. And kept for that click only, which the browser
-// sends straight after the release: a click with no press before it -- assistive technology sends
-// one -- is a plain click, even after a drag that ended off the button and so made no click.
+// selects (Mod) is the note's, and so is a drag, and a press that puts down a note in flight from
+// a tool (`ToolArm.landing`): the button took the click that finished a link and opened the note
+// as well, a circle dragged by it opened where it was let go, and a tap that put a new note down
+// on a circle opened the note under it. Read at the press, when an armed link is still armed: its
+// release finishes the link (`Node.stopFollowingMouse`), before the click. And kept for that click
+// only, which the browser sends straight after the release: a click with no press before it --
+// assistive technology sends one -- is a plain click, even after a drag that ended off the button
+// and so made no click. Nor does the second click of a double-click open anything: its first
+// opened the note, or linked or selected -- a double-click that finished a link opened the note.
 // One handler per card, so a press whose release never came -- let go in another window -- adds
 // no second listener (the same function is added once), and the window's blur ends it as well.
 NodeView.prototype.onExpandPress = function(e){
-    this.expandPress = {gesture: App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e) || Boolean(Node.prev)};
+    this.expandPress = {gesture: App.interface.nodeMode.isOnFor(e) || Mod.isHeld(e) || Boolean(Node.prev)
+                                 || ToolArm.landing.length > 0};
     this.endExpandPress ||= ()=>{ setTimeout( ()=>{ this.expandPress = null }, 0 ) };
     On.mouseup(window, this.endExpandPress, {once: true, capture: true});
     On.blur(window, this.endExpandPress, {once: true});
@@ -209,21 +213,21 @@ NodeView.prototype.onExpandPress = function(e){
 NodeView.prototype.onExpandClick = function(e){
     const press = this.expandPress;
     this.expandPress = null;
-    if (press?.gesture || (press && this.model._hasAddedGrabbing) || App.interface.nodeMode.isOnFor(e)) return;
+    if (e.detail > 1 || press?.gesture || (press && this.model._hasAddedGrabbing) || App.interface.nodeMode.isOnFor(e)) return;
     this.toggleCollapse(e);
     if (e.detail) NodeView.swallowRestOfDoubleClick();
 }
 // The rest of a double-click whose first click opened a note goes nowhere: its second press, its
-// click and its double-click. The card opens around its middle, under the pointer, so they landed
-// on whatever is there: the text took the caret and a word, and the link strip's double-click
-// released the note to the fractal. It ends at the next press that is not part of it.
+// click and its double-click, and a triple click's third. The card opens around its middle, under
+// the pointer, so they landed on whatever is there: the text took the caret and a word, and the
+// link strip's double-click released the note to the fractal. It ends at the next press that is
+// not part of it.
 NodeView.swallowRestOfDoubleClick = function(){
     const types = ['mousedown', 'click', 'dblclick'];
     const swallow = (e)=>{
         if (e.detail < 2) return end();
         e.preventDefault();
         e.stopPropagation();
-        if (e.type === 'dblclick') end();
     };
     const end = ()=>{ for (const type of types) Off[type](window, swallow, true) };
     for (const type of types) On[type](window, swallow, true);

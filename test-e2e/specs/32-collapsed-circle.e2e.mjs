@@ -268,6 +268,21 @@ test('while linking or selecting, a click on a circle never opens it: a link arm
     await page.mouse.click(b.centre.x, b.centre.y);
     await page.waitForTimeout(400);
     assert.deepEqual(await linked(page), { edges: ['Alpha - Beta'], open: [] }, 'the click that finished the link');
+    // And by a double-click, whose second click is a plain one: it opened the note. A double-click
+    // on a circle pins it or releases it, its look with it.
+    await page.evaluate(() => { const cm = window.currentActiveZettelkastenMirror; cm.setValue(cm.getValue().replace(/\[\[[^\]]*\]\]/g, '')); });
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 0, undefined, { timeout: 5000 });
+    await page.keyboard.down('Shift');
+    await page.mouse.click(a.centre.x, a.centre.y);
+    await page.keyboard.up('Shift');
+    await page.mouse.move(b.centre.x, b.centre.y, { steps: 5 });
+    await page.mouse.dblclick(b.centre.x, b.centre.y);
+    await page.waitForTimeout(400);
+    assert.deepEqual(await linked(page), { edges: ['Alpha - Beta'], open: [] }, 'the double-click that finished the link');
+    assert.deepEqual(await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Beta');
+        return [n.anchorForce, n.view.circleCollapsed.classList.contains('collapsed-anchor')];
+    }), [0, false], "the double-click did not release Beta, or its look did not follow");
     // Command (Control off a Mac) + click selects it.
     const mod = await page.evaluate(() => (Mod.isCommand ? 'Meta' : 'Control'));
     await page.keyboard.down(mod);
@@ -306,6 +321,28 @@ test('the keyboard opens a collapsed note: Tab to its expand button, which shows
     await page.evaluate(() => Object.values(Graph.nodes)[0].view.btnExpand.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     await page.waitForTimeout(300);
     assert.deepEqual((await linked(page)).open, ['Alpha'], 'a click from assistive technology did not open the note');
+    assert.deepEqual(errors, []);
+});
+
+// The press that puts down a note in flight from a tool is for that alone (`ToolArm.landing`). A
+// finger's note does not follow it, so the tap that puts the note down lands on what is under it.
+test('a tap that puts a new note down on a circle opens nothing under it', async () => {
+    if (!isIPad) {
+        await context.close();
+        ({ context, page, errors } = await openNeurite(browser, { touch: true }));
+    }
+    await notes(page, ['Alpha']);
+    const tool = await page.evaluate(() => { const r = document.querySelector('.panel-icon.note-icon').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    const { centre } = await spot(page, 'Alpha');
+    await page.touchscreen.tap(tool.x, tool.y);
+    await page.waitForTimeout(400);
+    await page.touchscreen.tap(centre.x, centre.y);
+    await page.waitForTimeout(1200);
+    assert.deepEqual(await page.evaluate(() => {
+        const nodes = Object.values(Graph.nodes), made = nodes.find((n) => n.getTitle() !== 'Alpha');
+        return { notes: nodes.length, alphaOpen: !nodes.find((n) => n.getTitle() === 'Alpha').view.div.classList.contains('collapsed'),
+                 caretInNew: Boolean(made?.view.div.contains(document.activeElement)) };
+    }), { notes: 2, alphaOpen: false, caretInNew: true });
     assert.deepEqual(errors, []);
 });
 
