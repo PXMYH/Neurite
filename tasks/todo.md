@@ -1066,3 +1066,25 @@ Decisions:
 - [x] Shift + double-click on a circle pins or releases the note, as on an open card, rather than
       opening it. The circle's pinned look follows the pin in every mode now.
 - [x] Every collapsed card, not only text notes: one rule for every circle.
+
+## Review
+
+- Seen in a browser first: a probe of every gesture on a circle in Chromium -- a plain click, a
+  double-click on a note with text and on one with a link strip, Shift + click, a link armed and
+  finished with Shift let go, the Connect tool, Command + click, a drag, Alt + click, Shift +
+  double-click, and Tab then Enter -- and as an iPad: a tap, a double tap, Connect and two taps.
+- The first adversarial review (Codex, read-only) found two, fixed in bff7e22:
+  - a link armed by Shift + click and finished by a double-click opened the second note, since
+    its second click came with no Shift and no armed link;
+  - a tap that put a new note down on a circle, from the Note tool, opened the note under it as
+    well (ToolArm's rule: the press that lands a note is for that alone). Reproduced in Chromium
+    with touch and as an iPad.
+- The second found none. Stopped: two, then none.
+- Negative controls, 32-collapsed-circle: on fc10e7e (1.9.7) tests 6, 7, 8, 9, 11 and 13 fail,
+  and 6, 8 and 13 as an iPad. On 4bf9353, each wrong variant fails at least one: without the
+  gesture guard (5, 6, 9), without the swallower (8), with the hover's arrows back (7), with the
+  old double-click (9), without the circle's click (6, 7, 8, 11, 13), with no tab stop (10). On
+  4bf9353 the first review's tests fail (9 and 11; 11 as an iPad), and on bff7e22 without the
+  landing gesture (11) or the double-click rule (9).
+- Full suite on bff7e22: Chromium 360 of 361 and 1 skipped; as an iPad 296 passed, 63 skipped,
+  and the two that fail on main.
