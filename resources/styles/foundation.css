@@ -630,6 +630,35 @@ body.connect-mode .window textarea {
     border-color: var(--node-colour, transparent);
 }
 
+/* The mark of a note whose text holds a web address (#88, `syncWebLinkMark`): the Link node tool's
+   glyph cut out of a disc in the Node's colour, set on the circle's rim at the lower right, where
+   a status badge sits on an avatar. The title's last line ends three quarters of the way down
+   and the expand button sits under the middle of the rim, so this is the spot clear of both.
+   The glyph is the chrome's dark: on the palette's seven colours it reads at 5.7:1 or better, and
+   white would read at under 3:1 on every one. Drawn in the sprite's weight of 2 it read as a
+   smudge at 1x, so it is drawn heavier. A sign, not a control: a press goes to the circle. */
+.web-link-mark {
+    position: absolute;
+    left: 85.36%;   /* 50% + 50% x cos 45deg */
+    top: 85.36%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    padding: 2px;
+    border-radius: 50%;
+    background-color: var(--node-colour, var(--ui-accent));
+    --icon-stroke: var(--ui-chrome);
+    --icon-weight: 2.6;
+    box-shadow: 0 0 0 1.5px var(--ui-chrome),
+                0 0 8px -1px var(--node-colour, transparent);
+    pointer-events: none;
+}
+
+/* The toolbar's Link node tool keeps the sprite's own weight. */
+#link-icon-symbol {
+    stroke-width: var(--icon-weight, 2);
+}
+
 /* The card header buttons are NOT fixed here, and the reason belongs in the file
    rather than in a commit: each one is a <g> inside a single <svg>
    (resources/svg/icons.html:303), and a <g> has no CSS box model -- min-width,

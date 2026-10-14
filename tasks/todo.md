@@ -995,3 +995,27 @@ Decisions:
   59 skipped, and the same two. On ed1a5a2, the code released as 1.9.6: Chromium 349 of 350 and 1
   skipped; as an iPad 288 passed, 60 skipped, and the same two. The Mac app from its DMG: smoke 4/4,
   updates 8/8.
+
+# A link mark on a collapsed note (#88, 2026-10-13)
+
+Asked, in chat: "for the text nodes, i also want to add a small symbol or icon to the collapsed
+node if there are hyperlinks in the content, e.g. if i put a github link in there i want to make
+it visible that this node has links". Tier T2, brownfield.
+
+Measured on 1.9.6: a collapsed note is its 62 px circle and its title, and nothing else. The
+title's last line ends 43 px down the circle, and the expand button shows under the middle of the
+lower rim on hover.
+
+Decisions:
+- [ ] A link is what GitHub's Markdown links by itself: an address that starts with `http://`,
+      `https://` or `www.`, anywhere in the note's text. A bare `github.com/...` is not, as a
+      file name before a slash would pass for one.
+- [ ] The mark is the toolbar's Link node glyph (`#link-icon-symbol`) cut out of a disc in the
+      Node's colour, on the circle's lower-right rim: clear of the title and the expand button.
+      Mocked four ways on real circles; a dark glyph reads at 5.7:1 or better on all seven
+      palette colours, a white one under 3:1 on every one.
+- [ ] In the circle, so it is drawn and hidden with it and scales with the card. It takes no
+      pointer: dragging, linking and opening the circle stay as they are.
+- [ ] Kept in step from the frame (`Node.step`), as the collapsed title is: the text has writers
+      that send no event (an AI's reply, a Saved Graph's restore). There while the text holds a
+      link and absent otherwise, so a Saved Graph keeps no state of it that the text does not.

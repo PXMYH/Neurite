@@ -73,6 +73,39 @@ NodeView.prototype.syncCollapsedTitle = function(){
     if (el.textContent !== title) el.textContent = title;
 }
 
+// A collapsed note whose text holds a web address says so, with a link glyph on its circle's rim
+// (#88): the circle shows only the title, so a note kept for its link -- a repository, a paper --
+// looked like any other. A link is what GitHub's Markdown links by itself, an address that starts
+// with `http://`, `https://` or `www.`. Not a bare `github.com/...`, which a file name before a
+// slash would pass for.
+NodeView.WEB_LINK = /\b(?:https?:\/\/|www\.)\S/i;
+// Polled with the frame, as the title is, and for the same reason: the text has writers that send
+// no event -- an AI's reply, a Saved Graph's restore. It returns at once unless the text changed.
+// The mark is there while the text holds a link and gone otherwise, so a Saved Graph keeps nothing
+// of it that the text does not say.
+NodeView.prototype.syncWebLinkMark = function(){
+    const circle = this.circleCollapsed;
+    if (!this.model.isTextNode || !circle || !this.div.classList.contains('collapsed')) return;
+
+    const text = this.model.textarea?.value;
+    if (text === undefined || text === this.webLinkText) return;
+    this.webLinkText = text;
+
+    const mark = circle.querySelector(':scope > .web-link-mark');
+    if (!NodeView.WEB_LINK.test(text)) mark?.remove();
+    else if (!mark) circle.append(NodeView.makeWebLinkMark());
+}
+NodeView.makeWebLinkMark = function(){
+    const mark = Svg.new.svg();
+    mark.setAttribute('class', 'web-link-mark');
+    mark.setAttribute('role', 'img');
+    mark.setAttribute('aria-label', 'Has a web link');
+    const glyph = Svg.new.use();
+    glyph.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#link-icon-symbol');
+    mark.append(glyph);
+    return mark;
+}
+
 NodeView.prototype.hideButHeaderAndTitle = function(child){
     if (child !== this.headerContainer && child !== this.titleInput && child !== this.titleInputWrapper) {
         child.style.display = 'none';
@@ -145,6 +178,8 @@ NodeView.prototype.initCollapsed = function(){
     }
     this.btnExpand.style.display = '';
     this.circleCollapsed.style.display = '';
+    // At once rather than at the next step, which a Frames delay holds back.
+    this.syncWebLinkMark();
 }
 // A click on the expand button opens the note only when it is a plain click. A press that
 // links -- the connect mode, or a link armed and waiting for this note -- or selects (Mod) is the
