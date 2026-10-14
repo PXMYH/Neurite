@@ -72,11 +72,8 @@ test("a collapsed note whose text holds a web address has the mark on its circle
         assert.ok(p.mark.t >= p.title.b - 0.5, `${title}: the mark (top ${p.mark.t}) is on the title (bottom ${p.title.b})`);
         assert.equal(p.fill, rgb(p.colour), `${title}: the disc is not in the note's colour`);
     }
-    // Clear of the expand button, which shows under the rim while the circle is hovered.
-    if (!isIPad) {
-        const at = await parts(page, 'Repo');
-        await page.mouse.move(at.circle.x, at.circle.y - 10);
-        await page.waitForTimeout(250);
+    // Clear of the expand button, which shows under the rim while it has the keyboard's focus.
+    {
         const { mark: m, button: b } = await parts(page, 'Repo');
         const overlap = Math.max(0, Math.min(m.r, b.r) - Math.max(m.l, b.l)) * Math.max(0, Math.min(m.b, b.b) - Math.max(m.t, b.t));
         assert.equal(overlap, 0, 'the mark and the expand button overlap');

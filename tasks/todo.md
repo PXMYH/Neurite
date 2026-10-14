@@ -1041,3 +1041,28 @@ Decisions:
   581edbb, and 6 on 77c1463 without the sync in `TextNode.init`.
 - Full suite on 581edbb: Chromium 355 of 356 and 1 skipped; as an iPad 294 passed, 60 skipped,
   and the two that fail on main. On bebf943, the code released as 1.9.7: the same, in both.
+
+# A click opens a collapsed note, except while linking (#89, 2026-10-13)
+
+Asked, in chat: "don't show the expand arrows on the text node, when click it then expand it, but
+click it won't expand during link/connect node mode, i.e. when user press shift or trying to
+connect two nodes, click on the node won't expand so it doesn't accidentally open". Tier T2,
+brownfield.
+
+Measured on 1.9.7: the expand button (two arrows) showed under the circle's rim while the pointer
+was over it, and a click on the circle opened nothing. A double-click on a circle pinned or
+released the note, and with Shift held it opened it. An opened card grows around its middle, so
+the circle's middle became the middle of the open card: its text, or its link strip.
+
+Decisions:
+- [x] A click on the circle opens the note by the expand button's own rule (#86): never a press
+      that links (the Connect tool, Shift, a link armed and waiting), selects (Command) or drags.
+      The same two handlers, bound to the circle as well.
+- [x] The expand button shows only while it has the keyboard's focus: it is the keyboard's way to
+      open a note, and the only one besides Ctrl+Shift+F.
+- [x] The rest of a double-click whose first click opened the note is swallowed. Measured before
+      the fix: its second click put the caret in the open card's text and selected a word, or
+      released the note to the fractal through the link strip.
+- [x] Shift + double-click on a circle pins or releases the note, as on an open card, rather than
+      opening it. The circle's pinned look follows the pin in every mode now.
+- [x] Every collapsed card, not only text notes: one rule for every circle.

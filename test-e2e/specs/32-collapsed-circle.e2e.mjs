@@ -133,8 +133,11 @@ test('Shift + a scroll across, as a Mac mouse wheel sends it, lengthens an Edge'
 // Linking collapsed notes (asked in chat: "when i click the second circle text it always expand
 // the text node"). The expand button sat inside the circle, from just under its middle, where it
 // covered the last 8 px of a two-line title; a Shift + click there linked the notes and opened the
-// second one as well. It is under the circle's rim now, gone while the connect mode is on, and a
-// press that links, selects or drags never opens the note.
+// second one as well. A press that links, selects or drags never opens the note.
+//
+// And opening one (#89, asked in chat: "don't show the expand arrows on the text node, when click
+// it then expand it, but click it won't expand during link/connect node mode"). A click on the
+// circle opens it, by that same rule, and the expand button shows to the keyboard only.
 const spot = (page, title) => page.evaluate((title) => {
     const v = Object.values(Graph.nodes).find((n) => n.getTitle() === title).view;
     const c = v.div.querySelector('.collapsed-circle').getBoundingClientRect(), t = v.div.querySelector('.collapsed-title').getBoundingClientRect();
@@ -176,54 +179,156 @@ test("Shift + click on a collapsed note's circle links it, under its title too, 
     assert.deepEqual(errors, []);
 });
 
-test('with the Connect tool on, a click or a tap on each circle links them and opens neither', async () => {
+test('with the Connect tool on, a click or a tap on each circle links them and opens neither; with it off, one opens a note', async () => {
     await notes(page, ['Alpha', 'Agent = Model + Harness + Evals']);
     const a = await spot(page, 'Alpha'), b = await spot(page, 'Agent = Model + Harness + Evals');
-    await press(page, await page.evaluate(() => { const r = document.getElementById('connectTool').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }));
+    const tool = await page.evaluate(() => { const r = document.getElementById('connectTool').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await press(page, tool);
     await page.waitForTimeout(200);
     await press(page, a.centre);
     await page.waitForTimeout(200);
     await press(page, b.was);
     await page.waitForTimeout(400);
     assert.deepEqual(await linked(page), { edges: ['Agent = Model + Harness + Evals - Alpha'], open: [] });
+    await press(page, tool);
+    await page.waitForTimeout(200);
+    await press(page, a.centre);
+    await page.waitForTimeout(400);
+    assert.deepEqual((await linked(page)).open, ['Alpha'], 'with the Connect tool off, a click or a tap did not open the note');
     assert.deepEqual(errors, []);
 });
 
-test("the expand button is under the circle's rim, clear of its title; a click on it opens the note, a drag from it does not", { skip: isIPad && 'shows under a mouse' }, async () => {
+const openOnly = (page) => page.evaluate(() => { for (const n of Object.values(Graph.nodes)) n.view.collapseIfExpanded() });
+const arrows = (page, title) => page.evaluate((t) => getComputedStyle(Object.values(Graph.nodes).find((n) => n.getTitle() === t).view.btnExpand).opacity, title);
+
+test("a click on a collapsed note's circle opens it, under its title too; a drag does not; no arrows show to the pointer", { skip: isIPad && 'hovers and drags a mouse' }, async () => {
     const long = 'Retrieval practice spaced over weeks beats one long session';
     await notes(page, ['Alpha', 'Agent = Model + Harness + Evals', long]);
     for (const title of ['Alpha', 'Agent = Model + Harness + Evals', long]) {
         const s = await spot(page, title);
         await page.mouse.move(s.centre.x, s.centre.y);
         await page.waitForTimeout(200);
-        const now = await spot(page, title);
-        assert.ok(now.button.top >= now.title.bottom, `${title}: the expand button is on the title (${now.button.top} < ${now.title.bottom})`);
-        assert.ok(now.button.top < now.circle.bottom, `${title}: the expand button has come off the circle, and its hover with it`);
+        assert.equal(await arrows(page, title), '0', `${title}: the expand arrows show under the pointer`);
     }
-    // A drag that starts on it moves the circle and leaves it collapsed.
-    let s = await spot(page, 'Alpha');
+    // A drag from the circle moves it and leaves it collapsed.
+    const s = await spot(page, 'Alpha');
     await page.mouse.move(s.centre.x, s.centre.y);
-    await page.mouse.move(s.button.x, s.button.y, { steps: 4 });
     await page.mouse.down();
-    await page.mouse.move(s.button.x + 80, s.button.y + 40, { steps: 8 });
+    await page.mouse.move(s.centre.x + 80, s.centre.y + 40, { steps: 8 });
     await page.mouse.up();
     await page.waitForTimeout(400);
-    assert.deepEqual((await linked(page)).open, [], 'a drag from the expand button opened the note');
-    // A click with no press before it, as assistive technology sends one, after that drag.
-    await page.evaluate(() => Object.values(Graph.nodes)[0].view.div.querySelector('.expand-button')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+    assert.deepEqual((await linked(page)).open, [], 'a drag of the circle opened the note');
+    // A plain click opens it, on its middle and on its title's last line.
+    for (const title of ['Alpha', 'Agent = Model + Harness + Evals']) {
+        for (const where of ['middle', "title's last line"]) {
+            const p = await spot(page, title);
+            const at = where === 'middle' ? p.centre : { x: p.centre.x, y: p.title.bottom - 4 };
+            await page.mouse.click(at.x, at.y);
+            await page.waitForTimeout(400);
+            assert.deepEqual((await linked(page)).open, [title], `a click on ${title}'s ${where} did not open it`);
+            await openOnly(page);
+            await page.waitForTimeout(400);
+        }
+    }
+    assert.deepEqual(errors, []);
+});
+
+// The card opens around its middle, so the second click of a double-click landed on the open card:
+// on its text, which took the caret and a word, or on its link strip, whose double-click released
+// the note to the fractal.
+test('a double-click or a double tap on a collapsed note opens it and does nothing more', async () => {
+    await notes(page, ['Alpha', 'Agent = Model + Harness + Evals']);
+    for (const title of ['Alpha', 'Agent = Model + Harness + Evals']) {
+        const { centre } = await spot(page, title);
+        if (isIPad) {
+            await page.touchscreen.tap(centre.x, centre.y);
+            await page.waitForTimeout(80);
+            await page.touchscreen.tap(centre.x, centre.y);
+        } else await page.mouse.dblclick(centre.x, centre.y);
+        await page.waitForTimeout(400);
+        assert.deepEqual(await page.evaluate((t) => {
+            const n = Object.values(Graph.nodes).find((n) => n.getTitle() === t);
+            return { open: !n.view.div.classList.contains('collapsed'), pinned: n.anchorForce,
+                     caret: n.view.div.contains(document.activeElement), word: String(window.getSelection()) };
+        }, title), { open: true, pinned: 1, caret: false, word: '' }, title);
+        await openOnly(page);
+        await page.waitForTimeout(400);
+    }
+    assert.deepEqual(errors, []);
+});
+
+test('while linking or selecting, a click on a circle never opens it: a link armed by Shift + click, Command + click, Shift + double-click', { skip: isIPad && 'a finger has no Shift' }, async () => {
+    await notes(page, ['Alpha', 'Beta']);
+    const a = await spot(page, 'Alpha'), b = await spot(page, 'Beta');
+    // Armed by Shift + click, and finished by a plain click once Shift is let go.
+    await page.keyboard.down('Shift');
+    await page.mouse.click(a.centre.x, a.centre.y);
+    await page.keyboard.up('Shift');
+    await page.mouse.move(b.centre.x, b.centre.y, { steps: 5 });
+    await page.mouse.click(b.centre.x, b.centre.y);
+    await page.waitForTimeout(400);
+    assert.deepEqual(await linked(page), { edges: ['Alpha - Beta'], open: [] }, 'the click that finished the link');
+    // Command (Control off a Mac) + click selects it.
+    const mod = await page.evaluate(() => (Mod.isCommand ? 'Meta' : 'Control'));
+    await page.keyboard.down(mod);
+    await page.mouse.click(a.centre.x, a.centre.y);
+    await page.keyboard.up(mod);
+    await page.waitForTimeout(400);
+    assert.deepEqual((await linked(page)).open, [], 'Command + click opened the note');
+    await page.evaluate(() => App.selectedNodes.clear());
+    // Shift + double-click pins the note or releases it, as on an open card, and opens nothing.
+    await page.keyboard.down('Shift');
+    await page.mouse.dblclick(a.centre.x, a.centre.y);
+    await page.keyboard.up('Shift');
+    await page.waitForTimeout(400);
+    assert.deepEqual(await page.evaluate(() => {
+        const n = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Alpha');
+        return { open: !n.view.div.classList.contains('collapsed'), pinned: n.anchorForce, drawnPinned: n.view.circleCollapsed.classList.contains('collapsed-anchor') };
+    }), { open: false, pinned: 0, drawnPinned: false }, 'Shift + double-click');
+    assert.deepEqual(errors, []);
+});
+
+// The keyboard keeps its way to open a note: Tab to the expand button, which shows then, and Enter.
+test('the keyboard opens a collapsed note: Tab to its expand button, which shows then, and Enter', { skip: isIPad && "Safari's Tab skips it" }, async () => {
+    await notes(page, ['Alpha']);
+    const focused = () => page.evaluate(() => document.activeElement === Object.values(Graph.nodes)[0].view.btnExpand);
+    for (let i = 0; i < 200 && !(await focused()); i++) await page.keyboard.press('Tab');
+    assert.ok(await focused(), 'Tab never reached the expand button');
+    assert.equal(await arrows(page, 'Alpha'), '1', 'the focused expand button does not show');
+    const p = await spot(page, 'Alpha');
+    assert.ok(p.button.top >= p.title.bottom && p.button.top < p.circle.bottom, `the expand button is not under the rim, clear of the title (${p.button.top})`);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    assert.deepEqual((await linked(page)).open, ['Alpha'], 'Enter did not open the note');
+    // A click with no press before it, as assistive technology sends one, opens a note too.
+    await openOnly(page);
     await page.waitForTimeout(300);
-    assert.deepEqual((await linked(page)).open, ['Alpha'], 'a click after a drag from the button opened nothing');
-    await page.evaluate(() => Object.values(Graph.nodes)[0].view.toggleCollapse());
+    await page.evaluate(() => Object.values(Graph.nodes)[0].view.btnExpand.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+    await page.waitForTimeout(300);
+    assert.deepEqual((await linked(page)).open, ['Alpha'], 'a click from assistive technology did not open the note');
+    assert.deepEqual(errors, []);
+});
+
+const fingerAt = async (page, type, at) => {
+    const cdp = page.cdp ??= await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: at ? [{ x: at.x, y: at.y, id: 1 }] : [] });
+};
+test('a finger drags a circle without opening it, and a tap opens it', { skip: isIPad && 'needs real touches' }, async () => {
+    await context.close();
+    ({ context, page, errors } = await openNeurite(browser, { touch: true }));
+    await notes(page, ['Alpha']);
+    const was = await spot(page, 'Alpha');
+    await fingerAt(page, 'touchStart', was.centre);
+    for (let k = 1; k <= 10; k++) await fingerAt(page, 'touchMove', { x: was.centre.x + 9 * k, y: was.centre.y + 6 * k });
+    await fingerAt(page, 'touchEnd');
     await page.waitForTimeout(400);
-    // Reached from the circle, a plain click on it opens the note.
-    s = await spot(page, 'Alpha');
-    await page.mouse.move(s.centre.x, s.centre.y);
-    await page.mouse.move(s.button.x, s.button.y, { steps: 4 });
-    await page.waitForTimeout(150);
-    await page.mouse.click(s.button.x, s.button.y);
+    const now = await spot(page, 'Alpha');
+    assert.ok(Math.abs(now.centre.x - was.centre.x - 90) <= 2, `the finger moved the circle ${now.centre.x - was.centre.x} px, not 90`);
+    assert.deepEqual((await linked(page)).open, [], 'a finger drag opened the note');
+    await fingerAt(page, 'touchStart', now.centre);
+    await fingerAt(page, 'touchEnd');
     await page.waitForTimeout(400);
-    assert.deepEqual((await linked(page)).open, ['Alpha'], 'a click on the expand button did not open the note');
+    assert.deepEqual((await linked(page)).open, ['Alpha'], 'a tap did not open the note');
     assert.deepEqual(errors, []);
 });
 
@@ -258,7 +363,7 @@ test('a note collapsed as it is made shows no link strip, and its circle stays i
 // this. Restored, the window buttons came back shown too: a fresh copy replaced the saved ones
 // (`refreshControlIcons`), and their 30 px pushed the circle out of its card, so that its middle
 // was where the expand button sat.
-test('a collapsed note restored from a Saved Graph keeps its circle in its card, its buttons and links hidden', async () => {
+test('a collapsed note restored from a Saved Graph keeps its circle in its card, its buttons and links hidden, and opens on a click', async () => {
     await notes(page, ['Alpha']);
     await page.evaluate(() => {
         const strip = Object.values(Graph.nodes)[0].view.div.querySelector(':scope > .link-strip');
@@ -277,6 +382,10 @@ test('a collapsed note restored from a Saved Graph keeps its circle in its card,
     assert.equal(display, 'none', 'the restored collapsed card shows its link strip');
     assert.equal(buttons, 'none', 'the restored collapsed card shows its window buttons');
     assert.ok(Math.abs(offset) <= 8, `the circle is ${offset} px down its card`);
+    // And a click or a tap on the restored circle opens it.
+    await press(page, (await spot(page, 'Alpha')).centre);
+    await page.waitForTimeout(400);
+    assert.deepEqual((await linked(page)).open, ['Alpha'], 'a click or a tap on the restored circle did not open it');
     assert.deepEqual(errors, []);
 });
 

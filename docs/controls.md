@@ -75,7 +75,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Double Click</code></td>
-    <td>A note arrives pinned. Double click releases it to the fractal; again pins it where it is.</td>
+    <td>A note arrives pinned. Double click releases it to the fractal; again pins it where it is. On a collapsed note, a double click opens it instead.</td>
   </tr>
   <tr>
     <td><code>Ctrl + Shift + M</code></td>
@@ -83,7 +83,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Ctrl + Shift + F</code></td>
-    <td>Expand a collapsed node. Same target rule as above. The expand button under a circle's rim, which shows under the pointer, does it too. While Connect is on, a click on a circle links it and never expands it.</td>
+    <td>Expand a collapsed node. Same target rule as above. A click on a circle does it too, except while you link: with Shift held, Connect on, or a link waiting for its second note, a click on a circle links it and never expands it. From the keyboard, Tab to the circle's expand button, which shows only then, and press Enter.</td>
   </tr>
     <tr>
     <td><code>Right Click</code></td>

@@ -157,9 +157,12 @@ NodeView.prototype.makeCircleCollapsed = function(){
     // outranked the disc's rule, and a Saved Graph kept it.
     return circle;
 }
+// A double-click pins the note or releases it, in any mode, as on an open card (window.js). In the
+// connect mode it opened the note, which no click there does now. A plain one opens the note with
+// its first click and does nothing more (`swallowRestOfDoubleClick`), so this hears only one whose
+// first click linked or selected.
 NodeView.prototype.onCircleDoubleClicked = function(e){
-    if (App.interface.nodeMode.isOnFor(e)) this.toggleCollapse(e)
-    else e.currentTarget.classList.toggle('collapsed-anchor')
+    e.currentTarget.classList.toggle('collapsed-anchor')
 }
 NodeView.prototype.initCollapsed = function(){
     if (!this.div.classList.contains('collapsed')) return;
@@ -174,7 +177,11 @@ NodeView.prototype.initCollapsed = function(){
         On.click(this.btnExpand, this.onExpandClick.bind(this));
         On.keydown(this.btnExpand, NodeView.keyActivates(this.toggleCollapse.bind(this)));
 
+        // A click on the circle opens the note, by the expand button's rule; the button shows to
+        // the keyboard only.
         const circle = this.circleCollapsed = this.getCircleCollapsed();
+        On.mousedown(circle, this.onExpandPress.bind(this));
+        On.click(circle, this.onExpandClick.bind(this));
         On.dblclick(circle, this.onCircleDoubleClicked.bind(this));
         On.dragstart(circle, Event.preventDefault);
     }
@@ -183,11 +190,11 @@ NodeView.prototype.initCollapsed = function(){
     // At once rather than at the next step, which a Frames delay holds back.
     this.syncWebLinkMark();
 }
-// A click on the expand button opens the note only when it is a plain click. A press that
-// links -- the connect mode, or a link armed and waiting for this note -- or selects (Mod) is the
-// note's, as it is anywhere else on the circle, and so is a drag: the button took the click that
-// finished a link and opened the note as well, and a circle dragged by it opened where it was
-// let go. Read at the press, when an armed link is still armed: its release finishes the link
+// A click on the circle, or on the expand button, opens the note only when it is a plain click. A
+// press that links -- the connect mode, Shift, or a link armed and waiting for this note -- or
+// selects (Mod) is the note's, and so is a drag: the button took the click that finished a link
+// and opened the note as well, and a circle dragged by it opened where it was let go. Read at
+// the press, when an armed link is still armed: its release finishes the link
 // (`Node.stopFollowingMouse`), before the click. And kept for that click only, which the browser
 // sends straight after the release: a click with no press before it -- assistive technology sends
 // one -- is a plain click, even after a drag that ended off the button and so made no click.
@@ -204,6 +211,22 @@ NodeView.prototype.onExpandClick = function(e){
     this.expandPress = null;
     if (press?.gesture || (press && this.model._hasAddedGrabbing) || App.interface.nodeMode.isOnFor(e)) return;
     this.toggleCollapse(e);
+    if (e.detail) NodeView.swallowRestOfDoubleClick();
+}
+// The rest of a double-click whose first click opened a note goes nowhere: its second press, its
+// click and its double-click. The card opens around its middle, under the pointer, so they landed
+// on whatever is there: the text took the caret and a word, and the link strip's double-click
+// released the note to the fractal. It ends at the next press that is not part of it.
+NodeView.swallowRestOfDoubleClick = function(){
+    const types = ['mousedown', 'click', 'dblclick'];
+    const swallow = (e)=>{
+        if (e.detail < 2) return end();
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dblclick') end();
+    };
+    const end = ()=>{ for (const type of types) Off[type](window, swallow, true) };
+    for (const type of types) On[type](window, swallow, true);
 }
 NodeView.prototype.makeBtnExpand = function(){
     const btn = Svg.new.svg();
