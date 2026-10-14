@@ -1035,9 +1035,9 @@ Decisions:
     frame at all: the marks read `[0, 1]` where the text says `[1, 0]`;
   - `\b` turned away Markdown's `_https://..._` and passed `(www.)`.
 - The second found none. Stopped: two, then none.
-- Negative controls: all six tests of 34 fail on 63568a6. On 8d1b5ff, each wrong variant fails
-  at least one: without the sync at the collapse (4), without the frame's poll (3, 6), with the mark taking
-  the pointer (5), at the top right (2), never removed (3, 4, 6). Tests 1 and 6 fail on 581edbb,
-  and 6 on 77c1463 without the sync in `TextNode.init`.
+- Negative controls: all six tests of 34 fail on 63568a6. On 8d1b5ff, each wrong variant fails at
+  least one: without the sync at the collapse (4), without the frame's poll (3, 6), with the mark
+  taking the pointer (5), at the top right (2), never removed (3, 4, 6). Tests 1 and 6 fail on
+  581edbb, and 6 on 77c1463 without the sync in `TextNode.init`.
 - Full suite on 581edbb: Chromium 355 of 356 and 1 skipped; as an iPad 294 passed, 60 skipped,
-  and the two that fail on main.
+  and the two that fail on main. On bebf943, the code released as 1.9.7: the same, in both.
