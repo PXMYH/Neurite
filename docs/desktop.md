@@ -58,6 +58,11 @@ What to know:
   update that satisfies the running app's designated requirement, and an ad hoc requirement is
   the build's own hash. `desktop/updater.cjs`; `npm test` here drives a real update of a
   packaged build when `NEURITE_APP` is set.
+- **Zoom, as a Mac app zooms.** The View menu's Zoom In (Cmd =), Zoom Out (Cmd -), Fit (Cmd 0)
+  and Home move the Plane, as the HUD's buttons and keys do; Electron's own View menu scaled the
+  whole interface instead. Interface Size, in the same menu, still does that, with no keys. A
+  trackpad's pinch zooms as far as the fingers move, as it does in Safari. Both follow
+  ExcalidrawZ, the native Mac app for Excalidraw, read with REA ([notes](excalidrawz.md)).
 - **Offline.** index.html loads its libraries from two CDNs. The app keeps a copy of each the
   first time it arrives, so after one launch with a network it opens with none.
 - **AI.** OpenAI, Groq and Ollama work directly. Claude and the other gateway features need the

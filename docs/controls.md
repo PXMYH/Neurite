@@ -17,13 +17,21 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <!-- Navigation -->
   <tr>
-    <td rowspan="2"><strong>Navigation</strong></td>
+    <td rowspan="4"><strong>Navigation</strong></td>
     <td><code>Click and Drag</code></td>
     <td>Move around</td>
   </tr>
   <tr>
     <td><code>Scroll</code></td>
     <td>Zoom through the fractal</td>
+  </tr>
+  <tr>
+    <td><code>Pinch on a trackpad</code></td>
+    <td>Zoom as far as your fingers move, about the pointer -- over a note too, even one whose text scrolls, and whatever Scroll is set to do</td>
+  </tr>
+  <tr>
+    <td><code>Cmd + =</code>, <code>Cmd + -</code>, <code>Cmd + 0</code></td>
+    <td>In the Mac app: Zoom In, Zoom Out and Fit, from the View menu. Interface Size, in the same menu, makes the buttons and text larger or smaller.</td>
   </tr>
   <!-- Touch -->
   <tr>
