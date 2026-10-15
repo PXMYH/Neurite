@@ -1125,3 +1125,38 @@ Decisions:
       (Cmd -), Fit (Cmd 0), Home, each the HUD's own command (`Hud.command`); the interface's size
       moves to its own submenu, Interface Size, with no keys.
 - [x] Docs: controls, desktop, and the reverse-engineering notes (`docs/excalidrawz.md`).
+- [x] A pinch is told from a mouse's wheel turned with Control held by the keyboard (`isPinch`,
+      `ControlKey`): a pinch presses no key. Control held and the wheel is the wheel -- its zoom,
+      or the turn where Adjust Controls gave the turn to Control -- and any Control + wheel goes
+      past a note's scroller, since the page cancels its default.
+
+## Review
+
+- Seen in Chromium first, each case with `Input.synthesizePinchGesture` (Chromium's own touchpad
+  pinch) and the zoom read against the events that arrived; then in real Electron: a pinch on the
+  Plane 0.5x for 0.5x, the menu's items clicked from the main process (Zoom In 1 -> 0.625, Zoom
+  Out back, Fit, Home, nothing under Settings, the page's zoom untouched), and on b2d5a6e the keys
+  themselves from System Events (Cmd =, Cmd +, Cmd -, Cmd 0, each once). On 1.9.8 the same keys:
+  Cmd = nothing, Cmd - the interface to 0.913, Cmd 0 back.
+- Four rounds of adversarial review (Codex, read-only): seven, two, two, then none. Stopped.
+  - The first (486aa74, 05eea49): Control + wheel left uncancelled over the Plane and the tool bar
+    (0 of 16 events), a mouse's Control notch at 3.3x, a pinch turning the view with the turn on
+    Control, a pinch resizing a note or an Edge with Connect on, an AI note's response keeping the
+    pinch (found by my own probe too), the iframe exception undocumented, a menu key before load.
+  - The second (f637543): the per-event cap from the first answer cut fast pinches (0.259x for
+    0.25x), and my test vector had been moved under the cap; Control could no longer turn the view.
+  - The third (f7ea168): the keyboard's Control could go stale, and Control held + wheel over text
+    moved nothing.
+- Negative controls: 35-trackpad-pinch's tests 1-3, 5-11 fail on 332ce6f; the second round's on
+  486aa74 (fast pinch, Control held, Control's turn); the third's on f637543. pinch-math's on
+  332ce6f. The View menu's smoke test fails on 332ce6f.
+- Not measured: Safari on a Mac trackpad, which sends `gesturechange` and, by Excalidraw handling
+  both side by side, no Control + wheel; a pinch over a link's web page, which keeps the gesture.
+- 32-collapsed-circle played a pinch as Control held and the wheel; it drives Chromium's touchpad
+  pinch now, and Control held with Alt's place resizes the note, as Alt does.
+- Full suite on f7ea168: Chromium 371 of 372 and 1 skipped; as an iPad 296 passed, 74 skipped
+  (the 11 new ones are Chromium's pinch), and the two that fail on main -- the same two, 39 and
+  101, on 332ce6f in this run. npm test 398 of 398; desktop smoke 5 of 5; typecheck clean.
+- One slip: a second System Events run on the final build found another app in front, so its four
+  keys (Cmd =, +, -, 0) went to that app (Ghostty) and not to Neurite. Not retried; the menu's
+  clicks were checked on the final build instead.
