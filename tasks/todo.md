@@ -1157,6 +1157,10 @@ Decisions:
 - Full suite on f7ea168: Chromium 371 of 372 and 1 skipped; as an iPad 296 passed, 74 skipped
   (the 11 new ones are Chromium's pinch), and the two that fail on main -- the same two, 39 and
   101, on 332ce6f in this run. npm test 398 of 398; desktop smoke 5 of 5; typecheck clean.
+  f7ea168's code is the code released as 1.9.9 (nothing under js/ or desktop/ moved after it but
+  the version).
+- The Mac app, 1.9.9 from its DMG, in a scratch folder: smoke 5/5, updates 8/8, and a pinch in it
+  0.5x for 0.5x with all 17 events cancelled and the page's zoom at 1.
 - One slip: a second System Events run on the final build found another app in front, so its four
   keys (Cmd =, +, -, 0) went to that app (Ghostty) and not to Neurite. Not retried; the menu's
   clicks were checked on the final build instead.
