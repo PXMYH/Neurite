@@ -218,9 +218,10 @@ function createWindow() {
 // its roles are what carry Cmd+C / Cmd+V / Cmd+Z. Its Help menu, which links to electronjs.org,
 // stays out.
 //
-// A click from code has no window to pass, so the app's one window stands in for it.
+// A click from code has no window to pass, so the app's one window stands in for it. A key pressed
+// while the page is still loading -- at launch, or after a reload -- finds no Plane yet, and is let go.
 const onPage = (act) => (_, win = BrowserWindow.getAllWindows()[0]) => {
-    win?.webContents.executeJavaScript(`Hud.command(${JSON.stringify(act)})`)
+    win?.webContents.executeJavaScript(`window.appReady === true && Hud.command(${JSON.stringify(act)})`)
         .catch((err) => console.warn('[neurite] menu command failed:', act, err.message));
 };
 const interfaceSize = (step) => (_, win = BrowserWindow.getAllWindows()[0]) => {

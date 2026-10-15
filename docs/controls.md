@@ -27,7 +27,7 @@ Mouse, keyboard and window handling. The full list also lives in the `?` tab of 
   </tr>
   <tr>
     <td><code>Pinch on a trackpad</code></td>
-    <td>Zoom as far as your fingers move, about the pointer -- over a note too, even one whose text scrolls, and whatever Scroll is set to do</td>
+    <td>Zoom as far as your fingers move, about the pointer -- over a note too, even one whose text scrolls, and whatever Scroll is set to do. Not over a page shown inside a note -- a link's web page, or a note's HTML run as a page -- which keeps the gesture for itself, as a browser tab would.</td>
   </tr>
   <tr>
     <td><code>Cmd + =</code>, <code>Cmd + -</code>, <code>Cmd + 0</code></td>

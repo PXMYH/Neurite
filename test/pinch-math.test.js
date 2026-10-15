@@ -28,7 +28,9 @@ const sandbox = createContext({
     Svg: {},
     Logger: { info(){}, debug(){}, warn(){}, err(){} },
     On: new Proxy({}, { get: ()=> ()=>{} }),
-    settings: {}
+    settings: {},
+    // The step of the HUD's + key (hud.js), which also caps one pinch event's zoom.
+    Hud: { zoomStep: 1.6 }
 });
 runInContext(read('js/mandelbrot/mandelbrot.js') + '\n;globalThis.vec2 = vec2;', sandbox);
 
@@ -161,8 +163,8 @@ const pinchOver = (deltas)=> deltas
     .reduce((a, b)=> a * b, 1);
 
 test("a trackpad's pinch zooms by its own scale, whatever the wheel's speed", ()=>{
-    // One 0.5x pinch, cut into uneven events as Chromium sends them; a fast one sends 50 at once.
-    const out = [8.2, 50.4, 10.714718055994531];
+    // One 0.5x pinch, cut into uneven events as Chromium sends them; a fast one sent 29 at once.
+    const out = [8.2, 40.4, 20.71471805599453];
     assert.ok(Math.abs(out.reduce((a, b)=> a + b) - 100 * Math.LN2) < 1e-12);
     for (const zoomSpeedMultiplier of [1, 3, 0.1]) {
         Object.assign(sandbox.settings, { zoomSpeed: 0.001, zoomSpeedMultiplier });
@@ -178,4 +180,14 @@ test('the wheel without Control zooms at the zoom speed, as it did', ()=>{
     assert.equal(sandbox.wheelZoomAmount({ deltaY: -120, ctrlKey: false }), Math.exp(120 * 0.001 * 2),
         'a notch up should zoom in by exp(120 · zoomSpeed · zoomSpeedMultiplier)');
     assert.ok(sandbox.wheelZoomAmount({ deltaY: 120, ctrlKey: false }) < 1, 'a notch down zooms out');
+});
+
+test("a mouse's notch with Control held zooms one step of +, not a pinch's 3.3x", ()=>{
+    // The same event as a pinch's, 120 a notch. At a pinch's scale that is exp(1.2), 3.32x.
+    assert.ok(Math.abs(sandbox.wheelZoomAmount({ deltaY: -120, ctrlKey: true }) - 1.6) < 1e-12,
+        'a notch up with Control should zoom in by one step of + (1.6x)');
+    assert.ok(Math.abs(sandbox.wheelZoomAmount({ deltaY: 120, ctrlKey: true }) - 1 / 1.6) < 1e-12,
+        'a notch down with Control should zoom out by one step of +');
+    // Under the cap, a pinch's event is its own scale.
+    assert.equal(sandbox.wheelZoomAmount({ deltaY: -40, ctrlKey: true }), Math.exp(0.4));
 });

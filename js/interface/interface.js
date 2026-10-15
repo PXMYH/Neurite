@@ -106,12 +106,19 @@ function performZoom(amount, dest) {
 // set, and Chromium picks their `deltaY` so that `Math.exp(-deltaY / 100)` is the pinch's own
 // scale: a 0.5x pinch summed to +69.315, measured. Read as a scroll it zoomed a tenth as far as
 // the fingers moved (0.933x for that 0.5x), so it is taken as the scale it is, as Safari's pinch
-// is (`TrackpadPinch`) and as Excalidraw's wheel does. Not Excalidraw's clamp of 10 a step: its
-// zoom is linear and needs one, this one multiplies, and a fast pinch sends 50 in one event.
+// is (`TrackpadPinch`) and as Excalidraw's wheel does.
+//
+// A mouse's wheel with Control held is the same event, a notch at a time of 100 or 120, which at
+// a pinch's scale jumps 3.3x. So no one event goes further than a press of `+` (`Hud.zoomStep`,
+// 47 of `deltaY`): a notch is a step, as on the keys, and a pinch is not cut -- 9 an event at
+// 800 px/s, 29 at 3000, measured. Excalidraw clamps at 10, for a zoom that adds, not multiplies.
 //
 // `deltaY` is negative when the wheel goes up, so the exponent is negated for up to mean in.
 function wheelZoomAmount(e) {
-    if (e.ctrlKey) return Math.exp(-e.deltaY / 100);
+    if (e.ctrlKey) {
+        const most = Math.log(Hud.zoomStep);
+        return Math.exp(Math.max(-most, Math.min(most, -e.deltaY / 100)));
+    }
     return Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
 }
 
@@ -327,8 +334,10 @@ class Interface {
     }
 
     onWheel = (e)=>{
-        // Only perform rotation via Alt + scroll wheel when zoomClick is "scroll"
-        if (settings.zoomClick === "scroll" && !this.nodeMode.isOnFor(e) && e.getModifierState(settings.rotateModifier)) {
+        // Only perform rotation via Alt + scroll wheel when zoomClick is "scroll". Never with Control
+        // down, which is a trackpad's pinch and so the zoom -- even should Adjust Controls have given
+        // the turn to Control, as `Node.wheelResizes` reads it too.
+        if (settings.zoomClick === "scroll" && !this.nodeMode.isOnFor(e) && e.getModifierState(settings.rotateModifier) && !e.ctrlKey) {
             Autopilot.stop();
             this.coordsLive = true;
 

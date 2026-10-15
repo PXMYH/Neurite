@@ -725,9 +725,11 @@ class Node {
     // text already, and over the Plane it still turns the view (`Interface.onWheel`). Not
     // Control: a trackpad's pinch arrives as Control and the wheel, and over a card that is
     // the canvas's zoom -- so not Alt's key either while Control is down, should Adjust Controls
-    // have given Alt's place to Control.
+    // have given Alt's place to Control, and not under the connect mode either: with Connect on,
+    // a pinch over a note resized it.
     static wheelResizes(e){
-        return App.interface.nodeMode.isOnFor(e) || (e.getModifierState(controls.altKey.value) && !e.ctrlKey);
+        if (e.ctrlKey) return false;
+        return App.interface.nodeMode.isOnFor(e) || e.getModifierState(controls.altKey.value);
     }
     // How far a wheel that resizes turned, positive for down: `deltaY`, or `deltaX` where it is
     // 0. macOS sends Shift and a mouse wheel as a scroll across, so read from `deltaY` alone

@@ -1115,11 +1115,13 @@ Mac trackpad takes in the Mac app):
   which scale the interface, not the Plane.
 
 Decisions:
-- [ ] A pinch zooms by its own scale, `exp(-deltaY / 100)`, about the pointer, as Safari's pinch
+- [x] A pinch zooms by its own scale, `exp(-deltaY / 100)`, about the pointer, as Safari's pinch
       does (`TrackpadPinch`): one function both wheel handlers call, so the three wheel zooms stay
       one expression (`test/zoom-direction.test.js`).
-- [ ] A pinch over a card zooms the Plane even when the card has text to scroll.
-- [ ] A pinch zooms whatever the wheel is set to do.
-- [ ] The Mac app's View menu zooms the Plane: Zoom In (Cmd +), Zoom Out (Cmd -), Fit (Cmd 0),
-      Home, each the HUD's own command; the interface's size moves to its own submenu.
-- [ ] Docs: controls, desktop, and the reverse-engineering notes.
+- [x] A pinch over a card zooms the Plane even when the card has text to scroll -- an AI note's
+      response included, which stopped the event outright.
+- [x] A pinch zooms whatever the wheel is set to do.
+- [x] The Mac app's View menu zooms the Plane: Zoom In (Cmd =, and Cmd + out of sight), Zoom Out
+      (Cmd -), Fit (Cmd 0), Home, each the HUD's own command (`Hud.command`); the interface's size
+      moves to its own submenu, Interface Size, with no keys.
+- [x] Docs: controls, desktop, and the reverse-engineering notes (`docs/excalidrawz.md`).

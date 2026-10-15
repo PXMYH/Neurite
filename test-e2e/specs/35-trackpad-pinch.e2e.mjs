@@ -20,16 +20,14 @@ const skip = isIPad && "WebKit's pinch is Safari's gesture events (20-touch)";
 async function pinch(page, at, scaleFactor) {
     await page.evaluate(() => {
         // One listener for the page, however many pinches: a second one counted each event twice.
-        if (!window.__pinch) window.addEventListener('wheel', (e) => {
-            window.__pinch.sum += e.deltaY;
-            window.__pinch.ctrl &&= e.ctrlKey;
-        }, true);
-        window.__pinch = { sum: 0, ctrl: true };
+        // The events are kept, since an event reads `defaultPrevented` after its dispatch is over.
+        if (!window.__pinch) window.addEventListener('wheel', (e) => { window.__pinch.push(e) }, true);
+        window.__pinch = [];
     });
     await page.mouse.move(at.x, at.y);
     const before = await page.evaluate(([x, y]) => {
         const z = Graph.xyToZ(x, y);
-        return { mag: Graph.zoom.mag(), x: z.x, y: z.y };
+        return { mag: Graph.zoom.mag(), angle: Math.atan2(Graph.zoom.y, Graph.zoom.x), x: z.x, y: z.y };
     }, [at.x, at.y]);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Input.synthesizePinchGesture',
@@ -37,8 +35,11 @@ async function pinch(page, at, scaleFactor) {
     await page.waitForTimeout(300);
     const after = await page.evaluate(([x, y]) => {
         const z = Graph.xyToZ(x, y);
-        return { mag: Graph.zoom.mag(), x: z.x, y: z.y, pxPerUnit: Svg.scale / 2 / Graph.zoom.mag(),
-                 ...window.__pinch };
+        const events = window.__pinch;
+        return { mag: Graph.zoom.mag(), angle: Math.atan2(Graph.zoom.y, Graph.zoom.x), x: z.x, y: z.y,
+                 pxPerUnit: Svg.scale / 2 / Graph.zoom.mag(),
+                 sum: events.reduce((a, e) => a + e.deltaY, 0), events: events.length,
+                 ctrl: events.every((e) => e.ctrlKey), cancelled: events.filter((e) => e.defaultPrevented).length };
     }, [at.x, at.y]);
     return {
         // Above 1 is closer, as `performZoom`'s argument is.
@@ -46,6 +47,9 @@ async function pinch(page, at, scaleFactor) {
         pinched: Math.exp(-after.sum / 100),
         allControl: after.ctrl,
         driftPx: Math.hypot(after.x - before.x, after.y - before.y) * after.pxPerUnit,
+        turned: after.angle - before.angle,
+        events: after.events,
+        cancelled: after.cancelled,
     };
 }
 
@@ -150,5 +154,92 @@ test("a pinch over an AI note's response zooms the Plane", { skip }, async () =>
     const out = await pinch(page, at, 0.5);
     assert.ok(Math.abs(out.magnification / out.pinched - 1) < 1e-6,
         `a ${out.pinched}x pinch over the response zoomed ${out.magnification}x`);
+    assert.deepEqual(errors, []);
+});
+
+// From the adversarial review. The page cancels every Control + wheel against the browser's own
+// zoom, but on the way up: the Plane's wheel listener stopped the event first and, passive, could
+// not cancel it itself, so 0 of a pinch's events over the Plane came out cancelled, nor over the
+// tool bar, which stops the wheel too. Cancelled before anything sees it now.
+test("a pinch never reaches the browser's own zoom", { skip }, async () => {
+    const bar = await page.evaluate(() => {
+        const b = document.querySelector('.tool-bar').getBoundingClientRect();
+        return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) };
+    });
+    for (const [where, at] of [['the Plane', { x: 1100, y: 500 }], ['the tool bar', bar]]) {
+        const out = await pinch(page, at, 0.5);
+        assert.ok(out.events > 0, `no pinch arrived over ${where}`);
+        assert.equal(out.cancelled, out.events, `${out.events - out.cancelled} of ${out.events} events over ${where} were left to the browser`);
+    }
+    assert.deepEqual(errors, []);
+});
+
+// A mouse's wheel with Control held is the same event as a pinch's, 120 a notch -- at a pinch's
+// scale a 3.3x jump. One notch is one step of the + key.
+test("Control and a mouse's wheel zoom one step of + a notch", { skip }, async () => {
+    await page.mouse.move(800, 500);
+    const before = await page.evaluate(() => Graph.zoom.mag());
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, -120);
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(300);
+    const magnification = before / await page.evaluate(() => Graph.zoom.mag());
+    assert.ok(Math.abs(magnification - await page.evaluate(() => Hud.zoomStep)) < 1e-9,
+        `a notch with Control zoomed ${magnification}x`);
+});
+
+// Adjust Controls can give the turn of the view to Control, and a pinch is Control and the wheel:
+// on 1.9.8 a pinch then turned the view and zoomed nothing. The pinch stays the zoom, as it does
+// over a card for the same reason (`Node.wheelResizes`).
+test('a pinch zooms, not turns, with the turn given to Control', { skip }, async () => {
+    await page.evaluate(() => { controls.altKey.value = 'Control'; updateSettingsFromControls(); });
+    assert.equal(await page.evaluate(() => settings.rotateModifier), 'Control');
+    const out = await pinch(page, { x: 1100, y: 500 }, 0.5);
+    assert.ok(Math.abs(out.magnification / out.pinched - 1) < 1e-6, `a ${out.pinched}x pinch zoomed ${out.magnification}x`);
+    assert.equal(out.turned, 0, 'the pinch turned the view');
+    assert.deepEqual(errors, []);
+});
+
+// With Connect on, the wheel over a note resizes it and over an Edge changes its length, as Shift
+// does. A pinch did the same on 1.9.8, and zoomed nothing. It is the Plane's zoom now, in any mode.
+test('with Connect on, a pinch over a note or an Edge zooms the Plane and leaves them be', { skip }, async () => {
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Alpha\nSee [[Beta]].\n\n## Beta\nb\n'));
+    await page.waitForFunction(() => Object.keys(Graph.edges).length === 1, null, { timeout: 8000 });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => Autopilot.stop());
+    await page.click('#connectTool');
+    assert.equal(await page.evaluate(() => document.getElementById('connectTool').getAttribute('aria-pressed')), 'true');
+    const at = await page.evaluate(() => {
+        const node = Object.values(Graph.nodes).find((n) => n.getTitle() === 'Alpha');
+        const b = node.view.div.getBoundingClientRect();
+        const path = Object.values(Graph.edges)[0].view.svgLink;
+        const p = path.getPointAtLength(path.getTotalLength() / 2);
+        const m = path.getScreenCTM();
+        const edge = { x: Math.round(p.x * m.a + p.y * m.c + m.e), y: Math.round(p.x * m.b + p.y * m.d + m.f) };
+        return { note: { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + 14) }, edge,
+                 onEdge: Boolean(document.elementFromPoint(edge.x, edge.y)?.closest('.edge-halo, .edge-link')) };
+    });
+    assert.ok(at.onEdge, 'the point half way along the Edge is not on it');
+    const sizes = () => page.evaluate(() => ({
+        scale: Object.values(Graph.nodes).find((n) => n.getTitle() === 'Alpha').scale,
+        length: Object.values(Graph.edges)[0].length,
+    }));
+    const start = await sizes();
+
+    const overNote = await pinch(page, at.note, 0.5);
+    assert.ok(Math.abs(overNote.magnification / overNote.pinched - 1) < 1e-6,
+        `a ${overNote.pinched}x pinch over the note zoomed ${overNote.magnification}x`);
+    // Out by a half about the note's top, the Edge's middle is still where it was on the Plane;
+    // read again, so the second pinch is over the Edge as it is drawn now.
+    const edgeNow = await page.evaluate(() => {
+        const path = Object.values(Graph.edges)[0].view.svgLink;
+        const p = path.getPointAtLength(path.getTotalLength() / 2);
+        const m = path.getScreenCTM();
+        return { x: Math.round(p.x * m.a + p.y * m.c + m.e), y: Math.round(p.x * m.b + p.y * m.d + m.f) };
+    });
+    const overEdge = await pinch(page, edgeNow, 2);
+    assert.ok(Math.abs(overEdge.magnification / overEdge.pinched - 1) < 1e-6,
+        `a ${overEdge.pinched}x pinch over the Edge zoomed ${overEdge.magnification}x`);
+    assert.deepEqual(await sizes(), start, 'a pinch resized the note or changed the Edge');
     assert.deepEqual(errors, []);
 });

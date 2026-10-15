@@ -80,10 +80,14 @@ On.keydown(document, (e)=>{
         e.preventDefault();
     }
 });
+// Before anything else sees it: the Plane's wheel listener stops the event and, passive, cannot
+// cancel it itself, so this one -- on the way up -- never ran there, and 0 of a pinch's 13 events
+// came out cancelled over the Plane, the browser's own zoom free to take them as well.
 On.wheel(document, (e)=>{
     if (e.ctrlKey) e.preventDefault();
 }, {
-    passive: false
+    passive: false,
+    capture: true
 });
 
 document.body.style.transform = "scale(1)";

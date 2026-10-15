@@ -388,7 +388,8 @@ class EdgeView {
         if (App.interface.nodeMode.isOnFor(e)) this.model.removeInstance();
     }
     onWheel = (e)=>{
-        if (!App.interface.nodeMode.isOnFor(e)) return;
+        // Not a trackpad's pinch, Control and the wheel: that goes on to the Plane, to zoom.
+        if (!App.interface.nodeMode.isOnFor(e) || e.ctrlKey) return;
 
         // Same convention as the fractal's zoom and a card's, so an edge lengthens on a
         // scroll up rather than shortening. `wheelDelta` is the legacy property and its

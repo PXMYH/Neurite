@@ -60,12 +60,14 @@ Mod `-` and Mod `0`.
 
 | From ExcalidrawZ / Excalidraw | In Neurite | Where |
 | --- | --- | --- |
-| A pinch is a zoom by its own scale, about the pointer | `wheelZoomAmount`: Control and the wheel zooms by `exp(-deltaY / 100)`, Chromium's own convention, over a note too | `js/interface/interface.js`, `js/nodes/nodeclass.js` |
+| A pinch is a zoom by its own scale, about the pointer | `wheelZoomAmount`: Control and the wheel zooms by `exp(-deltaY / 100)`, Chromium's own convention, at most a `+` step an event, over a note too; never the browser's zoom, never a turn or a resize | `js/interface/interface.js`, `js/nodes/nodeclass.js` |
 | Its menus run the page's own commands | The Mac app's View menu: Zoom In (Cmd =), Zoom Out (Cmd -), Fit (Cmd 0), Home, through `Hud.command` | `desktop/main.cjs`, `js/interface/hud.js` |
 
-Not Excalidraw's clamp of 10 a step: its zoom is linear, so a mouse's Control + wheel would
-otherwise take it past its limits in one notch. Neurite's zoom multiplies, and a fast pinch sends
-up to 50 in one event (measured), which the clamp would cut short.
+Excalidraw clamps each event at 10, for a zoom that adds: a mouse's Control + wheel, 100 or 120 a
+notch, would otherwise take it past its limits in one. Neurite's zoom multiplies, so its cap is one
+press of `+` (`Hud.zoomStep`, 47 of `deltaY`): a notch is a step, as on the keys, and a pinch is not
+cut -- 9 an event at 800 px/s and 29 at 3000, measured; a clamp at 10 would cut the fast one short.
+A pinch does not reach a page shown inside a note (a link's iframe): that page keeps the gesture.
 
 ## What was left, and why
 
