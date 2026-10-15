@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchBrowser, openNeurite, addNote, isIPad, openSettings } from './helpers.mjs';
+import { launchBrowser, openNeurite, addNote, addAiNote, isIPad, openSettings } from './helpers.mjs';
 
 let browser, context, page, errors;
 before(async () => { browser = await launchBrowser(); });
@@ -131,5 +131,24 @@ test('a pinch under Settings leaves the Graph', { skip }, async () => {
         assert.equal(await page.evaluate(() => Graph.zoom.mag()), zoom,
             `a pinch at (${at.x}, ${at.y}) zoomed the Graph behind Settings`);
     }
+    assert.deepEqual(errors, []);
+});
+
+// An AI note's response keeps the wheel, to scroll, and it stopped the event there -- a pinch too,
+// so over a response a pinch zoomed nothing (1.000x, measured).
+test("a pinch over an AI note's response zooms the Plane", { skip }, async () => {
+    const uuid = await addAiNote(page, 'Asked');
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => Autopilot.stop());
+    const at = await page.evaluate((id) => {
+        const el = Graph.nodes[id].view.div.querySelector('.ai-response-div');
+        const b = el.getBoundingClientRect();
+        const pt = { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + Math.min(b.height / 2, 20)) };
+        return { ...pt, hit: document.elementFromPoint(pt.x, pt.y)?.closest('.ai-response-div') === el };
+    }, uuid);
+    assert.ok(at.hit, 'no point over the response to pinch on');
+    const out = await pinch(page, at, 0.5);
+    assert.ok(Math.abs(out.magnification / out.pinched - 1) < 1e-6,
+        `a ${out.pinched}x pinch over the response zoomed ${out.magnification}x`);
     assert.deepEqual(errors, []);
 });
