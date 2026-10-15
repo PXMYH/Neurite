@@ -560,12 +560,13 @@ class Node {
         //
         // A note whose body has more text than fits still scrolls, because that is what
         // the wheel means inside a scrollable box; the canvas only takes the gesture when
-        // there is nothing to scroll.
+        // there is nothing to scroll. Not a trackpad's pinch, which is Control and the wheel:
+        // handed to the scroller, it scrolled nothing either, since the page cancels every
+        // Control + wheel (dropdown.js) -- a pinch out over a long note zoomed 1.000x, measured.
         if (!Node.wheelResizes(e)) {
-            if (Node.wheelScrollsContent(e)) return;
+            if (!e.ctrlKey && Node.wheelScrollsContent(e)) return;
             Autopilot.stop();
-            const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
-            performZoom(amount, Graph.vecToZ());
+            performZoom(wheelZoomAmount(e), Graph.vecToZ());
             regenAmount += Math.abs(e.deltaY);
             e.preventDefault();
             return;

@@ -146,3 +146,36 @@ test('the map keeps a pinch from the browser, on the Fractal and on the cards', 
     // finger on a card hanging past the window's edge slid the whole page (rv15).
     assert.match(read('resources/styles/foundation.css'), /#svg_bg, \.window, \.window \*\s*\{\s*touch-action:\s*none;\s*\}/);
 });
+
+// A Mac trackpad's pinch in Chromium, the Mac app's engine, is no gesture event: it is Control
+// and the wheel, with `deltaY` chosen so that Math.exp(-deltaY / 100) is the pinch's own scale
+// (measured: a 0.5x pinch summed to +69.315, 100·ln 2). Read as a scroll it zoomed a tenth as
+// far as the fingers moved -- 0.933x for that 0.5x. `wheelZoomAmount` takes it at its scale, and
+// the plain wheel as it always was.
+const wheelAt = source.indexOf('function wheelZoomAmount(');
+assert.notEqual(wheelAt, -1, 'wheelZoomAmount should be declared as a function in interface.js');
+runInContext(source.slice(wheelAt, source.indexOf('\n}\n', wheelAt) + 2)
+    + '\n;globalThis.wheelZoomAmount = wheelZoomAmount;', sandbox);
+const pinchOver = (deltas)=> deltas
+    .map((deltaY)=> sandbox.wheelZoomAmount({ deltaY, ctrlKey: true }))
+    .reduce((a, b)=> a * b, 1);
+
+test("a trackpad's pinch zooms by its own scale, whatever the wheel's speed", ()=>{
+    // One 0.5x pinch, cut into uneven events as Chromium sends them; a fast one sends 50 at once.
+    const out = [8.2, 50.4, 10.714718055994531];
+    assert.ok(Math.abs(out.reduce((a, b)=> a + b) - 100 * Math.LN2) < 1e-12);
+    for (const zoomSpeedMultiplier of [1, 3, 0.1]) {
+        Object.assign(sandbox.settings, { zoomSpeed: 0.001, zoomSpeedMultiplier });
+        assert.ok(Math.abs(pinchOver(out) - 0.5) < 1e-12,
+            `a 0.5x pinch should zoom out by 0.5 at speed ${zoomSpeedMultiplier}; got ${pinchOver(out)}`);
+        assert.ok(Math.abs(pinchOver(out.map((d)=> -d)) - 2) < 1e-12,
+            `a 2x pinch should zoom in by 2 at speed ${zoomSpeedMultiplier}; got ${pinchOver(out.map((d)=> -d))}`);
+    }
+});
+
+test('the wheel without Control zooms at the zoom speed, as it did', ()=>{
+    Object.assign(sandbox.settings, { zoomSpeed: 0.001, zoomSpeedMultiplier: 2 });
+    assert.equal(sandbox.wheelZoomAmount({ deltaY: -120, ctrlKey: false }), Math.exp(120 * 0.001 * 2),
+        'a notch up should zoom in by exp(120 · zoomSpeed · zoomSpeedMultiplier)');
+    assert.ok(sandbox.wheelZoomAmount({ deltaY: 120, ctrlKey: false }) < 1, 'a notch down zooms out');
+});

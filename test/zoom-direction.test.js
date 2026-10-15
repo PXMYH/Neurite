@@ -48,12 +48,20 @@ test('nothing reads the legacy wheelDelta any more', ()=>{
 });
 
 test('all three zooms are the same expression', ()=>{
-    // The canvas's, which a card zooms too when the wheel is not resizing it.
+    // The canvas's, which a card zooms too when the wheel is not resizing it. It lives in one
+    // function, `wheelZoomAmount` (interface.js), which takes a trackpad's pinch at its own
+    // scale as well, and both wheel handlers call it -- so neither can drift from the other.
     const wanted = 'Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier)';
+    assert.ok(code['js/interface/interface.js'].includes(wanted),
+        '`wheelZoomAmount` no longer zooms the canvas the way the canvas does. It must read: ' + wanted);
     for (const path of ['js/interface/interface.js', 'js/nodes/nodeclass.js']) {
-        assert.ok(code[path].includes(wanted),
-            path + ' no longer zooms the canvas the way the canvas does. It must read: ' + wanted);
+        assert.match(code[path], /performZoom\(wheelZoomAmount\(e\),/,
+            path + ' zooms the canvas on the wheel without `wheelZoomAmount`, so its wheel or a '
+            + 'pinch over it can come to mean something else than over the rest of the canvas');
     }
+    // Read with its comments, so a copy that comes back cannot hide behind a stripped line.
+    assert.ok(!files['js/nodes/nodeclass.js'].includes(wanted),
+        'js/nodes/nodeclass.js computes the canvas zoom itself again; call `wheelZoomAmount`');
     // A card's resize and an Edge's length, which a modifier gates.
     const gated = 'Math.exp(-Node.wheelTurn(e) * settings.zoomSpeed * settings.zoomSpeedMultiplier)';
     for (const path of ['js/nodes/nodeclass.js', 'js/nodes/edgeclass.js']) {

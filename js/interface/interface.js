@@ -99,6 +99,22 @@ function performZoom(amount, dest) {
         .pan_set(dest.scale(1 - inverseAmount).plus(Graph.pan.scale(inverseAmount)));
 }
 
+// How far one wheel event zooms the Plane, for `performZoom`: above 1 is closer. Both the Plane's
+// wheel and a card's call this, so the two can never zoom differently.
+//
+// A trackpad's pinch reaches Chromium -- the Mac app's engine -- as wheel events with Control
+// set, and Chromium picks their `deltaY` so that `Math.exp(-deltaY / 100)` is the pinch's own
+// scale: a 0.5x pinch summed to +69.315, measured. Read as a scroll it zoomed a tenth as far as
+// the fingers moved (0.933x for that 0.5x), so it is taken as the scale it is, as Safari's pinch
+// is (`TrackpadPinch`) and as Excalidraw's wheel does. Not Excalidraw's clamp of 10 a step: its
+// zoom is linear and needs one, this one multiplies, and a fast pinch sends 50 in one event.
+//
+// `deltaY` is negative when the wheel goes up, so the exponent is negated for up to mean in.
+function wheelZoomAmount(e) {
+    if (e.ctrlKey) return Math.exp(-e.deltaY / 100);
+    return Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
+}
+
 // Constants
 const DRAG_THRESHOLD = 1; // pixels
 
@@ -326,7 +342,8 @@ class Interface {
             return;
         }
 
-        if (settings.zoomClick === "scroll") {
+        // A pinch (Control and the wheel) zooms whatever the wheel is set to do: it is not the wheel.
+        if (settings.zoomClick === "scroll" || e.ctrlKey) {
             // Zooming via scroll wheel
             Autopilot.stop();
             Coordinate.deselect();
@@ -334,11 +351,8 @@ class Interface {
             this.coordsLive = true;
             const dest = Graph.vecToZ();
             regenAmount += Math.abs(e.deltaY);
-            // `performZoom` inverts its argument, so amount > 1 zooms in. deltaY is
-            // negative when the wheel is scrolled up, so the exponent has to be
-            // negated for up to mean in. The drag-zoom path above already does this.
-            const amount = Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
-            performZoom(amount, dest);
+            // `performZoom` inverts its argument, so amount > 1 zooms in.
+            performZoom(wheelZoomAmount(e), dest);
             e.stopPropagation();
         } else if (settings.panClick === "scroll") {
             // Panning via scroll wheel

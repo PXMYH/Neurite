@@ -1088,3 +1088,38 @@ Decisions:
   landing gesture (11) or the double-click rule (9).
 - Full suite on bff7e22: Chromium 360 of 361 and 1 skipped; as an iPad 296 passed, 63 skipped,
   and the two that fail on main.
+
+# A trackpad's pinch, and a Mac app's View menu, after ExcalidrawZ (2026-10-14)
+
+Asked, in chat: "install https://github.com/morluto/rea for me" then "use it to reverse engineer
+the excalidraw, then I want some native behavior and component to be ported to Neurite". Tier T3,
+brownfield. Which behaviour and which component was left open; the choice below is an assumption,
+made against #40, which already ported Excalidraw's interaction craft and ruled out drawing tools,
+undo, image export and chrome expansion.
+
+REA 6.5.0 on `/Applications/ExcalidrawZ.app` 1.5.1 (findings in `docs/excalidrawz.md`): the native
+app wraps the Excalidraw web build in a WKWebView, so a Mac trackpad's pinch reaches Excalidraw as
+Safari's `gesturechange`, and in Chromium as wheel events with Control set (`App.tsx`
+`handleWheel`); its Swift menus and toolbar drive the page through one helper object.
+
+Measured on 1.9.8 in Chromium, with `Input.synthesizePinchGesture` (a touchpad pinch, the path a
+Mac trackpad takes in the Mac app):
+- A 0.5x pinch arrives as Control + wheel events summing to `deltaY` +69.315, which is Chromium's
+  own convention, `scale = exp(-deltaY / 100)`. The Plane zoomed out 0.933x for it; a 2x pinch
+  zoomed in 1.05x. The pinch is read as a scroll at the wheel's speed, a tenth of the fingers.
+- Over a note with text to scroll, a pinch out zoomed 1.000x: the card hands the wheel to its
+  scroller, and the page's guard against the browser's own zoom cancels the scroll.
+- Fast pinches send up to 29 (3000 px/s) and 50 (8000 px/s) per event, so Excalidraw's clamp of
+  10 per event, which its linear zoom needs, would throttle them here. Not ported.
+- The Mac app's menu is Electron's: View carries the page's zoom on Cmd +, Cmd - and Cmd 0,
+  which scale the interface, not the Plane.
+
+Decisions:
+- [ ] A pinch zooms by its own scale, `exp(-deltaY / 100)`, about the pointer, as Safari's pinch
+      does (`TrackpadPinch`): one function both wheel handlers call, so the three wheel zooms stay
+      one expression (`test/zoom-direction.test.js`).
+- [ ] A pinch over a card zooms the Plane even when the card has text to scroll.
+- [ ] A pinch zooms whatever the wheel is set to do.
+- [ ] The Mac app's View menu zooms the Plane: Zoom In (Cmd +), Zoom Out (Cmd -), Fit (Cmd 0),
+      Home, each the HUD's own command; the interface's size moves to its own submenu.
+- [ ] Docs: controls, desktop, and the reverse-engineering notes.
