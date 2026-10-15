@@ -262,3 +262,55 @@ test('with Connect on, a pinch over a note or an Edge zooms the Plane and leaves
     assert.deepEqual(await sizes(), start, 'a pinch resized the note or changed the Edge');
     assert.deepEqual(errors, []);
 });
+
+// From the third review. Control held and the wheel, over a note with text to scroll, went to the
+// text's scroller as a plain wheel does, and the page cancels every Control + wheel against the
+// browser's own zoom: neither the text nor the Plane moved. It is a zoom, as a pinch is.
+test('Control held and the wheel over a note with text to scroll zoom the Plane', { skip }, async () => {
+    const body = Array.from({ length: 60 }, (_, i) => `Sentence ${i} of a long note.`).join(' ');
+    const uuid = await addNote(page, 'Long', body);
+    await page.waitForFunction((id) => {
+        const ed = Graph.nodes[id]?.view?.div?.querySelector('.editable-div');
+        return !!ed && ed.scrollHeight - ed.clientHeight > 1;
+    }, uuid, { timeout: 10000 });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => Autopilot.stop());
+    const at = await page.evaluate((id) => {
+        const b = Graph.nodes[id].view.div.querySelector('.editable-div').getBoundingClientRect();
+        return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) };
+    }, uuid);
+    await page.mouse.move(at.x, at.y);
+    const before = await page.evaluate(() => Graph.zoom.mag());
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, 120);              // down: the way the text could scroll
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(300);
+    const magnification = before / await page.evaluate(() => Graph.zoom.mag());
+    const wheel = await page.evaluate(() => Math.exp(-120 * settings.zoomSpeed * settings.zoomSpeedMultiplier));
+    assert.ok(Math.abs(magnification - wheel) < 1e-9, `Control and the wheel over the note zoomed ${magnification}x, the wheel ${wheel}x`);
+    assert.equal(await page.evaluate((id) => Graph.nodes[id].view.div.querySelector('.editable-div').scrollTop, uuid), 0,
+        'Control and the wheel scrolled the note');
+    assert.deepEqual(errors, []);
+});
+
+// Where Control is comes from the keys and the mouse's moves (`ControlKey`). A key the page never
+// heard -- pressed while a link's web page had the keyboard, or let go over a menu of the system's
+// -- left it wrong until the next key; the next move of the mouse puts it right.
+test("a key the page never heard is put right by the mouse's next move", { skip }, async () => {
+    // A keyup lost: Control taken for held, so the next pinch would have been the wheel's zoom.
+    await page.evaluate(() => { ControlKey.held = true });
+    await page.mouse.move(1100, 300);
+    await page.mouse.move(1100, 330);
+    assert.equal(await page.evaluate(() => ControlKey.held), false, 'a move without Control left Control held');
+    const out = await pinch(page, { x: 1100, y: 330 }, 0.5);
+    assert.ok(Math.abs(out.magnification / out.pinched - 1) < 1e-6, `a ${out.pinched}x pinch zoomed ${out.magnification}x`);
+
+    // A keydown lost: Control down, the page told it is not.
+    await page.keyboard.down('Control');
+    await page.evaluate(() => { ControlKey.held = false });
+    await page.mouse.move(900, 500);
+    const held = await page.evaluate(() => ControlKey.held);
+    await page.keyboard.up('Control');
+    assert.equal(held, true, 'a move with Control down left Control let go');
+    assert.deepEqual(errors, []);
+});

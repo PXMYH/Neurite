@@ -119,10 +119,14 @@ function wheelZoomAmount(e) {
 // same event as a pinch -- the wheel with `ctrlKey` -- 120 a notch, which at a pinch's scale jumped
 // 3.3x and could not turn the view for a reader who gave the turn to Control. The event cannot
 // tell them apart; the keyboard can, since a pinch presses no key. Every key says where Control
-// is, and the window's focus lost forgets it: a key let go elsewhere sends this page no keyup.
+// is, and so does every move of the mouse -- a pinch moves none with Control -- which puts it right
+// after a key this page never heard: one pressed while a link's web page had the keyboard, or let
+// go over a menu of the system's. The window's focus lost forgets it.
 const ControlKey = { held: false };
-On.keydown(window, (e)=>{ ControlKey.held = e.ctrlKey }, true);
-On.keyup(window, (e)=>{ ControlKey.held = e.ctrlKey }, true);
+const heardControl = (e)=>{ ControlKey.held = e.ctrlKey };
+On.keydown(window, heardControl, true);
+On.keyup(window, heardControl, true);
+On.mousemove(window, heardControl, true);
 On.blur(window, ()=>{ ControlKey.held = false });
 
 // A trackpad's pinch, as Chromium sends it: the wheel with Control, and no Control on the keyboard.
