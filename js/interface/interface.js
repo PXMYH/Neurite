@@ -106,21 +106,27 @@ function performZoom(amount, dest) {
 // set, and Chromium picks their `deltaY` so that `Math.exp(-deltaY / 100)` is the pinch's own
 // scale: a 0.5x pinch summed to +69.315, measured. Read as a scroll it zoomed a tenth as far as
 // the fingers moved (0.933x for that 0.5x), so it is taken as the scale it is, as Safari's pinch
-// is (`TrackpadPinch`) and as Excalidraw's wheel does.
-//
-// A mouse's wheel with Control held is the same event, a notch at a time of 100 or 120, which at
-// a pinch's scale jumps 3.3x. So no one event goes further than a press of `+` (`Hud.zoomStep`,
-// 47 of `deltaY`): a notch is a step, as on the keys, and a pinch is not cut -- 9 an event at
-// 800 px/s, 29 at 3000, measured. Excalidraw clamps at 10, for a zoom that adds, not multiplies.
+// is (`TrackpadPinch`) and as Excalidraw's wheel does. Whole: a fast pinch sends up to 50 in one
+// event (8000 px/s, measured), and a cap, as Excalidraw's of 10, cut it short.
 //
 // `deltaY` is negative when the wheel goes up, so the exponent is negated for up to mean in.
 function wheelZoomAmount(e) {
-    if (e.ctrlKey) {
-        const most = Math.log(Hud.zoomStep);
-        return Math.exp(Math.max(-most, Math.min(most, -e.deltaY / 100)));
-    }
+    if (isPinch(e)) return Math.exp(-e.deltaY / 100);
     return Math.exp(-e.deltaY * settings.zoomSpeed * settings.zoomSpeedMultiplier);
 }
+
+// Whether Control is down on the keyboard. A mouse's wheel turned with Control held arrives as the
+// same event as a pinch -- the wheel with `ctrlKey` -- 120 a notch, which at a pinch's scale jumped
+// 3.3x and could not turn the view for a reader who gave the turn to Control. The event cannot
+// tell them apart; the keyboard can, since a pinch presses no key. Every key says where Control
+// is, and the window's focus lost forgets it: a key let go elsewhere sends this page no keyup.
+const ControlKey = { held: false };
+On.keydown(window, (e)=>{ ControlKey.held = e.ctrlKey }, true);
+On.keyup(window, (e)=>{ ControlKey.held = e.ctrlKey }, true);
+On.blur(window, ()=>{ ControlKey.held = false });
+
+// A trackpad's pinch, as Chromium sends it: the wheel with Control, and no Control on the keyboard.
+function isPinch(e){ return e.ctrlKey && !ControlKey.held }
 
 // Constants
 const DRAG_THRESHOLD = 1; // pixels
@@ -334,10 +340,10 @@ class Interface {
     }
 
     onWheel = (e)=>{
-        // Only perform rotation via Alt + scroll wheel when zoomClick is "scroll". Never with Control
-        // down, which is a trackpad's pinch and so the zoom -- even should Adjust Controls have given
-        // the turn to Control, as `Node.wheelResizes` reads it too.
-        if (settings.zoomClick === "scroll" && !this.nodeMode.isOnFor(e) && e.getModifierState(settings.rotateModifier) && !e.ctrlKey) {
+        // Only perform rotation via Alt + scroll wheel when zoomClick is "scroll". Never for a pinch,
+        // which comes with Control set and is the zoom -- even should Adjust Controls have given the
+        // turn to Control, where Control held on the keyboard and the wheel still turns it.
+        if (settings.zoomClick === "scroll" && !this.nodeMode.isOnFor(e) && e.getModifierState(settings.rotateModifier) && !isPinch(e)) {
             Autopilot.stop();
             this.coordsLive = true;
 
@@ -351,8 +357,8 @@ class Interface {
             return;
         }
 
-        // A pinch (Control and the wheel) zooms whatever the wheel is set to do: it is not the wheel.
-        if (settings.zoomClick === "scroll" || e.ctrlKey) {
+        // A pinch zooms whatever the wheel is set to do: it is not the wheel.
+        if (settings.zoomClick === "scroll" || isPinch(e)) {
             // Zooming via scroll wheel
             Autopilot.stop();
             Coordinate.deselect();

@@ -560,11 +560,11 @@ class Node {
         //
         // A note whose body has more text than fits still scrolls, because that is what
         // the wheel means inside a scrollable box; the canvas only takes the gesture when
-        // there is nothing to scroll. Not a trackpad's pinch, which is Control and the wheel:
-        // handed to the scroller, it scrolled nothing either, since the page cancels every
+        // there is nothing to scroll. Not a trackpad's pinch (`isPinch`), which is Control and the
+        // wheel: handed to the scroller, it scrolled nothing either, since the page cancels every
         // Control + wheel (dropdown.js) -- a pinch out over a long note zoomed 1.000x, measured.
         if (!Node.wheelResizes(e)) {
-            if (!e.ctrlKey && Node.wheelScrollsContent(e)) return;
+            if (!isPinch(e) && Node.wheelScrollsContent(e)) return;
             Autopilot.stop();
             performZoom(wheelZoomAmount(e), Graph.vecToZ());
             regenAmount += Math.abs(e.deltaY);
@@ -722,13 +722,12 @@ class Node {
     // Whether the wheel over a card resizes it, collapsed to its circle or not, rather than
     // zooming the canvas: under the connect mode (Shift), or with Alt held -- Option on a Mac,
     // where Shift turns a mouse wheel sideways. Alt is how a gesture reaches a Node through its
-    // text already, and over the Plane it still turns the view (`Interface.onWheel`). Not
-    // Control: a trackpad's pinch arrives as Control and the wheel, and over a card that is
-    // the canvas's zoom -- so not Alt's key either while Control is down, should Adjust Controls
-    // have given Alt's place to Control, and not under the connect mode either: with Connect on,
-    // a pinch over a note resized it.
+    // text already, and over the Plane it still turns the view (`Interface.onWheel`). Never a
+    // trackpad's pinch (`isPinch`), which arrives as Control and the wheel and over a card is the
+    // canvas's zoom -- under the connect mode as well, where a pinch over a note resized it. Control
+    // held on the keyboard is a key like another, should Adjust Controls have given it Alt's place.
     static wheelResizes(e){
-        if (e.ctrlKey) return false;
+        if (isPinch(e)) return false;
         return App.interface.nodeMode.isOnFor(e) || e.getModifierState(controls.altKey.value);
     }
     // How far a wheel that resizes turned, positive for down: `deltaY`, or `deltaX` where it is

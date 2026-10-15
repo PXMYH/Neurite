@@ -72,18 +72,36 @@ test("Shift or Alt + scroll over a collapsed note's circle resizes it, and its t
 
 test('a plain scroll and a pinch over the circle zoom the canvas, and Alt + scroll on the Plane still turns it', { skip: isIPad && 'mobile WebKit takes no wheel' }, async () => {
     await notes(page, ['Alpha']);
-    // A trackpad's pinch arrives as Control and the wheel -- and stays the canvas's zoom though
-    // Adjust Controls gave Alt's place to Control.
-    for (const [key, alt] of [[null, 'Alt'], ['Control', 'Alt'], ['Control', 'Control']]) {
+    // A trackpad's pinch arrives as Control and the wheel with no key down -- and stays the
+    // canvas's zoom though Adjust Controls gave Alt's place to Control. Driven as Chromium's own
+    // touchpad pinch: played as Control held and the wheel, as it was before the keyboard could
+    // tell the two apart (`isPinch`), it is a mouse's wheel turned with Control held, below.
+    const pinch = async (at) => {
+        await page.mouse.move(at.x, at.y);
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send('Input.synthesizePinchGesture', { x: at.x, y: at.y, scaleFactor: 2, relativeSpeed: 800, gestureSourceType: 'mouse' });
+        await page.waitForTimeout(250);
+    };
+    for (const [gesture, alt] of [['scroll', 'Alt'], ['pinch', 'Alt'], ['pinch', 'Control']]) {
         await page.evaluate((alt) => { controls.altKey.value = alt; Graph.zoom = Graph.zoom.unscale(Graph.zoom.mag()) }, alt);
         await page.waitForTimeout(300);
         const was = await circle(page);
-        await wheel(page, was.at, key, 0, -200);
+        if (gesture === 'pinch') await pinch(was.at); else await wheel(page, was.at, null, 0, -200);
         const now = await circle(page);
-        assert.equal(now.scale, 1, `${key ?? 'a plain'} scroll over the circle resized it, with Alt's key ${alt}`);
-        assert.ok(now.zoom < was.zoom * 0.95, `${key ?? 'a plain'} scroll over the circle did not zoom the canvas in, with Alt's key ${alt}`);
+        assert.equal(now.scale, 1, `a ${gesture} over the circle resized it, with Alt's key ${alt}`);
+        assert.ok(now.zoom < was.zoom * 0.95, `a ${gesture} over the circle did not zoom the canvas in, with Alt's key ${alt}`);
     }
-    await page.evaluate(() => { controls.altKey.value = 'Alt' });
+    // Control held on the keyboard is a key like another: given Alt's place, its scroll resizes the
+    // note, as Alt's does, and leaves the canvas -- as it turns the view on the Plane (35-trackpad-pinch).
+    await page.evaluate(() => { Graph.zoom = Graph.zoom.unscale(Graph.zoom.mag()) });
+    await page.waitForTimeout(300);
+    const held = await circle(page);
+    await wheel(page, held.at, 'Control', 0, -200);
+    const resized = await circle(page);
+    near(resized.scale, await factor(page, -200), 1e-9, "Control's scroll, given Alt's place, did not scale the note by one turn");
+    near(resized.zoom, held.zoom, 1e-12, "Control's scroll, given Alt's place, zoomed the canvas as well");
+    await page.evaluate(() => { controls.altKey.value = 'Alt'; Object.values(Graph.nodes)[0].scale = 1 });
+    await page.waitForTimeout(300);
     // Away from the note, Alt + scroll is the view's turn.
     const was = await circle(page);
     await wheel(page, { x: 80, y: 500 }, 'Alt', 0, -200);

@@ -29,8 +29,8 @@ const sandbox = createContext({
     Logger: { info(){}, debug(){}, warn(){}, err(){} },
     On: new Proxy({}, { get: ()=> ()=>{} }),
     settings: {},
-    // The step of the HUD's + key (hud.js), which also caps one pinch event's zoom.
-    Hud: { zoomStep: 1.6 }
+    // Where Control is on the keyboard (interface.js), which tells a pinch from Control + wheel.
+    ControlKey: { held: false }
 });
 runInContext(read('js/mandelbrot/mandelbrot.js') + '\n;globalThis.vec2 = vec2;', sandbox);
 
@@ -153,18 +153,24 @@ test('the map keeps a pinch from the browser, on the Fractal and on the cards', 
 // and the wheel, with `deltaY` chosen so that Math.exp(-deltaY / 100) is the pinch's own scale
 // (measured: a 0.5x pinch summed to +69.315, 100·ln 2). Read as a scroll it zoomed a tenth as
 // far as the fingers moved -- 0.933x for that 0.5x. `wheelZoomAmount` takes it at its scale, and
-// the plain wheel as it always was.
+// the plain wheel as it always was. A pinch is told from a mouse's wheel turned with Control held
+// by the keyboard (`isPinch`, `ControlKey`): a pinch presses no key.
 const wheelAt = source.indexOf('function wheelZoomAmount(');
 assert.notEqual(wheelAt, -1, 'wheelZoomAmount should be declared as a function in interface.js');
 runInContext(source.slice(wheelAt, source.indexOf('\n}\n', wheelAt) + 2)
     + '\n;globalThis.wheelZoomAmount = wheelZoomAmount;', sandbox);
+const pinchAt = source.indexOf('function isPinch(');
+assert.notEqual(pinchAt, -1, 'isPinch should be declared as a function in interface.js');
+runInContext(source.slice(pinchAt, source.indexOf('\n', pinchAt)) + '\n;globalThis.isPinch = isPinch;', sandbox);
 const pinchOver = (deltas)=> deltas
     .map((deltaY)=> sandbox.wheelZoomAmount({ deltaY, ctrlKey: true }))
     .reduce((a, b)=> a * b, 1);
 
 test("a trackpad's pinch zooms by its own scale, whatever the wheel's speed", ()=>{
-    // One 0.5x pinch, cut into uneven events as Chromium sends them; a fast one sent 29 at once.
-    const out = [8.2, 40.4, 20.71471805599453];
+    // One 0.5x pinch, cut into uneven events as Chromium sends them; a fast one sends 50 at once
+    // (8000 px/s, measured), and a cap on one event cut it short.
+    sandbox.ControlKey.held = false;
+    const out = [8.2, 50.4, 10.714718055994531];
     assert.ok(Math.abs(out.reduce((a, b)=> a + b) - 100 * Math.LN2) < 1e-12);
     for (const zoomSpeedMultiplier of [1, 3, 0.1]) {
         Object.assign(sandbox.settings, { zoomSpeed: 0.001, zoomSpeedMultiplier });
@@ -182,12 +188,17 @@ test('the wheel without Control zooms at the zoom speed, as it did', ()=>{
     assert.ok(sandbox.wheelZoomAmount({ deltaY: 120, ctrlKey: false }) < 1, 'a notch down zooms out');
 });
 
-test("a mouse's notch with Control held zooms one step of +, not a pinch's 3.3x", ()=>{
-    // The same event as a pinch's, 120 a notch. At a pinch's scale that is exp(1.2), 3.32x.
-    assert.ok(Math.abs(sandbox.wheelZoomAmount({ deltaY: -120, ctrlKey: true }) - 1.6) < 1e-12,
-        'a notch up with Control should zoom in by one step of + (1.6x)');
-    assert.ok(Math.abs(sandbox.wheelZoomAmount({ deltaY: 120, ctrlKey: true }) - 1 / 1.6) < 1e-12,
-        'a notch down with Control should zoom out by one step of +');
-    // Under the cap, a pinch's event is its own scale.
-    assert.equal(sandbox.wheelZoomAmount({ deltaY: -40, ctrlKey: true }), Math.exp(0.4));
+test("a mouse's wheel with Control held on the keyboard is the wheel, not a pinch's 3.3x", ()=>{
+    // The same event as a pinch's, 120 a notch: at a pinch's scale, exp(1.2), 3.32x.
+    Object.assign(sandbox.settings, { zoomSpeed: 0.001, zoomSpeedMultiplier: 1 });
+    sandbox.ControlKey.held = true;
+    try {
+        assert.equal(sandbox.isPinch({ ctrlKey: true }), false, 'Control held and the wheel was read as a pinch');
+        assert.equal(sandbox.wheelZoomAmount({ deltaY: -120, ctrlKey: true }), Math.exp(120 * 0.001),
+            'a notch up with Control held should zoom in as the wheel does');
+    } finally { sandbox.ControlKey.held = false }
+    // With no key down, the same event is a pinch, at its own scale.
+    assert.equal(sandbox.isPinch({ ctrlKey: true }), true);
+    assert.equal(sandbox.wheelZoomAmount({ deltaY: -120, ctrlKey: true }), Math.exp(1.2));
+    assert.equal(sandbox.isPinch({ ctrlKey: false }), false, 'a plain wheel was read as a pinch');
 });

@@ -17,7 +17,7 @@ afterEach(async () => { await context?.close(); });
 // the events that arrived, not with the scale it asked for.
 const skip = isIPad && "WebKit's pinch is Safari's gesture events (20-touch)";
 
-async function pinch(page, at, scaleFactor) {
+async function pinch(page, at, scaleFactor, relativeSpeed = 800) {
     await page.evaluate(() => {
         // One listener for the page, however many pinches: a second one counted each event twice.
         // The events are kept, since an event reads `defaultPrevented` after its dispatch is over.
@@ -31,7 +31,7 @@ async function pinch(page, at, scaleFactor) {
     }, [at.x, at.y]);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Input.synthesizePinchGesture',
-        { x: at.x, y: at.y, scaleFactor, relativeSpeed: 800, gestureSourceType: 'mouse' });
+        { x: at.x, y: at.y, scaleFactor, relativeSpeed, gestureSourceType: 'mouse' });
     await page.waitForTimeout(300);
     const after = await page.evaluate(([x, y]) => {
         const z = Graph.xyToZ(x, y);
@@ -65,6 +65,13 @@ test('a pinch on the Plane zooms by its own scale, about the pointer', { skip },
     assert.ok(closer.pinched > 1.2, `Chromium sent a pinch of ${closer.pinched}, not a spread`);
     assert.ok(Math.abs(closer.magnification / closer.pinched - 1) < 1e-6,
         `a ${closer.pinched}x pinch zoomed ${closer.magnification}x`);
+
+    // A fast one sends up to 50 in an event (8000 px/s); a cap of one step on an event cut it to
+    // 0.517x where it was 0.5x (the second review).
+    const fast = await pinch(page, { x: 1100, y: 330 }, 0.25, 8000);
+    assert.ok(Math.abs(fast.pinched - 0.25) < 0.05, `Chromium sent a fast pinch of ${fast.pinched}, not about 0.25`);
+    assert.ok(Math.abs(fast.magnification / fast.pinched - 1) < 1e-6,
+        `a fast ${fast.pinched}x pinch zoomed ${fast.magnification}x`);
     assert.deepEqual(errors, []);
 });
 
@@ -174,29 +181,41 @@ test("a pinch never reaches the browser's own zoom", { skip }, async () => {
     assert.deepEqual(errors, []);
 });
 
-// A mouse's wheel with Control held is the same event as a pinch's, 120 a notch -- at a pinch's
-// scale a 3.3x jump. One notch is one step of the + key.
-test("Control and a mouse's wheel zoom one step of + a notch", { skip }, async () => {
+// A mouse's wheel turned with Control held is the same event as a pinch's, 120 a notch -- at a
+// pinch's scale a 3.3x jump. The keyboard tells them apart: Control held, it is the wheel.
+async function controlWheel(page, deltaY) {
     await page.mouse.move(800, 500);
-    const before = await page.evaluate(() => Graph.zoom.mag());
+    const before = await page.evaluate(() => [Graph.zoom.mag(), Math.atan2(Graph.zoom.y, Graph.zoom.x)]);
     await page.keyboard.down('Control');
-    await page.mouse.wheel(0, -120);
+    await page.mouse.wheel(0, deltaY);
     await page.keyboard.up('Control');
     await page.waitForTimeout(300);
-    const magnification = before / await page.evaluate(() => Graph.zoom.mag());
-    assert.ok(Math.abs(magnification - await page.evaluate(() => Hud.zoomStep)) < 1e-9,
-        `a notch with Control zoomed ${magnification}x`);
+    const after = await page.evaluate(() => [Graph.zoom.mag(), Math.atan2(Graph.zoom.y, Graph.zoom.x)]);
+    return { magnification: before[0] / after[0], turned: after[1] - before[1] };
+}
+
+test("Control held and a mouse's wheel zoom as the wheel does, not as a pinch", { skip }, async () => {
+    const out = await controlWheel(page, -120);
+    const wheel = await page.evaluate(() => Math.exp(120 * settings.zoomSpeed * settings.zoomSpeedMultiplier));
+    assert.ok(Math.abs(out.magnification - wheel) < 1e-9, `a notch with Control held zoomed ${out.magnification}x, the wheel ${wheel}x`);
+    // And the next pinch is a pinch again: Control let go.
+    const after = await pinch(page, { x: 1100, y: 500 }, 0.5);
+    assert.ok(Math.abs(after.magnification / after.pinched - 1) < 1e-6, `a ${after.pinched}x pinch zoomed ${after.magnification}x`);
 });
 
-// Adjust Controls can give the turn of the view to Control, and a pinch is Control and the wheel:
-// on 1.9.8 a pinch then turned the view and zoomed nothing. The pinch stays the zoom, as it does
-// over a card for the same reason (`Node.wheelResizes`).
-test('a pinch zooms, not turns, with the turn given to Control', { skip }, async () => {
+// Adjust Controls can give the turn of the view to Control, and a pinch comes with Control set:
+// on 1.9.8 a pinch then turned the view and zoomed nothing. The pinch stays the zoom, and Control
+// held on the keyboard with the wheel turns the view, as the reader chose (the second review).
+test('with the turn given to Control, a pinch zooms and Control with the wheel turns', { skip }, async () => {
     await page.evaluate(() => { controls.altKey.value = 'Control'; updateSettingsFromControls(); });
     assert.equal(await page.evaluate(() => settings.rotateModifier), 'Control');
     const out = await pinch(page, { x: 1100, y: 500 }, 0.5);
     assert.ok(Math.abs(out.magnification / out.pinched - 1) < 1e-6, `a ${out.pinched}x pinch zoomed ${out.magnification}x`);
     assert.equal(out.turned, 0, 'the pinch turned the view');
+
+    const held = await controlWheel(page, -120);
+    assert.ok(Math.abs(held.turned) > 0.01, `Control and the wheel turned the view ${held.turned} rad`);
+    assert.ok(Math.abs(held.magnification - 1) < 1e-9, `Control and the wheel zoomed ${held.magnification}x`);
     assert.deepEqual(errors, []);
 });
 

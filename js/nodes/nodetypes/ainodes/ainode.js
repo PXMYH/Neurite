@@ -306,9 +306,9 @@ AiNode.setupResponseDivListeners = function(node){
     });
     On.wheel(aiResponseDiv, (e)=>{
         // Unless the wheel resizes the card (Shift or Alt), the response scrolls and keeps it.
-        // Not a trackpad's pinch, Control and the wheel: that zooms the Plane over any note
-        // (`Node.onWheel`), and kept here it zoomed nothing.
-        if (!Node.wheelResizes(e) && !e.ctrlKey) e.stopPropagation();
+        // Not a trackpad's pinch (`isPinch`): that zooms the Plane over any note (`Node.onWheel`),
+        // and kept here it zoomed nothing.
+        if (!Node.wheelResizes(e) && !isPinch(e)) e.stopPropagation();
     }, { passive: false });
 
     let userHasScrolled = false;
