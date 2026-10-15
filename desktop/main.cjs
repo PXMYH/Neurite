@@ -210,6 +210,47 @@ function createWindow() {
     win.loadURL(ORIGIN + '/');
 }
 
+// The menus, as a Mac app's. Electron's own View menu zoomed the page -- the whole interface --
+// on Cmd +, Cmd - and Cmd 0, where a Mac app zooms what it shows: ExcalidrawZ, read with REA
+// (docs/excalidrawz.md), runs its page's own commands from its menus. These run the HUD's, by
+// name (`Hud.command`, hud.js), which does nothing under Settings or a dialog that asks. The
+// interface's own size keeps a submenu, with no keys. The Edit menu stays Electron's: on macOS
+// its roles are what carry Cmd+C / Cmd+V / Cmd+Z. Its Help menu, which links to electronjs.org,
+// stays out.
+//
+// A click from code has no window to pass, so the app's one window stands in for it.
+const onPage = (act) => (_, win = BrowserWindow.getAllWindows()[0]) => {
+    win?.webContents.executeJavaScript(`Hud.command(${JSON.stringify(act)})`)
+        .catch((err) => console.warn('[neurite] menu command failed:', act, err.message));
+};
+const interfaceSize = (step) => (_, win = BrowserWindow.getAllWindows()[0]) => {
+    const contents = win?.webContents;
+    if (contents) contents.setZoomLevel(step === 0 ? 0 : contents.getZoomLevel() + step);
+};
+const MENU = [
+    { role: 'appMenu' }, { role: 'fileMenu' }, { role: 'editMenu' },
+    { label: 'View', submenu: [
+        { id: 'zoom-in', label: 'Zoom In', accelerator: 'CommandOrControl+=', click: onPage('zoomIn') },
+        // Cmd + typed as a US keyboard types +, with Shift: the same command, out of sight.
+        { id: 'zoom-in-plus', label: 'Zoom In', accelerator: 'CommandOrControl+Plus', visible: false,
+          click: onPage('zoomIn') },
+        { id: 'zoom-out', label: 'Zoom Out', accelerator: 'CommandOrControl+-', click: onPage('zoomOut') },
+        { id: 'fit', label: 'Fit', accelerator: 'CommandOrControl+0', click: onPage('fit') },
+        { id: 'home', label: 'Home', click: onPage('home') },
+        { type: 'separator' },
+        { label: 'Interface Size', submenu: [
+            { id: 'interface-actual', label: 'Actual Size', click: interfaceSize(0) },
+            { id: 'interface-larger', label: 'Larger', click: interfaceSize(0.5) },
+            { id: 'interface-smaller', label: 'Smaller', click: interfaceSize(-0.5) },
+        ] },
+        { type: 'separator' },
+        { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+    ] },
+    { role: 'windowMenu' },
+];
+
 // Two copies would share one profile, and with it the IndexedDB the saved graphs
 // live in. A second launch focuses the first instead.
 if (!app.requestSingleInstanceLock()) {
@@ -239,12 +280,7 @@ if (!app.requestSingleInstanceLock()) {
     app.on('window-all-closed', () => app.quit());
 
     app.whenReady().then(() => {
-        // Electron's default menu, minus its Help menu, which links to electronjs.org.
-        // Keep the Edit menu: on macOS its roles are what carry Cmd+C / Cmd+V / Cmd+Z.
-        Menu.setApplicationMenu(Menu.buildFromTemplate([
-            { role: 'appMenu' }, { role: 'fileMenu' }, { role: 'editMenu' },
-            { role: 'viewMenu' }, { role: 'windowMenu' },
-        ]));
+        Menu.setApplicationMenu(Menu.buildFromTemplate(MENU));
         const ses = session.defaultSession;
         cdnSession = session.fromPartition('cdn');
         protocol.handle('app', serve);

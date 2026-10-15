@@ -626,6 +626,22 @@ class Hud {
         Autopilot.stop();
         Hud.setZoomMag(Graph.zoom.mag() / factor);
     }
+    // How far one step of the keys' zoom and the menu's goes.
+    static zoomStep = 1.6;
+
+    // The Mac app's View menu (desktop/main.cjs) runs these by name, as its keys run the HUD's.
+    // Nothing under Settings or a dialog that asks (#82): no key guard sees a menu.
+    static command(act){
+        if (SettingsModal.isOpen() || Modal.current?.asks) return false;
+        switch (act) {
+            case 'zoomIn':  Hud.zoomBy(Hud.zoomStep); break;
+            case 'zoomOut': Hud.zoomBy(1 / Hud.zoomStep); break;
+            case 'fit':     Hud.fitAll(); break;
+            case 'home':    Hud.home(); break;
+            default: return false;
+        }
+        return true;
+    }
 
     // Keys chosen from what is actually free: 1-4 are the creator tools, Shift is
     // node mode, Alt is the overlay reveal, the arrows and f/d move the selection,
@@ -641,8 +657,8 @@ class Hud {
                 case '0':    Hud.fitAll(); break;
                 case 't': case 'T': Hud.tidy(); break;
                 case 'Home': Hud.home(); break;
-                case '+': case '=': Hud.zoomBy(1.6); break;
-                case '-': case '_': Hud.zoomBy(1 / 1.6); break;
+                case '+': case '=': Hud.zoomBy(Hud.zoomStep); break;
+                case '-': case '_': Hud.zoomBy(1 / Hud.zoomStep); break;
                 default: return;
             }
             e.preventDefault();

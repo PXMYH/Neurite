@@ -142,3 +142,64 @@ test('a quit before the saved graph is back leaves the graph alone', async () =>
         assert.equal(await again.page.evaluate(() => Object.keys(Graph.nodes).length), 5);
     } finally { await again.app.close() }
 });
+
+// The View menu zooms the Plane, as a Mac app's zooms what it shows (ExcalidrawZ's runs its
+// page's own commands: docs/excalidrawz.md). On 1.9.8 it was Electron's: Cmd - shrank the whole
+// interface, Cmd 0 put it back, and Cmd =, bound as Cmd +, did nothing; none of them moved the
+// Plane. Clicked here as the menu bar clicks, in the main process -- a key from CDP never reaches
+// a menu, so the keys themselves were tried once from System Events (tasks/todo.md).
+test('the View menu zooms the Plane, and the interface only from its own submenu', async () => {
+    const { app, page, errors } = await launch(freshProfile());
+    try {
+        const view = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items
+            .find((i) => i.label === 'View').submenu.items
+            .map((s) => ({ id: s.id, role: s.role, accelerator: s.accelerator })));
+        const accel = Object.fromEntries(view.filter((s) => s.accelerator).map((s) => [s.id || s.role, s.accelerator]));
+        assert.equal(accel['zoom-in'], 'CommandOrControl+=');
+        assert.equal(accel['zoom-in-plus'], 'CommandOrControl+Plus');
+        assert.equal(accel['zoom-out'], 'CommandOrControl+-');
+        assert.equal(accel['fit'], 'CommandOrControl+0');
+        assert.deepEqual(view.filter((s) => ['zoomin', 'zoomout', 'resetzoom'].includes(s.role)), [],
+            "the page's zoom is back in View, on keys");
+
+        const click = (id) => app.evaluate(({ Menu }, id) => Menu.getApplicationMenu().getMenuItemById(id).click(), id);
+        const state = async () => ({
+            page: await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomFactor()),
+            plane: await page.evaluate(() => Graph.zoom.mag()),
+        });
+        const settle = () => page.waitForTimeout(400);
+        const start = await state();
+        await click('zoom-in'); await settle();
+        const closer = await state();
+        assert.ok(Math.abs(start.plane / closer.plane - 1.6) < 1e-9, `Zoom In moved the Plane ${start.plane / closer.plane}x`);
+        assert.equal(closer.page, 1, 'Zoom In scaled the interface');
+        await click('zoom-out'); await settle();
+        assert.ok(Math.abs((await state()).plane - start.plane) < 1e-12, 'Zoom Out did not undo Zoom In');
+
+        // Fit frames the notes, as the HUD's Fit does: one note far from the start.
+        await page.evaluate(async () => {
+            await window.createNote('Far', 'Out of the way.');
+            Autopilot.stop();
+            const node = Object.values(Graph.nodes)[0];
+            node.pos = node.anchor = new vec2(3, 2); node.anchorForce = 1;
+        });
+        await page.waitForTimeout(600);
+        const panBefore = await page.evaluate(() => Graph.pan.mag());
+        await click('fit'); await page.waitForTimeout(1500);
+        assert.notEqual(await page.evaluate(() => Graph.pan.mag()), panBefore, 'Fit did not move the view');
+        await click('home'); await settle();
+        assert.deepEqual(await page.evaluate(() => [Graph.pan.mag(), Graph.zoom.mag()]), [0, 1], 'Home is pan 0, zoom 1');
+
+        // Under Settings nothing reaches the Graph (#82), the menu included.
+        await page.evaluate(() => SettingsModal.open());
+        await click('zoom-in'); await settle();
+        assert.equal((await state()).plane, 1, 'Zoom In zoomed the Graph behind Settings');
+        await page.evaluate(() => SettingsModal.close());
+
+        await click('interface-larger'); await settle();
+        assert.ok((await state()).page > 1, 'Larger did not grow the interface');
+        await click('interface-actual'); await settle();
+        assert.equal((await state()).page, 1);
+        assert.deepEqual(errors, []);
+    } finally { await app.close() }
+});
