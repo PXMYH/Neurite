@@ -7,7 +7,10 @@
 // accepted; a content upload bumps `version`, sets a new `headRevisionId` and the content's
 // `md5Checksum`, while a metadata change bumps `version` only; `appProperties` are matched by the
 // `appProperties has { key=... and value=... }` query; a resumable start answers with an upload id
-// that the browser can read only as `X-GUploader-UploadID`, as Google's own start answer exposes.
+// that the browser can read only as `X-GUploader-UploadID`, as Google's own start answer exposes;
+// a list comes a page at a time; an earlier revision is given only once it is kept forever, 200 a
+// file at most; and a refresh token is issued for offline access the first time a client is given
+// it, and after that only when consent is asked for again.
 import { Buffer } from 'node:buffer';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -18,7 +21,8 @@ const b64url = (buf) => Buffer.from(buf).toString('base64url');
 export class FakeGoogle {
     files = new Map();
     calls = [];
-    // Failures to answer the next matching requests with: {match: (req) => bool, status, times}.
+    // Failures to answer the next matching requests with: {match: (req) => bool, status, times}, where
+    // a status of 'drop' is a connection that drops without an answer.
     failures = [];
     // Requests held until a test lets them go: `const h = fake.hold(match)`, `await h.reached`,
     // `h.release()`. The first matching request waits, before Drive does anything with it.
@@ -43,6 +47,15 @@ export class FakeGoogle {
     // Whether a resumable start's `Location` is in the answer at all: a browser cannot read it from
     // Google's (it is not among the exposed headers), so a test can take it away.
     hideLocation = false;
+    // Drive answers a list a page at a time, at most `pageSize` items, and says nothing of the
+    // order of a file's revisions; a test can make the pages small and the order newest first.
+    maxPage = Infinity;
+    revisionOrder = 'oldest-first';
+    // Drive keeps at most 200 revisions of a file forever.
+    static MAX_KEPT = 200;
+    // Google issues a refresh token the first time a client is given offline access, and after
+    // that only when consent is asked for again (`prompt=consent`).
+    #offlineGranted = new Set();
     #seq = 0;
 
     // A token the page may use at once, as a browser sign-in would hand it.
@@ -63,7 +76,10 @@ export class FakeGoogle {
     filesIn(folderId) { return [...this.files.values()].filter((f) => f.parents.includes(folderId) && !f.trashed) }
 
     #id() { return 'f' + (++this.#seq).toString(36) + randomBytes(4).toString('hex') }
-    #now() { return new Date(Date.now()).toISOString() }
+    // Drive's times have milliseconds, and two writes to it are never in the same one; here they can
+    // be, so each time is at least a millisecond after the last.
+    #last = 0;
+    #now() { this.#last = Math.max(Date.now(), this.#last + 1); return new Date(this.#last).toISOString() }
     // Every content change is a revision, as for a file with binary content in Drive.
     #setContent(f, buf) {
         f.content = buf;
@@ -103,9 +119,17 @@ export class FakeGoogle {
         for (const w of want) if (f[w] !== undefined) out[w] = f[w];
         return out;
     }
-    #listFields(fields) {
-        const m = /files\(([^)]*)\)/.exec(fields ?? '');
+    #listFields(fields, key = 'files') {
+        const m = new RegExp(key + '\\(([^)]*)\\)').exec(fields ?? '');
         return m ? m[1] : 'kind,id,name,mimeType';
+    }
+    // One page of a list, and where the next begins.
+    #page(items, url, key, defaultSize) {
+        const size = Math.min(Number(url.searchParams.get('pageSize')) || defaultSize, this.maxPage);
+        const start = Number(/^p(\d+)$/.exec(url.searchParams.get('pageToken') ?? '')?.[1] ?? 0);
+        const page = { [key]: items.slice(start, start + size) };
+        if (start + size < items.length) page.nextPageToken = 'p' + (start + size);
+        return page;
     }
     // Enough of Drive's query language for what the client asks: clauses joined by `and`.
     #matches(f, q) {
@@ -141,6 +165,8 @@ export class FakeGoogle {
         const fail = this.failures.find((x) => x.times > 0 && x.match(call));
         if (fail) {
             fail.times -= 1;
+            // A connection that drops: the page's fetch fails with no answer at all.
+            if (fail.status === 'drop') throw new Error('fake Google dropped the connection');
             return { status: fail.status, headers: { ...cors, 'content-type': 'application/json' },
                      body: JSON.stringify({ error: { code: fail.status, message: 'fake failure' } }) };
         }
@@ -171,7 +197,7 @@ export class FakeGoogle {
             const q = url.searchParams.get('q');
             const found = [...this.files.values()].filter((f) => this.#matches(f, q));
             const ff = this.#listFields(fields);
-            return json(200, { files: found.map((f) => this.#pick(f, ff)) });
+            return json(200, this.#page(found.map((f) => this.#pick(f, ff)), url, 'files', 100));
         }
         if (p === '/drive/v3/files' && req.method === 'POST') {
             const f = this.#create(JSON.parse(req.body.toString() || '{}'));
@@ -181,11 +207,18 @@ export class FakeGoogle {
             const f = this.files.get(m[1]);
             if (!f) return err(404, 'File not found: ' + m[1]);
             const revs = this.revisionsOf[f.id] ?? [];
-            if (!m[2]) return json(200, { revisions: revs.map(({ id, md5Checksum, modifiedTime, keepForever }) => ({ id, md5Checksum, modifiedTime, keepForever: Boolean(keepForever) })) });
+            if (!m[2]) {
+                const listed = revs.map(({ id, md5Checksum, modifiedTime, keepForever }) => ({ id, md5Checksum, modifiedTime, keepForever: Boolean(keepForever) }));
+                if (this.revisionOrder === 'newest-first') listed.reverse();
+                return json(200, this.#page(listed, url, 'revisions', 200));
+            }
             const r = revs.find((x) => x.id === m[2]);
             if (!r) return err(404, 'Revision not found: ' + m[2]);
             if (req.method === 'PATCH') {
                 const { keepForever } = JSON.parse(req.body.toString() || '{}');
+                if (keepForever === true && !r.keepForever && revs.filter((x) => x.keepForever).length >= FakeGoogle.MAX_KEPT) {
+                    return err(403, 'This file already has the most revisions that can be kept forever.');
+                }
                 if (typeof keepForever === 'boolean') r.keepForever = keepForever;
                 return json(200, { id: r.id, keepForever: Boolean(r.keepForever) });
             }
@@ -239,7 +272,7 @@ export class FakeGoogle {
         if (q.get('code_challenge_method') !== 'S256' || !q.get('code_challenge')) return { status: 400, headers: {}, body: 'pkce required' };
         const code = '4/fake-' + randomBytes(10).toString('hex');
         this.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri'), client: q.get('client_id'), scope: q.get('scope'),
-                               offline: q.get('access_type') === 'offline' });
+                               offline: q.get('access_type') === 'offline', consent: (q.get('prompt') ?? '').split(' ').includes('consent') });
         const back = new URL(q.get('redirect_uri'));
         back.searchParams.set('code', code);
         back.searchParams.set('state', q.get('state') ?? '');
@@ -257,7 +290,8 @@ export class FakeGoogle {
             if (challenge !== grant.challenge) return json(400, { error: 'invalid_grant', error_description: 'PKCE mismatch.' });
             if (form.get('redirect_uri') !== grant.redirect) return json(400, { error: 'redirect_uri_mismatch' });
             const access = { access_token: this.issueAccessToken(grant.scope), expires_in: 3599, scope: grant.scope, token_type: 'Bearer' };
-            if (!grant.offline) return json(200, access);
+            if (!grant.offline || (this.#offlineGranted.has(grant.client) && !grant.consent)) return json(200, access);
+            this.#offlineGranted.add(grant.client);
             const refresh = '1//fake-' + randomBytes(12).toString('hex');
             this.refreshTokens.set(refresh, { scope: grant.scope, client: grant.client });
             return json(200, { ...access, refresh_token: refresh });

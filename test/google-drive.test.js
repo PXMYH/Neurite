@@ -97,6 +97,37 @@ test("a file's revisions are listed the oldest first, and an earlier one is mark
     assert.deepEqual(fake.revisionsOf[made.id].map((r) => Boolean(r.keepForever)), [true, false]);
 });
 
+test('every list reads all its pages, and revisions come in order of time whatever order Drive lists them in', async () => {
+    const { d, fake } = drive();
+    fake.maxPage = 1;
+    const [one, two] = await Promise.all([d.folderId(), drive({ fake }).d.folderId()]);
+    assert.equal([...(await d.folders())].length, 2, 'a folder on the second page was missed');
+    const made = await d.upload({ folderId: one, name: 'A.neurite', appProperties: { neuriteUuid: 'u', neuriteOp: 'op-a' }, blob: new Blob(['1']) });
+    await d.upload({ folderId: two, name: 'B.neurite', appProperties: { neuriteUuid: 'u' }, blob: new Blob(['2']) });
+    await d.upload({ folderId: one, name: 'A (conflict).neurite', appProperties: { neuriteUuid: 'u', neuriteConflictOf: made.id, neuriteOp: 'op-c' }, blob: new Blob(['3']) });
+    assert.equal([...(await d.list([one, two]))].length, 3);
+    assert.deepEqual([...(await d.findByUuid([one, two], 'u'))].map((f) => f.name).sort(), ['A.neurite', 'B.neurite']);
+    // A push's own file is found by its operation id, a conflict copy too.
+    assert.deepEqual([...(await d.findByOp('op-c'))].map((f) => f.name), ['A (conflict).neurite']);
+    for (const content of ['4', '5', '6']) await d.upload({ fileId: made.id, name: 'A.neurite', blob: new Blob([content]) });
+    fake.revisionOrder = 'newest-first';
+    assert.deepEqual([...(await d.revisions(made.id))].map((r) => r.md5Checksum), ['1', '4', '5', '6'].map(md5));
+});
+
+test("an earlier revision's keep-forever mark comes off again, and Drive's limit on the marks is an error", async () => {
+    const { d, fake } = drive();
+    const made = await d.upload({ folderId: await d.folderId(), name: 'G.neurite', blob: new Blob(['a']) });
+    await d.upload({ fileId: made.id, name: 'G.neurite', blob: new Blob(['b']) });
+    const [first] = await d.revisions(made.id);
+    await d.downloadRevision(made.id, first.id);
+    await d.keepRevision(made.id, first.id, false);
+    assert.equal(fake.revisionsOf[made.id][0].keepForever, false);
+    for (const r of fake.revisionsOf[made.id]) r.keepForever = true;
+    fake.revisionsOf[made.id].push(...Array.from({ length: 199 }, (_, i) => ({ id: 'kept' + i, keepForever: true })));
+    fake.revisionsOf[made.id][0].keepForever = false;
+    await assert.rejects(d.keepRevision(made.id, first.id, true), (err) => err.status === 403);
+});
+
 test('a Graph larger than one request goes up resumable, by the upload id when Location is hidden', async () => {
     for (const hideLocation of [false, true]) {
         const { d, fake, GoogleDrive } = drive();

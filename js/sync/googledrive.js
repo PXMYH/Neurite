@@ -90,6 +90,21 @@ class GoogleDrive {
         return {message: e?.message || ('Google Drive answered ' + res.status), reason: String(e?.errors?.[0]?.reason ?? e?.status ?? '')};
     }
     async #json(method, path, options){ return (await this.#send(method, path, options)).json() }
+    // Every page of a list: Drive answers one page at a time, with where the next one begins.
+    async #all(path, query, key){
+        const items = [];
+        let pageToken = null;
+        do {
+            const page = await this.#json('GET', path, {query: pageToken ? {...query, pageToken} : query});
+            items.push(...(page[key] ?? []));
+            pageToken = page.nextPageToken ?? null;
+        } while (pageToken);
+        return items;
+    }
+    // Files that match a query, with the fields a binding needs.
+    #files(q, extra = {}){
+        return this.#all('/drive/v3/files', {q, fields: `nextPageToken,files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive', pageSize: '1000', ...extra}, 'files');
+    }
 
     async about(){
         return (await this.#json('GET', '/drive/v3/about', {query: {fields: 'user(emailAddress,displayName)'}})).user ?? null;
@@ -101,8 +116,8 @@ class GoogleDrive {
     async folders(){
         const q = [`mimeType = '${GoogleDrive.FOLDER_TYPE}'`, 'trashed = false',
                    `appProperties has { key='neuriteFolder' and value='1' }`].join(' and ');
-        const found = await this.#json('GET', '/drive/v3/files', {query: {q, fields: 'files(id,createdTime)', spaces: 'drive'}});
-        return (found.files ?? []).sort( (a, b)=>String(a.createdTime).localeCompare(String(b.createdTime)) ).map( (f)=>f.id );
+        const found = await this.#all('/drive/v3/files', {q, fields: 'nextPageToken,files(id,createdTime)', spaces: 'drive'}, 'files');
+        return found.sort( (a, b)=>String(a.createdTime).localeCompare(String(b.createdTime)) ).map( (f)=>f.id );
     }
     // The oldest, made the first time at the top of My Drive. Not asked twice: an answer that never
     // came may have made it, and the next look finds it by its mark.
@@ -123,10 +138,7 @@ class GoogleDrive {
         const files = [];
         for (const id of [].concat(folderIds)) {
             const q = [`${GoogleDrive.quote(id)} in parents`, `mimeType != '${GoogleDrive.FOLDER_TYPE}'`, 'trashed = false'].join(' and ');
-            const res = await this.#json('GET', '/drive/v3/files', {
-                query: {q, fields: `files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive', pageSize: '1000', orderBy: 'modifiedTime desc'}
-            });
-            files.push(...(res.files ?? []));
+            files.push(...await this.#files(q, {orderBy: 'modifiedTime desc'}));
         }
         return files.filter(GoogleDrive.isGraphFile)
             .sort( (a, b)=>String(b.modifiedTime).localeCompare(String(a.modifiedTime)) );
@@ -139,29 +151,38 @@ class GoogleDrive {
         for (const id of [].concat(folderIds)) {
             const q = [`${GoogleDrive.quote(id)} in parents`, 'trashed = false',
                        `appProperties has { key='neuriteUuid' and value=${GoogleDrive.quote(uuid)} }`].join(' and ');
-            const res = await this.#json('GET', '/drive/v3/files', {query: {q, fields: `files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive'}});
-            files.push(...(res.files ?? []));
+            files.push(...await this.#files(q));
         }
         return files.filter( (f)=>!(f.appProperties?.neuriteConflictOf) )
             .sort( (a, b)=>String(b.modifiedTime).localeCompare(String(a.modifiedTime)) );
     }
+    // The files a push made, by the operation id it carried, wherever they are now: a create, an
+    // update or a conflict copy whose answer never came back.
+    findByOp(op){
+        return this.#files(['trashed = false', `appProperties has { key='neuriteOp' and value=${GoogleDrive.quote(op)} }`].join(' and '));
+    }
 
-    // A file's content revisions, the oldest first, and one of them: where a write that landed
-    // between another device's check and its own is found again. One page of the most Drive gives:
-    // a file's newest are on the last page, and Drive keeps a hundred of a binary file's at most.
+    // A file's content revisions, the oldest first by time: where a write that landed between
+    // another device's check and its own is found again. Drive does not say in what order it lists
+    // them, so they are put in order here.
     async revisions(fileId){
-        const res = await this.#json('GET', '/drive/v3/files/' + encodeURIComponent(fileId) + '/revisions', {
-            query: {fields: 'revisions(id,md5Checksum,modifiedTime)', pageSize: '1000'}
-        });
-        return res.revisions ?? [];
+        const all = await this.#all('/drive/v3/files/' + encodeURIComponent(fileId) + '/revisions',
+                                    {fields: 'nextPageToken,revisions(id,md5Checksum,modifiedTime)', pageSize: '1000'}, 'revisions');
+        return all.map( (r, i)=>({r, i}) )
+            .sort( (a, b)=>(String(a.r.modifiedTime).localeCompare(String(b.r.modifiedTime)) || a.i - b.i) )
+            .map( ({r})=>r );
     }
     // Drive gives a binary file's earlier revision only once it is marked to be kept forever, which
-    // also keeps Drive from purging it while the copy is made.
-    // ponytail: the mark stays, and Drive allows 200 per file; unmark after the copy if that is reached.
+    // also keeps Drive from purging it while it is read. The mark is taken off again once a copy of
+    // it is safe (`keepRevision(..., false)`): Drive allows 200 a file.
+    keepRevision(fileId, revisionId, keep = true){
+        return this.#json('PATCH', '/drive/v3/files/' + encodeURIComponent(fileId) + '/revisions/' + encodeURIComponent(revisionId),
+                          {query: {fields: 'id,keepForever'}, json: {keepForever: keep}});
+    }
     async downloadRevision(fileId, revisionId){
-        const path = '/drive/v3/files/' + encodeURIComponent(fileId) + '/revisions/' + encodeURIComponent(revisionId);
-        await this.#json('PATCH', path, {query: {fields: 'id,keepForever'}, json: {keepForever: true}});
-        return (await this.#send('GET', path, {query: {alt: 'media'}})).blob();
+        await this.keepRevision(fileId, revisionId, true);
+        return (await this.#send('GET', '/drive/v3/files/' + encodeURIComponent(fileId) + '/revisions/' + encodeURIComponent(revisionId),
+                                 {query: {alt: 'media'}})).blob();
     }
 
     get(fileId, fields = GoogleDrive.FILE_FIELDS){

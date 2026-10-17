@@ -66,6 +66,10 @@ test('Connect signs in by code and PKCE in the browser, back to 127.0.0.1, and k
         assert.equal(consent.searchParams.get('scope'), 'https://www.googleapis.com/auth/drive.file');
         assert.match(consent.searchParams.get('redirect_uri'), /^http:\/\/127\.0\.0\.1:\d+\/$/);
         assert.ok(consent.searchParams.get('state').length >= 32, 'the state is short');
+        // Offline access, with consent asked every time: Google issues a refresh token only for the
+        // first offline grant otherwise, and a second Connect would get none.
+        assert.equal(consent.searchParams.get('access_type'), 'offline');
+        assert.equal(consent.searchParams.get('prompt'), 'consent');
         // The refresh token is written encrypted, and the page is handed access tokens only.
         const [refresh] = [...t.fake.refreshTokens.keys()];
         assert.equal(readFileSync(t.tokenFile, 'utf8'), 'enc:' + refresh);
@@ -75,6 +79,10 @@ test('Connect signs in by code and PKCE in the browser, back to 127.0.0.1, and k
         assert.deepEqual(await t.call('drive:status'), { configured: true, connected: true });
         // The listener is gone with the answer.
         await assert.rejects(fetch(consent.searchParams.get('redirect_uri')));
+        // Disconnected and connected again, it is given a refresh token again.
+        await t.call('drive:disconnect');
+        assert.deepEqual(await t.call('drive:connect'), { connected: true });
+        assert.deepEqual(await t.call('drive:status'), { configured: true, connected: true });
     } finally { await t.done() }
 });
 
