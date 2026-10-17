@@ -151,7 +151,9 @@ list is read. A write sent again after its answer was lost lands twice, so the c
 this device's own copies of the same bytes to the revision before them. The check after a write is
 recorded before it runs: one that fails is not called synced, even after a reload, and runs again
 before the next push, and a copy it made whose answer never came is found by its own operation id
-rather than made twice.
+rather than made twice (and not offered if it went to the bin meanwhile). A push that builds on a
+lost push's write counts what that one built on as a base too, since its own check never ran. The
+note about a copy kept this way stays while the Graph is bound to the same file.
 
 A push whose answer never came may still have written. Each push carries an id (`neuriteOp`), kept
 before it goes with the SHA-256 of the bytes it sends: the next push looks for the file with that

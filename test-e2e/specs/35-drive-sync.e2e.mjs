@@ -855,6 +855,16 @@ test('a copy made beside a damaged Graph whose answer never came is not made twi
     assert.equal(copies.length, 1, 'a second copy was made');
     assert.equal(copies[0].appProperties.neuriteConflictOf, file.id);
     assert.ok(textOf(copies[0]).includes('Whole, with a card missing.'));
+    // The saves after it go to that copy, the card still missing.
+    for (const [from, to] of [['with a card missing.', 'edited again.'], ['edited again.', 'and again.']]) {
+        await edit(page, from, to);
+        await page.waitForTimeout(900);
+        await settled(page);
+    }
+    assert.equal(graphs(fake).length, 2, 'a later save made another copy');
+    assert.ok(textOf(fake.files.get(copies[0].id)).includes('and again.'));
+    await openSettings(page, 'sync');
+    assert.match(await page.locator('#sync-graph-note').textContent(), /could not be reopened here/);
     assert.deepEqual(errors, []);
 });
 
@@ -937,4 +947,81 @@ test('Open asks first when the Graph on screen has changes whose file was remove
     assert.equal(await page.evaluate(() => window.__asked), 1, 'Open did not ask');
     assert.match(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), /changed here only/);
     assert.deepEqual(errors, []);
+});
+
+// The fifth review's cases.
+test('Open asks first about a Graph begun since the last save, whose push failed', async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nIn Drive.\n');
+    await connect(page);
+    await settled(page);
+    const [file] = graphs(fake);
+    await page.evaluate(() => App.viewGraphs.startNewGraph());
+    fake.failures.push({ match: (c) => c.path.startsWith('/upload/'), status: 503, times: 99 });
+    await page.evaluate(() => window.currentActiveZettelkastenMirror.setValue('## Beta\nTyped, and not saved yet.\n'));
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { GoogleDrive.RETRY_MS = [50, 50, 50]; window.__asked = 0; window.confirm = async () => { window.__asked += 1; return false } });
+    assert.equal(await page.evaluate((id) => App.cloudSync.open(id), file.id), null);
+    assert.equal(await page.evaluate(() => window.__asked), 1, 'Open did not ask');
+    assert.match(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), /not saved yet/);
+    assert.deepEqual(errors, []);
+});
+
+test('a push sent again after its answers were lost makes no copy of what it built on', async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nFirst.\n');
+    await connect(page);
+    await settled(page);
+    const [file] = graphs(fake);
+    await page.evaluate(() => { GoogleDrive.RETRY_MS = [50, 50, 50]; CloudSync.RETRY_MS = [60000, 60000, 60000] });
+    loseAnswers(fake, (c) => c.method === 'PATCH' && c.path.startsWith('/upload/'), 4);
+    await edit(page, 'First.', 'Second.');
+    await page.waitForTimeout(600);
+    await settled(page);
+    await page.evaluate(() => App.cloudSync.check());
+    await page.waitForTimeout(600);
+    await settled(page);
+    assert.equal(graphs(fake).length, 1, 'a copy of the version it built on was kept as if another device wrote it');
+    assert.ok(textOf(fake.files.get(file.id)).includes('Second.'));
+    assert.ok(await page.evaluate(() => App.cloudSync.syncedAt(App.viewGraphs.selectedMeta)));
+    assert.deepEqual(errors, []);
+});
+
+test("a copy of another device's write moved to the bin before its answer came is not offered", async () => {
+    const fake = new FakeGoogle();
+    const a = await device(fake);
+    await write(a.page, '## Alpha\nShared.\n');
+    await connect(a.page);
+    await settled(a.page);
+    const b = await device(fake);
+    await connect(b.page, { pushes: false });
+    await b.page.waitForFunction(() => document.querySelectorAll('#sync-files [role=listitem]').length === 1, undefined, { timeout: 10000 });
+    await b.page.click('#sync-files [role=listitem] button');
+    await b.page.waitForFunction(() => /Shared\./.test(window.currentActiveZettelkastenMirror.getValue()), undefined, { timeout: 10000 });
+    const [file] = graphs(fake);
+    await a.page.evaluate(() => { CloudSync.RETRY_MS = [60000, 60000, 60000] });
+
+    // B's write lands under A's; A keeps it as a copy, and that copy's answer is lost.
+    loseAnswers(fake, (c) => c.method === 'POST' && c.path === '/upload/drive/v3/files', 1);
+    const held = fake.hold((c) => c.path.startsWith('/upload/') && c.method === 'PATCH');
+    await edit(a.page, 'Shared.', 'Shared, and from A.');
+    await held.reached;
+    await edit(b.page, 'Shared.', 'Shared, and from B.');
+    await b.page.waitForTimeout(900);
+    await settled(b.page);
+    held.release();
+    await a.page.waitForTimeout(600);
+    await settled(a.page);
+    const copy = graphs(fake).find((f) => f.appProperties.neuriteConflictOf === file.id);
+    assert.ok(copy, 'the copy did not land');
+    copy.trashed = true;
+    await a.page.evaluate(() => App.cloudSync.check());
+    await a.page.waitForTimeout(600);
+    await settled(a.page);
+    assert.equal(await a.page.evaluate(() => App.cloudSync.status.conflict?.otherId ?? null), null, 'a copy in the bin is offered');
+    assert.ok(fake.revisionsOf[file.id].every((r) => !r.keepForever), 'the revision read stayed kept');
+    assert.equal(graphs(fake).length, 1, 'the copy was made again');
+    assert.deepEqual([...a.errors, ...b.errors], []);
 });

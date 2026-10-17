@@ -327,6 +327,7 @@ class CloudSync {
             // over since, by something that left the id alone, the file is another's to keep. One
             // moved to the bin since is someone's choice, as for any file of the Graph's.
             let before = bound;
+            let lostBase = null;
             if (before?.pendingOp) {
                 const [landed] = await this.drive.findByOp(before.pendingOp);
                 if (!live()) return false;
@@ -334,6 +335,9 @@ class CloudSync {
                 if (landed) {
                     const ours = Boolean(before.pendingSha) && landed.sha256Checksum === before.pendingSha;
                     const made = landed.id !== before.fileId;
+                    // What that push built on is a base too for the check after this one: its own check
+                    // never ran.
+                    lostBase = (ours && !made) ? (before.md5 ?? null) : null;
                     before = {...before, fileId: landed.id, name: landed.name,
                               md5: ours ? landed.md5Checksum : (made ? null : before.md5),
                               conflictOf: landed.appProperties?.neuriteConflictOf ?? null,
@@ -380,10 +384,12 @@ class CloudSync {
             if (!live()) return false;
             const next = {uuid: meta.uuid, fileId: file.id, md5: file.md5Checksum, name: file.name, title: meta.title,
                           pushedAt: Date.now(), pushedRevision: revision, pushedSignature: signature,
-                          conflictOf: file.appProperties?.neuriteConflictOf ?? null, conflictDamaged: conflict?.damaged ?? false,
-                          damaged: false, recovered: null, removed: false, pendingOp: null, pendingSha: null,
+                          conflictOf: file.appProperties?.neuriteConflictOf ?? null,
+                          conflictDamaged: conflict ? conflict.damaged : Boolean(before?.conflictDamaged && file.id === before.fileId),
+                          damaged: false, recovered: (file.id === before?.fileId) ? (before.recovered ?? null) : null,
+                          removed: false, pendingOp: null, pendingSha: null,
                           // An update is checked once it lands: another device's write may be under it.
-                          verify: base ? {base, head: file.headRevisionId, md5: file.md5Checksum, copyOp: CloudSync.#newOp()} : null};
+                          verify: base ? {base, lostBase, head: file.headRevisionId, md5: file.md5Checksum, copyOp: CloudSync.#newOp()} : null};
             await this.#bind(graphId, next);
             if (next.verify) await this.#verify(meta, next, generation, {again: false});
             if (!live()) return false;
@@ -444,32 +450,35 @@ class CloudSync {
     async #verify(meta, bound, generation, {again}){
         const live = ()=>generation === this.#generation;
         const {fileId, verify} = bound;
+        // Made already, by a check whose answer never came back -- or since moved to the bin.
         let copy = again ? ((await this.drive.findByOp(verify.copyOp))[0] ?? null) : null;
         if (!live()) return;
-        if (!copy) {
-            const revisions = await this.drive.revisions(fileId);
-            if (!live()) return;
-            const at = revisions.findIndex( (r)=>r.id === verify.head );
-            // Back past this device's own writes of the same bytes -- a write retried after its answer
-            // was lost lands twice -- to the one before them.
-            let k = at - 1;
-            while (k >= 0 && revisions[k].md5Checksum === verify.md5) k -= 1;
-            const between = (at > 0 && k >= 0) ? revisions[k] : null;
-            if (between?.md5Checksum && between.md5Checksum !== verify.base && between.md5Checksum !== verify.md5) {
+        const revisions = await this.drive.revisions(fileId);
+        if (!live()) return;
+        const at = revisions.findIndex( (r)=>r.id === verify.head );
+        // Back past this device's own writes of the same bytes -- a write retried after its answer was
+        // lost lands twice -- to the one before them, which is a base or another device's.
+        let k = at - 1;
+        while (k >= 0 && revisions[k].md5Checksum === verify.md5) k -= 1;
+        const between = (at > 0 && k >= 0) ? revisions[k] : null;
+        const bases = [verify.base, verify.lostBase, verify.md5].filter(Boolean);
+        if (between?.md5Checksum && !bases.includes(between.md5Checksum)) {
+            if (!copy) {
                 const theirs = await this.drive.downloadRevision(fileId, between.id);
                 if (!live()) return;
                 copy = await this.#conflictUpload(meta, (await this.#folderIds())[0], theirs,
                     {neuriteUuid: meta.uuid, neuriteConflictOf: fileId, neuriteOp: verify.copyOp}, 'another device');
                 if (!live()) return;
-                // Safe in its copy now: the mark that let it be read comes off (Drive allows 200).
-                await this.drive.keepRevision(fileId, between.id, false)
-                    .catch( (err)=>Logger.warn("Could not unmark a revision kept to be read:", err) );
-                if (!live()) return;
             }
+            // Safe in its copy now: the mark that let it be read comes off (Drive allows 200).
+            await this.drive.keepRevision(fileId, between.id, false)
+                .catch( (err)=>Logger.warn("Could not unmark a revision kept to be read:", err) );
+            if (!live()) return;
         }
         const now = this.#bound.get(meta.graphId);
         if (now?.verify !== verify) return;
-        await this.#bind(meta.graphId, {...now, verify: null, recovered: copy ? {id: copy.id, name: copy.name} : (now.recovered ?? null)});
+        const kept = (copy && !copy.trashed) ? {id: copy.id, name: copy.name} : null;
+        await this.#bind(meta.graphId, {...now, verify: null, recovered: kept ?? now.recovered ?? null});
     }
     // This device's version, beside the other's: the other file is left as it is.
     #conflictUpload(meta, folder, blob, appProperties, device){
@@ -587,9 +596,10 @@ class CloudSync {
         // Disconnected meanwhile, an open stops before it changes the screen.
         const generation = this.#generation;
         const live = ()=>generation === this.#generation && this.isConnected;
-        const outgoing = this.views.selectedMeta;
         await this.views.saveNow();
         await this.flush();
+        // Read after the save: a Graph begun since the last tick has its record only now.
+        const outgoing = this.views.selectedMeta;
         if (outgoing && this.#written.get(outgoing.graphId) && !this.syncedAt(outgoing)
             && String(await this.views.keeper.dataForMeta(outgoing) ?? '').includes('data-node_json')) {
             const go = await window.confirm(`The latest changes to “${outgoing.title}” are not in Google Drive. `
