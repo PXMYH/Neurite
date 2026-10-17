@@ -103,7 +103,10 @@ const SettingsModal = {
         // and the notes editor, which lays its text out to the width it last had.
         refreshSliders(Elem.byId(tab));
         if (page === 'notes') window.currentActiveZettelkastenMirror?.refresh();
+        SettingsModal.onShow(page);
     },
+    // Told the page that is shown: Sync reads Drive's list then (syncpage.js).
+    onShow: Function.nop,
 
     // The arrows move through the sidebar and choose as they go, as Notion's sidebar does: up
     // and down, and left and right where the sidebar is a strip across the top.

@@ -45,7 +45,7 @@ Every capability, by category.
       <td>Retrieve AI memories and conversation histories <code>non-linearly</code>, enabling contextual responses that utilize <code>graph search</code>.</td>
     </tr>
     <tr>
-      <td rowspan="3"><strong>Synchronized Knowledge</strong></td>
+      <td rowspan="4"><strong>Synchronized Knowledge</strong></td>
       <td>Bi-Directional Sync</td>
       <td>Sync updates between the <code>fractal mind-mapping</code> workspace and <code>Zettelkasten Archives</code>, ensuring consistency between visual graph representations and text-based notes.</td>
     </tr>
@@ -56,6 +56,10 @@ Every capability, by category.
     <tr>
       <td>Custom Note Creation</td>
       <td>Text nodes support <code>code highlighting and execution</code>. Define and test <code>custom nodes</code> without ever leaving Neurite.</td>
+    </tr>
+    <tr>
+      <td>Cloud Sync</td>
+      <td>Connect <code>Google Drive</code> in Settings → Sync, and every graph you work on is kept as a <code>.neurite</code> file in a Neurite folder in your Drive; another device opens it from the same page. A graph changed on two devices is kept twice, never written over. How it follows Notion's design is in <a href="cloud-sync.md">cloud-sync.md</a>.</td>
     </tr>
     <tr>
       <td rowspan="2"><strong>Mind-Mapping</strong></td>

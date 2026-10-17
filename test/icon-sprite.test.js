@@ -56,6 +56,7 @@ const EXPECTED = {
     'keyboard-icon': 'keyboard',
     'database-icon': 'database',
     'close-icon': 'x',
+    'cloud-icon': 'cloud',
     'pin-icon': 'pin',
     'aiNodeSettingsIcon': 'sliders-horizontal',
     'funcErrorIcon': 'circle-alert',

@@ -257,6 +257,9 @@ class GraphsKeeper {
     #lastWritten = new Map();
 
     forgetLastWritten(){ this.#lastWritten.clear() }
+    // Told after every write that completed, with what was written: cloud sync's cue
+    // (js/sync/cloudsync.js), which reads its content from the markup itself.
+    afterWrite = null;
 
     saveMetaAndData(meta, data){
         if (this.#lastWritten.get(meta.graphId) === data) return Promise.resolve();
@@ -270,9 +273,15 @@ class GraphsKeeper {
         return this.#data.save(meta.graphId, data)
             .then(this.saveMeta.bind(this, meta))
             .then(this.#markWritten.bind(this, meta.graphId, data))
-            .then(this.#mirrorToDisk.bind(this, meta));
+            .then(this.#mirrorToDisk.bind(this, meta))
+            .then(this.#tellWritten.bind(this, meta, data));
     }
     #markWritten(graphId, data){ this.#lastWritten.set(graphId, data) }
+    #tellWritten(meta, data, mirrored){
+        try { this.afterWrite?.(meta, data) }
+        catch (err) { Logger.warn("After a write:", err) }
+        return mirrored;
+    }
     saveMeta(meta){ return this.#meta.save(meta.graphId, meta) }
 
     #mirrorToDisk(meta){
@@ -321,6 +330,8 @@ class GraphExporter {
         blobMeta: {},
         offsets: {}
     };
+    // The markup the bundle was made of, read once with the rest: what cloud sync signs.
+    get data(){ return this.#out.data }
     constructor(meta, stored){
         this.meta = meta;
         this.stored = stored;
@@ -556,7 +567,27 @@ View.Graphs = class {
     // rather than declining, because the restore can finish after notes are already on
     // screen: a burst of them at startup pushed it 700ms past `appReady`, and a quit in
     // that window would otherwise have saved nothing at all.
-    saveNow(){ return this.#whenRestored.then( (restored)=>restored && this.#autosave() ) }
+    saveNow(){
+        return this.#whenRestored.then( (restored)=>restored && this.#autosave() )
+            .then( (saved)=>Promise.resolve(this.onSavedNow?.()).then( ()=>saved, ()=>saved ) );
+    }
+    // Run once a `saveNow` has saved: cloud sync sends what is pending, for as long as it is given.
+    onSavedNow = null;
+
+    // For cloud sync (js/sync/cloudsync.js), which lives outside this module: the record on screen,
+    // the store, whether this tab is the one that writes, whether the restore failed, and a Graph's
+    // file, as Save to… writes it.
+    get selectedMeta(){ return this.#selectedGraph }
+    get keeper(){ return this.#stored }
+    get isWriter(){ return this.#isWriter }
+    get restoreFailed(){ return this.#restoreFailed }
+    async exportBundle(meta = this.#selectedGraph){
+        const exporter = new GraphExporter(meta, this.#stored);
+        const blob = await exporter.export();
+        return {blob, data: exporter.data};
+    }
+    refreshSaveNote(){ this.#updateSaveNote() }
+    static deviceKind = deviceKind;
     #import(file){
         const importer = new GraphImporter();
         const afterImport = this.#afterImport.bind(this, importer, file);
@@ -584,7 +615,11 @@ View.Graphs = class {
             return reader.readAsText(file);
         }
 
-        this.#loadAndSave(importer, title).then(this.#updateGraphs);
+        // Settled once the opened Graph is saved, with its record, which cloud sync binds to the
+        // Drive file it came from. A save that fails is logged, and the Graph stays on screen.
+        return this.#loadAndSave(importer, title)
+            .then( (meta)=>this.#updateGraphs().then( ()=>meta ) )
+            .catch( (err)=>{ Logger.err("Could not keep the opened graph:", err) } );
     }
     // A file names itself after the graph it came from, so opening one twice -- or opening
     // a file exported from this browser at all -- lands a second save under a title the
@@ -664,7 +699,8 @@ View.Graphs = class {
         return this.#stored.saveMetaAndData(meta, importer.finalData)
             .then( ()=>this.#stored.markSavedToFile(meta, 'opened', importer.meta?.updatedAt ?? Date.now()) )
             .then(this.#resumeAfterRecovery)
-            .then(this.#updateSaveNote);
+            .then(this.#updateSaveNote)
+            .then( ()=>meta );
     }
     // The same guard on the older path: a `.txt` or a bundle this importer could not read
     // still arrives with a name, and `addSave` does not check titles either.
@@ -1116,6 +1152,8 @@ View.Graphs = class {
     }
 
     #clearGraph(){
+        // Of the Graph that is going; the next restore counts its own.
+        this.restoreSkipped = 0;
         Graph.clear();
         ZetProposals.restoreDismissed([]);
 
@@ -1331,6 +1369,9 @@ View.Graphs = class {
         if (stopped?.reason === 'failed') {
             return ["The file could not be written. Save to… picks a file again.", true];
         }
+        // A Graph in Google Drive as it is now is kept outside this browser (cloud sync).
+        const synced = App.cloudSync?.syncedAt?.(this.#selectedGraph);
+        if (synced) return ["Synced to Google Drive " + View.Graphs.ago(synced) + ".", false];
 
         // The browser's own copy is the only one of what is not in a file, so that is when its
         // being cleared is worth a word. A download is only a download: the page cannot see it
@@ -1518,7 +1559,8 @@ View.Graphs = class {
     }
     // Shared with the prompt, because a name a reader types is exactly as capable of
     // holding a slash as a title they typed into the old list was.
-    #fileNameForName(name){
+    #fileNameForName(name){ return View.Graphs.fileNameFor(name) }
+    static fileNameFor(name){
         const clean = String(name || '')
             .replace(/\.neurite$/i, '')
             .replace(/[^\p{L}\p{N} .\-_]+/gu, '_')

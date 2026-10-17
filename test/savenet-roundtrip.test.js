@@ -219,14 +219,17 @@ test('the helpers this file calls by bare name exist', ()=>{
 });
 
 test('the download name keeps titles in any script and drops path characters', ()=>{
-    // `#fileNameForName` is private and its class reads the DOM as it is built, so the
-    // whole method body is lifted out of the source and run. It is worth pinning twice
+    // `View.Graphs.fileNameFor` (what `#fileNameForName` and cloud sync both use) sits in a
+    // class that reads the DOM as it is built, so the whole method body is lifted out of the
+    // source and run. It is worth pinning twice
     // over now: the ASCII-only `\w` that suggests itself here turns a Chinese title into
     // underscores, and with no list of graphs in the interface the file name is the only
     // thing that tells two graphs apart. It also sanitises what a reader types into the
     // save prompt, which can hold a slash exactly as a title could.
-    const body = src.match(/#fileNameForName\(name\)\{([\s\S]*?)\n {4}\}/)?.[1];
-    assert.ok(body, '#fileNameForName was not found in ' + PATH);
+    const body = src.match(/static fileNameFor\(name\)\{([\s\S]*?)\n {4}\}/)?.[1];
+    assert.ok(body, 'View.Graphs.fileNameFor was not found in ' + PATH);
+    assert.match(src, /#fileNameForName\(name\)\{ return View\.Graphs\.fileNameFor\(name\) \}/,
+        "the download's name no longer comes from the rule pinned here");
     const nameFor = new Function('name', body);
 
     assert.equal(nameFor('Graph 1'), 'Graph 1.neurite');

@@ -84,10 +84,11 @@ test('Settings opens on Notes, its pages are in a known order, and Help is the o
             tabId + ' has a tablink and nothing loads into it');
     }
 
-    // Notes first: it is the graph itself, and the pages under it are tools for it. Updates
-    // last, and only in the Mac app (`appupdate.js`).
+    // Notes first: it is the graph itself, and the pages under it are tools for it. Sync after
+    // Data, where a Graph is kept (docs/cloud-sync.md). Updates last, and only in the Mac app
+    // (`appupdate.js`).
     const pages = [...dropdownHtml.matchAll(/class="settings-nav-item" data-page="([\w-]+)"/g)].map( (m)=>m[1] );
-    assert.deepEqual(pages, ['notes', 'ai', 'theme', 'saved-views', 'fractal', 'editing', 'data', 'updates'],
+    assert.deepEqual(pages, ['notes', 'ai', 'theme', 'saved-views', 'fractal', 'editing', 'data', 'sync', 'updates'],
         "the Settings modal's sidebar changed; check that every page still has something to show");
 
     // Notes and Ai are their panels' markup whole; every other page shows the sections of
