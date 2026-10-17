@@ -248,7 +248,9 @@ export class FakeGoogle {
     async route(context) {
         const handler = async (route) => {
             const r = route.request();
-            const res = await this.handle({ method: r.method(), url: r.url(), headers: await r.allHeaders(), body: r.postDataBuffer() ?? Buffer.alloc(0) });
+            let res;
+            try { res = await this.handle({ method: r.method(), url: r.url(), headers: await r.allHeaders(), body: r.postDataBuffer() ?? Buffer.alloc(0) }) }
+            catch { return route.abort('connectionreset') }
             await route.fulfill({ status: res.status, headers: res.headers, body: typeof res.body === 'string' ? res.body : Buffer.from(res.body ?? '') });
         };
         await context.route('https://www.googleapis.com/**', handler);

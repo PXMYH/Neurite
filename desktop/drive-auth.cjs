@@ -98,9 +98,10 @@ function page(error) {
 // as a browser would make it: the consent page, then wherever that sends it.
 async function openInBrowser(url) {
     if (env.NEURITE_AUTH_BROWSER !== 'fetch') return shell.openExternal(url);
-    const consent = await net.fetch(url, { redirect: 'manual' });
+    // Node's own fetch, which reads a redirect's Location; Electron's cancels a manual redirect.
+    const consent = await globalThis.fetch(url, { redirect: 'manual' });
     const back = consent.headers.get('location');
-    if (back) await net.fetch(back);
+    if (back) await globalThis.fetch(back);
 }
 
 async function signIn() {

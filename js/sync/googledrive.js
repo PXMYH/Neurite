@@ -160,13 +160,15 @@ class GoogleDrive {
                                                          : this.#resumable(fileId, meta, blob);
     }
     #uploadPath(fileId){ return '/upload/drive/v3/files' + (fileId ? '/' + encodeURIComponent(fileId) : '') }
-    #multipart(fileId, meta, blob){
+    // As bytes rather than a Blob: at most 5 MiB, and a body every test harness can read --
+    // Playwright's WebKit cannot see a Blob body, and the upload looked blocked there.
+    async #multipart(fileId, meta, blob){
         const boundary = 'neurite' + Math.floor(this.random() * 1e16).toString(36);
-        const body = new Blob([
+        const body = await new Blob([
             `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`, JSON.stringify(meta),
             `\r\n--${boundary}\r\nContent-Type: ${GoogleDrive.FILE_TYPE}\r\n\r\n`, blob,
             `\r\n--${boundary}--`
-        ]);
+        ]).arrayBuffer();
         return this.#json(fileId ? 'PATCH' : 'POST', this.#uploadPath(fileId), {
             query: {uploadType: 'multipart', fields: GoogleDrive.FILE_FIELDS},
             headers: {'Content-Type': `multipart/related; boundary=${boundary}`},

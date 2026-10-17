@@ -13,6 +13,11 @@
 // goes up beside it as a conflict copy, and the Graph is bound to that copy from then on. Nothing
 // is merged. A newer copy is offered, never loaded on its own: opening a Graph replaces the screen.
 // A file removed from Drive is not made again: the Graph stops syncing until it is asked to.
+//
+// Each file carries the content signature of what it holds (`neuriteSignature`), so a change made
+// elsewhere to how the Graph is viewed -- a pan, a resize -- is told from one to its content: it is
+// no conflict and no newer copy, and is simply written over by the next push. Without it, one
+// device's pan made the next edit on the other a conflict.
 class CloudSync {
     static QUIET_MS = 10000;
     static MAX_WAIT_MS = 60000;
@@ -194,13 +199,21 @@ class CloudSync {
             const renamed = !bound?.name || bound.title !== meta.title;
             const name = renamed ? (View.Graphs.fileNameFor(meta.title) || 'Graph.neurite') : bound.name;
             const props = {neuriteUuid: meta.uuid, neuriteRevisions: String(meta.revisions ?? 0),
-                           neuriteDevice: View.Graphs.deviceKind(), neuriteUpdatedAt: String(meta.updatedAt ?? Date.now())};
+                           neuriteDevice: View.Graphs.deviceKind(), neuriteUpdatedAt: String(meta.updatedAt ?? Date.now()),
+                           neuriteSignature: String(signature ?? '')};
 
             let file = null;
             if (bound?.fileId) {
                 const remote = await this.drive.get(bound.fileId).catch( (err)=>(err.reason === 'notFound' ? null : Promise.reject(err)) );
                 if (!remote || remote.trashed) return this.#removed(meta, bound);
-                file = (remote.md5Checksum === bound.md5)
+                const sameContent = (remote.md5Checksum === bound.md5) || CloudSync.#viewedOnly(remote, bound);
+                if (!sameContent && signature && signature === bound.pushedSignature) {
+                    // Its content changed elsewhere, and here only how it is viewed: no conflict, and
+                    // nothing to keep -- the other copy is newer, and offered.
+                    this.#set({phase: 'idle', newer: CloudSync.#newerOf(remote)});
+                    return false;
+                }
+                file = sameContent
                     ? await this.drive.upload({fileId: remote.id, name, appProperties: props, blob})
                     : await this.#conflictCopy(meta, folder, remote, blob, props);
             } else {
@@ -285,9 +298,12 @@ class CloudSync {
         try {
             const remote = await this.drive.get(bound.fileId).catch( (err)=>(err.reason === 'notFound' ? null : Promise.reject(err)) );
             if (!remote || remote.trashed) return this.#removed(meta, bound);
-            const newer = (remote.md5Checksum !== bound.md5)
-                ? {fileId: remote.id, name: remote.name, device: remote.appProperties?.neuriteDevice ?? null, modifiedTime: remote.modifiedTime}
-                : null;
+            // Viewed differently elsewhere, with the same content: the file's checksum is this
+            // device's to build on from now.
+            if (remote.md5Checksum !== bound.md5 && CloudSync.#viewedOnly(remote, bound)) {
+                await this.#bind(meta.graphId, {...bound, md5: remote.md5Checksum});
+            }
+            const newer = (remote.md5Checksum !== this.#bound.get(meta.graphId).md5) ? CloudSync.#newerOf(remote) : null;
             // A conflict copy says so for as long as the Graph is bound to it.
             const conflict = bound.conflictOf
                 ? (this.status.conflict?.otherId === bound.conflictOf ? this.status.conflict : {name: bound.name, otherId: bound.conflictOf})
@@ -309,6 +325,14 @@ class CloudSync {
             .finally( ()=>{ this.#folderReady = null } );
         return this.#folderReady;
     }
+    // Whether a file changed elsewhere holds the content this device last wrote or read.
+    static #viewedOnly(remote, bound){
+        const theirs = remote.appProperties?.neuriteSignature;
+        return Boolean(theirs) && theirs === bound.pushedSignature;
+    }
+    static #newerOf(remote){
+        return {fileId: remote.id, name: remote.name, device: remote.appProperties?.neuriteDevice ?? null, modifiedTime: remote.modifiedTime};
+    }
     // The Graphs in Neurite's folder, the latest first, for Settings → Sync.
     async listFiles(){
         return this.drive.list(await this.#folderId());
@@ -317,7 +341,6 @@ class CloudSync {
     // goes first -- saved, and pushed if it has changes -- so none of it is left behind in a record
     // nothing reaches; and the save the opening makes pushes nothing, being what Drive holds.
     async open(fileId){
-        this.views.keeper.forgetLastWritten();
         await this.views.saveNow();
         await this.flush();
 
