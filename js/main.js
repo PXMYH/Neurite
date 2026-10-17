@@ -155,6 +155,7 @@ class App {
     viewCode = new View.Code();
     viewGraphs = new View.Graphs();
     zetPanes = new ZetPanes(Elem.byId('zetPaneContainer'));
+    cloudSync = new CloudSync();
 
     init(){
         Host.checkServer();
@@ -168,6 +169,9 @@ class App {
         this.tabEdit.init(settings);
         this.viewCode.init();
         this.viewGraphs.init();
+        // After the Graphs, whose store it listens to; it waits for the restore on its own.
+        SyncPage.init(this.cloudSync);
+        this.cloudSync.init().catch( (err)=>Logger.warn("Cloud sync did not start:", err) );
         this.zetPanes.init();
         ZetPath.init();
         Hud.init();
@@ -228,6 +232,12 @@ class PageLoad {
         'js/interface/dropdown/settingsmodal.js',
         // After dropdown.js, whose `menuButton` it marks when an update is ready.
         'js/interface/dropdown/appupdate.js',
+        // Cloud sync to Google Drive (docs/cloud-sync.md); `App.cloudSync` is made once all are in.
+        'js/sync/driveconfig.js',
+        'js/sync/googledrive.js',
+        'js/sync/driveauth.js',
+        'js/sync/cloudsync.js',
+        'js/sync/syncpage.js',
         'js/interface/dropdown/neuritepanel.js',
         'js/interface/dropdown/signin.js',
         'js/mandelbrot/mandelbrot.js',

@@ -37,13 +37,16 @@ function drive({ fake = new FakeGoogle(), token } = {}){
 }
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 
-test('the Neurite folder is made once at the top of My Drive, found by name, and kept by id', async () => {
+test("the Neurite folder is made once at the top of My Drive, found by its mark whatever it is called, and kept by id", async () => {
     const { d, fake } = drive();
     const id = await d.folderId();
     assert.equal(await d.folderId(), id, 'a second look made a second folder');
     assert.equal(await d.folderId(id), id);
     const folders = [...fake.files.values()].filter((f) => f.mimeType === 'application/vnd.google-apps.folder');
-    assert.deepEqual(folders.map((f) => [f.name, f.parents]), [['Neurite', ['root']]]);
+    assert.deepEqual(folders.map((f) => [f.name, f.parents, f.appProperties.neuriteFolder]), [['Neurite', ['root'], '1']]);
+    // Renamed in Drive, it is still Neurite's.
+    fake.files.get(id).name = 'My graphs';
+    assert.equal(await d.folderId(), id);
     // A remembered folder that went to the bin is not used; a new one is found or made.
     fake.files.get(id).trashed = true;
     const again = await d.folderId(id);
@@ -88,8 +91,8 @@ test("a Graph's file is found by its lineage id, never a conflict copy of it; th
     const own = await d.upload({ folderId: folder, name: 'Mind.neurite', appProperties: { neuriteUuid: "it's" }, blob: new Blob(['a']) });
     await d.upload({ folderId: folder, name: 'Mind (conflict).neurite', appProperties: { neuriteUuid: "it's", neuriteConflictOf: own.id }, blob: new Blob(['b']) });
     await d.upload({ folderId: folder, name: 'notes.txt', blob: new Blob(['c']) });
-    assert.equal((await d.findByUuid(folder, "it's"))?.id, own.id);
-    assert.equal(await d.findByUuid(folder, 'nobody'), null);
+    assert.deepEqual((await d.findByUuid(folder, "it's")).map((f) => f.id), [own.id]);
+    assert.deepEqual(await d.findByUuid(folder, 'nobody'), []);
     assert.deepEqual((await d.list(folder)).map((f) => f.name).sort(), ['Mind (conflict).neurite', 'Mind.neurite']);
 });
 
@@ -116,6 +119,41 @@ test("retries follow Notion's schedule for 5xx, 429 and a dropped connection, an
     pauses.length = 0;
     await d.list(folder);
     assert.deepEqual(pauses, [750]);
+
+    // A Retry-After is waited out, up to a minute; a 403 for a rate limit is a 429.
+    d.fetch = flaky;
+    pauses.length = 0;
+    const real = fake.handle.bind(fake);
+    let once = 2;
+    fake.handle = async (req) => (once-- > 0
+        ? { status: once ? 429 : 403, headers: { 'retry-after': once ? '3' : '600', 'content-type': 'application/json' },
+            body: JSON.stringify({ error: { code: 403, message: 'slow down', errors: [{ reason: 'userRateLimitExceeded' }] } }) }
+        : real(req));
+    await d.list(folder);
+    assert.deepEqual(pauses, [3000, 60000], 'the Retry-After of 3 s, then 600 s held to a minute');
+    fake.handle = real;
+});
+
+test('a request that makes a file is not repeated after an answer that never came, or a server error', async () => {
+    const { d, fake, pauses } = drive();
+    const folder = await d.folderId();
+    const flaky = fake.asFetch();
+    let drops = 1;
+    // The answer is lost after the file was made: the client must not make a second.
+    d.fetch = async (...a) => { const res = await flaky(...a); if (drops-- > 0) throw new TypeError('Failed to fetch'); return res };
+    await assert.rejects(d.upload({ folderId: folder, name: 'Once.neurite', appProperties: { neuriteOp: 'op1' }, blob: new Blob(['x']) }),
+        (err) => err.reason === 'unknown');
+    assert.equal(fake.filesIn(folder).filter((f) => f.name === 'Once.neurite').length, 1);
+    assert.deepEqual(pauses, []);
+    d.fetch = flaky;
+    fake.failures.push({ match: (c) => c.path.startsWith('/upload/') && c.method === 'POST', status: 503, times: 1 });
+    await assert.rejects(d.upload({ folderId: folder, name: 'Twice.neurite', blob: new Blob(['y']) }), (err) => err.reason === 'unknown');
+    assert.deepEqual(pauses, []);
+    // New content for a file it has is repeated: the same bytes twice are one change.
+    const made = fake.fileByName('Once.neurite');
+    fake.failures.push({ match: (c) => c.path.startsWith('/upload/') && c.method === 'PATCH', status: 503, times: 1 });
+    await d.upload({ fileId: made.id, name: 'Once.neurite', blob: new Blob(['z']) });
+    assert.equal(fake.files.get(made.id).content.toString(), 'z');
 });
 
 test('a 401 is retried once with a fresh token; a second is the answer, and no token at all is one', async () => {

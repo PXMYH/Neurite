@@ -1345,12 +1345,18 @@
    tools' are (above). The notes glyph keeps its own blue wherever nothing sets one: it is the
    file tree's text file too. */
 #gear-icon, #eyeball-symbol, #fractal-icon, #refresh-icon,
-#palette-icon, #keyboard-icon, #database-icon, #close-icon {
+#palette-icon, #keyboard-icon, #database-icon, #cloud-icon, #close-icon {
     stroke: var(--icon-stroke, currentColor);
 }
 
 #file-text-icon {
     stroke: var(--icon-stroke, skyblue);
+}
+
+/* Sync's rows and buttons that have nothing to say are hidden (syncpage.js); a button's own
+   `display` would otherwise draw an empty one. */
+#syncSettings [hidden] {
+    display: none;
 }
 
 /* The chosen page: its name over a rule, then its contents, which scroll under the name. */

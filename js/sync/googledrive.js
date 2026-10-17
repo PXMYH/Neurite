@@ -4,8 +4,10 @@
 // GitHub Pages and from localhost (measured).
 //
 // The retries are Notion's, read from its Drive connector's settings (`googleApiRetryConfig`,
-// `googleApiTimeoutMS`): after 500, 1000 and 2000 ms, each up to 500 ms later, and a minute at most
-// for one call. A 401 is retried once, with a fresh token.
+// `googleApiTimeoutMS`): after 500, 1000 and 2000 ms, each up to 500 ms later -- or after what a
+// `Retry-After` asks, up to a minute -- and a minute at most for one call. A 401 is retried once,
+// with a fresh token. A request that makes a file is not repeated after an answer that never came
+// or a server error, which may have made it: the caller finds it by its operation id instead.
 class DriveError extends Error {
     constructor(message, status = 0, reason = 'http'){
         super(message);
@@ -38,7 +40,7 @@ class GoogleDrive {
     // A quoted value in Drive's query language.
     static quote(value){ return "'" + String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'" }
 
-    async #send(method, path, {query, json, body, headers = {}, url} = {}){
+    async #send(method, path, {query, json, body, headers = {}, url, makes = false} = {}){
         const target = new URL(url ?? (GoogleDrive.API + path));
         for (const [k, v] of Object.entries(query ?? {})) target.searchParams.set(k, v);
         if (json !== undefined) {
@@ -58,26 +60,33 @@ class GoogleDrive {
                     signal: AbortSignal.timeout?.(GoogleDrive.TIMEOUT_MS)
                 });
             } catch (err) {
-                if (attempt < GoogleDrive.RETRY_MS.length) { await this.#pause(attempt); continue }
-                throw new DriveError("Google Drive could not be reached.", 0, 'network');
+                if (!makes && attempt < GoogleDrive.RETRY_MS.length) { await this.#pause(attempt); continue }
+                throw new DriveError("Google Drive could not be reached.", 0, makes ? 'unknown' : 'network');
             }
             if (res.ok) return res;
             if (res.status === 401 && !fresh) { fresh = true; continue }
-            if ((res.status === 429 || res.status >= 500) && attempt < GoogleDrive.RETRY_MS.length) {
-                await this.#pause(attempt);
+            const error = await GoogleDrive.#errorOf(res);
+            const limited = (res.status === 429 || (res.status === 403 && /rateLimitExceeded/i.test(error.reason)));
+            if ((limited || (!makes && res.status >= 500)) && attempt < GoogleDrive.RETRY_MS.length) {
+                await this.#pause(attempt, res.headers.get('Retry-After'));
                 continue;
             }
-            const reason = (res.status === 401 ? 'unauthorized' : res.status === 404 ? 'notFound' : 'http');
-            throw new DriveError(await GoogleDrive.#messageOf(res), res.status, reason);
+            const reason = (res.status === 401 ? 'unauthorized' : res.status === 404 ? 'notFound'
+                          : (makes && res.status >= 500) ? 'unknown' : 'http');
+            throw new DriveError(error.message, res.status, reason);
         }
     }
-    #pause(attempt){
-        return this.sleep(GoogleDrive.RETRY_MS[attempt] + Math.floor(this.random() * GoogleDrive.JITTER_MS));
+    #pause(attempt, retryAfter = null){
+        const asked = Number(retryAfter) * 1000;
+        const ms = (asked > 0) ? Math.min(asked, 60000)
+                 : GoogleDrive.RETRY_MS[attempt] + Math.floor(this.random() * GoogleDrive.JITTER_MS);
+        return this.sleep(ms);
     }
-    static async #messageOf(res){
+    static async #errorOf(res){
         const text = await res.text().catch( ()=>'' );
-        try { return JSON.parse(text)?.error?.message || ('Google Drive answered ' + res.status) }
-        catch { return 'Google Drive answered ' + res.status }
+        let e = null;
+        try { e = JSON.parse(text)?.error } catch {}
+        return {message: e?.message || ('Google Drive answered ' + res.status), reason: String(e?.errors?.[0]?.reason ?? e?.status ?? '')};
     }
     async #json(method, path, options){ return (await this.#send(method, path, options)).json() }
 
@@ -85,8 +94,9 @@ class GoogleDrive {
         return (await this.#json('GET', '/drive/v3/about', {query: {fields: 'user(emailAddress,displayName)'}})).user ?? null;
     }
 
-    // Neurite's folder at the top of My Drive, made the first time. By name, since the folder is
-    // the one place a person looks for the files; then by id, which is remembered.
+    // Neurite's folder at the top of My Drive, made the first time: the remembered one while it is
+    // there, else the oldest marked as Neurite's, whatever it is called now. Two devices that make
+    // it together make two, and both then use the oldest.
     async folderId(known = null){
         if (known) {
             const f = await this.get(known, 'id,trashed,mimeType').catch( (err)=>{
@@ -95,15 +105,16 @@ class GoogleDrive {
             });
             if (f && !f.trashed && f.mimeType === GoogleDrive.FOLDER_TYPE) return f.id;
         }
-        const q = [`name = ${GoogleDrive.quote(GoogleDrive.FOLDER_NAME)}`, `mimeType = '${GoogleDrive.FOLDER_TYPE}'`,
-                   `'root' in parents`, 'trashed = false'].join(' and ');
+        const q = [`mimeType = '${GoogleDrive.FOLDER_TYPE}'`, 'trashed = false',
+                   `appProperties has { key='neuriteFolder' and value='1' }`].join(' and ');
         const found = await this.#json('GET', '/drive/v3/files', {query: {q, fields: 'files(id,createdTime)', spaces: 'drive'}});
         const first = (found.files ?? []).sort( (a, b)=>String(a.createdTime).localeCompare(String(b.createdTime)) )[0];
         if (first) return first.id;
 
         const made = await this.#json('POST', '/drive/v3/files', {
             query: {fields: 'id'},
-            json: {name: GoogleDrive.FOLDER_NAME, mimeType: GoogleDrive.FOLDER_TYPE, parents: ['root']}
+            json: {name: GoogleDrive.FOLDER_NAME, mimeType: GoogleDrive.FOLDER_TYPE, parents: ['root'],
+                   appProperties: {neuriteFolder: '1'}}
         });
         return made.id;
     }
@@ -120,13 +131,13 @@ class GoogleDrive {
     }
     static isGraphFile(f){ return Boolean(f?.id) && /\.neurite$/i.test(f.name ?? '') }
 
-    // A Graph's file, by the lineage id its save carries; the latest if there are several.
+    // A Graph's files, by the lineage id its saves carry, the latest first; never a conflict copy.
     async findByUuid(folderId, uuid){
         const q = [`${GoogleDrive.quote(folderId)} in parents`, 'trashed = false',
                    `appProperties has { key='neuriteUuid' and value=${GoogleDrive.quote(uuid)} }`].join(' and ');
         const res = await this.#json('GET', '/drive/v3/files', {query: {q, fields: `files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive'}});
         return (res.files ?? []).filter( (f)=>!(f.appProperties?.neuriteConflictOf) )
-            .sort( (a, b)=>String(b.modifiedTime).localeCompare(String(a.modifiedTime)) )[0] ?? null;
+            .sort( (a, b)=>String(b.modifiedTime).localeCompare(String(a.modifiedTime)) );
     }
 
     get(fileId, fields = GoogleDrive.FILE_FIELDS){
@@ -159,7 +170,7 @@ class GoogleDrive {
         return this.#json(fileId ? 'PATCH' : 'POST', this.#uploadPath(fileId), {
             query: {uploadType: 'multipart', fields: GoogleDrive.FILE_FIELDS},
             headers: {'Content-Type': `multipart/related; boundary=${boundary}`},
-            body
+            body, makes: !fileId
         });
     }
     // The start answers with the session's address. A browser may read only the upload id that
@@ -177,7 +188,7 @@ class GoogleDrive {
 
         return (await this.#send('PUT', null, {
             url: session, query: {fields: GoogleDrive.FILE_FIELDS},
-            headers: {'Content-Type': GoogleDrive.FILE_TYPE}, body: blob
+            headers: {'Content-Type': GoogleDrive.FILE_TYPE}, body: blob, makes: !fileId
         })).json();
     }
 }

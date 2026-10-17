@@ -257,10 +257,15 @@ class GraphsKeeper {
     #lastWritten = new Map();
 
     forgetLastWritten(){ this.#lastWritten.clear() }
+    // Told after every write that completed, with the content signature of what was written: cloud
+    // sync's (js/sync/cloudsync.js) cue. Taken as the write starts, when only promise callbacks have
+    // run since the data was read off the screen, so no keystroke can fall between the two.
+    afterWrite = null;
 
     saveMetaAndData(meta, data){
         if (this.#lastWritten.get(meta.graphId) === data) return Promise.resolve();
 
+        const signature = this.signatureOf?.() ?? null;
         meta.lastUpdated = new Date().toLocaleString();
         // `lastUpdated` is for reading and does not sort; this does (#60).
         meta.updatedAt = Date.now();
@@ -270,9 +275,15 @@ class GraphsKeeper {
         return this.#data.save(meta.graphId, data)
             .then(this.saveMeta.bind(this, meta))
             .then(this.#markWritten.bind(this, meta.graphId, data))
-            .then(this.#mirrorToDisk.bind(this, meta));
+            .then(this.#mirrorToDisk.bind(this, meta))
+            .then(this.#tellWritten.bind(this, meta, signature));
     }
     #markWritten(graphId, data){ this.#lastWritten.set(graphId, data) }
+    #tellWritten(meta, signature, mirrored){
+        try { this.afterWrite?.(meta, signature) }
+        catch (err) { Logger.warn("After a write:", err) }
+        return mirrored;
+    }
     saveMeta(meta){ return this.#meta.save(meta.graphId, meta) }
 
     #mirrorToDisk(meta){
@@ -556,7 +567,23 @@ View.Graphs = class {
     // rather than declining, because the restore can finish after notes are already on
     // screen: a burst of them at startup pushed it 700ms past `appReady`, and a quit in
     // that window would otherwise have saved nothing at all.
-    saveNow(){ return this.#whenRestored.then( (restored)=>restored && this.#autosave() ) }
+    saveNow(){
+        return this.#whenRestored.then( (restored)=>restored && this.#autosave() )
+            .then( (saved)=>Promise.resolve(this.onSavedNow?.()).then( ()=>saved, ()=>saved ) );
+    }
+    // Run once a `saveNow` has saved: cloud sync sends what is pending, for as long as it is given.
+    onSavedNow = null;
+
+    // For cloud sync (js/sync/cloudsync.js), which lives outside this module: the record on screen,
+    // the store, whether this tab is the one that writes, whether the restore failed, and a Graph's
+    // file, as Save to… writes it.
+    get selectedMeta(){ return this.#selectedGraph }
+    get keeper(){ return this.#stored }
+    get isWriter(){ return this.#isWriter }
+    get restoreFailed(){ return this.#restoreFailed }
+    exportBundle(meta = this.#selectedGraph){ return (new GraphExporter(meta, this.#stored)).export() }
+    refreshSaveNote(){ this.#updateSaveNote() }
+    static deviceKind = deviceKind;
     #import(file){
         const importer = new GraphImporter();
         const afterImport = this.#afterImport.bind(this, importer, file);
@@ -1331,6 +1358,9 @@ View.Graphs = class {
         if (stopped?.reason === 'failed') {
             return ["The file could not be written. Save to… picks a file again.", true];
         }
+        // A Graph in Google Drive as it is now is kept outside this browser (cloud sync).
+        const synced = App.cloudSync?.syncedAt?.(this.#selectedGraph);
+        if (synced) return ["Synced to Google Drive " + View.Graphs.ago(synced) + ".", false];
 
         // The browser's own copy is the only one of what is not in a file, so that is when its
         // being cleared is worth a word. A download is only a download: the page cannot see it
@@ -1518,7 +1548,8 @@ View.Graphs = class {
     }
     // Shared with the prompt, because a name a reader types is exactly as capable of
     // holding a slash as a title they typed into the old list was.
-    #fileNameForName(name){
+    #fileNameForName(name){ return View.Graphs.fileNameFor(name) }
+    static fileNameFor(name){
         const clean = String(name || '')
             .replace(/\.neurite$/i, '')
             .replace(/[^\p{L}\p{N} .\-_]+/gu, '_')

@@ -446,6 +446,39 @@
         </div>
     </div>
 
+    <!-- Cloud sync to Google Drive (docs/cloud-sync.md). The words, the buttons' labels and which
+         rows show are `syncpage.js`'s: Connect until Drive is connected, then this Graph's state and
+         the Graphs in Neurite's folder, each with Open. -->
+    <div class="settings-section" id="syncSettings" data-page="sync">
+        <div class="button-label settings-heading">Sync</div>
+        <div class="settings-group">
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-label">Google Drive</span>
+                    <p class="settings-description" id="sync-note"></p>
+                </div>
+                <button type="button" class="key-button" id="sync-connect" aria-describedby="sync-note">Connect</button>
+            </div>
+            <div class="settings-row" id="sync-graph-row" hidden>
+                <div class="settings-row-text">
+                    <span class="settings-label">This graph</span>
+                    <p class="settings-description" id="sync-graph-note"></p>
+                </div>
+                <button type="button" class="key-button" id="sync-graph-action" aria-describedby="sync-graph-note" hidden></button>
+            </div>
+        </div>
+        <div class="settings-group" id="sync-files-group" hidden>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-label">In Google Drive</span>
+                    <p class="settings-description" id="sync-files-note">The graphs in the Neurite folder of your Drive. Open one to carry on with it here.</p>
+                </div>
+                <button type="button" class="key-button" id="sync-files-refresh">Refresh</button>
+            </div>
+            <div id="sync-files" role="list"></div>
+        </div>
+    </div>
+
     <!-- One row each, with what it clears said under its name. Reset puts the settings back;
          Clear asks first, in red, because the API keys go with it. -->
     <div class="settings-section" data-page="data">
