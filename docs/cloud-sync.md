@@ -98,20 +98,30 @@ server in the most protected place it has, and follows Notion's shape everywhere
 
 - **Push:** after a save that changed a Graph's content. Content is the saved markup less how it
   is viewed (`CloudSync.signatureOf`): each card's place on the screen, the camera and the look are
-  left out, and one setting an AI note writes two ways is read one way. A pan sends nothing; an
-  edit, a moved card, or an AI note's answer does. The push goes ten seconds after the last such
-  save, at least once a minute while they keep coming, and at once when the window goes to the
-  background or the app quits (which waits for it five seconds at most). A push still waiting for
-  one Graph goes at once when another is opened. Only the tab that holds the autosave lock pushes.
-  Nothing is pushed before the last Graph is back on screen, after a restore that failed or could
-  not bring back every card, while a Mac app update is on probation, or for a Graph with no note
-  in it. A push that fails is tried again after half a minute, two minutes, then every ten
-  minutes, and on every check; Disconnect ends one that is under way without writing anything.
+  left out; so are the heights a title box and an editor are given to fit their text, an image's
+  `blob:` address and its blob's number in this browser's store; and one setting an AI note writes
+  two ways is read one way. Each of those was measured changing in a Graph opened from its own
+  file. A pan sends nothing; an edit, a moved or resized card, or an AI note's answer does. The
+  push goes ten seconds after the last such save, at least once a minute while they keep coming,
+  and at once when the window goes to the background or the app quits (which waits for it five
+  seconds at most). A push still waiting for one Graph goes at once when another is opened. Only
+  the tab that holds the autosave lock pushes. Nothing is pushed before the last Graph is back on
+  screen, for the Graph on screen after a restore that failed, while a Mac app update is on
+  probation (it waits, and goes after), or for a Graph with no note in it. A Graph saved while some
+  of its cards could not be reopened goes up once beside its file rather than over it (below). A
+  push that fails is tried again after half a minute, two minutes, then every ten minutes, and on
+  every check. On start, the last save of the Graph on screen is read from the store, so one that
+  never went up is not called synced, and goes once Drive is connected.
+- **Disconnect** is at once: no save after the click starts a push, though the Mac app's main
+  process may still be telling Google; a push or a check already under way ends without writing
+  anything or changing what Sync says.
 - **Check:** on start, when the window comes back, and every 5 minutes, the bound file's checksum is
   read. A newer copy from another device is offered in Settings → Sync ("Open it"), never loaded on
   its own: opening a Graph moves the view and replaces the screen. Open saves and pushes the Graph
-  on screen first, and asks before it leaves behind changes that could not go up. The save the
-  opening makes is bound to the file and sends nothing back.
+  on screen first, and asks before it leaves behind changes that could not go up. Opens go one at a
+  time; each binds the record its own import made to the file it came from, as Drive holds it, so
+  the save the opening makes sends nothing back. Each Graph has its own check: one still out for
+  the last Graph does not stand in for the next.
 - **Another kind of browser:** a Graph opened in the Mac app (Chromium) from an iPad's save (WebKit),
   or the other way, can settle a card a little differently, as the two measure text apart. A moved
   card is content, so that move goes up once.
@@ -134,11 +144,20 @@ every write, the file's revisions are read: a revision between the one this devi
 its own is another device's write that landed in between. It is kept as a conflict copy too, and
 Settings → Sync says that another device saved the Graph in the same moment. Drive gives an
 earlier revision of a binary file only once it is marked to be kept forever, so Neurite marks it
-before it reads it; the mark stays.
+before it reads it, and takes the mark off once the copy is made (Drive allows 200 a file). Drive
+does not say in what order it lists revisions, so they are put in order of time; every page of a
+list is read. The check after a write is recorded before it runs: one that fails is not called
+synced, and runs again before the next push, and a copy it made whose answer never came is found
+by its own operation id rather than made twice.
 
 A push whose answer never came may still have written. Each push carries an id (`neuriteOp`), kept
-before it goes: the next push finds the file that id made, or recognises the write as its own,
-rather than making a second file or calling its own write a conflict.
+before it goes: the next push looks for the file with that id -- the Graph's own, a new one, or a
+conflict copy -- and goes on from there, rather than making a second file or calling its own write
+a conflict.
+
+A Graph saved while some of its cards could not be reopened (a restore that skipped a card it could
+not rebuild) is smaller than its file in Drive. It goes up once beside it as a conflict copy, and
+Settings → Sync says why and offers the whole one; the saves after that go to the copy.
 
 A file moved to the bin or deleted in Drive is not made again: the Graph stops syncing, and
 Settings → Sync offers to sync it again, which makes a new file.

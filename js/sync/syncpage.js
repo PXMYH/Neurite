@@ -96,6 +96,10 @@ const SyncPage = {
             note = `Another device saved this graph in the same moment as this one. Its version is kept in Google Drive as `
                  + `“${named(s.conflict.name)}”.`;
             [label, action, warn] = ["Open it", ()=>SyncPage.open(s.conflict.otherId), true];
+        } else if (s.conflict?.damaged) {
+            note = `Some cards of this graph could not be reopened here, so this version is kept in Google Drive as `
+                 + `“${named(s.conflict.name)}”, beside the whole one.`;
+            [label, action, warn] = ["Open the whole one", ()=>SyncPage.open(s.conflict.otherId), true];
         } else if (s.conflict) {
             note = `This graph changed here and on another device, so it is kept in Google Drive as “${named(s.conflict.name)}”, `
                  + "beside the other copy.";

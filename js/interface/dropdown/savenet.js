@@ -615,7 +615,11 @@ View.Graphs = class {
             return reader.readAsText(file);
         }
 
-        this.#loadAndSave(importer, title).then(this.#updateGraphs);
+        // Settled once the opened Graph is saved, with its record, which cloud sync binds to the
+        // Drive file it came from. A save that fails is logged, and the Graph stays on screen.
+        return this.#loadAndSave(importer, title)
+            .then( (meta)=>this.#updateGraphs().then( ()=>meta ) )
+            .catch( (err)=>{ Logger.err("Could not keep the opened graph:", err) } );
     }
     // A file names itself after the graph it came from, so opening one twice -- or opening
     // a file exported from this browser at all -- lands a second save under a title the
@@ -695,7 +699,8 @@ View.Graphs = class {
         return this.#stored.saveMetaAndData(meta, importer.finalData)
             .then( ()=>this.#stored.markSavedToFile(meta, 'opened', importer.meta?.updatedAt ?? Date.now()) )
             .then(this.#resumeAfterRecovery)
-            .then(this.#updateSaveNote);
+            .then(this.#updateSaveNote)
+            .then( ()=>meta );
     }
     // The same guard on the older path: a `.txt` or a bundle this importer could not read
     // still arrives with a name, and `addSave` does not check titles either.
@@ -1147,6 +1152,8 @@ View.Graphs = class {
     }
 
     #clearGraph(){
+        // Of the Graph that is going; the next restore counts its own.
+        this.restoreSkipped = 0;
         Graph.clear();
         ZetProposals.restoreDismissed([]);
 

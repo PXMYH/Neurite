@@ -23,7 +23,7 @@ test('the Fractal and Views panels are pages of Settings, and a fresh page wears
         .map((l) => l.textContent)), ['Help']);
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.settings-nav-item')]
         .filter((item) => !item.hidden).map((item) => item.textContent.trim())),
-        ['Notes', 'Ai', 'Theme', 'Saved views', 'Fractal', 'Editing', 'Data']);
+        ['Notes', 'Ai', 'Theme', 'Saved views', 'Fractal', 'Editing', 'Data', 'Sync']);
     // One page at a time, and a page of one section is named by its title alone.
     const shown = () => page.evaluate(() => [document.getElementById('settingsPageTitle').textContent,
         ...[...document.querySelectorAll('#tab5 .settings-section > .settings-heading')]
