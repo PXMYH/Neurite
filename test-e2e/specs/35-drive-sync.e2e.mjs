@@ -1025,3 +1025,28 @@ test("a copy of another device's write moved to the bin before its answer came i
     assert.equal(graphs(fake).length, 1, 'the copy was made again');
     assert.deepEqual([...a.errors, ...b.errors], []);
 });
+
+test('a push that finds its lost write over a view change elsewhere makes no copy of that view change', async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nFirst.\n');
+    await connect(page);
+    await settled(page);
+    const [file] = graphs(fake);
+    // Another device moves the view only: new bytes, the same content.
+    const head = bundleOf(file);
+    const nul = file.content.indexOf(0);
+    const viewed = Buffer.concat([Buffer.from(JSON.stringify({ ...head, meta: { ...head.meta, device: 'iPad' } })), file.content.subarray(nul)]);
+    fake.writeElsewhere(file.id, viewed, { neuriteSignature: file.appProperties.neuriteSignature, neuriteDevice: 'iPad' });
+    await page.evaluate(() => { GoogleDrive.RETRY_MS = [50, 50, 50]; CloudSync.RETRY_MS = [60000, 60000, 60000] });
+    loseAnswers(fake, (c) => c.method === 'PATCH' && c.path.startsWith('/upload/'), 4);
+    await edit(page, 'First.', 'Second.');
+    await page.waitForTimeout(600);
+    await settled(page);
+    await page.evaluate(() => App.cloudSync.check());
+    await page.waitForTimeout(600);
+    await settled(page);
+    assert.equal(graphs(fake).length, 1, 'the view change elsewhere was kept as a copy');
+    assert.ok(textOf(fake.files.get(file.id)).includes('Second.'));
+    assert.deepEqual(errors, []);
+});

@@ -1200,5 +1200,30 @@ Tickets, each with its own commit and tests:
       copy, the check for a newer copy, and every guard autosave has.
 - [x] T5. Settings → Sync: Connect/Disconnect, the account and status, the files in Drive with
       Open, the newer-copy and conflict notices; the save note counts a synced Graph as kept.
-- [ ] T6. End to end: the browser against the fake (spec 35), the Mac app against the fake over
+- [x] T6. End to end: the browser against the fake (spec 35), the Mac app against the fake over
       HTTP (desktop/drive.e2e.mjs), negative controls, adversarial review, the full suite.
+- [ ] T7. Against real Google: needs the project's OAuth clients (a Desktop app client and a Web
+      application client, with the Drive API on and `drive.file` on the consent screen), then a
+      sign-in, a push, an open on a second device, and a conflict, by hand. The release waits for it.
+
+## Review (2026-10-17)
+
+- Built: `js/sync/{googledrive,driveauth,driveconfig,cloudsync,syncpage}.js`, the Mac app's
+  sign-in in `desktop/drive-auth.cjs` (loopback + PKCE, refresh token under `safeStorage`, IPC
+  behind `fromApp`), Settings → Sync, and the save note's "Synced to Google Drive". Design and
+  the Notion findings: docs/cloud-sync.md.
+- Reviews: Codex design review d1 (10 items), then implementation reviews s1–s5 (12, 11, 8, 5 and
+  2 findings, falling in likelihood; the loop stopped when the last round found only an extra
+  conflict copy under compound rare conditions). Each fix that a test can show has a spec 35 test with a
+  negative control that fails with the fix taken out. Declined, with reasons in the commits: a
+  durable outbox beyond the store, images' bytes in the content signature, stopping a local
+  import already under way at Disconnect (and the extra copy that can follow it on reconnect).
+- What the reviews taught, worth keeping: Drive serves an earlier revision of a binary file only
+  once it is marked keepForever (200 a file); revisions.list has no stated order; a refresh token
+  comes only with the first offline grant unless `prompt=consent`; a write retried after a lost
+  answer lands twice; a markup signature must leave out what each load renumbers or lays out
+  (blob addresses and ids, autosize heights), measured, not guessed.
+- Tests: spec 35 has 35 browser tests (Chromium and the iPad), test/google-drive.test.js 12,
+  test/drive-auth.test.js 6, desktop/drive.e2e.mjs 1 (a real Electron app against the fake over
+  HTTP). The two iPad failures in the full suite (07-canvas wheel, 12-connect menu) fail on the
+  base commit too.

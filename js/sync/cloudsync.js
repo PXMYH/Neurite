@@ -31,9 +31,9 @@ class CloudSync {
     // pushedRevision, pushedSignature, conflictOf, damaged, recovered, removed, pendingOp, verify}.
     // `title` is the record's title when it was bound: the file keeps its name in Drive until the
     // Graph is renamed here -- a Graph opened from Drive is often given "(2)" to keep it apart from
-    // one of its name. `pendingOp` is the operation id of a push that has not finished, and
-    // `pendingSha` the SHA-256 of what it sent; `verify` an update whose check for a write under it
-    // has not finished.
+    // one of its name. `pendingOp` is the operation id of a push that has not finished,
+    // `pendingSha` the SHA-256 of what it sent and `pendingBase` the checksum it built on; `verify`
+    // an update whose check for a write under it has not finished.
     #bound = new Map();
     // What each record last wrote: {signature, revision}.
     #written = new Map();
@@ -337,7 +337,7 @@ class CloudSync {
                     const made = landed.id !== before.fileId;
                     // What that push built on is a base too for the check after this one: its own check
                     // never ran.
-                    lostBase = (ours && !made) ? (before.md5 ?? null) : null;
+                    lostBase = (ours && !made) ? (before.pendingBase ?? before.md5 ?? null) : null;
                     before = {...before, fileId: landed.id, name: landed.name,
                               md5: ours ? landed.md5Checksum : (made ? null : before.md5),
                               conflictOf: landed.appProperties?.neuriteConflictOf ?? null,
@@ -352,7 +352,7 @@ class CloudSync {
                            neuriteUpdatedAt: String(meta.updatedAt ?? Date.now()), neuriteSignature: signature, neuriteOp: op};
             // Its operation id is kept before it goes, so that an answer that never comes back is
             // found by it (above).
-            await this.#bind(graphId, {...(before ?? {}), uuid: meta.uuid, pendingOp: op, pendingSha: sha});
+            await this.#bind(graphId, {...(before ?? {}), uuid: meta.uuid, pendingOp: op, pendingSha: sha, pendingBase: null});
             if (!live()) return false;
 
             let file = null, base = null, conflict = null;
@@ -363,6 +363,10 @@ class CloudSync {
                 const same = !before.damaged && ((remote.md5Checksum === before.md5) || CloudSync.#viewedOnly(remote, before));
                 if (same) {
                     base = remote.md5Checksum;
+                    // What it builds on, kept with its id: a push that finds this one's write counts it a
+                    // base -- it can be later than the binding's, after a view-only change elsewhere.
+                    await this.#bind(graphId, {...this.#bound.get(graphId), pendingBase: base});
+                    if (!live()) return false;
                     file = await this.drive.upload({fileId: remote.id, name, appProperties: props, blob});
                 } else {
                     file = await this.#conflictUpload(meta, folders[0], blob, {...props, neuriteConflictOf: remote.id}, View.Graphs.deviceKind());
@@ -387,7 +391,7 @@ class CloudSync {
                           conflictOf: file.appProperties?.neuriteConflictOf ?? null,
                           conflictDamaged: conflict ? conflict.damaged : Boolean(before?.conflictDamaged && file.id === before.fileId),
                           damaged: false, recovered: (file.id === before?.fileId) ? (before.recovered ?? null) : null,
-                          removed: false, pendingOp: null, pendingSha: null,
+                          removed: false, pendingOp: null, pendingSha: null, pendingBase: null,
                           // An update is checked once it lands: another device's write may be under it.
                           verify: base ? {base, lostBase, head: file.headRevisionId, md5: file.md5Checksum, copyOp: CloudSync.#newOp()} : null};
             await this.#bind(graphId, next);
