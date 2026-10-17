@@ -20,6 +20,19 @@ export class FakeGoogle {
     calls = [];
     // Failures to answer the next matching requests with: {match: (req) => bool, status, times}.
     failures = [];
+    // Requests held until a test lets them go: `const h = fake.hold(match)`, `await h.reached`,
+    // `h.release()`. The first matching request waits, before Drive does anything with it.
+    holds = [];
+    hold(match) {
+        let release, reached;
+        const h = { match, used: false };
+        h.gate = new Promise((r) => { release = r });
+        h.reached = new Promise((r) => { reached = r });
+        h.release = release;
+        h.arrive = reached;
+        this.holds.push(h);
+        return h;
+    }
     user = { emailAddress: 'reader@example.com', displayName: 'Reader' };
     clientIds = new Set(['test-client.apps.googleusercontent.com']);
     // The OAuth side: authorization codes waiting for their exchange, and the tokens issued.
@@ -38,18 +51,20 @@ export class FakeGoogle {
         this.accessTokens.set(token, { scope, expires: Date.now() + ttlSeconds * 1000 });
         return token;
     }
-    // What another device does to a file: new content, with all that comes with it.
+    // What another device does to a file: new content, with all that comes with it -- its own push
+    // carries an operation id of its own.
     writeElsewhere(id, content, appProperties = {}) {
         const f = this.files.get(id);
         if (!f) throw new Error('no file ' + id);
         this.#setContent(f, Buffer.from(content));
-        Object.assign(f.appProperties, appProperties);
+        Object.assign(f.appProperties, { neuriteOp: 'elsewhere-' + randomBytes(4).toString('hex') }, appProperties);
     }
     fileByName(name) { return [...this.files.values()].find((f) => f.name === name && !f.trashed) ?? null }
     filesIn(folderId) { return [...this.files.values()].filter((f) => f.parents.includes(folderId) && !f.trashed) }
 
     #id() { return 'f' + (++this.#seq).toString(36) + randomBytes(4).toString('hex') }
     #now() { return new Date(Date.now()).toISOString() }
+    // Every content change is a revision, as for a file with binary content in Drive.
     #setContent(f, buf) {
         f.content = buf;
         f.size = String(buf.length);
@@ -57,7 +72,9 @@ export class FakeGoogle {
         f.headRevisionId = 'r' + randomBytes(6).toString('hex');
         f.version = String(Number(f.version ?? 0) + 1);
         f.modifiedTime = this.#now();
+        (this.revisionsOf[f.id] ??= []).push({ id: f.headRevisionId, md5Checksum: f.md5Checksum, modifiedTime: f.modifiedTime, content: buf });
     }
+    revisionsOf = {};
     #create(meta, content) {
         const f = {
             kind: 'drive#file', id: this.#id(), name: meta.name ?? 'Untitled', mimeType: meta.mimeType ?? 'application/octet-stream',
@@ -114,6 +131,8 @@ export class FakeGoogle {
         const url = new URL(req.url);
         const call = { method: req.method, host: url.host, path: url.pathname, query: Object.fromEntries(url.searchParams) };
         this.calls.push(call);
+        const held = req.method !== 'OPTIONS' && this.holds.find((h) => !h.used && h.match(call));
+        if (held) { held.used = true; held.arrive(); await held.gate }
         const cors = { 'access-control-allow-origin': req.headers.origin ?? '*', 'access-control-expose-headers': 'X-GUploader-UploadID, Date' };
         if (req.method === 'OPTIONS') {
             return { status: 200, headers: { ...cors, 'access-control-allow-methods': 'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT',
@@ -157,6 +176,22 @@ export class FakeGoogle {
         if (p === '/drive/v3/files' && req.method === 'POST') {
             const f = this.#create(JSON.parse(req.body.toString() || '{}'));
             return json(200, this.#pick(f, fields));
+        }
+        if ((m = /^\/drive\/v3\/files\/([^/]+)\/revisions(?:\/([^/]+))?$/.exec(p)) && ['GET', 'PATCH'].includes(req.method)) {
+            const f = this.files.get(m[1]);
+            if (!f) return err(404, 'File not found: ' + m[1]);
+            const revs = this.revisionsOf[f.id] ?? [];
+            if (!m[2]) return json(200, { revisions: revs.map(({ id, md5Checksum, modifiedTime, keepForever }) => ({ id, md5Checksum, modifiedTime, keepForever: Boolean(keepForever) })) });
+            const r = revs.find((x) => x.id === m[2]);
+            if (!r) return err(404, 'Revision not found: ' + m[2]);
+            if (req.method === 'PATCH') {
+                const { keepForever } = JSON.parse(req.body.toString() || '{}');
+                if (typeof keepForever === 'boolean') r.keepForever = keepForever;
+                return json(200, { id: r.id, keepForever: Boolean(r.keepForever) });
+            }
+            // As Drive: a binary file's revision is downloaded only once it is kept forever.
+            if (!r.keepForever) return err(403, 'Only revisions marked keepForever can be downloaded.');
+            return { status: 200, headers: { ...cors, 'content-type': f.mimeType }, body: r.content };
         }
         if ((m = /^\/drive\/v3\/files\/([^/]+)$/.exec(p))) {
             const f = this.files.get(m[1]);
@@ -203,7 +238,8 @@ export class FakeGoogle {
         if (!this.clientIds.has(q.get('client_id'))) return { status: 400, headers: {}, body: 'invalid_client' };
         if (q.get('code_challenge_method') !== 'S256' || !q.get('code_challenge')) return { status: 400, headers: {}, body: 'pkce required' };
         const code = '4/fake-' + randomBytes(10).toString('hex');
-        this.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri'), client: q.get('client_id'), scope: q.get('scope') });
+        this.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri'), client: q.get('client_id'), scope: q.get('scope'),
+                               offline: q.get('access_type') === 'offline' });
         const back = new URL(q.get('redirect_uri'));
         back.searchParams.set('code', code);
         back.searchParams.set('state', q.get('state') ?? '');
@@ -220,9 +256,11 @@ export class FakeGoogle {
             const challenge = b64url(createHash('sha256').update(form.get('code_verifier') ?? '').digest());
             if (challenge !== grant.challenge) return json(400, { error: 'invalid_grant', error_description: 'PKCE mismatch.' });
             if (form.get('redirect_uri') !== grant.redirect) return json(400, { error: 'redirect_uri_mismatch' });
+            const access = { access_token: this.issueAccessToken(grant.scope), expires_in: 3599, scope: grant.scope, token_type: 'Bearer' };
+            if (!grant.offline) return json(200, access);
             const refresh = '1//fake-' + randomBytes(12).toString('hex');
             this.refreshTokens.set(refresh, { scope: grant.scope, client: grant.client });
-            return json(200, { access_token: this.issueAccessToken(grant.scope), expires_in: 3599, refresh_token: refresh, scope: grant.scope, token_type: 'Bearer' });
+            return json(200, { ...access, refresh_token: refresh });
         }
         if (kind === 'refresh_token') {
             const grant = this.refreshTokens.get(form.get('refresh_token'));

@@ -15,6 +15,8 @@ const require = createRequire(import.meta.url);
 const APP = 'app://neurite/';
 
 async function load({ fake = new FakeGoogle(), clientId = 'test-client.apps.googleusercontent.com', browser } = {}) {
+    // Found before the fake starts listening: a server left open keeps this file's run waiting.
+    const path = require.resolve('../desktop/drive-auth.cjs');
     const google = await fake.listen();
     const userData = mkdtempSync(join(tmpdir(), 'neurite-drive-auth-'));
     const handlers = new Map();
@@ -33,12 +35,13 @@ async function load({ fake = new FakeGoogle(), clientId = 'test-client.apps.goog
         NEURITE_TEST_PLAIN_TOKEN_STORE: '',
     });
     delete process.env.NEURITE_AUTH_BROWSER;
-    const path = require.resolve('../desktop/drive-auth.cjs');
     delete require.cache[path];
     const original = Module._load;
     Module._load = function (request, ...rest) { return request === 'electron' ? electron : original.call(this, request, ...rest) };
     let auth;
-    try { auth = require(path) } finally { Module._load = original }
+    try { auth = require(path) }
+    catch (err) { await google.close(); throw err }
+    finally { Module._load = original }
     auth.init();
     const fromApp = { senderFrame: { url: APP, parent: null } };
     const call = (channel, arg) => handlers.get(channel)(fromApp, arg);

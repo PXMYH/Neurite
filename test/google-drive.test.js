@@ -54,6 +54,21 @@ test("the Neurite folder is made once at the top of My Drive, found by its mark 
     assert.equal(fake.files.get(again).trashed, false);
 });
 
+test('two devices that make the folder at once both use the older one, and read the files of both', async () => {
+    const fake = new FakeGoogle();
+    const a = drive({ fake }).d, b = drive({ fake }).d;
+    const [made, alsoMade] = await Promise.all([a.folderId(), b.folderId()]);
+    assert.notEqual(made, alsoMade, 'the race this is about did not happen');
+    fake.files.get(alsoMade).createdTime = new Date(Date.parse(fake.files.get(made).createdTime) + 1000).toISOString();
+    assert.deepEqual([...(await b.folders())], [made, alsoMade]);
+    assert.equal(await a.folderId(), made);
+    assert.equal(await b.folderId(), made);
+    // A Graph put in the newer folder before the two met is still in the list.
+    await b.upload({ folderId: alsoMade, name: 'Early.neurite', blob: new Blob(['e']) });
+    await a.upload({ folderId: made, name: 'Later.neurite', blob: new Blob(['l']) });
+    assert.deepEqual([...(await a.list(await a.folders()))].map((f) => f.name).sort(), ['Early.neurite', 'Later.neurite']);
+});
+
 test('a Graph goes up in one request, and new content for it bumps its version and checksum', async () => {
     const { d, fake } = drive();
     const folder = await d.folderId();
@@ -68,6 +83,18 @@ test('a Graph goes up in one request, and new content for it bumps its version a
     assert.equal(fake.files.get(made.id).content.toString(), 'second');
     assert.equal(fake.files.get(made.id).appProperties.neuriteUuid, 'abc', 'an update dropped the properties it did not name');
     assert.equal(await (await d.download(made.id)).text(), 'second');
+});
+
+test("a file's revisions are listed the oldest first, and an earlier one is marked to be kept before it is read", async () => {
+    const { d, fake } = drive();
+    const folder = await d.folderId();
+    const made = await d.upload({ folderId: folder, name: 'Graph.neurite', blob: new Blob(['first']) });
+    await d.upload({ fileId: made.id, name: 'Graph.neurite', blob: new Blob(['second']) });
+    const revisions = [...(await d.revisions(made.id))];
+    assert.deepEqual(revisions.map((r) => r.md5Checksum), [md5('first'), md5('second')]);
+    // Drive refuses an earlier revision's content until it is kept forever.
+    assert.equal(await (await d.downloadRevision(made.id, revisions[0].id)).text(), 'first');
+    assert.deepEqual(fake.revisionsOf[made.id].map((r) => Boolean(r.keepForever)), [true, false]);
 });
 
 test('a Graph larger than one request goes up resumable, by the upload id when Location is hidden', async () => {
@@ -91,9 +118,10 @@ test("a Graph's file is found by its lineage id, never a conflict copy of it; th
     const own = await d.upload({ folderId: folder, name: 'Mind.neurite', appProperties: { neuriteUuid: "it's" }, blob: new Blob(['a']) });
     await d.upload({ folderId: folder, name: 'Mind (conflict).neurite', appProperties: { neuriteUuid: "it's", neuriteConflictOf: own.id }, blob: new Blob(['b']) });
     await d.upload({ folderId: folder, name: 'notes.txt', blob: new Blob(['c']) });
-    assert.deepEqual((await d.findByUuid(folder, "it's")).map((f) => f.id), [own.id]);
-    assert.deepEqual(await d.findByUuid(folder, 'nobody'), []);
-    assert.deepEqual((await d.list(folder)).map((f) => f.name).sort(), ['Mind (conflict).neurite', 'Mind.neurite']);
+    // Spread into this realm: the client's arrays are the sandbox's.
+    assert.deepEqual([...(await d.findByUuid(folder, "it's"))].map((f) => f.id), [own.id]);
+    assert.deepEqual([...(await d.findByUuid(folder, 'nobody'))], []);
+    assert.deepEqual([...(await d.list(folder))].map((f) => f.name).sort(), ['Mind (conflict).neurite', 'Mind.neurite']);
 });
 
 test("retries follow Notion's schedule for 5xx, 429 and a dropped connection, and never for a 4xx", async () => {

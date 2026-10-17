@@ -116,8 +116,11 @@ async function signIn() {
     const redirect = `http://${host}/`;
     try {
         const consent = new URL(ENDPOINTS.auth);
+        // Offline, and asked each time, so that Google hands over a refresh token on a sign-in it has
+        // seen before too: without one, the app could not keep the connection.
         for (const [k, v] of Object.entries({ client_id: CLIENT.id, redirect_uri: redirect, response_type: 'code', scope: SCOPE,
-                                              code_challenge: challenge, code_challenge_method: 'S256', state })) {
+                                              code_challenge: challenge, code_challenge_method: 'S256', state,
+                                              access_type: 'offline', prompt: 'consent' })) {
             consent.searchParams.set(k, v);
         }
         const answer = waitForCode(server, state, host);
@@ -127,7 +130,8 @@ async function signIn() {
         if (error) return { connected: false, error };
 
         const res = await post(ENDPOINTS.token, { ...clientForm(), code, code_verifier: verifier, grant_type: 'authorization_code', redirect_uri: redirect });
-        if (!res.ok || !res.json.refresh_token) return { connected: false, error: res.json.error || 'exchange-failed' };
+        if (!res.ok) return { connected: false, error: res.json.error || 'exchange-failed' };
+        if (!res.json.refresh_token) return { connected: false, error: 'no-refresh-token' };
         await writeRefresh(res.json.refresh_token);
         access = { token: res.json.access_token, expires: Date.now() + (res.json.expires_in ?? 0) * 1000 - EARLY_MS };
         return { connected: true };

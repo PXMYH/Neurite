@@ -71,8 +71,9 @@ class GoogleDrive {
                 await this.#pause(attempt, res.headers.get('Retry-After'));
                 continue;
             }
-            const reason = (res.status === 401 ? 'unauthorized' : res.status === 404 ? 'notFound'
-                          : (makes && res.status >= 500) ? 'unknown' : 'http');
+            const reason = (res.status === 401 ? 'unauthorized'
+                          : (makes && (res.status >= 500 || res.status === 404)) ? 'unknown'
+                          : res.status === 404 ? 'notFound' : 'http');
             throw new DriveError(error.message, res.status, reason);
         }
     }
@@ -94,50 +95,73 @@ class GoogleDrive {
         return (await this.#json('GET', '/drive/v3/about', {query: {fields: 'user(emailAddress,displayName)'}})).user ?? null;
     }
 
-    // Neurite's folder at the top of My Drive, made the first time: the remembered one while it is
-    // there, else the oldest marked as Neurite's, whatever it is called now. Two devices that make
-    // it together make two, and both then use the oldest.
-    async folderId(known = null){
-        if (known) {
-            const f = await this.get(known, 'id,trashed,mimeType').catch( (err)=>{
-                if (err.reason === 'notFound') return null;
-                throw err;
-            });
-            if (f && !f.trashed && f.mimeType === GoogleDrive.FOLDER_TYPE) return f.id;
-        }
+    // Neurite's folders, the oldest first: those marked as Neurite's, whatever each is called now.
+    // There is meant to be one; two devices that make it together make two, and the files of both
+    // are read, while new files go to the oldest.
+    async folders(){
         const q = [`mimeType = '${GoogleDrive.FOLDER_TYPE}'`, 'trashed = false',
                    `appProperties has { key='neuriteFolder' and value='1' }`].join(' and ');
         const found = await this.#json('GET', '/drive/v3/files', {query: {q, fields: 'files(id,createdTime)', spaces: 'drive'}});
-        const first = (found.files ?? []).sort( (a, b)=>String(a.createdTime).localeCompare(String(b.createdTime)) )[0];
-        if (first) return first.id;
-
+        return (found.files ?? []).sort( (a, b)=>String(a.createdTime).localeCompare(String(b.createdTime)) ).map( (f)=>f.id );
+    }
+    // The oldest, made the first time at the top of My Drive. Not asked twice: an answer that never
+    // came may have made it, and the next look finds it by its mark.
+    async folderId(){
+        const [oldest] = await this.folders();
+        if (oldest) return oldest;
         const made = await this.#json('POST', '/drive/v3/files', {
             query: {fields: 'id'},
             json: {name: GoogleDrive.FOLDER_NAME, mimeType: GoogleDrive.FOLDER_TYPE, parents: ['root'],
-                   appProperties: {neuriteFolder: '1'}}
+                   appProperties: {neuriteFolder: '1'}},
+            makes: true
         });
         return made.id;
     }
 
-    // The Graphs in the folder, the latest first.
-    async list(folderId){
-        const q = [`${GoogleDrive.quote(folderId)} in parents`, `mimeType != '${GoogleDrive.FOLDER_TYPE}'`,
-                   'trashed = false'].join(' and ');
-        const res = await this.#json('GET', '/drive/v3/files', {
-            query: {q, fields: `files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive', pageSize: '1000', orderBy: 'modifiedTime desc'}
-        });
-        return (res.files ?? []).filter(GoogleDrive.isGraphFile)
+    // The Graphs in the folders, the latest first.
+    async list(folderIds){
+        const files = [];
+        for (const id of [].concat(folderIds)) {
+            const q = [`${GoogleDrive.quote(id)} in parents`, `mimeType != '${GoogleDrive.FOLDER_TYPE}'`, 'trashed = false'].join(' and ');
+            const res = await this.#json('GET', '/drive/v3/files', {
+                query: {q, fields: `files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive', pageSize: '1000', orderBy: 'modifiedTime desc'}
+            });
+            files.push(...(res.files ?? []));
+        }
+        return files.filter(GoogleDrive.isGraphFile)
             .sort( (a, b)=>String(b.modifiedTime).localeCompare(String(a.modifiedTime)) );
     }
     static isGraphFile(f){ return Boolean(f?.id) && /\.neurite$/i.test(f.name ?? '') }
 
     // A Graph's files, by the lineage id its saves carry, the latest first; never a conflict copy.
-    async findByUuid(folderId, uuid){
-        const q = [`${GoogleDrive.quote(folderId)} in parents`, 'trashed = false',
-                   `appProperties has { key='neuriteUuid' and value=${GoogleDrive.quote(uuid)} }`].join(' and ');
-        const res = await this.#json('GET', '/drive/v3/files', {query: {q, fields: `files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive'}});
-        return (res.files ?? []).filter( (f)=>!(f.appProperties?.neuriteConflictOf) )
+    async findByUuid(folderIds, uuid){
+        const files = [];
+        for (const id of [].concat(folderIds)) {
+            const q = [`${GoogleDrive.quote(id)} in parents`, 'trashed = false',
+                       `appProperties has { key='neuriteUuid' and value=${GoogleDrive.quote(uuid)} }`].join(' and ');
+            const res = await this.#json('GET', '/drive/v3/files', {query: {q, fields: `files(${GoogleDrive.FILE_FIELDS})`, spaces: 'drive'}});
+            files.push(...(res.files ?? []));
+        }
+        return files.filter( (f)=>!(f.appProperties?.neuriteConflictOf) )
             .sort( (a, b)=>String(b.modifiedTime).localeCompare(String(a.modifiedTime)) );
+    }
+
+    // A file's content revisions, the oldest first, and one of them: where a write that landed
+    // between another device's check and its own is found again. One page of the most Drive gives:
+    // a file's newest are on the last page, and Drive keeps a hundred of a binary file's at most.
+    async revisions(fileId){
+        const res = await this.#json('GET', '/drive/v3/files/' + encodeURIComponent(fileId) + '/revisions', {
+            query: {fields: 'revisions(id,md5Checksum,modifiedTime)', pageSize: '1000'}
+        });
+        return res.revisions ?? [];
+    }
+    // Drive gives a binary file's earlier revision only once it is marked to be kept forever, which
+    // also keeps Drive from purging it while the copy is made.
+    // ponytail: the mark stays, and Drive allows 200 per file; unmark after the copy if that is reached.
+    async downloadRevision(fileId, revisionId){
+        const path = '/drive/v3/files/' + encodeURIComponent(fileId) + '/revisions/' + encodeURIComponent(revisionId);
+        await this.#json('PATCH', path, {query: {fields: 'id,keepForever'}, json: {keepForever: true}});
+        return (await this.#send('GET', path, {query: {alt: 'media'}})).blob();
     }
 
     get(fileId, fields = GoogleDrive.FILE_FIELDS){
@@ -190,7 +214,7 @@ class GoogleDrive {
 
         return (await this.#send('PUT', null, {
             url: session, query: {fields: GoogleDrive.FILE_FIELDS},
-            headers: {'Content-Type': GoogleDrive.FILE_TYPE}, body: blob, makes: !fileId
+            headers: {'Content-Type': GoogleDrive.FILE_TYPE}, body: blob, makes: true
         })).json();
     }
 }

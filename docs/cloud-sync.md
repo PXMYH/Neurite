@@ -87,27 +87,34 @@ server in the most protected place it has, and follows Notion's shape everywhere
   **Neurite** and is found by a private mark (`neuriteFolder`), so renaming it changes nothing. A
   file's private `appProperties` say which Graph it is (`neuriteUuid`, the lineage id a save
   already carries), how far along (`neuriteRevisions`), where it was last written
-  (`neuriteDevice`), and the content signature of what it holds (`neuriteSignature`).
+  (`neuriteDevice`), the content signature of what it holds (`neuriteSignature`), and the id of
+  the push that wrote it (`neuriteOp`).
 - **In this browser** (IndexedDB `sync`): per record, the Drive file it is bound to, the checksum
   (`md5Checksum`) of the copy this device last wrote or read, the revision and content signature
-  it pushed, and whether the file was removed in Drive; and the folder's id and the account. No
-  token is kept by the page.
+  it pushed, the id of a push still out, and whether the file was removed in Drive; and the
+  account. No token is kept by the page. Connecting another account forgets every binding.
 
 ### When it moves
 
-- **Push:** after a save of the Graph on screen. Ten seconds after the last change to its content
-  (`View.Graphs.contentSignature`: the Panes' text and each Node's title and place), and at least
-  once a minute while such changes keep coming; two minutes after a save that changed anything
-  else, such as a pan or a resize; and at once when the window goes to the background, or the
-  app quits (which waits for it five seconds at most). Only the tab that holds the autosave lock
-  pushes. Nothing is pushed before the last Graph is back on screen, after a restore that failed or
-  could not bring back every card, while a Mac app update is on probation, or for a Graph with no
-  note in it. A push that fails is not queued: the store is the queue, and the next save pushes
-  again.
+- **Push:** after a save that changed a Graph's content. Content is the saved markup less how it
+  is viewed (`CloudSync.signatureOf`): each card's place on the screen, the camera and the look are
+  left out, and one setting an AI note writes two ways is read one way. A pan sends nothing; an
+  edit, a moved card, or an AI note's answer does. The push goes ten seconds after the last such
+  save, at least once a minute while they keep coming, and at once when the window goes to the
+  background or the app quits (which waits for it five seconds at most). A push still waiting for
+  one Graph goes at once when another is opened. Only the tab that holds the autosave lock pushes.
+  Nothing is pushed before the last Graph is back on screen, after a restore that failed or could
+  not bring back every card, while a Mac app update is on probation, or for a Graph with no note
+  in it. A push that fails is tried again after half a minute, two minutes, then every ten
+  minutes, and on every check; Disconnect ends one that is under way without writing anything.
 - **Check:** on start, when the window comes back, and every 5 minutes, the bound file's checksum is
   read. A newer copy from another device is offered in Settings → Sync ("Open it"), never loaded on
   its own: opening a Graph moves the view and replaces the screen. Open saves and pushes the Graph
-  on screen first.
+  on screen first, and asks before it leaves behind changes that could not go up. The save the
+  opening makes is bound to the file and sends nothing back.
+- **Another kind of browser:** a Graph opened in the Mac app (Chromium) from an iPad's save (WebKit),
+  or the other way, can settle a card a little differently, as the two measure text apart. A moved
+  card is content, so that move goes up once.
 
 ### When two devices disagree
 
@@ -122,11 +129,22 @@ wrote or read, the file was changed elsewhere:
   copy from then on, and Settings → Sync says so and offers the other copy.
 
 Nothing is merged, as nothing is merged for a file on disk either. The check and the write are two
-requests, so two devices pushing in the same second can still write one after the other; Drive
-keeps a file's earlier versions (File → Manage versions), which is where the first would be.
+requests, so two devices pushing in the same second can still write one after the other. After
+every write, the file's revisions are read: a revision between the one this device built on and
+its own is another device's write that landed in between. It is kept as a conflict copy too, and
+Settings → Sync says that another device saved the Graph in the same moment. Drive gives an
+earlier revision of a binary file only once it is marked to be kept forever, so Neurite marks it
+before it reads it; the mark stays.
+
+A push whose answer never came may still have written. Each push carries an id (`neuriteOp`), kept
+before it goes: the next push finds the file that id made, or recognises the write as its own,
+rather than making a second file or calling its own write a conflict.
 
 A file moved to the bin or deleted in Drive is not made again: the Graph stops syncing, and
 Settings → Sync offers to sync it again, which makes a new file.
+
+Two devices that make Neurite's folder at the same moment make two. Both read the files of every
+marked folder, and new files go to the oldest one.
 
 ### What the page may do with a token
 
@@ -142,10 +160,12 @@ they are the account owner's own sites.
 
 - **Mac app:** Settings → Sync → Connect opens Google's consent page in the system browser. Google
   sends the browser back to a listener the app opens on `127.0.0.1` for that one answer (5 minutes
-  at most), which takes it only with the `state` it sent and its own Host. The app exchanges the
-  code with its PKCE verifier, keeps the refresh token encrypted by the Keychain in its own folder,
-  and refreshes the access token as it runs out. Disconnect revokes the token at Google and
-  deletes it. Without the Keychain, it does not keep a sign-in at all.
+  at most), which takes it only with the `state` it sent and its own Host. The consent asks for
+  offline access, so that Google issues a refresh token; a sign-in without one connects nothing.
+  The app exchanges the code with its PKCE verifier, keeps the refresh token encrypted by the
+  Keychain in its own folder, and refreshes the access token as it runs out. A refresh Google
+  refuses forgets the connection. Disconnect revokes the token at Google and deletes it. Without
+  the Keychain, it does not keep a sign-in at all.
 - **Browser:** Connect loads Google Identity Services and asks for an access token in a popup. It
   lasts an hour and is kept in memory only, so after an hour, or a reload, Sync asks to be
   connected again before it pushes.

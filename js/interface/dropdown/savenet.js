@@ -257,15 +257,13 @@ class GraphsKeeper {
     #lastWritten = new Map();
 
     forgetLastWritten(){ this.#lastWritten.clear() }
-    // Told after every write that completed, with the content signature of what was written: cloud
-    // sync's (js/sync/cloudsync.js) cue. Taken as the write starts, when only promise callbacks have
-    // run since the data was read off the screen, so no keystroke can fall between the two.
+    // Told after every write that completed, with what was written: cloud sync's cue
+    // (js/sync/cloudsync.js), which reads its content from the markup itself.
     afterWrite = null;
 
     saveMetaAndData(meta, data){
         if (this.#lastWritten.get(meta.graphId) === data) return Promise.resolve();
 
-        const signature = this.signatureOf?.() ?? null;
         meta.lastUpdated = new Date().toLocaleString();
         // `lastUpdated` is for reading and does not sort; this does (#60).
         meta.updatedAt = Date.now();
@@ -276,11 +274,11 @@ class GraphsKeeper {
             .then(this.saveMeta.bind(this, meta))
             .then(this.#markWritten.bind(this, meta.graphId, data))
             .then(this.#mirrorToDisk.bind(this, meta))
-            .then(this.#tellWritten.bind(this, meta, signature));
+            .then(this.#tellWritten.bind(this, meta, data));
     }
     #markWritten(graphId, data){ this.#lastWritten.set(graphId, data) }
-    #tellWritten(meta, signature, mirrored){
-        try { this.afterWrite?.(meta, signature) }
+    #tellWritten(meta, data, mirrored){
+        try { this.afterWrite?.(meta, data) }
         catch (err) { Logger.warn("After a write:", err) }
         return mirrored;
     }
@@ -332,6 +330,8 @@ class GraphExporter {
         blobMeta: {},
         offsets: {}
     };
+    // The markup the bundle was made of, read once with the rest: what cloud sync signs.
+    get data(){ return this.#out.data }
     constructor(meta, stored){
         this.meta = meta;
         this.stored = stored;
@@ -581,7 +581,11 @@ View.Graphs = class {
     get keeper(){ return this.#stored }
     get isWriter(){ return this.#isWriter }
     get restoreFailed(){ return this.#restoreFailed }
-    exportBundle(meta = this.#selectedGraph){ return (new GraphExporter(meta, this.#stored)).export() }
+    async exportBundle(meta = this.#selectedGraph){
+        const exporter = new GraphExporter(meta, this.#stored);
+        const blob = await exporter.export();
+        return {blob, data: exporter.data};
+    }
     refreshSaveNote(){ this.#updateSaveNote() }
     static deviceKind = deviceKind;
     #import(file){

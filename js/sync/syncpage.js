@@ -92,6 +92,10 @@ const SyncPage = {
             const where = s.newer.device ? ` on the ${s.newer.device}` : '';
             note = `A newer copy is in Google Drive, saved${where} ${ago(s.newer.modifiedTime)}.`;
             [label, action, warn] = ["Open it", ()=>SyncPage.open(s.newer.fileId), true];
+        } else if (s.conflict?.recovered) {
+            note = `Another device saved this graph in the same moment as this one. Its version is kept in Google Drive as `
+                 + `“${named(s.conflict.name)}”.`;
+            [label, action, warn] = ["Open it", ()=>SyncPage.open(s.conflict.otherId), true];
         } else if (s.conflict) {
             note = `This graph changed here and on another device, so it is kept in Google Drive as “${named(s.conflict.name)}”, `
                  + "beside the other copy.";
