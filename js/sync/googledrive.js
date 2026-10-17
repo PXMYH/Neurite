@@ -22,7 +22,7 @@ class GoogleDrive {
     static FOLDER_TYPE = 'application/vnd.google-apps.folder';
     static FOLDER_NAME = 'Neurite';
     static FILE_TYPE = 'application/octet-stream';
-    static FILE_FIELDS = 'id,name,md5Checksum,headRevisionId,version,modifiedTime,size,appProperties,trashed,parents';
+    static FILE_FIELDS = 'id,name,md5Checksum,sha256Checksum,headRevisionId,version,modifiedTime,size,appProperties,trashed,parents';
     static RETRY_MS = [500, 1000, 2000];
     static JITTER_MS = 500;
     static TIMEOUT_MS = 60000;
@@ -156,10 +156,10 @@ class GoogleDrive {
         return files.filter( (f)=>!(f.appProperties?.neuriteConflictOf) )
             .sort( (a, b)=>String(b.modifiedTime).localeCompare(String(a.modifiedTime)) );
     }
-    // The files a push made, by the operation id it carried, wherever they are now: a create, an
-    // update or a conflict copy whose answer never came back.
+    // The files a push made, by the operation id it carried, wherever they are now -- in the bin too:
+    // a create, an update or a conflict copy whose answer never came back.
     findByOp(op){
-        return this.#files(['trashed = false', `appProperties has { key='neuriteOp' and value=${GoogleDrive.quote(op)} }`].join(' and '));
+        return this.#files(`appProperties has { key='neuriteOp' and value=${GoogleDrive.quote(op)} }`);
     }
 
     // A file's content revisions, the oldest first by time: where a write that landed between

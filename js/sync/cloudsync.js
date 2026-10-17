@@ -31,8 +31,9 @@ class CloudSync {
     // pushedRevision, pushedSignature, conflictOf, damaged, recovered, removed, pendingOp, verify}.
     // `title` is the record's title when it was bound: the file keeps its name in Drive until the
     // Graph is renamed here -- a Graph opened from Drive is often given "(2)" to keep it apart from
-    // one of its name. `pendingOp` is the operation id of a push that has not finished, `verify` an
-    // update whose check for a write under it has not finished.
+    // one of its name. `pendingOp` is the operation id of a push that has not finished, and
+    // `pendingSha` the SHA-256 of what it sent; `verify` an update whose check for a write under it
+    // has not finished.
     #bound = new Map();
     // What each record last wrote: {signature, revision}.
     #written = new Map();
@@ -322,19 +323,32 @@ class CloudSync {
             if (!live()) return false;
             // A push before this one whose answer never came may have written: its operation id finds
             // what it made -- the Graph's file, a new one, a conflict copy -- which is where it went.
+            // What it wrote is the base to build on only if Drive still holds those bytes: written
+            // over since, by something that left the id alone, the file is another's to keep. One
+            // moved to the bin since is someone's choice, as for any file of the Graph's.
             let before = bound;
             if (before?.pendingOp) {
                 const [landed] = await this.drive.findByOp(before.pendingOp);
                 if (!live()) return false;
-                if (landed) before = {...before, fileId: landed.id, md5: landed.md5Checksum, name: landed.name,
-                                      conflictOf: landed.appProperties?.neuriteConflictOf ?? null};
+                if (landed?.trashed) return this.#removed(meta, {...before, fileId: landed.id, name: landed.name});
+                if (landed) {
+                    const ours = Boolean(before.pendingSha) && landed.sha256Checksum === before.pendingSha;
+                    const made = landed.id !== before.fileId;
+                    before = {...before, fileId: landed.id, name: landed.name,
+                              md5: ours ? landed.md5Checksum : (made ? null : before.md5),
+                              conflictOf: landed.appProperties?.neuriteConflictOf ?? null,
+                              // A copy it made beside the file is where the Graph went, damaged or not.
+                              ...(made ? {damaged: false, conflictDamaged: Boolean(before.damaged || before.conflictDamaged)} : {})};
+                }
             }
             const op = CloudSync.#newOp();
+            const sha = await CloudSync.#sha256(blob);
+            if (!live()) return false;
             const props = {neuriteUuid: meta.uuid, neuriteRevisions: String(revision ?? 0), neuriteDevice: View.Graphs.deviceKind(),
                            neuriteUpdatedAt: String(meta.updatedAt ?? Date.now()), neuriteSignature: signature, neuriteOp: op};
             // Its operation id is kept before it goes, so that an answer that never comes back is
             // found by it (above).
-            await this.#bind(graphId, {...(before ?? {}), uuid: meta.uuid, pendingOp: op});
+            await this.#bind(graphId, {...(before ?? {}), uuid: meta.uuid, pendingOp: op, pendingSha: sha});
             if (!live()) return false;
 
             let file = null, base = null, conflict = null;
@@ -367,7 +381,7 @@ class CloudSync {
             const next = {uuid: meta.uuid, fileId: file.id, md5: file.md5Checksum, name: file.name, title: meta.title,
                           pushedAt: Date.now(), pushedRevision: revision, pushedSignature: signature,
                           conflictOf: file.appProperties?.neuriteConflictOf ?? null, conflictDamaged: conflict?.damaged ?? false,
-                          damaged: false, recovered: null, removed: false, pendingOp: null,
+                          damaged: false, recovered: null, removed: false, pendingOp: null, pendingSha: null,
                           // An update is checked once it lands: another device's write may be under it.
                           verify: base ? {base, head: file.headRevisionId, md5: file.md5Checksum, copyOp: CloudSync.#newOp()} : null};
             await this.#bind(graphId, next);
@@ -389,6 +403,14 @@ class CloudSync {
         }
     }
     static #newOp(){ return Math.random().toString(36).slice(2) + Date.now().toString(36) }
+    // The bytes a push sends, as Drive gives them back (`sha256Checksum`); null where the page has no
+    // WebCrypto, which leaves a lost push's file to be kept as another's.
+    static async #sha256(blob){
+        try {
+            const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+            return [...new Uint8Array(digest)].map( (b)=>b.toString(16).padStart(2, '0') ).join('');
+        } catch { return null }
+    }
     // The push is over: what the Graph on screen says now comes from its binding.
     #done(meta, generation, pushed){
         if (generation !== this.#generation) return pushed;
@@ -428,7 +450,11 @@ class CloudSync {
             const revisions = await this.drive.revisions(fileId);
             if (!live()) return;
             const at = revisions.findIndex( (r)=>r.id === verify.head );
-            const between = (at > 0) ? revisions[at - 1] : null;
+            // Back past this device's own writes of the same bytes -- a write retried after its answer
+            // was lost lands twice -- to the one before them.
+            let k = at - 1;
+            while (k >= 0 && revisions[k].md5Checksum === verify.md5) k -= 1;
+            const between = (at > 0 && k >= 0) ? revisions[k] : null;
             if (between?.md5Checksum && between.md5Checksum !== verify.base && between.md5Checksum !== verify.md5) {
                 const theirs = await this.drive.downloadRevision(fileId, between.id);
                 if (!live()) return;
@@ -558,19 +584,23 @@ class CloudSync {
         return run;
     }
     async #open(fileId){
+        // Disconnected meanwhile, an open stops before it changes the screen.
+        const generation = this.#generation;
+        const live = ()=>generation === this.#generation && this.isConnected;
         const outgoing = this.views.selectedMeta;
         await this.views.saveNow();
         await this.flush();
-        if (outgoing && this.#written.get(outgoing.graphId) && !this.syncedAt(outgoing) && !this.#bound.get(outgoing.graphId)?.removed
+        if (outgoing && this.#written.get(outgoing.graphId) && !this.syncedAt(outgoing)
             && String(await this.views.keeper.dataForMeta(outgoing) ?? '').includes('data-node_json')) {
-            const go = await window.confirm(`The latest changes to “${outgoing.title}” could not go up to Google Drive. `
+            const go = await window.confirm(`The latest changes to “${outgoing.title}” are not in Google Drive. `
                 + "Open the other graph anyway? Those changes stay in this browser.", {title: "Open from Google Drive?", ok: "Open"});
             if (!go) return null;
         }
-
-        const generation = this.#generation;
+        if (!live()) return null;
         const meta = await this.drive.get(fileId);
+        if (!live()) return null;
         const blob = await this.drive.download(fileId);
+        if (!live()) return null;
         const uuid = meta.appProperties?.neuriteUuid ?? null;
         this.#opening = uuid;
         let opened = null;
@@ -578,7 +608,7 @@ class CloudSync {
         finally { this.#opening = null }
         if (!opened?.graphId || opened.graphId === outgoing?.graphId) return null;
 
-        if (uuid && opened.uuid === uuid && generation === this.#generation) {
+        if (uuid && opened.uuid === uuid && live()) {
             // Bound to what Drive holds; if the save the opening made differs from it -- a card that
             // settled elsewhere here -- that goes up as a change.
             const theirs = meta.appProperties?.neuriteSignature ?? null;
@@ -598,11 +628,12 @@ class CloudSync {
     }
 
     // For the save note: when the Graph on screen went to Drive as it is now, or null -- not while a
-    // push is waiting for it or has not finished, after one failed, or before a rename has gone.
+    // push is waiting for it or has not finished, nor its check, after one failed, or before a
+    // rename has gone.
     syncedAt(meta){
         const bound = meta?.graphId && this.#bound.get(meta.graphId);
         const written = meta?.graphId && this.#written.get(meta.graphId);
-        if (!bound?.pushedAt || bound.removed || bound.pendingOp || bound.damaged || bound.title !== meta.title
+        if (!bound?.pushedAt || bound.removed || bound.pendingOp || bound.verify || bound.damaged || bound.title !== meta.title
             || this.#pending.has(meta.graphId) || this.#failures.has(meta.graphId)) return null;
         return (!written || written.signature === bound.pushedSignature) ? bound.pushedAt : null;
     }

@@ -503,7 +503,7 @@ function loseAnswers(fake, match, times = 1) {
     fake.handle = async (req) => {
         const res = await real(req);
         const u = new URL(req.url);
-        if (times > 0 && match({ method: req.method, path: u.pathname, query: Object.fromEntries(u.searchParams) })) { times -= 1; throw new Error('the answer was lost') }
+        if (times > 0 && match({ method: req.method, path: u.pathname, query: Object.fromEntries(u.searchParams), body: req.body })) { times -= 1; throw new Error('the answer was lost') }
         return res;
     };
 }
@@ -776,5 +776,165 @@ test("a check of one Graph does not stand in for the next one's", async () => {
     held.release();
     await firstCheck;
     assert.equal(await page.evaluate(() => App.cloudSync.status.newer?.fileId), second.id, "the first Graph's check spoke for the second");
+    assert.deepEqual(errors, []);
+});
+
+// The fourth review's cases.
+test("a write sent twice after its answer was lost still finds another device's write under it", async () => {
+    const fake = new FakeGoogle();
+    const a = await device(fake);
+    await write(a.page, '## Alpha\nShared.\n');
+    await connect(a.page);
+    await settled(a.page);
+    const b = await device(fake);
+    await connect(b.page, { pushes: false });
+    await b.page.waitForFunction(() => document.querySelectorAll('#sync-files [role=listitem]').length === 1, undefined, { timeout: 10000 });
+    await b.page.click('#sync-files [role=listitem] button');
+    await b.page.waitForFunction(() => /Shared\./.test(window.currentActiveZettelkastenMirror.getValue()), undefined, { timeout: 10000 });
+    const [file] = graphs(fake);
+
+    // B's write lands between A's check and A's write; A's answer is lost, and its write goes again.
+    loseAnswers(fake, (c) => c.method === 'PATCH' && c.path.startsWith('/upload/') && Buffer.from(c.body ?? '').toString('latin1').includes('from A'), 1);
+    const held = fake.hold((c) => c.path.startsWith('/upload/') && c.method === 'PATCH');
+    await edit(a.page, 'Shared.', 'Shared, and from A.');
+    await held.reached;
+    await edit(b.page, 'Shared.', 'Shared, and from B.');
+    await b.page.waitForTimeout(900);
+    await settled(b.page);
+    held.release();
+    await a.page.waitForTimeout(1500);
+    await settled(a.page);
+    const md5s = fake.revisionsOf[file.id].map((r) => r.md5Checksum);
+    assert.ok(md5s.length >= 4 && md5s.at(-1) === md5s.at(-2), "A's write was not sent twice");
+    const texts = graphs(fake).map((f) => textOf(f));
+    assert.ok(texts.some((t) => t.includes('from B')), "B's version was written over");
+    assert.ok(textOf(fake.files.get(file.id)).includes('from A'));
+    assert.deepEqual([...a.errors, ...b.errors], []);
+});
+
+test("a push whose answers were lost does not take a later write by something else for its own", async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nMine.\n');
+    await connect(page);
+    await settled(page);
+    const [file] = graphs(fake);
+    await page.evaluate(() => { GoogleDrive.RETRY_MS = [50, 50, 50]; CloudSync.RETRY_MS = [60000, 60000, 60000] });
+    // Every try lands and every answer is lost.
+    loseAnswers(fake, (c) => c.method === 'PATCH' && c.path.startsWith('/upload/'), 4);
+    await edit(page, 'Mine.', 'Mine, sent.');
+    await page.waitForTimeout(600);
+    await settled(page);
+    assert.ok(textOf(fake.files.get(file.id)).includes('Mine, sent.'), 'the write did not land');
+    // Then something that leaves Neurite's properties alone writes the file.
+    const now = fake.files.get(file.id);
+    fake.writeElsewhere(file.id, savedElsewhere(now, 'Mine, sent.', 'Written by something else.'), { neuriteOp: now.appProperties.neuriteOp });
+    await page.evaluate(() => App.cloudSync.check());
+    await page.waitForTimeout(600);
+    await settled(page);
+    assert.ok(textOf(fake.files.get(file.id)).includes('Written by something else.'), 'the other write was written over');
+    assert.ok(graphs(fake).some((f) => f.appProperties.neuriteConflictOf === file.id && textOf(f).includes('Mine, sent.')), "this device's version was not kept beside it");
+    assert.deepEqual(errors, []);
+});
+
+test('a copy made beside a damaged Graph whose answer never came is not made twice', async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nWhole.\n');
+    await connect(page);
+    await settled(page);
+    const [file] = graphs(fake);
+    await page.evaluate(() => { App.viewGraphs.restoreSkipped = 1 });
+    loseAnswers(fake, (c) => c.method === 'POST' && c.path === '/upload/drive/v3/files', 1);
+    await edit(page, 'Whole.', 'Whole, with a card missing.');
+    await page.waitForTimeout(900);
+    await settled(page);
+    await page.waitForTimeout(1200);
+    await settled(page);
+    const copies = graphs(fake).filter((f) => f.id !== file.id);
+    assert.equal(copies.length, 1, 'a second copy was made');
+    assert.equal(copies[0].appProperties.neuriteConflictOf, file.id);
+    assert.ok(textOf(copies[0]).includes('Whole, with a card missing.'));
+    assert.deepEqual(errors, []);
+});
+
+test('a file made by a push whose answer was lost, and moved to the bin since, is not made again', async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nOnce.\n');
+    loseAnswers(fake, (c) => c.method === 'POST' && c.path === '/upload/drive/v3/files', 1);
+    // The next push looks for what the lost create made; before Drive answers, the file goes to the bin.
+    const looking = fake.hold((c) => c.method === 'GET' && c.path === '/drive/v3/files' && (c.query.q ?? '').includes("key='neuriteOp'"));
+    await connect(page, { pushes: false });
+    await looking.reached;
+    const made = [...fake.files.values()].find((f) => f.name.endsWith('.neurite'));
+    assert.ok(made, 'the create did not land');
+    made.trashed = true;
+    looking.release();
+    await page.waitForTimeout(600);
+    await settled(page);
+    assert.deepEqual(graphs(fake), [], 'the file in the bin was made again');
+    await openSettings(page, 'sync');
+    assert.match(await page.locator('#sync-graph-note').textContent(), /was removed from Google Drive/);
+    assert.deepEqual(errors, []);
+});
+
+test('Disconnect during an open stops it before the screen changes', async () => {
+    const fake = new FakeGoogle();
+    const a = await device(fake);
+    await write(a.page, '## Alpha\nFrom A.\n');
+    await connect(a.page);
+    await settled(a.page);
+    const [file] = graphs(fake);
+    const b = await device(fake);
+    await connect(b.page, { pushes: false });
+    const held = fake.hold((c) => c.method === 'GET' && c.path === '/drive/v3/files/' + file.id && c.query.alt === 'media');
+    const opening = b.page.evaluate((id) => App.cloudSync.open(id), file.id);
+    await held.reached;
+    await b.page.evaluate(() => App.cloudSync.disconnect());
+    held.release();
+    assert.equal(await opening, null);
+    await b.page.waitForTimeout(500);
+    assert.ok(!/From A\./.test(await b.page.evaluate(() => window.currentActiveZettelkastenMirror.getValue())), 'the open went on after Disconnect');
+    assert.deepEqual([...a.errors, ...b.errors], []);
+});
+
+test('a write whose check did not finish is still not called synced after a reload', async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nChecked.\n');
+    await connect(page);
+    await settled(page);
+    await page.evaluate(() => { GoogleDrive.RETRY_MS = [50, 50, 50] });
+    fake.failures.push({ match: (c) => c.path.endsWith('/revisions'), status: 500, times: 99 });
+    await edit(page, 'Checked.', 'Not checked.');
+    await page.waitForTimeout(600);
+    await settled(page);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.appReady === true && App.cloudSync?.status.phase !== 'starting', undefined, { timeout: 30000 });
+    await page.waitForFunction(() => /Not checked\./.test(window.currentActiveZettelkastenMirror.getValue()), undefined, { timeout: 10000 });
+    assert.equal(await page.evaluate(() => App.cloudSync.syncedAt(App.viewGraphs.selectedMeta)), null, 'an unchecked write is said to be synced');
+    assert.deepEqual(errors, []);
+});
+
+test('Open asks first when the Graph on screen has changes whose file was removed from Drive', async () => {
+    const fake = new FakeGoogle();
+    const { page, errors } = await device(fake);
+    await write(page, '## Alpha\nThe first graph.\n');
+    await connect(page);
+    await settled(page);
+    const [first] = graphs(fake);
+    await page.evaluate(() => App.viewGraphs.startNewGraph());
+    await write(page, '## Beta\nThe second graph.\n');
+    await page.waitForTimeout(900);
+    await settled(page);
+    const second = graphs(fake).find((f) => f.id !== first.id);
+    second.trashed = true;
+    await page.evaluate(() => App.cloudSync.check());
+    await edit(page, 'The second graph.', 'The second graph, changed here only.');
+    await page.evaluate(() => { window.__asked = 0; window.confirm = async () => { window.__asked += 1; return false } });
+    assert.equal(await page.evaluate((id) => App.cloudSync.open(id), first.id), null);
+    assert.equal(await page.evaluate(() => window.__asked), 1, 'Open did not ask');
+    assert.match(await page.evaluate(() => window.currentActiveZettelkastenMirror.getValue()), /changed here only/);
     assert.deepEqual(errors, []);
 });

@@ -118,8 +118,9 @@ server in the most protected place it has, and follows Notion's shape everywhere
 - **Check:** on start, when the window comes back, and every 5 minutes, the bound file's checksum is
   read. A newer copy from another device is offered in Settings → Sync ("Open it"), never loaded on
   its own: opening a Graph moves the view and replaces the screen. Open saves and pushes the Graph
-  on screen first, and asks before it leaves behind changes that could not go up. Opens go one at a
-  time; each binds the record its own import made to the file it came from, as Drive holds it, so
+  on screen first, and asks before it leaves behind changes that are not in Drive -- a push that
+  failed, or a file removed from Drive. Disconnect during an open stops it before the screen
+  changes. Opens go one at a time; each binds the record its own import made to the file it came from, as Drive holds it, so
   the save the opening makes sends nothing back. Each Graph has its own check: one still out for
   the last Graph does not stand in for the next.
 - **Another kind of browser:** a Graph opened in the Mac app (Chromium) from an iPad's save (WebKit),
@@ -146,14 +147,18 @@ Settings → Sync says that another device saved the Graph in the same moment. D
 earlier revision of a binary file only once it is marked to be kept forever, so Neurite marks it
 before it reads it, and takes the mark off once the copy is made (Drive allows 200 a file). Drive
 does not say in what order it lists revisions, so they are put in order of time; every page of a
-list is read. The check after a write is recorded before it runs: one that fails is not called
-synced, and runs again before the next push, and a copy it made whose answer never came is found
-by its own operation id rather than made twice.
+list is read. A write sent again after its answer was lost lands twice, so the check looks past
+this device's own copies of the same bytes to the revision before them. The check after a write is
+recorded before it runs: one that fails is not called synced, even after a reload, and runs again
+before the next push, and a copy it made whose answer never came is found by its own operation id
+rather than made twice.
 
 A push whose answer never came may still have written. Each push carries an id (`neuriteOp`), kept
-before it goes: the next push looks for the file with that id -- the Graph's own, a new one, or a
-conflict copy -- and goes on from there, rather than making a second file or calling its own write
-a conflict.
+before it goes with the SHA-256 of the bytes it sends: the next push looks for the file with that
+id -- the Graph's own, a new one, or a conflict copy -- and goes on from there, rather than making
+a second file or calling its own write a conflict. It builds on that file only if Drive still
+holds those bytes (`sha256Checksum`): one written since by something that left Neurite's
+properties alone is another's, kept as a conflict. One moved to the bin since is not made again.
 
 A Graph saved while some of its cards could not be reopened (a restore that skipped a card it could
 not rebuild) is smaller than its file in Drive. It goes up once beside it as a conflict copy, and

@@ -85,6 +85,7 @@ export class FakeGoogle {
         f.content = buf;
         f.size = String(buf.length);
         f.md5Checksum = createHash('md5').update(buf).digest('hex');
+        f.sha256Checksum = createHash('sha256').update(buf).digest('hex');
         f.headRevisionId = 'r' + randomBytes(6).toString('hex');
         f.version = String(Number(f.version ?? 0) + 1);
         f.modifiedTime = this.#now();
