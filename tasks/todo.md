@@ -1187,18 +1187,18 @@ Research done:
       check-then-write, the writer lock, the Mac app's IPC (`fromApp`) and `app://` origin.
 
 Tickets, each with its own commit and tests:
-- [ ] T1. A fake Google (Drive v3 subset, uploads, OAuth token and revoke) as one handler, with
+- [x] T1. A fake Google (Drive v3 subset, uploads, OAuth token and revoke) as one handler, with
       adapters for `fetch`, Playwright routes and `node:http`.
-- [ ] T2. The Drive client (`js/sync/googledrive.js`): folder, list, find by uuid, create and
+- [x] T2. The Drive client (`js/sync/googledrive.js`): folder, list, find by uuid, create and
       update (multipart up to 5 MiB, resumable above), metadata, download; retries at
       500/1000/2000 ms ± 500, 60 s timeout, one retry after a 401 with a fresh token.
-- [ ] T3. Sign-in: the browser's (Google Identity Services, token in memory) and the Mac app's
+- [x] T3. Sign-in: the browser's (Google Identity Services, token in memory) and the Mac app's
       (main process: loopback + PKCE + `state`, refresh token under `safeStorage`, IPC behind
       `fromApp`), with `js/sync/driveconfig.js` and `desktop/drive-config.cjs`.
-- [ ] T4. The sync engine (`js/sync/cloudsync.js`): binding by uuid, push after content changes
+- [x] T4. The sync engine (`js/sync/cloudsync.js`): binding by uuid, push after content changes
       (10 s quiet, 60 s at most, at once on hide and quit), the checksum check and the conflict
       copy, the check for a newer copy, and every guard autosave has.
-- [ ] T5. Settings → Sync: Connect/Disconnect, the account and status, the files in Drive with
+- [x] T5. Settings → Sync: Connect/Disconnect, the account and status, the files in Drive with
       Open, the newer-copy and conflict notices; the save note counts a synced Graph as kept.
 - [ ] T6. End to end: the browser against the fake (spec 35), the Mac app against the fake over
       HTTP (desktop/drive.e2e.mjs), negative controls, adversarial review, the full suite.

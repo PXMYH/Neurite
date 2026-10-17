@@ -36,6 +36,7 @@ class CloudSync {
     #written = new Map();
     #pending = new Map();       // graphId -> {meta, since, timer}
     #failures = new Map();      // graphId -> how many pushes in a row failed
+    #retries = new Map();       // graphId -> the timer of its next try, one at a time
     #pushing = Promise.resolve();
     #checking = null;
     #folders = null;            // Neurite's folders, the oldest first, once looked for
@@ -137,6 +138,8 @@ class CloudSync {
         this.#generation += 1;
         for (const p of this.#pending.values()) clearTimeout(p.timer);
         this.#pending.clear();
+        for (const timer of this.#retries.values()) clearTimeout(timer);
+        this.#retries.clear();
         this.#failures.clear();
         await this.auth.disconnect();
         await this.#state.delete('wanted');
@@ -210,14 +213,17 @@ class CloudSync {
         for (const graphId of [...this.#pending.keys()]) this.#fire(graphId);
         return this.#pushing;
     }
-    // A push that failed is tried again later: half a minute, two minutes, then every ten.
+    // A push that failed is tried again later: half a minute, two minutes, then every ten -- one
+    // timer a Graph, however many pushes failed while it was offline.
     #retryLater(meta){
         const n = this.#failures.get(meta.graphId) ?? 0;
         this.#failures.set(meta.graphId, n + 1);
         const generation = this.#generation;
-        setTimeout( ()=>{
+        clearTimeout(this.#retries.get(meta.graphId));
+        this.#retries.set(meta.graphId, setTimeout( ()=>{
+            this.#retries.delete(meta.graphId);
             if (generation === this.#generation && this.isConnected && !this.#pending.has(meta.graphId)) this.#schedule(meta, {now: true});
-        }, CloudSync.RETRY_MS[Math.min(n, CloudSync.RETRY_MS.length - 1)]);
+        }, CloudSync.RETRY_MS[Math.min(n, CloudSync.RETRY_MS.length - 1)]));
     }
 
     // Whether a push may run at all: the guards autosave has, the lock, and a Graph that came back
@@ -286,7 +292,11 @@ class CloudSync {
                 const found = await this.drive.findByUuid(folders, meta.uuid);
                 if (generation !== this.#generation) return false;
                 const mine = before?.pendingOp && found.find( (f)=>f.appProperties?.neuriteOp === before.pendingOp );
+                // The Graph came here in a file before this device connected: a file with the same
+                // content is the one to go on in, not one to copy beside.
+                const same = found.find( (f)=>f.appProperties?.neuriteSignature === signature );
                 if (mine) file = await this.#update(meta, mine.id, name, props, blob, mine.md5Checksum);
+                else if (same) file = same;
                 else if (found.length) file = await this.#conflictCopy(meta, folders[0], found[0], blob, props);
                 else file = await this.drive.upload({folderId: folders[0], name, appProperties: props, blob});
             }

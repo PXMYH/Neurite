@@ -240,6 +240,33 @@ test("a second device opens the Graph from Settings → Sync's list, and its edi
     assert.deepEqual([...a.errors, ...b.errors], []);
 });
 
+test('a Graph moved to a second device in a file before it connected goes on in the same Drive file', async () => {
+    const fake = new FakeGoogle();
+    const a = await device(fake);
+    await write(a.page, '## Alpha\nCarried over in a file.\n');
+    await connect(a.page);
+    await settled(a.page);
+    const [file] = graphs(fake);
+
+    // Open… on B, with the file A saved, and then Connect.
+    const b = await device(fake);
+    await b.page.evaluate(async (bytes) => {
+        await App.viewGraphs.importFile(new File([new Uint8Array(bytes)], 'Graph 1.neurite'));
+    }, [...fake.files.get(file.id).content]);
+    await b.page.waitForFunction(() => /Carried over/.test(window.currentActiveZettelkastenMirror.getValue()), undefined, { timeout: 10000 });
+    await b.page.waitForTimeout(600);
+    await connect(b.page);
+    await settled(b.page);
+    assert.equal(graphs(fake).length, 1, 'the same content went up beside itself as a conflict copy');
+
+    await edit(b.page, 'Carried over in a file.', 'Carried over, and edited on B.');
+    await b.page.waitForTimeout(900);
+    await settled(b.page);
+    assert.equal(graphs(fake).length, 1);
+    assert.ok(textOf(fake.files.get(file.id)).includes('edited on B'), "B's edit did not go to the Graph's file");
+    assert.deepEqual([...a.errors, ...b.errors], []);
+});
+
 test('a file removed from Drive is not made again until Sync it again is asked for', async () => {
     const fake = new FakeGoogle();
     const { page, errors } = await device(fake);
