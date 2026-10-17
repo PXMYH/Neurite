@@ -1164,3 +1164,41 @@ Decisions:
 - One slip: a second System Events run on the final build found another app in front, so its four
   keys (Cmd =, +, -, 0) went to that app (Ghostty) and not to Neurite. Not retried; the menu's
   clicks were checked on the final build instead.
+
+# Cloud sync: Google Drive, after Notion (2026-10-17)
+
+Asked: "let's add the feature to support sync artifacts in cloud, start with google drive first,
+use rea reverse engineer how notion does it, then let's replicate". Tier T4, brownfield. The design
+and the REA findings are in docs/cloud-sync.md.
+
+Research done:
+- [x] REA on Notion 7.39.0's Mac app (`app.asar`): the Drive picker popup and its session, the
+      callback's validation, where Google's tokens live, the local SQLite cache and its refetch
+      schedule, the Drive connector's polling and retry settings. Evidence ids in the doc.
+- [x] Google's rules, from its documentation: loopback + PKCE (S256) through the system browser for
+      desktop apps, refresh tokens always returned there; the token model (no refresh token) for
+      browsers; `drive.file` is non-sensitive; v3 has no ETag preconditions, so a file's
+      `md5Checksum` is the check; `version` is monotonic.
+- [x] Measured: Drive's API answers CORS from `app://neurite`, `https://pxmyh.github.io` and
+      `http://localhost:8999`, so the page calls it directly in both builds. An unauthenticated
+      resumable start exposes `X-GUploader-UploadID` but not `Location`.
+- [x] Neurite's storage, mapped: the `.neurite` bundle (GraphExporter/GraphImporter), the meta
+      record and its `uuid`, the 8 s autosave and `contentSignature`, the disk mirror's
+      check-then-write, the writer lock, the Mac app's IPC (`fromApp`) and `app://` origin.
+
+Tickets, each with its own commit and tests:
+- [ ] T1. A fake Google (Drive v3 subset, uploads, OAuth token and revoke) as one handler, with
+      adapters for `fetch`, Playwright routes and `node:http`.
+- [ ] T2. The Drive client (`js/sync/googledrive.js`): folder, list, find by uuid, create and
+      update (multipart up to 5 MiB, resumable above), metadata, download; retries at
+      500/1000/2000 ms ± 500, 60 s timeout, one retry after a 401 with a fresh token.
+- [ ] T3. Sign-in: the browser's (Google Identity Services, token in memory) and the Mac app's
+      (main process: loopback + PKCE + `state`, refresh token under `safeStorage`, IPC behind
+      `fromApp`), with `js/sync/driveconfig.js` and `desktop/drive-config.cjs`.
+- [ ] T4. The sync engine (`js/sync/cloudsync.js`): binding by uuid, push after content changes
+      (10 s quiet, 60 s at most, at once on hide and quit), the checksum check and the conflict
+      copy, the check for a newer copy, and every guard autosave has.
+- [ ] T5. Settings → Sync: Connect/Disconnect, the account and status, the files in Drive with
+      Open, the newer-copy and conflict notices; the save note counts a synced Graph as kept.
+- [ ] T6. End to end: the browser against the fake (spec 35), the Mac app against the fake over
+      HTTP (desktop/drive.e2e.mjs), negative controls, adversarial review, the full suite.
