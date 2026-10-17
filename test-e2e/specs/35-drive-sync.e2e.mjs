@@ -356,17 +356,22 @@ test("a push slower than the next save does not count that save as sent", async 
     assert.deepEqual(errors, []);
 });
 
-test("a switch to another graph straight after an edit still sends the edit", async () => {
+test("a switch to another graph straight after an edit still sends the edit, and the new graph's own", async () => {
     const fake = new FakeGoogle();
     const { page, errors } = await device(fake);
     await write(page, '## Alpha\nBefore.\n');
     await connect(page);
     await settled(page);
+    // A wait long enough that the edit's push is still waiting when the next Graph saves.
+    await page.evaluate(() => { CloudSync.QUIET_MS = 5000; CloudSync.MAX_WAIT_MS = 5000 });
     await edit(page, 'Before.', 'Edited, then left.');
     await page.evaluate(() => App.viewGraphs.startNewGraph());
-    await page.waitForTimeout(900);
+    await write(page, '## Beta\nOn the new graph.\n');
+    await page.waitForTimeout(600);
+    assert.ok(graphs(fake).some((f) => textOf(f).includes('Edited, then left.')), "the edit before the switch stayed behind");
     await settled(page);
-    assert.ok(textOf(graphs(fake)[0]).includes('Edited, then left.'), "the edit before the switch stayed behind");
+    assert.ok(graphs(fake).some((f) => textOf(f).includes('On the new graph.')), "the new graph did not go up");
+    assert.equal(graphs(fake).length, 2);
     assert.deepEqual(errors, []);
 });
 
