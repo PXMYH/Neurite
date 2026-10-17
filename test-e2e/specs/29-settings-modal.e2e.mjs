@@ -47,7 +47,7 @@ test('the Settings row opens a dialog over the page, on Notes, with every page i
     for (const [name, title, shows] of [['ai', 'Ai', '#prompt-form'], ['theme', 'Theme', '#themeGrid'],
                                         ['saved-views', 'Saved views', '#saveCoordinatesBtn'], ['fractal', 'Fractal', '#fractal-select-help'],
                                         ['editing', 'Editing', '#controls-button'], ['data', 'Data', '#clearLocalStorage'],
-                                        ['notes', 'Notes', '#zetPaneContainer']]) {
+                                        ['sync', 'Sync', '#sync-connect'], ['notes', 'Notes', '#zetPaneContainer']]) {
         await page.click(`.settings-nav-item[data-page="${name}"]`);
         const now = await state(page);
         assert.deepEqual([now.page, now.title], [name, title]);
@@ -87,12 +87,12 @@ test('the sidebar is one Tab stop, and the arrows move through it and choose',
     assert.deepEqual([(await state(page)).page, (await state(page)).focus], ['ai', 'ai']);
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('ArrowUp');
-    assert.equal((await state(page)).page, 'data', 'Up from the first page did not wrap to the last');
+    assert.equal((await state(page)).page, 'sync', 'Up from the first page did not wrap to the last');
     // Tab leaves the sidebar for the close button, past no other page.
     await page.keyboard.press('Tab');
     assert.equal((await state(page)).focus, 'settingsClose');
     await page.keyboard.press('Shift+Tab');
-    assert.equal((await state(page)).focus, 'data');
+    assert.equal((await state(page)).focus, 'sync');
 });
 
 test('the canvas keeps its keys and its gestures while Settings is open', async () => {
