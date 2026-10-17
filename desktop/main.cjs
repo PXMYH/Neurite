@@ -15,14 +15,15 @@
 // switches link nodes to <webview> and routes neurite.network calls through an IPC
 // proxy that lives on upstream's `electron` branch, not here. Without it the page
 // runs as it does in a browser tab, which is what the e2e suite checks. The one
-// thing the page can reach is the app's own updates (`window.neuriteDesktop`,
-// preload.cjs and updater.cjs).
+// things the page can reach are the app's own updates and its Google Drive sign-in
+// (`window.neuriteDesktop`, preload.cjs, updater.cjs and drive-auth.cjs).
 const { app, BrowserWindow, Menu, desktopCapturer, protocol, net, session, shell } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const updater = require('./updater.cjs');
+const driveAuth = require('./drive-auth.cjs');
 
 const ORIGIN = 'app://neurite';
 const WEB_ROOT = app.isPackaged
@@ -303,6 +304,7 @@ if (!app.requestSingleInstanceLock()) {
         }, { useSystemPicker: true });
 
         updater.init();
+        driveAuth.init();
         createWindow();
     });
 }
